@@ -1,0 +1,1199 @@
+Title: Consistent Distributed Cooperative Localization for Ultra Large-Scale Multi-agent Systems
+
+URL Source: https://arxiv.org/pdf/2606.04872v1
+
+Published Time: Thu, 04 Jun 2026 01:25:06 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# Consistent Distributed Cooperative Localization for Ultra Large-Scale Multi-agent Systems 
+
+Leonardo Pedroso a,b, W.P.M.H. (Maurice) Heemels a, Pedro Batista b
+
+> a
+
+Control Systems Technology section, Department of Mechanical Engineering, Eindhoven University of Technology, The Netherlands 
+
+> b
+
+Institute for Systems and Robotics, Instituto Superior T´ ecnico, Universidade de Lisboa, Portugal 
+
+Abstract 
+
+Cooperative localization (CL) is fundamental in emerging multi-agent systems, where agents fuse local sensing data with exchanged information to estimate their own states. At a large scale, however, tracking cross-correlations becomes infeasible, preventing the use of optimal filters. Ignoring or underestimating these correlations leads to overconfident, and thus inconsistent, estimates. Existing CL algorithms achieve good performance and consistency typically at the expense of communication, computation, or memory that scales with the network size. This is incompatible with ultra large-scale systems (ULSS)—for example, satellite mega-constellations—where per-agent resources are limited and must remain independent of the number of agents. This reveals a critical gap: no existing CL method is simultaneously well-performing , consistent , and ULSS-scalable . This paper introduces a new CL framework that addresses this gap using the recently proposed overlapping covariance intersection methodology, which enables agents to exploit limited structural information about cross-correlations without compromising consistency. The resulting CL algorithm leads to optimal conservative covariance propagation using only locally available information. The method is fully distributed, scalable to an ultra large scale, and provably recursively consistent. Simulations demonstrate substantial performance improvement over state-of-the-art consistent CL approaches while preserving scalability. 
+
+Key words: Cooperative localization, Distributed estimation, Covariance intersection, Multi-agent systems, Ultra large-scale systems, Information fusion 
+
+1 Introduction 
+
+1.1 Motivation 
+
+Cooperative localization (CL) is a cornerstone problem in the coordination of large-scale multi-agent systems. It concerns the task where each agent estimates its own state by combining (i) local measurements—such as odometry or relative measurements with respect to neighbors—and (ii) information exchanged through communication. This paradigm enables accurate and robust localization in scenarios where global positioning infrastructure is unavailable, unreliable, or deliberately absent. Consequently, CL has become critical for applications ranging from ground robot teams (Fox et al., 2000; Roumeliotis and Bekey, 2002), to formations of unmanned aerial vehicles (Bereg et al., 2015; Thien and Kim, 2018), cooperative underwater vehicles (Viegas et al., 2012; Yuan et al., 2018), and satellite formations (Russell Carpenter, 2002; Ivanov et al., 2019). These approaches embrace the distributed nature of multi-agent systems, offering resilience, scalability, and flexibility (S ¸ ahin, 2005). Despite substantial progress, distributed CL remains challenging. A central difficulty lies in properly accounting for correlations between agents’ estimates. On the one hand, if correlations are ignored or underestimated, the estimator becomes overconfident and it is said to be inconsistent , i.e., the estimated covariance of the fused estimate is smaller than the true covariance (Howard et al., 2003; Panzieri et al., 2006). Estimator inconsistency can have dire consequences, e.g., in debris avoidance maneuvers in satellite formations. On the other hand, if correlations are treated too conservatively, estimation is 
+
+consistent but performance is typically significantly degraded. This fundamental tension between consistency and performance is at the heart of the CL problem. Recently, the emergence of ultra large-scale systems (ULSS)—such as low Earth orbit mega-constellations (Daehnick et al., 2020; Xie et al., 2021)—has brought CL challenges to a new level (Pedroso et al., 2025, Section 5). Indeed, most well-performing CL solutions rely on algorithms whose communication, computation, or memory requirements per agent grow 
+
+Email addresses: l.pedroso@tue.nl (Leonardo Pedroso), m.heemels@tue.nl (W.P.M.H. (Maurice) Heemels), 
+
+pbatista@isr.tecnico.ulisboa.pt (Pedro Batista). 1
+
+> arXiv:2606.04872v1 [eess.SY] 3 Jun 2026
+
+with the size of the entire network. Beyond a certain scale, such procedures inevitably become infeasible. The term ULSS was introduced in the computational engineering field by Feiler et al. (2006) and, more recently, in the context of control systems by Pedroso et al. (2025) to formally characterize this regime. There, it is argued that the transition to the ultra large scale (ULS) calls for additional requirements beyond standard information-structure constraints to ensure real-world implementability. In particular, to be scalable to ULSS, both working and design phases of CL control algorithms must be entirely distributed across agents and their per-agent communication, computation, and memory usage must not grow with the number of agents. These disruptive constraints make ULSS fundamentally different from classical large-scale systems and demand new algorithmic paradigms. Motivated by this paradigm shift, this paper focuses on CL algorithms on the ultra large scale .
+
+1.2 State-of-the-art 
+
+Several families of CL solutions have been proposed. First, centralized-equivalent schemes—such as junction-tree protocols (Dai et al., 2016) or measurement-bookkeeping approaches (Leung et al., 2009)—are consistent and can reproduce centralized performance but incur per-agent communication and memory requirements that scale with the number of agents, making them infeasible on an ultra large scale. Second, well-performing consistent CL can be achieved by leveraging decentralized filtering solutions for linear time-varying systems (Pedroso et al., 2022). However, the design of distributed filter gains is centralized and its computational burden still scales with the number of agents. Third, another common strategy is to approximate covariance propagation to reduce complexity (Madhavan et al., 2002, 2004). Yet, this approach is prone to double-counting—an underestimation of correlations between measurements that leads to overconfident and inconsistent estimates, as exemplified in Howard et al. (2003); Panzieri et al. (2006). In Martinelli (2007), this idea is extended to a hierarchical extended Kalman filter that partitions the network of N agents into K groups (also called clusters) of M agents. This scheme requires a leader agent in each cluster that fuses all of the measurements of the cluster at a computational cost of O(M 3) and a central node that estimates all of the leaders’ states at a computational cost of O(K3). Since K = N/M , the computational burden of the central node grows with O(( N/M )3), which still grows with the number of agents N , and thus is not scalable in an ULSS. Fourth, covariance intersection (CI) methods (Julier and Uhlmann, 1997; Carrillo-Arce et al., 2013) have been proposed to eliminate double-counting. For instance, Carrillo-Arce et al. (2013) achieves consistent CL with communication and computational complexities independent of the network size, albeit at the expense of overly conservative estimates. Moreover, this result relies on the assumption that an agent can predict the state of a neighbor using only its own state estimate and a relative measurement, an assumption that does not always hold. Fifth, split covariance intersection (SCI) methods (Li et al., 2013; Wanasinghe et al., 2014; Julier and Uhlmann, 2017) were proposed to attenuate the over-conservatism of CI methods by splitting the covariance contributions in correlated and uncorrelated components and intersecting the correlated components only. As a result, SCI successfully reduces conservatism w.r.t. CI while maintaining consistency and, thus, it is the preferred option in many applications (Li and Yang, 2019; Fang et al., 2021, 2025). Sixth, recent research focuses on achieving better performance, albeit at the expense of consistency. For instance, Luft et al. (2016, 2018) proposed a promising CL method that distributively approximates correlations between each pair of agents, while supporting asynchronous communication and measurements. This approach achieves good performance with per-agent communication requirements that do not scale with the number of agents. However, its per-agent memory requirements grow linearly with the number of agents, and although an approximation error analysis is provided, the method is not provably consistent. In summary, there have been some contributions towards CL strategies based on a covariance intersection approach that are suitable for ULSS. Since these are conservative, recently proposed methods focus on achieving better performance. However, this is often obtained at the expense of requiring local resource usage that scales with the number of agents in the network or at the expense of consistency. As a result, there is a gap to develop CL algorithms that are well-performing ,
+
+consistent , and scalable to an ultra large scale. 
+
+1.3 Contribution 
+
+This paper addresses the gap identified in the state-of-the-art. Specifically, our contribution is twofold:  
+
+> •
+
+We state the problem of designing CL filter gains for each agent subject to the ultra large scale feasibility requirements. We show that this design problem can be expressed in an overlapping covariance intersection framework, which is a CI-like framework with partial structural information that was recently introduced and analyzed in Pedroso et al. (2026a).  
+
+> •
+
+We propose a CL algorithm that relies on an optimal conservative distributed computation of the covariance propagation 
+
+given locally known information. We show that the resulting CL algorithm is provably consistent and is scalable to an ultra large scale. Numerical simulations show that its performance is significantly better than a SCI filter. 21.4 Notation 
+
+The sets of n × n real symmetric positive semidefinite and positive definite matrices are denoted by Sn 
+
+> +
+
+and Sn
+
+> ++
+
+, respectively. Moreover, P ≻ 0 (P ⪰ 0) denotes that matrix P ∈ Rn×n is positive definite (semidefinite) and P ≻ Q (P ⪰ Q) denotes that matrix P − Q ∈ Rn×n is positive definite (semidefinite). Given a matrix A ∈ Rn×m, A+ denotes the Moore-Penrose inverse of A (Zhang, 2005, Chap. 1.6). 
+
+2 Problem Statement 
+
+2.1 Model of a Network of Output-Coupled Systems 
+
+In this paper, we follow the overarching formulation of a multi-agent system as described in (Pedroso et al., 2025, Section 3). Consider a network of N interconnected systems, Si, each associated with one computing unit Ti, with i = 1 , 2, . . . , N . Each system has decoupled linear dynamics and has access to linear sensor outputs, which are coupled with a set of other subsystems. The topology of this network is, thus, defined by the output couplings between systems, and it may be time-varying, where time is denoted by k ∈ N0. Such output coupling topology may be represented by a directed graph Go(k) := ( V, Eo(k)) ,composed of a set V = {1, 2, . . . , N } of vertices and a set Eo(k) of directed edges. An edge e incident on vertices i and j,directed from j towards i, is denoted by e = ( j, i ). For a vertex i, its in-neighborhood Ioi (k) is the set of vertices from which there is an edge in Eo(k) directed towards i and its out-neighborhood Ooi (k) is the set of vertices towards which there is an edge in Eo(k) directed away from i. In this framework, each system is represented by a vertex, i.e., system Si is represented by node i, and if Si has access to an output that depends on the state of system Sj , then this coupling is represented by an edge directed from vertex j towards vertex i, i.e., edge e = ( j, i ) ∈ E o(k). It is important to stress that the direction of the edge matters. Note, for instance, that the fact that Si has access to an output that depends on the state of system Sj does not, necessarily, imply the converse. Also, given that the goal of each system Si is to estimate its own state, it is assumed henceforth, without loss of generality, that the output of system Si depends on its state, i.e., i ∈ I oi (k). No further assumptions are made on the topology of the directed graph. We model each system Si by the discrete-time linear system            
+
+> (xi(k+ 1) = Ai(k)xi(k) + Bi(k)ui(k) + wi(k)
+> yi(k) = P
+> j∈I oi(k)Cij (k)xj(k) + vi(k),
+
+(1) where xi(k) ∈ Rni is the state vector, ui(k) ∈ Rmi is the input vector, which is assumed to be known, and yi(k) ∈ Roi is the output vector, all of system Si; matrices Ai(k) ∈ Rni×ni , Bi(k) ∈ Rni×mi , and Cij (k) ∈ Roi×nj with j ∈ I oi (k) are time-varying matrices that model the dynamics and output of system Si; vector wi(k) ∈ Rni is the process noise, modeled as a zero-mean white Gaussian process with associated covariance matrix Qi(k) ⪰ 0ni×ni , vector vi(k) ∈ Roi is the observation noise, modeled as a zero-mean white Gaussian process. It is considered that the observation noise vectors vi(k) and vj (k)
+
+of systems Si and Sj , respectively, are (possibly) correlated if their outputs are coupled with each other, i.e., j ∈ I oi (k) and   
+
+> i∈ I oj(k)
+
+. To illustrate the need to introduce such a correlation, consider, for example, two satellites with GNSS receivers. It is possible to obtain a very precise common relative position measurement between the two satellites using carrier-phase differential GNSS (Montenbruck et al., 2002), but the fact that the measurement is common couples the observation noise of both satellites. The observation noise process, thus, follows E[vi(k)v⊤     
+
+> i(k)] = Rii (k)≻0oi×oi
+
+and       
+
+> E[vi(k)v⊤
+> j(k)] =
+> (Rij (k),j∈ I oi(k)
+
+and i ∈ I oj (k)  
+
+> 0oi×oj,
+
+otherwise ,
+
+where Rij (k) ∈ Roi×oj are time-varying covariance matrices. Note that if the outputs of Si and Sj are not coupled, i.e.,   
+
+> j / ∈ I oi(k)
+
+or i / ∈ I oj (k), the observation noise vectors are not coupled. Crucially, interactions between agents in typical ultra large-scale multi-agent systems are local, thus we assume that |I oi (k)| is bounded in time and the bound does not grow with the number of systems, i.e., there exists M ∈ N such that |I oi (k)| ≤ M for all k ∈ N0 and all i ∈ { 1, . . . , N } and M grows with  
+
+> O(1)
+
+w.r.t. N .The computational unit of each system may be able to establish a communication link with the computational unit of other systems to exchange information. We define another (possibly time-varying) directed graph Gc(k) := ( V, Ec(k)) that models the topology of the communication network. For each vertex i ∈ V , one can also define the in-neighborhood Ici (k) and out-neighborhood Oci (k). In line with Pedroso et al. (2025), we follow the convention that Gc(k) does not have self-loops 3for k ∈ N0. Crucially, since the possibility of establishing a communication link is especially likely between systems that are output-coupled, in this paper we focus on the particular case whereby the communication topology follows the output coupling topology. Specifically, the communication graph Gc(k) is composed of all the (nonself) edges of Go(k) for k ∈ N0.
+
+2.2 Distributed Cooperative Localization 
+
+In this paper, CL is achieved by implementing a local dynamical filter in each system, based on prediction-update steps employed in a Kalman filter. In a centralized configuration, each system would have access to all systems’ output and state estimates, at the expense of all-to-all communication via a central system. However, it is well-known that transmitting outputs and state estimates among systems without significant delay is rarely feasible, so communication is restricted to Gc(k) and we consider a distributed configuration instead. Specifically, at each discrete-time instant k, the only output known to Si is 
+
+> yi(k)
+
+. Specifically, we focus on local Luenberger observers, whose prediction and update steps are given by             
+
+> 
+> ˆxi(k|k−1) = Ai(k−1)ˆ xi(k−1) + Bi(k−1) ui(k−1) ˆxi(k|k) = ˆxi(k|k−1) + Ki(k)
+> 
+> yi(k)−P
+> j∈I oi(k)Cij (k)ˆ xj(k|k−1)
+> 
+> ,
+
+(2) where ˆxi(k|k − 1) denotes the predicted state estimate, ˆxi(k|k) denotes the updated state estimate, and Ki(k) denotes the local filter gain for system Si at time k. Fig. 1 shows a block diagram of the CL solution from the perspective of system Si. From (2) and Fig. 1, one can already note the necessity of the communication links in Gc(k) for the transmission of ˆxj (k|k − 1) at time k − 1 from Tj with j ∈ I oi (k) to Ti.                   
+
+> Si
+> Ti
+> wi(k−1) ,vi(k)
+> xj(k), j ∈ I oi(k)
+> Tj, j ∈ I ci(k)
+> Tj, j ∈ O ci(k)
+> ˆxi(k)
+> ui(k−1) yi(k)
+> Fig. 1. Block diagram of the CL solution from the perspective of Si. Although this is outside the scope of the paper, the dashed line depicts that the input to system Sicould be computed using the estimate ˆxi(k).
+
+Remark 1 It is well-known that, even for linear time-invariant (LTI) systems, linear controllers may not be optimal among the family of distributed controllers (Witsenhausen, 1968). As a result, the filter (2) is suboptimal in general. Indeed, it is shown in Pedroso and Batista (2023a) that, even for LTI systems, a linear moving horizon estimation approach may unlock significant performance. Nevertheless, given their simplicity and widespread use, we focus on filters of the form (2) . △
+
+We now turn to the concept of consistency of a filter. Define the estimation error ˜xi(k|k − 1) := ˆxi(k|k − 1) − xi(k) and   
+
+> ˜xi(k|k) := ˆ xi(k|k)−xi(k)
+
+. Intuitively, a local filter is consistent if the estimation error covariance matrices provided by the filter are conservative w.r.t. the true estimation error covariance. A formal definition is presented below. 
+
+Definition 1 A filter is said to be consistent (also sometimes called conservative ) if, at each time k, it computes an unbiased estimate ˆxi(k|k) of xi(k) and an estimation error covariance matrix Xii (k|k) ⪰ 0 that is a bound on the true estimation covariance, i.e., Xii (k|k) ⪰ E[˜ xi(k|k)˜ x⊤ 
+
+> i(k|k)]
+
+. △
+
+Remark 2 The synchronization of the local filters (2) can be readily implemented when all systems have access to a common external signal. Such signals are common in practical applications, and their use does not violate the ULSS requirements. For example, if each system is equipped with a GNSS receiver, GNSS signals can be used for precise synchronization. In challenging environments where such signals are typically unavailable, such as underwater applications, synchronization requires complex protocols such as clock disciplining. △
+
+4Naturally, the goal is to design, for each system Si with i = 1 , 2, . . . , N and at each time k ∈ N, the local filter gains Ki(k) such that: (i) the filter is consistent; and (ii) the covariance bounds Xii (k|k) are optimized according to a prescribed performance criterion. We formulate this design problem next. 
+
+2.3 Distributed Design Problem 
+
+This paper focuses on networks of systems when N is large enough such that a centralized design procedure is not compu-tationally feasible, i.e., it is not possible to centrally synthesize the gains of the distributed filter in (2). These systems are called ultra large-scale systems , a definition that was recently introduced in Pedroso et al. (2025). The synthesis stage of this emerging class of systems is notoriously challenging and is subject to stringent requirements for a scalable deployment. Briefly, in this case, the synthesis stage entails locally designing the filter gains Ki(k) in real time and with limited communi-cation, computational, and memory resources according to a performance criterion. The distributed design problem can then be formally stated from the perspective of each computational unit Ti as follows. 
+
+Problem 1 At each time k, in each computational unit Ti, with knowledge of:  
+
+> •
+
+The systems with which Si has output couplings at time k, i.e., Ioi (k); 
+
+> •
+
+The input at time k − 1, i.e., ui(k − 1) ; 
+
+> •
+
+The dynamic matrices Ai(k−1) , Bi(k−1) , Qi(k−1) , Cij (k) with j ∈ I oi (k), and Rij (k) with j ∈ I oi (k); 
+
+> •
+
+Information received from Tj with j ∈ I oi (k) ;design a gain Ki(k) to compute:  
+
+> •
+
+An unbiased estimate ˆxi(k|k) of xi(k), resorting to the distributed filter (2) ; 
+
+> •
+
+A covariance bound Xii (k|k) ⪰ E[˜ xi(k|k)˜ x⊤ 
+
+> i(k|k)]
+
+;such that Ji(Xii (k|k)) is minimized, where Ji : Sni   
+
+> +→R
+
+is a performance metric. Furthermore, the design procedure must follow the ultra large-scale feasibility requirements in Pedroso et al. (2025, Table 1), i.e., the computational, memory, and communication load in Ti must not grow with N and Ti cannot use information from Tj with j ∈ I oi (k) that has been computed in Tj at time k and transmitted through Gc.
+
+The design problem in Problem 1 is distributed in the sense that the synthesis of the filter gains is distributed across the computational units of systems in the network. Specifically, resorting to local information, each computational unit designs a local gain Ki(k) to obtain an unbiased and consistent estimate of the local state. The performance metrics Ji with i = 1 , 2, . . . , N 
+
+are assumed to satisfy the following monotonicity criterion. 
+
+Assumption 1 For all i = 1 , 2, . . . , N , given X, Y ∈ Sni 
+
+> +
+
+, the map Ji : Sni   
+
+> +→R
+
+is such that X ≻ Y =⇒ Ji(X) > J i(Y). △
+
+This monotonicity assumption on Ji is very mild. Intuitively, let B1 and B2 be error covariance matrices. Assumption 1 enforces that if B1 ≺ B2, i.e., the covariance B2 portrays a larger spread of the error distribution in every direction than B1,then Ji(B2) > J i(B1). Common criteria in fusion applications such as the trace or determinant satisfy Assumption 1. 
+
+Remark 3 Note that if the dynamics of (1) are nonlinear, an extended Kalman filter framework also leads to the design problem in Problem 1. In that case, the dynamic matrices are instead obtained by linearizing the nonlinear dynamics about the last state estimate. It is worth remarking that the analysis of the consistency of the filter becomes significantly more complex. That is because the estimation error distribution is not fully characterized by its second moment anymore, even if the process and sensor noise are Gaussian distributed. In any case, the same consideration applies in the centralized setting. △
+
+3 Distributed Synthesis as an Overlapping Covariance Intersection Problem 
+
+In Section 3.1, we show that the design of local minimum variance estimation gains, which is a particular case of Problem 1 when the performance criterion is Ji(·) = tr( ·), has local information requirements that violate the ultra large scale requirements of Problem 1. In Section 3.2, we formulate the filter design problem as a problem of designing an optimal linear estimator. In Section 3.3, we analyze the partial information that is available in each computational unit for the design problem. In Section 3.4, we cast the distributed design problem as a generalized covariance intersection problem, which expresses the fusion gains as the minimization of a performance metric Ji(·) of the worst-case uncertainty under the information that is locally available. 53.1 Local Information is Insufficient for Minimum Variance Estimation 
+
+We consider that at each time k, each Ti has access to (i) an unbiased estimate ˆxi(k|k−1) of xi(k) (obtained from the application of the CL algorithm in the previous instant); (ii) unbiased estimates ˆxj (k|k − 1) of xj (k) with j ∈ I oi (k) obtained through communication; and (iii) the output yi(k). It is well-known (Anderson and Moore, 1979, Theorem 3.1 and Example 3.3) that at each time k, the local minimum-variance estimate, i.e., with Ji(·) = tr( ·), is given by (2) with the optimal gain 
+
+KMV  
+
+> i
+
+(k) = E[˜ xi(k|k − 1)˜ ϵ⊤ 
+
+> i
+
+(k)] E[˜ ϵi(k)˜ ϵ⊤ 
+
+> i
+
+(k)] −1, (3) where ˜ϵi(k) := yi(k) − P  
+
+> j∈I oi(k)
+
+Cij (k)ˆ xj (k|k − 1) . However, notice that knowledge about the covariance matrices E[˜ xi(k|k −
+
+1)˜ ϵ⊤ 
+
+> i
+
+(k)] and E[˜ ϵi(k)˜ ϵ⊤ 
+
+> i
+
+(k)] is required for the synthesis of the optimal minimum-variance local gain KMV  
+
+> i
+
+(k) according to (3). However, without all-to-all communication (which violates the ultra large-scale synthesis requirements), it is not possible to compute these covariance matrices in Ti at time k. To see why, define Pij (k|k) := E[˜ xi(k|k)˜ x⊤ 
+
+> j
+
+(k|k)] and 
+
+Pij (k|k − 1) := E[˜ xi(k|k − 1)˜ x⊤ 
+
+> j
+
+(k|k − 1)] . Assuming that the initial estimates ˜xi(0) , for i ∈ { 1, 2, . . . , N }, are unbiased and have covariance matrices Pij (0 |0) , for i, j ∈ { 1, 2, . . . , N }, from the system model in (1) and the filter in (2) one can obtain the well-known recurrence characterized by 
+
+Ppq (k|k−1) = δpq Qpp (k−1) + App (k−1) Ppq (k−1|k−1) A⊤ 
+
+> qq
+
+(k−1) (4) and 
+
+Ppq (k|k) = Kp(k)Rpq (k)K⊤ 
+
+> q
+
+(k) + X 
+
+> r∈I op(k)
+
+X 
+
+> s∈I oq(k)
+
+(δpr I − Kp(k)Cpr (k)) Prs (k|k − 1)( δqs I − Kq (k)Cqs (k)) ⊤, (5) which can be employed to write the expectations in (3) as 
+
+E[˜ ϵi(k)˜ ϵ⊤ 
+
+> i
+
+(k)] = Rii (k) + X 
+
+> p∈I oi(k)
+
+X  
+
+> q∈I oi(k)
+
+Cip (k)Ppq (k|k − 1) C⊤ 
+
+> iq
+
+(k)
+
+and 
+
+E[˜ xi(k|k − 1)˜ ϵ⊤ 
+
+> i
+
+(k)] = X  
+
+> p∈I oi(k)
+
+Pip (k|k − 1) C⊤
+
+> ip
+
+(k).
+
+To compute the minimum-variance gain (3) locally in Ti, one would have to compute Ppq (k|k − 1) and, from (4), have access to Ppq (k − 1|k − 1) with p, q ∈ I oi (k) either by computing them in Ti or by communication with other computational units. In turn, computing Ppq (k − 1|k − 1) with p, q ∈ I oi (k) would require access (by computing it or by communication) to 
+
+Prs (k − 1|k − 2) with (r, s ) ∈ I op (k) × I oq (k), and so forth. Because of that, in general, the exact cooperative propagation of 
+
+Ppq (k) is not possible without all-to-all communication or memory and computational requirements that grow with N , which violates the synthesis requirements in Problem 1. In this paper, we follow an approach inspired by Pedroso and Batista (2023b) and novel CI tools (Pedroso et al., 2026a,b) to devise a distributed synthesis procedure that is consistent. The main idea is that each computational unit Ti keeps and updates a bound on error covariances between the systems in 
+
+Ioi . This information alone is not enough to propagate Ppq (k − 1|k − 1) with p, q ∈ I oi , exactly, as aforementioned. Instead, we use the concept of robustness to information uncertainty . Specifically, the local gains are designed to minimize the worst-case consistent bound on E[˜ xi(k|k)˜ x⊤ 
+
+> i
+
+(k|k)] given the information that is known. This problem is cast as a novel formulation of a covariance intersection problem (Forsling et al., 2024), so-called overlapping covariance intersection (OCI) (Pedroso et al., 2026a). 
+
+3.2 Formulation as Optimal Linear Estimator 
+
+To cast the filtering problem as an OCI problem (Pedroso et al., 2026a) we follow a framework that is closer to the signal processing literature. Specifically, consider at time k a computational unit Ti whose goal is to obtain an estimate ˆxi(k|k). It has access to two unbiased (partial) estimates of ˆxi(k|k). The first estimate is zi, 1(k) := ˆ xi(k|k − 1) = Ai(k − 1)ˆ xi(k − 1|k −
+
+1) + Bi(k − 1) ui(k − 1) , where ˆxi(k − 1|k − 1) is obtained from the application of the CL algorithm in the previous instant. 6Notice that the estimate zi, 1(k) is unbiased because 
+
+ei, 1(k) = zi, 1(k) − xi(k)= Ai(k−1)ˆ xi(k−1|k−1)+ Bi(k−1) ui(k−1) − Ai(k−1) xi(k−1) − Bi(k−1) ui(k−1) − wi(k−1) = Ai(k − 1)˜ xi(k − 1|k − 1) − wi(k − 1) = ˜ xi(k|k − 1) 
+
+(6) and ˜xi(k − 1|k − 1) and wi(k − 1) are unbiased by hypothesis. The second estimate is 
+
+zi, 2(k) := yi(k) − X  
+
+> p∈I oi(k)\{ i}
+
+Cip (k)ˆ xp(k|k − 1) ,
+
+which is unbiased because 
+
+ei, 2(k) = zi, 2(k) − Cii (k)xi(k)= yi(k) − X  
+
+> p∈I oi(k)\{ i}
+
+Cip (k)ˆ xp(k|k − 1) − Cii (k)xi(k)= X  
+
+> p∈I oi(k)
+
+Cip (k)xp(k) + vi(k) − X  
+
+> p∈I oi(k)\{ i}
+
+Cip (k)ˆ xp(k|k−1) −Cii (k)xi(k)= − X  
+
+> p∈I oi(k)\{ i}
+
+Cip (k)˜ xp(k|k − 1) + vi(k)
+
+(7) and ˜xp(k|k − 1) and vi(k) are unbiased by hypothesis. Concatenating the two (partial) estimates one can write 
+
+zi, 1(k)
+
+zi, 2(k)
+
+| {z } 
+
+> =: zIi(k)
+
+=
+
+ Ini
+
+Cii (k)
+
+| {z } 
+
+> =: HIi(k)
+
+xi(k) + 
+
+ei, 1(k)
+
+ei, 2(k)
+
+| {z } 
+
+> =: eIi(k)
+
+,
+
+where E[eIi (k)] = 0 and, from (6) and (7), eIi (k) can be written as 
+
+eIi (k) := 
+
+ ˜xi(k|k − 1) 
+
+−P 
+
+> p∈I oi(k)\{ i}
+
+Cip (k)˜ xp(k|k − 1) 
+
+ +
+
+ 0
+
+vi(k)
+
+. (8) First, a linear estimator for xi(k) is of the form ˆxi(k|k) = KIi (k)zIi (k) and it is unbiased if and only if KIi (k)HIi (k) = I.One can now expand the condition on the gain as 
+
+h ˜Ki(k) Ki(k)
+
+i| {z } 
+
+> KIi(k)
+
+ Ini
+
+Cii (k)
+
+ = I ⇐⇒ ˜Ki(k) = I − Ki(k)Cii (k). (9) Substituting (9) in the expression for the linear estimator yields 
+
+ˆxi(k|k) = ( I − Ki(k)Cii (k)) zi, 1(k) + Ki(k)zi, 2(k)= ( I − Ki(k)Cii (k))ˆ xi(k|k − 1) + Ki(k)
+
+
+
+yi(k) − X  
+
+> p∈I oi(k)\{ i}
+
+Cip (k)ˆ xp(k|k − 1) 
+
+
+
+= ˆxi(k|k − 1) + Ki(k)
+
+
+
+yi(k) − X  
+
+> j∈I oi(k)
+
+Cij (k)ˆ xj (k|k − 1) 
+
+
+
+,
+
+(10) which, unsurprisingly, is exactly the same expression as the Luenberger filter expression in (2). The estimation error covariance of the estimate ˆxi(k|k) is denoted as Pii (k|k) := E[˜ xi(k|k)˜ x⊤ 
+
+> i
+
+(k|k)] , and it can be expressed 7after algebraic manipulation using ˆxi(k|k) = KIi (k)zIi (k) as 
+
+Pii (k|k) = KIi (k) E[eIi (k)e⊤Ii (k)] K⊤Ii (k). (11) According to Problem 1, one desires to design KIi (k) such that Ji(Pii (k|k)) is minimized. We have now cast the filter design problem as finding KIi (k) such that Ji(Pii (k|k)) is minimized subject to KIi (k)HIi (k) = I. However, from (11), Pii (k|k)
+
+depends on E[eIi (k)e⊤Ii (k)] , which is not exactly known without all-to-all communication, as analyzed in Section 3.1. In what follows, we characterize the partial information about E[eIi (k)e⊤Ii (k)] that is available in Ti.
+
+3.3 Partial Information about E[eIi (k)e⊤Ii (k)] 
+
+Notice that using (10), the estimation errors ˜xp(k|k − 1) with p ∈ I oi (k) can be expanded as 
+
+˜xp(k|k − 1) = Ap(k − 1)˜ xp(k − 1|k − 1) − wp(k)= Ap(k−1) X 
+
+> r∈I op(k−1)
+
+(δpr I − Kp(k−1) Cpr (k−1))˜ xr (k−1|k−2) + Ap(k−1) Kp(k−1) vp(k−1) − wp(k). (12) Denote ˜xIi (k|k − 1) := col(˜ xp(k|k − 1); p ∈ I oi (k)) , ˜xI2
+
+> i
+
+(k − 1|k − 2) := col(˜ xr (k − 1|k − 2); r ∈ I op (k − 1) , p ∈ I oi (k)) , and the respective covariance matrices as PIi (k|k − 1) := E[˜ xIi (k|k − 1)˜ x⊤Ii (k|k − 1)] and PI2
+
+> i
+
+(k − 1|k − 2) := E[˜ xI2
+
+> i
+
+(k − 1|k −
+
+2)˜ x⊤I2
+
+> i
+
+(k −1|k −2)] . Notice that PIi (k|k −1) represents the estimation error covariance between neighbors of Si, i.e., p ∈ I oi (k),and PI2
+
+> i
+
+(k|k − 1) represents the estimation error covariance between neighbors of neighbors of Si, i.e., r ∈ I op (k − 1) and 
+
+p ∈ I oi (k). By (12) one can write 
+
+PI2
+
+> i
+
+(k|k − 1) = DIi (k − 1) PI2
+
+> i
+
+(k − 1|k − 2) D⊤Ii (k − 1) + EIi (k − 1) , (13) where the expressions for DIi (k −1) and EIi (k −1) ⪰ 0 follow immediately from (12). 1 Likewise, from (8) and (13), one can express E[eIi (k)e⊤Ii (k)] as 
+
+E[eIi (k)e⊤Ii (k)] = RIi (k) + CIi (k)PI2
+
+> i
+
+(k−1|k−2) C⊤Ii (k), (14) where the expressions for CIi (k) and RIi (k) ⪰ 0 follow immediately from (8) and (13). 1 The formulation of the design problem as a generalized covariance intersection problem requires that RIi (k) is positive definite. That can be guaranteed under the following mild assumption. 
+
+Assumption 2 For all k ∈ N0 and for all i = 1 , 2, . . . , N , Qi(k) ≻ 0. △
+
+Lemma 1 Under Assumption 2, RIi (k) ≻ 0 for all i = 1 , 2, . . . , N and all k ∈ N.
+
+PROOF. Since ˜xi(k|k − 1) = Ai(k − 1)˜ xi(k − 1|k − 1) − wi(k − 1) , one can rewrite (8) as 
+
+eIi (k) := 
+
+ Ai(k)˜ xi(k − 1|k − 1) 
+
+− P  
+
+> p∈I oi(k)\{ i}
+
+Cip (k)( Ap(k − 1)˜ xp(k − 1|k − 1) − wp(k)) 
+
+ +
+
+−wi(k − 1) 
+
+vi(k)
+
+ .
+
+Therefore, from the definition of RIi (k) in (14), it follows that RIi (k) ⪰ E
+
+h
+
+[−wi(k−1) ⊤vi(k)⊤]⊤[−wi(k−1) ⊤vi(k)⊤]
+
+i
+
+, i.e., 
+
+RIi (k) ⪰ diag( Qi(k−1) , Rii (k)) . By hypothesis Rii (k) ≻ 0 and, by Assumption 2, Qi(k − 1) ≻ 0, which immediately proves the result. □ 
+
+> 1
+
+The expressions for DIi (k −1) , EIi (k −1) , CIi (k), and RIi (k) are not presented for the sake of conciseness and clarity. Nevertheless, these expressions are implemented in an open-access repository along with the code of the numerical simulations presented in Section 5. 
+
+8In this paper, we propose that, at time k, each computational unit Ti maintains a bound on PIi (k − 1|k − 2) , which is denoted by XIi (k − 1|k − 2) ⪰ PIi (k − 1|k − 2) . To guarantee that such a bound is available at the next instant, then at time k a new bound XIi (k|k − 1) ⪰ PIi (k|k − 1) must also be computed during the design procedure of KIi (k).
+
+At time k, the computational unit Ti can gather the bounds XIp (k − 1|k − 2) ⪰ PIp (k − 1|k − 2) with p ∈ I oi (k) from its neighbors. Notice that each PIp (k − 1|k − 2) with p ∈ I oi (k) is a principal submatrix of PI2
+
+> i
+
+(k − 1|k − 2) . Therefore, the computational unit Ti has access to |I oi (k)| bounds on principal submatrices of PI2
+
+> i
+
+(k − 1|k − 2) , which allows us to express a set of admissible matrices PI2
+
+> i
+
+(k − 1|k − 2) as 
+
+PI2
+
+> i
+
+(k − 1) := 
+
+
+
+PI2
+
+> i
+
+≻ 0 : Wip (k − 1) PI2
+
+> i
+
+W⊤
+
+> ip
+
+(k − 1) ⪯ XIp (k − 1|k − 2) ∀p ∈ I oi (k)
+
+
+
+, (15) where matrices Wip (k − 1) for p ∈ I oi (k) extract principal submatrices of PI2
+
+> i
+
+associated with XIp (k − 1|k − 2) , i.e., Wip (k−1) 
+
+is such that Wip (k−1) PI2
+
+> i
+
+(k−1|k−2) W⊤
+
+> ip
+
+(k−1) = PIp (k−1|k−2) .One concludes that E[eIi (k)e⊤Ii (k)] is given by (14), where PI2
+
+> i
+
+(k − 1|k − 2) is not exactly known but is known to satisfy 
+
+PI2
+
+> i
+
+(k − 1|k − 2) ∈ P I2
+
+> i
+
+(k − 1) with information locally available in Ti.Given the proposed information structure, one can show that the set of admissible matrices PI2
+
+> i
+
+(k − 1|k − 2) is bounded. 
+
+Lemma 2 For all i = 1 , 2, . . . , N , if at time k there exist bounds XIp (k − 1|k − 2) ⪰ PIp (k − 1|k − 2) with p ∈ I oi (k), then 
+
+Wi := [ W⊤ 
+
+> ip 1
+
+W⊤ 
+
+> ip 2
+
+· · · ]⊤ with Ioi (k) = {p1, p 2, . . . } is full column rank and PI2
+
+> i
+
+(k − 1) is bounded, i.e., there is M ∈ S++ 
+
+such that M ⪰ PI2
+
+> i
+
+for all PI2
+
+> i
+
+∈ P I2
+
+> i
+
+(k − 1) .
+
+PROOF. Notice that every row of Wip is composed of zeros except for one and only one entry, which is unitary. The column where the one is placed is associated with the entry of ˜xI2
+
+> i
+
+(k − 1|k − 2) that such row extracts. Since Wip extracts information about ˜xr (k − 1|k − 2) for all r ∈ I oi (k − 1) and all p ∈ I oi (k), it follows that every column of Wi has at least one one. As a result, there is a permutation of rows of Wi that yields a matrix of the form [I ˜W⊤ 
+
+> i
+
+]⊤, showing that Wi is full column rank. The fact that PI2
+
+> i
+
+is bounded follows from Pedroso et al. (2026a, Lemma 2) since Wi is full column rank. □
+
+3.4 Overlapping Covariance Intersection Problem 
+
+One can now incorporate the partial knowledge of E[eIi (k)e⊤Ii (k)] analyzed in Section 3.3 with the formulation of the design problem as an optimal linear filter in Section 3.2. The goal is now to design a gain KIi (k) that satisfies KIi (k)HIi (k) = I
+
+and that minimizes a performance metric on the worst-case bound Xii (k|k) ⪰ Pii (k|k) under the available information. This can be written as an OCI optimization problem (Pedroso et al., 2026a) 
+
+min  
+
+> KIi(k)∈Rni×oi
+> Xii (k|k)∈Sni
+> +
+
+Ji(Xii (k|k)) s.t. KIi (k)HIi (k) = IXii (k|k) ⪰ KIi (k)( RIi (k) + CIi (k)PC ⊤Ii (k)) K⊤Ii (k), ∀P ∈ P I2
+
+> i
+
+(k − 1) .
+
+(16) Additionally, the computational unit Ti must also compute a new bound on XIi (k|k − 1) , which is required for the next iteration of the filter. One can do so resorting to (13) and adding a regularization term to (16), which yields 
+
+min   
+
+> KIi(k),Xii (k|k)⪰0
+> XIi(k|k−1) ⪰0
+
+Ji(Xii (k|k)) + γiGi(XIi (k|k − 1)) s.t. KIi (k)HIi (k) = IXii (k|k) ⪰ KIi (k)( RIi (k) + CIi (k)PC ⊤Ii (k)) K⊤Ii (k), ∀P ∈ P I2
+
+> i
+
+(k − 1) 
+
+XIi (k|k − 1) ⪰ DIi (k − 1) PD ⊤Ii (k − 1) + EIi (k − 1) , ∀P ∈ P I2
+
+> i
+
+(k − 1) ,
+
+(17) 9where γi > 0 is a small regularization weight and Gi is any performance metric that satisfies Assumption 1. It is worth pointing out immediately that (17) is not easy or efficient to solve numerically with off-the-shelf solvers. In the following section, a computationally efficient solution to (17) is studied resorting to the literature on the OCI problem (Pedroso et al., 2026a). The local design of the gains resorting to (17) is distributed and can be computed recursively. We introduce an assumption on the initial information that must be known to solve (17) recursively. 
+
+Assumption 3 Every computational unit Ti with i = 1 , 2, . . . , N has access to an initial bound XIi (1 |0) ⪰ PIi (1 |0) . △
+
+Remark 4 Notice that (17) can only be solved starting at k = 2 . Indeed, at k = 1 all the information for a standard filter design is available (e.g., each computational unit has all the information to compute a local minimum variance gain (3) ). Since any choice for the gain at k = 1 allows to recursively employ the design procedure in (17) starting at k = 2 , we disregard the details of the synthesis at k = 1 . △
+
+4 Distributed Synthesis Algorithm 
+
+In this section, we study the recursive implementation of the distributed synthesis solution that was cast as an OCI problem in Section 3. In Section 4.1, we focus on the numerical computation of the local synthesis problem, by providing a solution that can be efficiently solved as a semidefinite program (SDP). In Section 4.2, we establish control-theoretic properties of the recursive implementation of the filter, namely feasibility and consistency. In Section 4.3, we outline the algorithm of the distributed synthesis procedure from the point of view of a computational unit, showing that the ultra large-scale requirements are met. 
+
+4.1 Efficient Distributed Synthesis 
+
+In the recursive implementation of the distributed filtering approach presented in Section 3, the optimization problem (17) must be numerically solved in real-time in the computational unit Ti for every instant k ≥ 2. As a result, the viability of the proposed solution depends heavily on the computational efficiency of solving (17). Unfortunately, as already mentioned, the optimization problem (17) is nonlinear and cannot be solved resorting to off-the-shelf solvers due to the form of the second and third constraints. The OCI problem has been recently studied in Pedroso et al. (2026a). Therein, a solution approach to the OCI problem is proposed, which amounts to replacing the information constraints that characterize PI2   
+
+> i
+> (k−1)
+
+with a parameterized set of conservative bounds. The new parameterized set of admissible matrices PI2     
+
+> i
+> (k−1|k−2)
+
+is called a family of bounds 
+
+and a solution of (17) when restricted to that family is called a family-optimal solution . In what follows, we characterize a meaningful family of bounds, whose family-optimal solution allows for an efficient numerical computation. First, it is beneficial to provide an alternative characterization of PI2   
+
+> i
+> (k−1)
+
+as shown in the following lemma. 
+
+Lemma 3 The set PI2  
+
+> i
+> (k−1)
+
+of admissible matrices PI2   
+
+> i
+> (k−1|k−2)
+
+defined in (15) can be equivalently expressed as PI2              
+
+> i
+> (k−
+> 1) := {PI2
+> i
+> ≻0:P−1
+> I2
+> i
+> ⪰Yi
+> Ip(k−1|k−2) ∀p∈ I oi(k)}
+
+, where Yi               
+
+> Ip(k−1|k−2) := W⊤
+> ip (k−1) XIp(k−1|k−2) −1Wip (k−1)
+
+for p ∈ I oi (k).
+
+PROOF. The result follows from the direct application of Pedroso et al. (2026a, Lemma 1). □
+
+Second, we introduce the so-called Kahan family of bounds, which is studied in Kahan (1968) and is a generalization of the most common family of bounding ellipsoids used in standard CI problems (e.g., Reinhardt et al. (2015)). Specifically, the Kahan family of bounds is denoted by PKF    
+
+> I2
+> i
+> (k−1)
+
+and it is parameterized by a vector ω ∈ ∆|I oi (k)| := {ω ∈ R|I oi (k)|≥0 : 1⊤ω = 1 } as               
+
+> PKF
+> I2
+> i
+> (ω, k −1) =
+> 
+> PI2
+> i
+> ≻0:P−1
+> I2
+> i
+> ⪰X
+> p∈I oi(k)ωpYi
+> Ip(k−1|k−2)
+> 
+> ,
+
+(18) where, for the sake of conciseness and by abuse of notation, each entry of ω is associated with one element of Ioi (k) and the entry associated with p ∈ I oi (k) is denoted by ωp. The following lemma establishes that PKF    
+
+> I2
+> i
+> (ω, k −1)
+
+is a conservative 10 approximation of PI2
+
+> i
+
+(k − 1) . For more details on the conservativeness and properties of the Kahan family see Kahan (1968) and Pedroso et al. (2026a, Section III.C). 
+
+Lemma 4 The Kahan family is conservative, i.e., PI2
+
+> i
+
+(k − 1) ⊆ P KF 
+
+> I2
+> i
+
+(ω, k − 1) for all ω ∈ ∆|I oi (k)|.
+
+PROOF. The result amounts to showing that P ∈ P I2
+
+> i
+
+(k − 1) implies P ∈ P KF 
+
+> I2
+> i
+
+(ω, k − 1) for all ω ∈ ∆|I oi (k)|. Take any 
+
+P ∈ P I2
+
+> i
+
+(k − 1) . By Lemma 3, P−1 ⪰ Yi 
+
+> Ip
+
+(k − 1|k − 2) for all p ∈ I oi (k). As a result, for all ω ∈ ∆|I oi (k)| one can write 
+
+P−1 = P  
+
+> p∈I oi(k)
+
+ωpP−1 ⪰ P  
+
+> p∈I oi(k)
+
+ωpYi 
+
+> Ip
+
+(k − 1|k − 2) . Therefore, P ∈ P KF 
+
+> I2
+> i
+
+(ω, k − 1) according to the definition in (18). □
+
+The Kahan-family-optimal solution of the design problem of computational unit Ti at time k in (17) is then said to be the solution to 
+
+min    
+
+> KIi(k),Xii (k|k)⪰0
+> XIi(k|k−1) ⪰0,ω∈∆|I oi(k)|
+
+Ji(Xii (k|k)) + γiGi(XIi (k|k − 1)) s.t. KIi (k)HIi (k) = IXii (k|k) ⪰ KIi (k)( RIi (k) + CIi (k)PC ⊤Ii (k)) K⊤Ii (k), ∀P ∈ P KF 
+
+> I2
+> i
+
+(ω, k − 1) 
+
+XIi (k|k − 1) ⪰ DIi (k − 1) PD ⊤Ii (k − 1) + EIi (k − 1) , ∀P ∈ P KF 
+
+> I2
+> i
+
+(ω, k − 1) 
+
+(19) where |I oi (k)| − 1 more degrees of freedom are added w.r.t. (17) to parameterize the Kahan family. Crucially, using a result from Pedroso et al. (2026a), one can show that the Kahan-family-optimal solution of (17) can be efficiently computed as an SDP, as shown in the following result. 
+
+Theorem 1 Under Assumptions 1 and 2, the triple (KIi (k), Xii (k|k), XIi (k|k − 1)) is a Kahan-family-optimal solution to the design problem of computational unit Ti at time k in (17) , where (U, Y, Xii (k|k), XIi (k|k − 1) , ω) ∈
+
+argmin   
+
+> U⪰0,Y⪰0,Xii (k|k)⪰0
+> XIi(k|k−1) ⪰0,ω∈∆|I oi(k)|
+
+Ji(Xii (k|k)) + γiGi(XIi (k|k − 1)) s.t.
+
+Xii (k|k) II H⊤Ii (k)RIi (k)−1HIi (k) − U
+
+ ⪰ 0
+
+ U H⊤Ii (k)RIi (k)−1CIi (k)(H⊤Ii (k)RIi (k)−1CIi (k)) ⊤ Y + C⊤Ii (k)RIi (k)−1CIi (k)
+
+ ⪰ 0
+
+XIi (k|k − 1) − EIi (k − 1) DIi (k − 1) 
+
+D⊤Ii (k − 1) Y
+
+ ⪰ 0
+
+Y = X  
+
+> p∈I oi(k)
+
+ωpYi 
+
+> Ip
+
+(k − 1|k − 2) 
+
+(20) 
+
+and 
+
+KIi (k) := 
+
+
+
+H⊤Ii (k)R−1 
+
+> Ii
+
+(k)
+
+
+
+RIi (k) − CIi (k)
+
+
+
+Y + C⊤Ii (k)R−1 
+
+> Ii
+
+(k)CIi (k)
+
++
+
+C⊤Ii (k)
+
+
+
+R−1 
+
+> Ii
+
+(k)HIi (k)
+
+−1
+
+H⊤Ii (k)R−1 
+
+> Ii
+
+(k)
+
+
+
+RIi (k) − CIi (k)
+
+
+
+Y + C⊤Ii (k)R−1 
+
+> Ii
+
+(k)CIi (k)
+
++
+
+C⊤Ii (k)
+
+
+
+R−1 
+
+> Ii
+
+(k).
+
+(21) 
+
+PROOF. Under Assumption 1 and since RIi (k) ≻ 0, by Lemma 1 under Assumption 2, we are in the conditions of Pedroso et al. (2026a, Theorem 1 and Corollary 2), which immediately proves the result. □
+
+Notice that the feasible set of (20) is convex, since it is characterized by three linear matrix inequalities and two equality 11 constraints. Thus, if Ji and Gi are convex (which is the case for meaningful choices such as the trace or determinant 2 ), then (20) is a convex optimization problem, which has desirable properties such as robustness to changes in input parameters and the existence of efficient numerical algorithms with global optimality guarantees (Boyd and Vandenberghe, 2004). Furthermore, for meaningful choices of Ji and Gi (such as the trace or determinant 2 ), it is possible to write (20) as an SDP, for which well-performing off-the-shelf solvers with polynomial worst-case complexity exist (Vandenberghe and Boyd, 1996; MOSEK, 2024). From Theorem 1, one concludes that it is possible to compute a Kahan-family-optimal solution to the design problem of computational unit Ti at time k from the numerical solution of (20). Moreover, for meaningful choices of Ji and Gi such as the trace (which corresponds to minimum variance estimation) or determinant, (20) can be cast as an SDP, which can be efficiently solved with well-performing off-the-shelf solvers. 
+
+4.2 Recursive Feasibility and Consistency 
+
+Crucially, the distributed filtering solution that results from designing the Kahan-family-optimal gains recursively according to Theorem 1 in every agent has very strong properties, namely recursive feasibility and recursive consistency , given an initial condition according to Assumption 3. Recursive feasibility guarantees that, for all k ≥ 2 and all i = 1 , 2, . . . , N , the optimization problem (20) is feasible, i.e., there exists a tuple of decision variables that satisfies the constraints. Recursive consistency guarantees that, for all k ≥ 2 and all i = 1 , 2, . . . , N , the estimates ˆxi(k|k) are consistent according to Definition 1, i.e., Xii (k|k) ⪰ E[˜ xi(k|k)˜ x⊤ 
+
+> i(k|k)]
+
+. The following theorem is the main result of the paper. 
+
+Theorem 2 Under Assumptions 1– 3, the distributed CL filter (2) with Kahan-family-optimal gains computed recursively resorting to Theorem 1 is recursively feasible and recursively consistent. 
+
+PROOF. First, from Lemma 2, for all i = 1 , 2, . . . , N , if at time k there exist bounds XIp (k − 1|k − 2) ⪰ PIp (k − 1|k − 2) with   
+
+> p∈ I oi(k)
+
+, then Wi is full column rank and PI2   
+
+> i
+> (k−1)
+
+is bounded. Thus, it follows from (Pedroso et al., 2026a, Corollary 1) that (17) is feasible and from (Pedroso et al., 2026a, Corollary 2) that (20) is feasible. Since at time k, computational unit Ti
+
+computes a new XIi (k|k − 1) resorting to (20), then it follows from a simple induction argument that the filtering solution is recursively feasible. Second, notice that recursive consistency follows immediately from the construction of (17), which is preserved in (19) since the Kahan family is conservative by Lemma 4. Since (20) characterizes a solution of (19), it follows that the filtering solution is recursively consistent. □
+
+As pointed out in the state-of-art in Section 1 as well as in (Pedroso et al., 2025, Section 5), there is a gap to develop well-performing CL algorithms that are both consistent and scalable to an ultra large scale. Theorem 2 shows that the proposed distributed CL that relies on a distributed synthesis procedure resorting to local information is provably consistent. 
+
+4.3 Synthesis Algorithm 
+
+Fig. 2 depicts the computation and communication steps of the proposed CL algorithm from the point of view of computational unit Ti. Different block colors represent different timing requirements. First, red blocks correspond to taking measurements, updating the state estimate, and updating the control action. These steps must be performed across all computational units precisely at times t = kT with k ∈ N, where T is the sampling time of the discrete-time system (1). Second, green blocks correspond to local computations, which do not have any synchronization requirements. Third, orange blocks correspond to the exchange of information between neighboring computational units. These transmissions need not occur at a precise time, but they must naturally reach neighboring computational units on time. Notice that, as long as the sampling time T is greater than the sum of computational and communication delays, the proposed CL algorithm is robust to those delays. In conclusion, together with the fact that computation, memory, and communication load of each operation in Fig. 2 does not scale with N , the proposed CL algorithm satisfies the ultra large-scale feasibility requirements (Pedroso et al., 2025, Table 1).   
+
+> 2If one desires to use the determinant as the metric Ji, then the optimization problem (20) needs to be slightly modified to be cast as a SDP (see Pedroso et al. (2026a, Remark III.3) and MOSEK (2024, Section 6.2.3) for details).
+
+12 t = ( k − 1) TTake measurement yi(k − 1) ˆxi(k−1|k−1) = ˆxi(k−1|k−2) + Ki(k−1) 
+
+(
+
+yi(k−1) − ∑  
+
+> j∈I oi(k−1)
+
+Cij (k−1)ˆ xj (k−1|k−2) 
+
+)Implement control law ui(k − 1) with ˆxi(k−1|k−1) Compute (if necessary) Ai(k − 1); Bi(k − 1); Qi(k − 1); Cip (k), ∀p ∈ I oi (k); Rip (k), ∀p ∈ I oi (k)ˆxi(k|k − 1) = Ai(k − 1)ˆ xi(k − 1) + Bi(k − 1) ui(k − 1) tTransmit to all p ∈ O oi (k) Ai(k − 1); Qi(k − 1); Cip (k − 1) , ∀p ∈ I oi (k − 1); Rip (k), ∀p ∈ I oi (k); Ki(k − 1); ˆxi(k|k − 1); XIi (k − 1|k − 2) Receive from all p ∈ I oi (k) Ap(k − 1); Qp(k − 1); Cpr (k − 1) , ∀r ∈ I op (k − 1); Rpr (k), ∀r ∈ I op (k); Kp(k − 1); ˆxp(k|k − 1); XIp (k − 1|k − 2) Compute HIi (k); RIi (k); CIi (k); EIi (k − 1); DIi (k − 1); Yi 
+
+> Ip
+
+(k), ∀p ∈ I oi (k)Compute KIi (k), Xii (k|k), XIi (k|k − 1) using Theorem 1 and extract Ki(k)t = kT Take measurement yi(k)ˆxi(k|k) = ˆxi(k|k − 1) + Ki(k)
+
+(
+
+yi(k) − ∑  
+
+> j∈I oi(k)
+
+Cij (k)ˆ xj (k|k − 1) 
+
+)Implement control law ui(k) with ˆxi(k|k)......Fig. 2. Timeline of proposed CL algorithm for a single computational unit Ti.
+
+5 Numerical Results 
+
+In this section, we simulate the proposed CL algorithm on illustrative synthetic systems. We consider a grid topology of a network of N systems with discrete-time single integrator dynamics. Each agent has access to relative position measurements w.r.t. neighboring systems according to the grid output topology, which is depicted in Fig. 3 for the case N = 36 . Some systems have access to measurements of their absolute positions, namely systems S1, S4, S28 , and S35 in the network in Fig. 3. 12345678910 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 Relative Position Absolute Position 
+
+Fig. 3. Output topology of the illustrative network for N = 36 .
+
+Fig. 4 depicts the evolution of the estimation error of two systems of the network depicted in Fig. 3 according to the proposed cooperative estimation algorithm with a minimum variance design criterion, which we label distributed minimum variance estimation (DMVE). Fig. 4 also depicts 3σ bounds according to the consistent estimation error covariance bounds provided by 13 the algorithm. Fig. 4 also depicts the evolution of the estimation error and 3σ bounds for: (i) a distributed minimum variance algorithm that is designed centrally, and thus has exact global covariance propagation, as described in Section 3.1 (which we label MVE); and (ii) the SCI algorithm proposed in Li et al. (2013). To evaluate the performance of the three methods we use the accuracy metric D defined as 
+
+D := 1
+
+N (Tsim + 1) 
+
+> Tsim
+
+X
+
+> k=0
+> N
+
+X
+
+> i=1
+
+|| ˜xi(k|k)|| 2,
+
+and the covariance tightness metric ANEES defined as 
+
+ANEES := 1
+
+N (Tsim + 1) 
+
+> Tsim
+
+X
+
+> k=0
+> N
+
+X
+
+> i=1
+
+˜x⊤ 
+
+> i
+
+(k|k)X−1 
+
+> ii
+
+(k|k)˜ xi(k|k),
+
+which are similar to the metrics used, for instance, in Luft et al. (2018). The accuracy metric D quantifies the average norm of the state estimation error across the entire network, thus, a lower D indicates higher estimation accuracy. The covariance tightness metric ANEES quantifies the average normalized estimation error squared. Thus, for a provably consistent estimation method, a higher ANEES indicates lower conservatism of the consistent covariance bounds Xii for i = 1 , 2, . . . , N . The performance metrics averaged over 100 simulations with Tsim = 70 of the illustrative network in Fig. 3 are shown in Table 1. The estimation accuracy of the proposed CL method (DMVE) is not significantly worse (only about 8% worse in the D metric) than the minimum variance estimator with exact global covariance propagation (MVE). However, we notice a significant 0 10 20 30 40 50 60 70 
+
+t   
+
+> -15 -10 -5 0510 15
+> ~p15
+> ~p15 (t) (DMVE) 3<p15 (t) (DMVE) ~p15 (t) (MVE) 3<p15 (t) (MVE) ~p15 (t) (SCI) 3<p15 (t) (SCI)
+
+(a) Position estimation error of S15 .0 10 20 30 40 50 60 70 
+
+t    
+
+> -15 -10 -5 0510 15
+> ~v15
+> ~v15 (t) (DMVE) 3<v15 (t) (DMVE) ~v15 (t) (MVE) 3<v15 (t) (MVE) ~v15 (t) (SCI) 3<v15 (t) (SCI)
+
+(b) Velocity estimation error of S15 .0 10 20 30 40 50 60 70 
+
+t   
+
+> -5 -4 -3 -2 -1 012345
+> ~p29
+> ~p29 (t) (DMVE) 3<p29 (t) (DMVE) ~p29 (t) (MVE) 3<p29 (t) (MVE) ~p29 (t) (SCI) 3<p29 (t) (SCI)
+
+(c) Position estimation error of S29 .0 10 20 30 40 50 60 70 
+
+t    
+
+> -4 -3 -2 -1 01234
+> ~v29
+> ~v29 (t) (DMVE) 3<v29 (t) (DMVE) ~v29 (t) (MVE) 3<v29 (t) (MVE) ~v29 (t) (SCI) 3<v29 (t) (SCI)
+
+(d) Velocity estimation error of S29 .Fig. 4. Evolution of estimation error of S15 and S29 and respective three-standard-deviation bounds. 
+
+14 Table 1 Accuracy ( D) and covariance tightness ( ANEES ) metrics averaged over 100 simulations with Tsim = 70 of the illustrative network in Fig. 3 with N = 36 .
+
+Method D ANEES 
+
+DMVE 0.7579 − 1.245 −
+
+MVE 0.6995 −7.706% 2.076 +66 .75% SCI 0.9724 +28 .30% 0.6734 −45 .93% 
+
+Table 2 Accuracy ( D) and covariance tightness ( ANEES ) metrics averaged over 100 simulations with Tsim = 70 with N = 576 .
+
+Method D ANEES 
+
+DMVE 0.7175 – 1.126 –
+
+MVE 0.5844 −18 .54% 1.973 +75 .24% SCI 0.9594 +33 .71% 0.6496 −42 .29% 
+
+conservatism introduced by DMVE with respect to MVE of about 70% of the ANEES metric. In Table 2 we also show the performance metrics averaged over 100 simulations with Tsim = 70 of a bigger network with N = 576 .The comparison between the two distributed CL methods DMVE and SCI, which are the only ones scalable to an ultra large scale, is the most insightful. Indeed, from Table 1, the proposed CL algorithm DMVE achieves significantly better estimation accuracy (roughly a 30% improvement in the D metric) and it is significantly less conservative (roughly a 40% 
+
+improvement in the ANEES metric). The accuracy and conservatism improvements are also clearly visible in Fig. 4. Another interesting analysis is the synthesis time of a single filter iteration of each of the CL methods. The three methods were simulated for many network sizes N and the average synthesis time of each iteration was measured. It is important to remark that the proposed CL method (DMVE) and SCI were synthesized in parallel for each agent, whereas that is not possible for the centralized design of MVE. The synthesis times are depicted in Fig. 5 in a logarithmic scale. It is worth remarking that the absolute synthesis times depicted in Fig. 5 are not very insightful, since the implementation is rather naive and not optimized for performance (e.g. the SDPs for DMVE are parsed at every iteration). Insights can be instead gathered from their qualitative growth. 10 0 10 1 10 2 10 3
+
+> N
+> 10 !3
+> 10 !2
+> 10 !1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> 10 4
+> Synthesis time (s)
+> DMVE MVE SCI
+
+Fig. 5. Evolution with N of the synthesis time of a single iteration of DMVE, MVE, and SCI. 
+
+15 One can readily notice that while the synthesis times of DMVE and SCI (which are the only ones scalable to an ultra large scale) remain approximately constant as N grows, that is not the case for MVE. Indeed, the asymptotic slope of the synthesis time of MVE in the logarithmic scale is approximately 3, which matches the expected growth with N 3 that is associated with the inversion and multiplication of matrices whose dimension grows with N .
+
+An implementation of the solution of the proposed CL method as well as the code of all numerical simulations in this paper is available in an open-access repository at github.com/decenter2021/coop-loc-oci .
+
+6 Conclusion 
+
+This work addresses a long-standing gap in cooperative localization (CL) research: the lack of algorithms that are well-performing, consistent, and scalable to an ultra large scale (ULS). To address this problem, we use the concept of robustness to information uncertainty . Specifically, local gains are designed to minimize the worst-case consistent bound on the covariance of the estimation error given the information that is known. First, we conclude that this design problem can be expressed in an overlapping covariance intersection framework, which is a CI-like framework with partial structural information that was recently introduced. Second, the proposed algorithm is provably consistent, robust to communication and computation delays, and satisfies the ULS feasibility requirements, since its computational, memory, and communication costs do not scale with the number of agents in the system. Third, numerical simulations demonstrate significant improvements over state-of-the-art ULS-scalable methods. Specifically, the proposed method achieves significantly higher accuracy and lower conservatism compared to split covariance intersection (SCI) while maintaining scalability. These results establish the proposed approach as a strong candidate for practical, consistent, and efficient CL in ultra large-scale systems. 
+
+Acknowledgements 
+
+This work was supported by the LARSyS FCT funding (UID/50009/2025: DOI 10.54499/UID/50009/2025; LA/P/0083/2020: DOI 10.54499/LA/P/0083/2020). 
+
+References 
+
+B. D. O. Anderson and J. B. Moore. Optimal Filtering . Englewood Cliffs, NJ: Prentice-Hall, 1979. S. Bereg, J. M. D´ ıaz-B´ a˜ nez, M. A. Lopez, T. Rozario, and K. Valavanis. A decentralized geometric approach for the formation keeping in unmanned aircraft navigation. In International Conference on Unmanned Aircraft Systems , pages 989–997, 2015. doi: 10.1109/ICUAS.2015.7152388. S. Boyd and L. Vandenberghe. Convex optimization . Cambridge University Press, 2004. L. C. Carrillo-Arce, E. D. Nerurkar, J. L. Gordillo, and S. I. Roumeliotis. Decentralized multi-robot cooperative localization using covariance intersection. In 2013 IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 1412–1417, 2013. doi: 10.1109/IROS.2013.6696534. C. Daehnick, I. Klinghoffer, B. Maritz, and B. Wiseman. Large LEO satellite constellations: Will it be different this time?, Aerospace & Defense In-sights, 2020. Available at: https://www.mckinsey.com/industries/aerospace-and-defense/our-insights/large-leo-satellite-constellations-will-it-be-different-this-time (Accessed: 15 February 2022). M. Dai, H. Mu, and M. Wu. Junction-tree-based cooperative orbit determination for crosslink-augmented satellite constellations. Proceedings of the Institution of Mechanical Engineers, Part G: Journal of Aerospace Engineering , 230(10):1848–1859, 2016. doi: 10.1177/0954410015616413. S. Fang, H. Li, and M. Yang. Multi-vehicle cooperative SLAM using iterated split covariance intersection filter. In IEEE Intelligent Vehicles Symposium ,pages 947–952, 2021. doi: 10.1109/IV48863.2021.9575759. S. Fang, Y. Li, and H. Li. Split covariance intersection filter based visual localization with accurate AprilTag map for warehouse robot navigation. arXiv preprint arXiv:2310.17879 , 2025. doi: 10.48550/arXiv.2310.17879. Peter Feiler, Richard P. Gabriel, John Goodenough, Rick Linger, Tom Longstaff, Rick Kazman, Mark Klein, Linda Northrop, Douglas Schmidt, Kevin Sullivan, and Kurt Wallnau. Ultra-large-scale systems: The software challenge of the future. Technical report, Carnegie Mellon University, 2006. R. Forsling, B. Noack, and G. Hendeby. A quarter century of covariance intersection: Correlations still unknown? IEEE Control Systems Magazine , 44 (2):81–105, 2024. doi: 10.1109/MCS.2024.3358658. D. Fox, W. Burgard, H. Kruppa, and S. Thrun. A probabilistic approach to collaborative multi-robot localization. Autonomous Robots , 8(3):325–344, 2000. doi: 10.1023/A:1008937911390. A. Howard, M. J. Mataric, and G. S. Sukhatme. Putting the ’I’ in ’team’: an ego-centric approach to cooperative localization. In IEEE International Conference on Robotics and Automation , pages 868–874, 2003. doi: 10.1109/ROBOT.2003.1241702. D. Ivanov, U. Monakhova, and M. Ovchinnikov. Nanosatellites swarm deployment using decentralized differential drag-based control with communicational constraints. Acta Astronautica , 159:646–657, 2019. doi: 10.1016/j.actaastro.2019.02.006. S.J. Julier and J.K. Uhlmann. A non-divergent estimation algorithm in the presence of unknown correlations. In 1997 American Control Conference (ACC) , volume 4, pages 2369–2373, 1997. doi: 10.1109/ACC.1997.609105. S.J. Julier and J.K. Uhlmann. General decentralized data fusion with covariance intersection. In James Llinas Martin Liggins II, David Hall, editor, 
+
+Handbook of Multisensor Data Fusion , pages 339–364. CRC Press, 2 edition, 2017. W. Kahan. Circumscribing an ellipsoid about the intersection of two ellipsoids. Canadian Mathematical Bulletin , 11(3):437–441, 1968. doi: 10.4153/ CMB-1968-050-2. 
+
+16 K. Y. Leung, T. D. Barfoot, and H. H. Liu. Decentralized localization of sparsely-communicating robot networks: A centralized-equivalent approach. 
+
+IEEE Transactions on Robotics , 26(1):62–77, 2009. doi: 10.1109/TRO.2009.2035741. H. Li and M. Yang. Multi-vehicle cooperative local mapping using split covariance intersection filter. In IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 2153–2158, 2019. doi: 10.1109/IROS40897.2019.8968442. H. Li, F. Nashashibi, and M. Yang. Split covariance intersection filter: Theory and its application to vehicle localization. IEEE Transactions on Intelligent Transportation Systems , 14(4):1860–1871, 2013. doi: 10.1109/TITS.2013.2267800. L. Luft, T. Schubert, S. I. Roumeliotis, and W. Burgard. Recursive decentralized collaborative localization for sparsely communicating robots. Robotics: Science and Systems , 12, 2016. doi: 10.15607/rss.2016.xii.016. L. Luft, T. Schubert, S. I. Roumeliotis, and W. Burgard. Recursive decentralized localization for multi-robot systems with asynchronous pairwise communication. The International Journal of Robotics Research , 37(10):1152–1167, 2018. doi: 10.1177/0278364918760698. R. Madhavan, K. Fregene, and L.E. Parker. Distributed heterogeneous outdoor multi-robot localization. In IEEE International Conference on Robotics and Automation , pages 374–381, 2002. doi: 10.1109/ROBOT.2002.1013389. R. Madhavan, K. Fregene, and L. E. Parker. Distributed cooperative outdoor multirobot localization and mapping. Autonomous Robots , 17(1):23–39, 2004. doi: 10.1023/B:AURO.0000032936.24187.41. A. Martinelli. Improving the precision on multi robot localization by using a series of filters hierarchically distributed. In IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 1053–1058, 2007. doi: 10.1109/IROS.2007.4399043. O. Montenbruck, T. Ebinuma, E. G. Lightsey, and S. Leung. A real-time kinematic GPS sensor for spacecraft relative navigation. Aerospace Science and Technology , 6(6):435–449, 2002. doi: 10.1016/S1270-9638(02)01185-9. MOSEK. MOSEK Modeling Cookbook . Release 3.3.0 edition, 2024. S. Panzieri, F. Pascucci, and R. Setola. Multirobot localisation using interlaced extended Kalman filter. In 2006 IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 2816–2821, 2006. doi: 10.1109/IROS.2006.282065. L. Pedroso and P. Batista. Decentralized moving horizon estimation for large-scale networks of interconnected unconstrained linear systems. IEEE Transactions on Control of Network Systems , 10(4):1855–1866, 2023a. doi: 10.1109/TCNS.2023.3244086. L. Pedroso and P. Batista. Distributed decentralized EKF for very large-scale networks with application to satellite mega-constellations navigation. Control Engineering Practice , 135:105509, 2023b. doi: 10.1016/j.conengprac.2023.105509. L. Pedroso, P. Batista, P. Oliveira, and C. Silvestre. Discrete-time distributed Kalman filter design for networks of interconnected systems with linear time-varying dynamics. International Journal of Systems Science , 53(6):1334–1351, 2022. doi: 10.1080/00207721.2021.2002461. L. Pedroso, P. Batista, and W. P. M. H. Heemels. Distributed design of ultra large-scale control systems: Progress, challenges, and prospects. Annual Reviews in Control , 59:100987, 2025. doi: 10.1016/j.arcontrol.2025.100987. L. Pedroso, P. Batista, and W. P. M. H. Heemels. Overlapping covariance intersection: Fusion with partial structural knowledge of correlation from multiple sources. IEEE Transactions on Automatic Control , 2026a. doi: 10.48550/arXiv.2603.16768. (conditionally accepted). L. Pedroso, W. P. M. H. Heemels, and P. Batista. A unified family-optimal solution to covariance intersection problems with semidefinite programming. 
+
+IEEE Control Systems Letters , 2026b. doi: 10.1109/LCSYS.2026.3698437. (in press). M. Reinhardt, B. Noack, P. O. Arambel, and U. D. Hanebeck. Minimum covariance bounds for the fusion under unknown correlations. IEEE Signal Processing Letters , 22(9):1210–1214, 2015. doi: 10.1109/LSP.2015.2390417. S. I. Roumeliotis and G. A. Bekey. Distributed multirobot localization. IEEE Transactions on Robotics and Automation , 18(5):781–795, 2002. doi: 10.1109/TRA.2002.803461. J. Russell Carpenter. Decentralized control of satellite formations. International Journal of Robust and Nonlinear Control , 12(2-3):141–161, feb 2002. ISSN 1049-8923. doi: 10.1002/rnc.680. R. T. Y. Thien and Y. Kim. Decentralized formation flight via PID and integral sliding mode control. Aerospace Science and Technology , 81:322–332, 2018. doi: 10.1016/j.ast.2018.08.011. L. Vandenberghe and S. Boyd. Semidefinite programming. SIAM Review , 38(1):49–95, 1996. doi: 10.1137/1038003. D. Viegas, P. Batista, P. Oliveira, and C. Silvestre. Decentralized observers for position and velocity estimation in vehicle formations with fixed topologies. 
+
+Systems & Control Letters , 61(3):443–453, mar 2012. doi: 10.1016/j.sysconle.2011.12.004. T. R. Wanasinghe, G. K. Mann, and R. G. Gosine. Decentralized cooperative localization for heterogeneous multi-robot system using split covariance intersection filter. In 2014 Canadian Conference on Computer and Robot Vision , pages 167–174, 2014. doi: 10.1109/CRV.2014.30. H. S. Witsenhausen. A counterexample in stochastic optimum control. SIAM Journal on Control , 6(1):131–147, 1968. doi: 10.1137/0306011. H. Xie, Y. Zhan, G. Zeng, and X. Pan. LEO mega-constellations for 6G global coverage: Challenges and opportunities. IEEE Access , 9:164223–164244, 2021. doi: 10.1109/ACCESS.2021.3133301. C. Yuan, S. Licht, and H. He. Formation learning control of multiple autonomous underwater vehicles with heterogeneous nonlinear uncertain dynamics. 
+
+IEEE Transactions on Cybernetics , 48(10):2920–2934, 2018. doi: 10.1109/TCYB.2017.2752458. F. Zhang, editor. The Schur Complement and Its Applications . Springer New York, NY, 1 edition, 2005. doi: 10.1007/b105056. E. S ¸ ahin. Swarm robotics: From sources of inspiration to domains of application. In E. S ¸ ahin and W. M. Spears, editors, Swarm Robotics . Springer, Berlin, Heidelberg, 2005. doi: 10.1007/978-3-540-30552-1 2. 
+
+17

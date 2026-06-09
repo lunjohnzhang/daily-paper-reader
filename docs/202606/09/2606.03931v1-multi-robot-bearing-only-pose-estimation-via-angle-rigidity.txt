@@ -1,0 +1,780 @@
+Title: Multi-Robot Bearing-only Pose Estimation via Angle Rigidity
+
+URL Source: https://arxiv.org/pdf/2606.03931v1
+
+Published Time: Wed, 03 Jun 2026 01:31:23 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Multi-Robot Bearing-only Pose Estimation via Angle Rigidity* 
+
+J. Francisco Presenza 1, Leonardo J. Colombo 2, Ignacio Mas 3, and Juan I. Giribet 3
+
+Abstract — This letter proposes a novel distributed bearing-based pose estimator for time-varying multi-robot systems. The method uses angles computed from body-frame bearings to estimate the robots’ positions in R3 without knowledge of their orientations. The orientations in SO(3) are recovered from the estimated positions, the bearings, and the bearing derivatives. The proposed observer only requires the (directed) sensing topology to be angle-rigid , a weaker condition than the commonly used ones like bearing rigidity. Local uniform exponential stability of the proposed observer is established under the assumption of persistently exciting motions for a subset of robots. Simulations are presented and discussed to evaluate the scheme’s effectiveness and practicality. 
+
+I. I NTRODUCTION 
+
+Distributed pose estimation using only inter-agent mea-surements is a fundamental problem in multi-robot systems. Over the past decade, extensive research has focused on 
+
+bearing-based methods, which exploit line-of-sight direction measurements between robots. This interest is largely moti-vated by the fact that bearings can be extracted from low-cost visual sensors with minimal processing. Bearings are typically measured in each robot’s body frame, and to use them for position estimation, they are typically transformed into a common frame. To this end, the corresponding robot orientations in SO(3) are required. However, absolute orientation estimation is often difficult in practice, as commonly used magnetic sensors are highly susceptible to disturbances and may be unavailable in some scenarios. Alternatively, some strategies employ inter-agent relative rotation measurements to estimate the orientations; see, for example, [1], [2]. Nevertheless, measuring relative rotations is challenging in practice, as it often requires substantially more processing, calibration, or additional in-frastructure, such as fiducial markers. For these reasons, many works have proposed exploiting body-frame bearing measurements for orientation estimation. Early approaches relied on the infinitesimal bearing rigidity  
+
+> *This work was partially supported by Universidad de Buenos Aires [grant number UBACyT 20020220100053BA]. L. Colombo acknowledge fi-nancial support from Grant PID2022-137909NB-C21 funded by MCIN/AEI/ 10.13039/501100011033 and iRoboCity2030-CM, Rob´ otica Inteligente para Ciudades Sostenibles (TEC-2024/TEC-62). Corresponding author J. Fran-cisco Presenza.
+> 1Institute of Engineering Technology and Sciences “Hilario Fern´ andez Long” (CONICET-UBA) - Av. Paseo Col´ on 850, C1063ACV, Buenos Aires, Argentina.
+
+jpresenza@fi.uba.ar                   
+
+> 2Centre for Automation and Robotics (CSIC-UPM) -Ctra. M300 Campo Real, Km 0.200, Arganda del Rey, 28500, Madrid, Spain.
+
+leonardo.colombo@csic.es  
+
+> 3Artificial Intelligence and Robotics Laboratory, Universidad de San Andr´ es and CONICET - Vito Dumas 284, B1644BID, Victoria, Argentina.
+
+imas@udesa.ar, jgiribet@udesa.ar 
+
+of the sensing network to guaranty pose observability; how-ever, these methods were limited to R3 ×S1 [3]. On the other hand, [4], [5], [6], [7], operate on SO(3) but still exhibit limited applicability, especially under time-varying sensing networks. This is partly because these methods depend on carefully designed sensing topologies, involving (i) cascaded interaction graphs, i.e., robot i only uses information from robots j < i , and (ii) reciprocal bearing measurements, i.e., 
+
+i measures j if and only if j measures i. Additionally, a key limitation of existing bearing-based methods, including [3], [4], [5], [6], [7], is that each robot must continuously measure at least one (or two) bearing(s) for its orientation in 
+
+S1 (SO(3) ) to be observable. This sensing requirement limit the robots’ visual sensors from being used for other tasks, such as mapping, target tracking, etc. More recently, angle rigidity has emerged as a promising avenue for network localization; see [8], [9], [10]. Angle measurements, which are obtained from the inner product of measured bearings, are independent of the robots’ orienta-tions. Hence, positions can be estimated without knowledge of orientation. Due to this, angle rigidity imposes milder conditions on the sensing topology than bearing rigidity; see [11]. Specifically, angle-based localization relaxes the requirement on the minimum number of measured bearings per robot. However, several shortcomings prevent their use in real-world applications. For example, most of them are only applicable in R2, or, to provide global convergence, they require special graph topologies, such as triangular in R2 and tetrahedral in R3. In addition, existing angle-based methods do not provide orientation estimation, which is required—or at least highly beneficial—in many robotic applications. This work introduces a novel distributed method for es-timating time-varying SE(3) poses of multi-robot systems using only body-frame bearing measurements. The observer leverages a position estimator based on the angles computed from bearings, whose output, together with the bearings and their velocities, is used for orientation estimation. To the best of our knowledge, this is the first approach achieving bearing-only pose estimation without requiring (i) reciprocal bearings, (ii) all robots to obtain bearing measurements, and (iii) additional sensing capabilities, such as inter-agent rotations. In addition, by leveraging rigidity theory, the proposed method is well-suited to time-varying networks, as distributed methods for maintaining rigidity are well studied in the literature; see [11] and references therein. The remainder of this letter is organized as follows. Section II presents basic definitions and an overview of angle rigidity theory. In Section III, we introduce the design of the distributed pose estimator; while the stability analysis is 
+
+> arXiv:2606.03931v1 [cs.RO] 2 Jun 2026
+
+presented in IV. Simulation results are presented in Section V, and Section VI provides final conclusions and directions for future work. II. P RELIMINARIES 
+
+A. Notation 
+
+Vectors are written as x ∈ Rn and matrices as A ∈ Rm×n.The standard basis is {ei}ni=1 ⊂ Rn. The vector of all ones is 
+
+1n ∈ Rn, and the identity matrix is In ∈ Rn×n; we omit the subscript when the dimension is clear from the context. The null space of a matrix is Null( A), and the Kronecker product is A ⊗ B. The unit n-sphere is Sn−1 = {v ∈ Rn : ∥v∥ = 1 }.For an n×n symmetric matrix A, we arrange its eigenvalues in nondecreasing order: λ1(A) ≤ . . . ≤ λn(A).Let SE(3) = R3 ⋊ SO(3) denote the special Euclidean group, where SO(3) corresponds to the Lie group of 3 × 3
+
+rotation matrices. Let S : R3 → so (3) denote the linear isomorphism defined by S(x)y = x × y for all x, y ∈ R3
+
+where × denotes the cross product and so (3) := TI3 SO(3) .For convenience, we adopt the following notation. First, a column stack of n vectors (or matrices) of equal dimensions is represented as x = [x1; . . . ; xn] = [xi]ni=1 (or A =[A1; . . . ; An] = [ Ai]ni=1 ). Second, if each xi ∈ R3, we let 
+
+S(x) := [ S(xi)] ni=1 . Third, if the dimensions of A = [ Ai]ni=1 
+
+and B = [ Bi]ni=1 are appropriate, then A ◦ B = [ AiBi]ni=1 
+
+denotes the block-wise product. 
+
+B. Robot and Network Models 
+
+Let (pi, R i) represent the pose of robot i, with position 
+
+pi ∈ R3 and orientation Ri ∈ SO(3) . Let V = {1, . . . , N }
+
+denote the robot indices, where N ≥ 3. Then, (p, R),with p = [ pi]i∈V ∈ R3N and R = [ Ri]i∈V ∈ SO(3) N ,represents the joint configuration. We consider first-order robot kinematics ˙pi = Riui and ˙Ri = RiS(ωi), where 
+
+ui, ω i ∈ R3 denotes the body-frame control actions of i ∈ V .Now, consider an anchor robot a ∈ V and express the robots’ poses in a reference frame attached to agent a,
+
+q := [qi]i∈V , Q := [Qi]i∈V where qi := R⊤ 
+
+> a
+
+(pi − pa),
+
+Qi := R⊤ 
+
+> a
+
+Ri, ∀i ∈ V . In this work, we assume that a
+
+can measure both the bearing and the distance to two robots 
+
+b, c ∈ V , which eliminates the similarity ambiguity that arises in angle-based localization; see Subsection II-C. It holds that, 
+
+˙qi = Qiui − ua − S(ωa)qi, ˙Qi = QiS(ωi − Q⊤ 
+
+> i
+
+ωa). (1) Here, ua and ωa are the control actions of the anchor. We assume these quantities are disseminated through the network via, e.g., a standard distributed consensus algorithm. The sensing network is modeled by a directed graph G =(V, E) with vertex set V and edge set E ⊆ V × V . The set of (outgoing) neighbors of i is Oi := {j : ( i, j ) ∈ E} . Here, 
+
+j ∈ O i means that robot i measures the bearing 
+
+βij := R⊤   
+
+> ipj−pi
+> ∥pj−pi∥
+
+= Q⊤ 
+
+> i
+
+qij , qij := qij   
+
+> ∥qij ∥
+
+, q ij := qj −qi. (2) Note that we do not require reciprocal measurements, i.e., 
+
+j ∈ O i does not imply i ∈ O j .The (cosine of the) angle measurement obtained when 
+
+{j, k } ⊆ O i is αijk := β⊤ 
+
+> ij
+
+βik . The set of all angle indices is A := {(i, j, k ) : {j, k } ⊆ O i, j < k }. We define A to include all angles induced by the (directed) edge set E, as this naturally represents the observed angles. The condition 
+
+j < k only prevents counting the same angle twice. 
+
+C. Angle Rigidity 
+
+Consider the framework (G, q) and let A be the set of angle indices. Define the angle function as αG : R3N → R|A| 
+
+such that αG (q) = [ αijk ](i,j,k )∈A . Let the angle rigidity matrix AG (q) ∈ R|A|× 3N be the differential of αG , which relates tangent vectors, i.e., δαG = AG (q)δq. To make the structure of the rigidity matrix explicit, consider Aijk (q) ∈
+
+R1×3N , the row corresponding to (i, j, k ) ∈ A . Then, 
+
+Aijk (q)δq = χ⊤
+
+> ijk
+
+(δq j − δq i) + χ⊤ 
+
+> ikj
+
+(δq k − δq i) (3) where χijk := Π( qij )qik /∥qij ∥ and Π : S2 → R3×3 such that Π( x) := I3 −xx ⊤. Equivalently, the only nonzero blocks of this row are [Aijk ]i = −(χijk + χikj )⊤, [Aijk ]j = χ⊤
+
+> ijk
+
+,and [Aijk ]k = χ⊤ 
+
+> ikj
+
+. For each (G, q), the null space of AG (q)
+
+contains the subspace 
+
+T (q) := {κq+S(1N ⊗ω)◦q+1N ⊗x : κ ∈ R, ω, x ∈ R3}, (4) i.e., velocities generated by similarity transformations: com-binations of translations, rotations, and scalings. Provided that the configuration is not contained in a lower-dimensional degenerate set, dim T (q) = 7 . Infinitesimal angle rigidity is defined as follows. 
+
+Definition 1: A framework (G, q) is said to be infinitesi-mally angle-rigid (IAR) if Null AG (q) = T (q). Equivalently, if λ8(LG (q)) > 0 where LG (q) := A⊤G (q)AG (q).Here, λ8 is referred to as the angle rigidity eigenvalue .Infinitesimal rigidity is important for cooperative localiza-tion, as it enables the recovery of the true positions up to a similarity transformation. This is established by Proposition 1, a classical result in rigidity theory that follows by applying the inverse function theorem to the angle function. 
+
+Proposition 1: Let (G, q) be infinitesimally angle-rigid. Then, there exists an open neighborhood U of q such that every q′ ∈ α−1 
+
+> G
+
+(αG (q)) ∩ U is similar to q.III. O BSERVER DESIGN 
+
+Motivated by the structure of the proposed observer, we define Vs := {i ∈ V : |O i| ≥ 2}, and Vf := V \ V s. The first group, the angle-sensing robots , consists of those that obtain angles from bearing measurements, while the second group, the angle-free robots , consists of those that measure one or no bearings. For simplicity, we will refer to them as sensing robots and free robots . It is clear that the anchor a ∈ V s.The observer is designed as follows. First, it recovers the positions of all i ∈ V in the anchor a’s reference frame using the angles computed from bearing measurements. Second, it uses bearing measurements to recover the orientations of robots i ∈ V s. Third, it exploits suitable robot motions to recover the orientations of robots i ∈ V f . In this step, orien-tation is inferred by comparing onboard control actions with the linear velocity estimated from the bearing derivatives. A. Assumptions 
+
+We explicitly state the assumptions on (G, q) required for the well-posedness of the proposed observer. All positive constants in the assumptions below are time-independent. 
+
+Assumption 1 (Uniform inter-agent separation): There exists ℓ > 0 such that the inter-agent distances satisfy 
+
+∥qij (t)∥ > ℓ , ∀t ≥ 0.
+
+Assumption 2 (Uniform infinitesimal angle rigidity): 
+
+There exists ℓ > 0 such that the rigidity eigenvalue satisfies 
+
+λ8(LG (q(t))) > ℓ , ∀t ≥ 0.
+
+Assumption 3 (Uniform non-collinearity 1): There exists 
+
+ℓ > 0 such that Π( βab (t)) + Π( βac (t)) ⪰ ℓI3, ∀t ≥ 0.
+
+Assumption 4 (Regularity): For each i ∈ V , the signals 
+
+qi(t), u i(t), ω i(t) are sufficiently regular and there exists 
+
+μq , μ u, μ ω > 0 such that ∥qi(t)∥ < μ q , ∥ui(t)∥ < μ u,
+
+∥ωi(t)∥ < μ ω , ∀t ≥ 0.
+
+Assumption 5 (Uniform non-collinearity 2): There exists 
+
+ℓ > 0 such that for each i ∈ V s, P 
+
+> j∈O i
+
+Π( βij (t)) ⪰ ℓI3,
+
+∀t ≥ 0.
+
+Assumption 6 (Persistent excitation of the free robots): 
+
+There exist constants T > 0 and ℓ > 0 such that for each 
+
+i ∈ V f , R t+Tt S( ˙ pi(τ )) ⊤S( ˙ pi(τ )) dτ ⪰ ℓI3, ∀t ≥ 0.These assumptions are appropriate for multi-robot appli-cations, as explained next. First, Assumption 1 merely states that collisions between robots are avoided. Assumption 2 is required for the correct estimation of the positions and can be enforced in practice by a rigidity maintenance controller [11]. Assumptions 3 and 5 fail to hold only on a measure-zero set, as this would require perfect alignment of the robots. If needed, both could be incorporated as additional objectives into the rigidity controller mentioned above. Assumption 4 requires sufficiently regular control actions and bounded inter-robot distances, which are reasonable requirements. Finally, Assumption 6 requires the velocity of each free robot to be persistently exciting, i.e., not confined to a fixed direction over each time window of length T .
+
+B. Position Correction 
+
+We begin by presenting a gradient-based position estimator that relies on angle measurements. Let ˆq = [ˆ qi]i∈V be the estimated joint position, and let ˜q := ˆ q − q be the estimation error. Let ˜αG ( ˆ q) = [˜ aijk ](i,j,k )∈A := αG ( ˆ q) − αG (q) denote the estimated angle errors, where αG (q) represents the vector of measured angles. Then, for κs > 0, we define the cost function 
+
+L( ˆ q) := 12
+
+P 
+
+> (i,j,k )∈A
+
+˜α2 
+
+> ijk
+
++ κs 
+
+> 2
+
+(∥˜qa∥2 +∥˜qb∥2 +∥˜qc∥2), (5) where the dependence of L on q is implicit. Here, qa = 0 ,while qb and qc are available from the anchor’s bearing-and-distance measurements. Assume a fixed configuration q.Then, from Proposition 1, infinitesimal angle rigidity implies that the (local) minimizers of the first term of (5) are similar to q. From Assumption 3, qb and qc are non-zero and non-collinear; hence, the second term removes the similarity ambiguity; see also Lemma 1. It follows that ˆq = q is an isolated local minimizer of (5). The gradient of the cost function with respect to the i-th estimate is 
+
+∇ˆqi L( ˆ q) = − P 
+
+> {j,k }⊆O i
+
+˜αijk ( ˆ χijk + ˆ χikj )+ P 
+
+> {i,k }⊆O j
+
+˜αjik ˆχjik + κs(δia ˆqa + δib ˜qb + δic ˜qc), (6) where ˆχijk := Π(ˆ qij )ˆ qik /∥ˆqij ∥ with ˆqij := ˆ qij /∥ˆqij ∥, and 
+
+δij is Kronecker’s delta. For simplicity in the notation, we denote 
+
+ζi( ˆ q) := ∇ˆqi L( ˆ q), ζ( ˆ q) = [ ζi]i∈V := ∇ ˆq L( ˆ q). (7) 
+
+Lemma 1 (Uniform positivity of the position Hessian): 
+
+Assume that Assumptions 1-4 hold. Then there exists 
+
+ℓh > 0 such that the Hessian of L( ˆ q) at ˆq = q(t) satisfies 
+
+H(q(t)) ⪰ ℓhIN , ∀t ≥ 0, i.e., is uniformly positive definite. 
+
+Proof: Define Q := cl {q(t) ∈ R3N : t ≥ 0}, which is compact. First, we show that H(q) ≻ 0 for all q ∈ Q .Fix q∗ ∈ Q . From the continuity of ∥ · ∥ and λ8(·), it follows that Assumptions 1-3 hold in Q. That is, q∗ 
+
+> b
+
+, q ∗ 
+
+> c
+
+are non-zero and non-collinear, and λ∗ 
+
+> 8
+
+:= λ8(LG (q∗)) > 0. The Hessian is 
+
+H(q∗) = LG (q∗) + κs
+
+ eae⊤ 
+
+> a
+
++ ebe⊤ 
+
+> b
+
++ ece⊤
+
+> c
+
+ ⊗ I3.
+
+where ei ∈ RN . Now, consider v = [ vi]i∈V ∈ R3N and let y be the orthogonal projection of v onto T (q∗)⊥. Since 
+
+LG (q∗) is symmetric and T (q∗) = Null( LG (q∗)) , it holds that 
+
+v⊤H(q∗)v = y⊤LG (q∗)y + κs(∥va∥2 + ∥vb∥2 + ∥vc∥2)
+
+≥ λ∗
+
+> 8
+
+∥y∥2 + κs(∥va∥2 + ∥vb∥2 + ∥vc∥2)
+
+Now, suppose that v⊤H(q∗)v = 0 . Then, v ∈ T (q∗) and 
+
+va = vb = vc = 0 . Therefore, v is a velocity generated by a similarity transformation that fixes q∗
+
+> a
+
+, q∗ 
+
+> b
+
+, and q∗ 
+
+> c
+
+. But the only similarity transformation that does so is the identity map; thus, v = 0 .From the implication proved above, λ1(H(q)) > 0 for all 
+
+q ∈ Q . Since Q is compact and λ1(H(·)) is continuous on 
+
+Q, it attains a positive minimum, and uniformity follows. 
+
+C. Orientation Correction 
+
+We denote (qs, Qs) ∈ SE(3) Ns and (qf , Qf ) ∈ SE(3) Nf
+
+as the poses of the sensing and free robots, respectively, where Ns and Nf are the number of robots in each group. For convenience, we define two maps, ηsi (q, Qs) for i ∈Vs and ηfi (q, Qs) for i ∈ V f , that reconstruct the robot velocities from qs, qf , and Qs. To do this, define Isi := 
+
+{j ∈ V s : ( j, i ) ∈ E} , i.e., the set of sensing robots observing robot i. Specifically, we set (8) for i ∈ V s and (9) for i ∈ V f ,
+
+˙qi = ηsi (q, Qs) := Qiui − ua − S(ωa)qi, (8) 
+
+˙qi = ηfi (q, Qs) := 
+
+P
+
+> j∈I si
+
+Π( Qj βji )
+
+−1 P
+
+> j∈I si
+
+
+
+(Π( Qj βji ) ˙ qj + ∥qji ∥( ˙Qj βji + Qj ˙βji )
+
+
+
+.
+
+(9) Here, (8) follows directly from (1), whereas the derivation of (9) is provided in Subsection III-C.2. Note that (8)-(9) are independent of Qf . The reason for doing so is to avoid relying on the estimated ˆQi, i ∈ V f , in the feed-forward term of (18), which would break the cascade architecture of the observer formulated in Subsection III-D. Instead, (8) and (9) allow us to reconstruct the velocities ˆυi from estimates as follows, 
+
+ˆυi := ηsi ( ˆ q, ˆQs) = ˆQiui − ua − S(ωa)ˆ qi, i ∈ V s, (10) 
+
+ˆυi := ηfi ( ˆ q, ˆQs), i ∈ V f . (11) The latter is computed from (9) using the measurements 
+
+βji , ˙βji and replacing Qj with ˆQj , ˙qj with ˆυj = ηsj ( ˆ q, ˆQs),and ˙Qj with ˆΨj := ˆQj S(ωj − ˆQ⊤ 
+
+> j
+
+ωa), for each j ∈ I si .We now turn our attention to the design of the orientation-correction terms. 
+
+1) Sensing robots: For i ∈ V s, it is possible to estimate 
+
+ˆQi by exploiting the relationship ∥qij ∥Qiβij = qij , ∀j ∈ O i.Indeed, consider the following cost function and the SO(3) 
+
+gradient-based update for i ∈ V s,
+
+J si ( ˆ q, ˆQi) := P
+
+> j∈O i
+
+
+
+∥ˆqij ∥ − β⊤ 
+
+> ij
+
+ˆQ⊤ 
+
+> i
+
+ˆqij 
+
+
+
+,
+
+˙ˆQi = −∇ ˆQiJ si = ˆQiS(Ω si ), Ωsi := P 
+
+> j∈O i
+
+S(βij ) ˆQ⊤ 
+
+> i
+
+ˆqij .
+
+(12) Note that J si ≥ 0 and J si (q, Q i) = 0 .
+
+2) Free robots: For i ∈ V f , the observer (12) is not appropriate since it requires |O i| ≥ 2 for correct estimation. However, Qi can be estimated by comparing the onboard control action ui with the estimated linear velocity ˆvi (11). To do this, define γi := Qiui and its reconstruction from estimates ˆγi := ˆ υi + ua + S(ωa)ˆ qi, see (1). We propose the following cost function and the SO(3) gradient-based update, 
+
+J fi (ˆ υi, ˆQi) := ∥ui∥∥ ˆγi∥ − u⊤ 
+
+> i
+
+ˆQ⊤ 
+
+> i
+
+ˆγi,
+
+˙ˆQi = −∇ ˆQiJ fi = ˆQiS(Ω fi ), Ωfi := S(ui) ˆQ⊤ 
+
+> i
+
+ˆγi. (13) Note that J fi ≥ 0 and J fi ( ˙ qi, Q i) = 0 .Next, we show how to derive (9). From (2), 
+
+Π( Qj βji )( ˙ qi − ˙qj ) = ∥qij ∥( ˙Qj βji +Qj ˙βji ), ∀j ∈ I si , (14) which is a linear system of equations on ˙qi. Proposition 2 shows that (9) is the unique solution to this system. Before establishing this result, we need Lemma 2. 
+
+Lemma 2 (Uniform non-collinearity of the in-bearings): 
+
+Let (G, q(t)) satisfy Assumptions 1-4. Then, there exists 
+
+ℓ > 0 such that for each i ∈ V f ,
+
+Pi(q(t)) := P
+
+> j∈I si
+
+Π( qji (t)) ⪰ ℓI3, ∀t ≥ 0. (15) 
+
+Proof: The argument mirrors the structure of the proof of Lemma 1. Define Q := cl {q(t) ∈ R3N : t ≥ 0}. First, we show that Pi(q) ≻ 0 for all q ∈ Q and all i ∈ V f .Fix q∗ ∈ Q and i∗ ∈ V f and suppose, by contradiction, that Pi∗ (q∗) is singular. If Isi∗̸ = ∅, since Pi∗ (q∗) is singular, all bearings q∗ 
+
+> ji ∗
+
+are collinear. Thus, let δq := ei∗ ⊗ q∗ 
+
+> ji ∗
+
+for some j ∈ I si∗ . Then, AG (q∗)δq = 0 and δq /∈ T (q∗), see (3) and (4), contradicting IAR. If Isi∗ = ∅, an analogous argument follows with δq := ei∗ ⊗ x ∈ R3N for any x̸ = 0 ∈ R3.From the implication proved above, λ1(Pi(q)) > 0 for each 
+
+q ∈ Q . Since Q is compact and λ1(Pi(·)) is continuous on 
+
+Q, it attains a positive minimum, and uniformity follows. 
+
+Proposition 2: Let (G, q(t)) satisfy Assumptions 1-4 and let Pi as in (15). Then (9) is the unique solution of (14). 
+
+Proof: From qji = Qj βji , the system (14) can be written as Mi ˙qi = bi where Mi := [Π( qji )] j∈I si and 
+
+bi := [Π( qji ) ˙ qj + ∥qji ∥ ˙qji ]j∈I si . This system is compatible since it is derived from the system kinematics. Also, (9) is a solution of the normal equation M ⊤ 
+
+> i
+
+Mi ˙qi = M ⊤ 
+
+> i
+
+bi,where M ⊤ 
+
+> i
+
+Mi = Pi and M ⊤ 
+
+> i
+
+bi = P 
+
+> j
+
+Π( qji ) ˙ qj + ∥qij ∥ ˙qji .Uniqueness follows from Pi ≻ 0 due to Lemma 2. 
+
+Remark 1: (9) provides a least-squares solution, which is exact in the noiseless case and is especially useful when the bearing measurements are corrupted by noise. 
+
+D. Full Pose Observer 
+
+Based on the previous analysis, we propose the following observer. Set κq , κ Q > 0, then 
+
+˙ˆqi = ηsi ( ˆ q, ˆQs) − κq ζi( ˆ q), i ∈ V s, (16) 
+
+˙ˆQi = ˆQiS
+
+
+
+ωi − ˆQ⊤ 
+
+> i
+
+ωa + κQΩsi ( ˆ q, ˆQs)
+
+
+
+, i ∈ V s, (17) 
+
+˙ˆqi = ηfi ( ˆ q, ˆQs) − κq ζi( ˆ q), i ∈ V f , (18) 
+
+˙ˆQi = ˆQiS
+
+
+
+ωi − ˆQ⊤ 
+
+> i
+
+ωa + κQΩfi ( ˆ q, ˆQ)
+
+
+
+, i ∈ V f . (19) 
+
+Remark 2: The observer (16)-(19) has a cascade structure in which the subsystem (16)-(18) is upstream of the subsys-tem (19), which does not feed back into it. 
+
+Remark 3: The observer (16)-(19) is distributed and only requires information exchange between neighbors. IV. S TABILITY ANALYSIS 
+
+Define the estimation errors as 
+
+˜q := [˜ qi]i∈V , ˜qi := ˆ qi − qi, ˜Q := [ ˜Qi]i∈V , ˜Qi := Q⊤ 
+
+> i
+
+ˆQi. (20) Let η(q, Qs) = [ ηi]i∈V ∈ R3N where ηi = ηsi for i ∈ V s
+
+and ηi = ηfi for i ∈ V f . Also, let let ωs := [ ωi]i∈V s , ωf := [ωi]i∈V f , Ωs := [Ω si ]i∈V s , and Ωf := [Ω fi ]i∈V f . Thus, the error dynamics can be written compactly as 
+
+˙˜q = η( ˆ q, ˆQs) − η(q, Qs) − κq ζ( ˆ q), (21) 
+
+˙˜Qs = −S(ωs) ◦ ˜Qs + ˜Qs ◦ S(ωs+κQΩs( ˆ q, ˆQs)) , (22) 
+
+˙˜Qf = −S(ωf ) ◦ ˜Qf + ˜Qf ◦ S(ωf +κQΩf ( ˆ q, ˆQ)) . (23) 
+
+Lemma 3: The zero-error trajectory ( ˜ q, ˜Q) = 1N ⊗(0 , I3)
+
+is invariant for the error dynamics (21)–(23). 
+
+Proof: At zero-error, one has ζ(q) = 0 (7), 
+
+Ωs(q, Qs) = 0 (12), and Ωf (q, Q) = 0 (13); hence 
+
+( ˙˜q, ˙˜Q) = 0 .Before establishing the main theorem, we define small orientation errors in local coordinates ξi ∈ R3, i ∈ V , such that ˜Qi = I + S(ξi) + o(∥ξi∥). Then, let ξs := [ ξi]i∈V s .
+
+Theorem 1 (Stability of the full pose observer): 
+
+Consider a configuration (q(t), Q(t)) ∈ SE(3) N such that Assumptions 1-6 hold. Consider the observer (16)-(19) and fix the orientation gain κQ. Then, if the position gain 
+
+κq > 0 is sufficiently large, the tracking error with respect to the true trajectory (q(t), Q(t)) is locally uniformly exponentially stable. Proof: Step 1: We begin by establishing the local uni-form exponential stability (LUES) of the upstream observer. The linearized dynamics (21)-(22) near ( ˜ q, ˜Q) = (0 , I) are 
+
+ ˙˜q
+
+˙ξs
+
+
+
+=
+
+C − κq H D
+
+−κQB −W − κQK
+
+  ˜qξs
+
+
+
++ o(∥[ ˜ q; ξs]∥).
+
+Here, H(t) is the position Hessian, which is uniformly positive definite by Lemma 1. C(t), D(t) are the jacobians of η(q, Qs) with respect to q and the local coordinates of Qs
+
+evaluated at q(t) and Qs(t), respectively. Both C(t), D(t)
+
+are uniformly bounded since the maps ηs, η f are uniformly smooth in a neighborhood of the true trajectory. Now, we derive expressions for K(t), B(t), and W (t).From (12) and (20), 
+
+Ωsi = P 
+
+> j∈O i
+
+S(βij ) ˜Q⊤ 
+
+> i
+
+(∥qij ∥βij + Q⊤ 
+
+> i
+
+˜qij ) = = P
+
+> j∈O i
+
+ S(βij )Q⊤ 
+
+> i
+
+˜qij − ∥ qij ∥Π( βij )ξi
+
+ + o(∥[ ˜ q; ξi]∥).
+
+where we used S(βij )S(ξi)βij = Π( βij )ξi. Now, the lin-earized error dynamics of (22) satisfy 
+
+˙ξi = −S(ωi)ξi + κQΩsi + o(∥ξi∥ + ∥Ωsi ∥)= −S(ωi)ξi + κQ
+
+P 
+
+> j∈O i
+
+Bij ˜qij − Kiξi
+
+
+
++ o(∥[ ˜ q; ξi]∥),
+
+where Ki := P 
+
+> j∈O i
+
+∥qij ∥Π( βij ) and Bij := S(βij )Q⊤ 
+
+> i
+
+.It follows that K(t) := diag( Ki)i∈V s is uniformly pos-itive definite, from Assumptions 1 and 5. Also, let B(t)
+
+be a matrix-weighted Laplacian such that block [B]ii =P 
+
+> j∈O i
+
+Bij , [B]ij = −Bij if j ∈ O i, and zero elsewhere. Then, B(t) is uniformly bounded since it only depends on unit-norm bearings and rotation matrices. Finally, W (t) := diag( S(ωi)) i∈V s is skew-symmetric and uniformly bounded. Hence, the involved matrices satisfy uniformly for t ≥ 0,
+
+H(t) ⪰ ℓhI, K(t) ⪰ ℓkI, ∥B(t)∥ ≤ μb, ∥C(t)∥ ≤ μc,
+
+∥D(t)∥ ≤ μd, ∥W (t)∥ ≤ μw for some ℓh, ℓ k > 0 and 
+
+μb, μ c, μ d, μ w ≥ 0.Now, let e := [ ˜ q; ξs] denote the upstream error, and consider the Lyapunov function V (e) := 12 ∥e∥2. Then, 
+
+˙V (e) = ˜ q⊤(C − κq H) ˜ q + ˜ q⊤(D − κQB⊤)ξs
+
+−κQ(ξs)⊤Kξ s + o(∥e∥2) ≤ (μc − κq ℓh)∥ ˜q∥2
+
++( μd + κQμb)∥ ˜q∥∥ ξs∥ − κQℓk∥ξs∥2 + o(∥e∥2).
+
+(24) On the right-hand side of (24), the higher-order terms are dominated by the quadratic term, which, according to Sylvester’s criterion, is negative definite if κq ℓh > μ c +(μd + κQμb)2/(4 κQℓk). Hence, for sufficiently small errors and for sufficiently large κq , there exists ρ > 0 such that 
+
+˙V ≤ − ρ∥e∥2 = −2ρV . It follows that V (t) ≤ V (0) e−2ρt ,thus ∥e(t)∥ ≤ Cee−λet∥e(0) ∥ for some constants Ce ≥ 1
+
+and λe > 0. Because all constants in the estimates are uniform over time, the upstream error is LUES. 
+
+Step 2: Now, we consider the error dynamics (23) with an ideal upstream observer, i.e., we assume ˆq = q and 
+
+ˆQs = Qs. We prove the result for each i ∈ V f separately since each subsystem is independent. Let i ∈ V f , then the reconstructed velocity is exact, that is ˆυi = ˙ qi, and one gets 
+
+ˆγi = Qiui. Then, from (13), one obtains Ωfi = S(ui) ˜Q⊤ 
+
+> i
+
+ui.We now linearize (23) around ˜Qi = I. It follows that Ωfi =
+
+−S(ui)⊤S(ui)ξi + o(∥ξi∥). Thus, the linearized orientation error of (23) satisfies 
+
+˙ξi = −Gi(t)ξi + o(∥ξi∥), G i := S(ωi) + κQS(ui)⊤S(ui)
+
+Now, fix an initial time t ≥ 0, and let τ ∈ [t, t + T ].Consider the change of coordinates ϕi(τ ) := Φ i(τ )ξi(τ ),where Φi(τ ) := Ri(t)⊤Ri(τ ) ∈ SO(3) . Here, Φi(τ ) is used to discount the transport of the error coordinates induced by 
+
+ωi. Since ˙pi(τ ) = Ri(τ )ui(τ ), it follows that 
+
+dϕ i
+
+dτ = −κQR⊤ 
+
+> i
+
+(t)S( ˙ pi(τ )) ⊤S( ˙ pi(τ )) Ri(t)ϕi(τ ) + o(∥ϕi∥).
+
+If the PE assumption is satisfied over [t, t + T ], then this linear system UES. 
+
+Step 3: Now, we consider the error dynamics (23) when the upstream error e(t) is nonzero but exponentially decaying, as established by Step 1 . Consider i ∈ V f , and let 
+
+ri := ˆ υi− ˙qi = ηfi ( ˆ q, ˆQs)−ηfi (q, Qs) = Ci ˜q+Diξs+o(∥e∥),
+
+where Ci(t), D i(t) are the jacobian matrices of ηfi with respect to q and the local coordinates of Qs evaluated at 
+
+q(t) and Qs(t), respectively. These matrices are uniformly bounded due to the uniform smoothness of the map ηfi , as discussed in Step 1 . Thus, there exists ρq , ρ ξ , ρ e, ρ 0, λ e > 0
+
+such that 
+
+∥ri(t)∥ ≤ ρq ∥ ˜q(t)∥ + ρξ ∥ξs(t)∥ ≤ ρe∥e(t)∥ ≤ ρ0e−λet.
+
+On the other hand, it holds that ˆγi = Qiui + si, where 
+
+si := ri + S(ωa)˜ qi decays exponentially. Thus, from (13), 
+
+Ωfi = S(ui) ˜Q⊤ 
+
+> i
+
+ui + S(ui) ˜Q⊤ 
+
+> i
+
+Q⊤ 
+
+> i
+
+si.
+
+Then, the linearized orientation error of (23) satisfies 
+
+˙ξi = −Gi(t)ξi + κQS(ui)Q⊤ 
+
+> i
+
+si + o(∥[e; ξi]∥).
+
+The unperturbed linear system ( si = 0 ) is UES as shown in Step 2 . In addition, since si(t) decays exponentially, a variation-of-constants argument shows that ξi(t) also decays exponentially. Hence, the nonlinear error dynamics are LUES near ˜Qi = I. Because the downstream system does not feed back into the upstream subsystem, the full observer is LUES. V. S IMULATION RESULTS 
+
+We conducted simulations aimed at validating the pro-posed estimator. We employed N = 5 robots in R3 with special agent a = 1. In the first example (Fig. 1), the sensing graph was determined by O1 = {2, 3, 4, 5}, O2 =
+
+{1, 3, 4, 5}, O3 = O4 = O5 = ∅. So, Vs = {1, 2} and 
+
+Vf = {3, 4, 5}.Let U(·) and N (·, ·) denote the uniform and normal distributions, respectively. The initial robots’ positions were generated as qi(0) ∼ U ([0 m , 20 m] 3). Orientations were sam-pled on SO(3) by setting Qa(0) = I and Qi(0) = exp( S(θi)) ,with θi ∼ U({x : ∥x∥ < 2π rad }). The initial position estimates were ˆqa(0) = 0 and ˆqi(0) ∼ N (qi(0) , 4 m 2). The 0   
+
+> 10
+> 20
+> x (m)
+> 010 20
+> y(m)
+> 0
+> 10
+> 20
+> z (m)
+
+(a) Robot trajectories. 0 2 4 6 8 10         
+
+> t(s)
+> 0.0
+> 5.0
+> ‖̃ qi‖(m)  sens
+> free
+> 0246810
+> t(s)
+> 0.0
+> 0.5
+> ‖ψi‖ (rad)  sens
+> free
+
+(b) Pose error. 
+
+Fig. 1: Simulation results: Case 1. (a): • and ◦ represent initial position of Vs and Vf , respectively; × are the final positions; and arrows the show sensing graph. initial orientation estimates were ˆQa(0) = I and ˆQi(0) = 
+
+Qi(0) exp( S(ψi)) , where ψi ∼ U ({x : ∥x∥ < 1 rad }).The body-frame control actions were u1(t) = [0; 0; 1] ,
+
+u2(t) = [cos( t/ 4); sin( t/ 4); 0] , u3(t) = [0; cos( t); sin( t)] ,
+
+u4(t) = [cos(2 t); sin(2 t); 0 .5] , and u5(t) =[cos( t); sin(0 .5t); 0 .0] . The body-frame angular velocities were ω1 = 0 .5e1, ω2 = e2, ω3 = e3, and ω4 = ω5 = 0 .The resulting trajectories are shown in Fig. 1a, where the body-frame axes are omitted for simplicity. Note that ˙p3,
+
+˙p4, and ˙p5 are persistently exciting, as per Assumption 6. Fig 1b shows the errors obtained by the proposed observer with gains κs = 0 .02 , κq = 500 , and κQ = 2 . For the orientation error, we plot ∥ψi∥ = arccos((tr( ˜Qi) − 1) /2) 
+
+where ˜Qi = exp( S(ψi)) . As expected, the errors decay rapidly toward zero, demonstrating the effectiveness of the proposed estimator. Notably, the sensing robots’ orientation errors diminish faster than those of the free robots, who rely on error correction over a period rather than instantaneously. A second case was considered where we set ωi(t) = 0 and 
+
+ui(t) = ˆQ⊤ 
+
+> i
+
+(t)[cos( t); sin( t/ 2); 0] ; see Fig. 2. As ˆQi → Qi
+
+robots converge to a common velocity. To illustrate the versatility of the observer, we employed a different sensing graph having O1 = {2, 4, 5}, O2 = {1, 3, 4}, O3 = {1, 2, 5},and O4 = O5 = ∅. Hence Vs = {1, 2, 3} and Vf =
+
+{4, 5}. Fig. 2b shows the errors decay rapidly toward zero, demonstrating that no relative motion between the robots is required for convergence. Two sharp decreases in ψi, i ∈ V f ,can be observed, beginning on t ≈ 1.5 s and t ≈ 5 s .These instants coincide with a change in motion direction, illustrating the persistence of the excitation condition. Note that the sensing graphs employed in these examples are angle-rigid; however, they neither induce a bearing-rigid framework nor are they compatible with the sensing structures required in [4], [5], [6], [7]. This illustrates the suitability of the proposed method, even for sparse sensing networks. VI. C ONCLUSIONS 
+
+This work presents a novel observer architecture for distributed pose estimation in multi-robot networks. By ex-ploiting angle rigidity, it removes the need for a minimum number of measured bearings per robot, as required by 0   
+
+> 10
+> 20
+> x (m)
+> 010 20
+> y(m)
+> 0
+> 10
+> 20
+> z (m)
+
+(a) Robot trajectories. 0 2 4 6 8 10         
+
+> t(s)
+> 0.0
+> 5.0
+> ‖̃ qi‖(m)  sens
+> free
+> 0246810
+> t(s)
+> 0.0
+> 0.5
+> ‖ψi‖ (rad)  sens
+> free
+
+(b) Pose error. 
+
+Fig. 2: Simulation results: Case 2. (a)-(b): □ marks the instants t = 1 .5 s and t = 5 s .bearing-rigidity methods. Additionally, orientations are ob-tained using measured bearings and their derivatives; hence, inter-agent rotation measurements are not required. Local exponential stability of the poses was established under persistently exciting motions for the free robots. Notably, all positions, as well as the orientations of sensing robots, can still be recovered even when free robots are static. Future work will involve analyzing the region of attraction associated with the orientation errors. It is also important to assess this scheme’s robustness to measurement noise: since orientation errors affect the position estimator only through the feed-forward term, this architecture may offer improved noise rejection compared to existing bearing-based methods. REFERENCES [1] M. H. Trinh, B.-H. Lee, M. Ye, and H.-S. Ahn, “Bearing-based formation control and network localization via global orientation estimation,” in 2018 IEEE conference on control technology and applications (CCTA) . IEEE, 2018, pp. 1084–1089. [2] X. Li, X. Luo, and S. Zhao, “Globally convergent distributed network localization using locally measured bearings,” IEEE Transactions on Control of Network Systems , vol. 7, no. 1, pp. 245–253, 2020. [3] F. Schiano, A. Franchi, D. Zelazo, and P. R. Giordano, “A rigidity-based decentralized bearing formation controller for groups of quadro-tor uavs,” in 2016 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2016, pp. 5099–5106. [4] Q. V. Tran, B. D. Anderson, and H.-S. Ahn, “Pose localization of leader–follower networks with direction measurements,” Automatica ,vol. 120, p. 109125, 2020. [5] K. Cao, Z. Han, Z. Lin, and L. Xie, “Bearing-only distributed localization: A unified barycentric approach,” Automatica , vol. 133, p. 109834, 2021. [6] M. Boughellaba and A. Tayebi, “Leader-follower bearing-based dis-tributed pose estimation for multi-vehicle networks,” in 2022 IEEE 61st Conference on Decision and Control (CDC) . IEEE, 2022, pp. 6562–6567. [7] ——, “Bearing-based distributed pose estimation for multi-agent net-works,” IEEE Control Systems Letters , vol. 7, pp. 2617–2622, 2023. [8] G. Jing, C. Wan, and R. Dai, “Angle-based sensor network localiza-tion,” IEEE Transactions on Automatic Control , vol. 67, no. 2, pp. 840–855, 2021. [9] L. Chen, L. Xie, X. Li, X. Fang, and M. Feroskhan, “Simultaneous localization and formation using angle-only measurements in 2d,” 
+
+Automatica , vol. 146, p. 110605, 2022. [10] L. Chen, K. Cao, L. Xie, X. Li, and M. Feroskhan, “3-d network localization using angle measurements and reduced communication,” 
+
+IEEE Transactions on Signal Processing , vol. 70, pp. 2402–2415, 2022. [11] J. F. Presenza, L. J. Colombo, J. I. Giribet, and I. Mas, “Angle-based localization and rigidity maintenance control for multi-robot networks,” 2026, under revision. Preprint available at https://arxiv.org/abs/2604.11754.
