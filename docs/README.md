@@ -6,81 +6,73 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-09
-- 运行时间：2026-06-09 22:12:08 UTC
+- 最新运行日期：2026-06-10
+- 运行时间：2026-06-10 21:18:49 UTC
 - 运行状态：成功
-- 本次总论文数：19
-- 精读区：8
+- 本次总论文数：17
+- 精读区：6
 - 速读区：11
 
 ### 今日简报（AI）
-今日推荐19篇论文，精读2篇9分论文：机器人集群的物理信息建模与控制、搜救无人机集群的基于市场重规划。
-
-最值得关注的是集群涌现行为建模与安全关键任务中的市场机制重规划，两者均获最高分。
-
-建议优先精读这两篇高分论文，深入理解集群智能与安全决策框架。
-- 详情：[/202606/09/README](/202606/09/README)
+今日推荐17篇多机器人协同与任务分配论文，精读《CADENCE》和《Shape Formation》两篇9分佳作。  
+值得关注的方向：利用“代价和以外因素”预测MAS执行延迟，以及基于多智能体强化学习的任意物体协同运输。  
+普通读者可优先精读这两篇，再深入探索异质多团队协作与无通信任务分配技术。
+- 详情：[/202606/10/README](/202606/10/README)
 
 ### 精读区论文标签
-1. [Physics-Informed Modeling and Control of Emergent Behaviors in Robot Swarms](/202606/09/2606.01597v1-physics-informed-modeling-and-control-of-emergent-behaviors-in-robot-swarms)  
+1. [CADENCE: Predicting Realized MAPF Execution Time Beyond Sum of Costs](/202606/10/2606.04746v2-cadence-predicting-realized-mapf-execution-time-beyond-sum-of-costs)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：机器人集群建模与控制，多机器人协调
-2. [Market-Based Replanning for Safety-Critical UAV Swarms in Search and Rescue Missions](/202606/09/2606.01970v1-market-based-replanning-for-safety-critical-uav-swarms-in-search-and-rescue-missions)  
+   evidence：研究仓储式工作单元中MAPF执行时间预测
+2. [Shape Formation for the Cooperative Transportation of Arbitrary Objects Using Multi-Agent Reinforcement Learning](/202606/10/2606.09610v1-shape-formation-for-the-cooperative-transportation-of-arbitrary-objects-using-multi-agent-reinforcement-learning)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：基于市场的重规划用于无人机集群协调
-3. [Coordination Graphs for Constrained Multi-Agent Reinforcement Learning](/202606/09/2606.02337v1-coordination-graphs-for-constrained-multi-agent-reinforcement-learning)  
+   evidence：多机器人协调运输
+3. [Co-GLANCE: Uncertainty-Aware Active Perception for Heterogeneous Robot Teaming](/202606/10/2606.09919v1-co-glance-uncertainty-aware-active-perception-for-heterogeneous-robot-teaming)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：用于约束多智能体强化学习的协调图
-4. [Towards a Data Flywheel for Embodied Intelligence in Logistics](/202606/09/2606.05960v1-towards-a-data-flywheel-for-embodied-intelligence-in-logistics)  
+   evidence：异构机器人团队协调中不确定性感知
+4. [Generation of Diverse and Functional Robot Designs using Superquadrics Parametrisation and Quality-Diversity](/202606/10/2606.11037v1-generation-of-diverse-and-functional-robot-designs-using-superquadrics-parametrisation-and-quality-diversity)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：物流中的世界模型，与多机器人世界模型需求一致
-5. [Merging model-based control with multi-agent reinforcement learning for multi-agent cooperative teaming strategies](/202606/09/2606.06011v1-merging-model-based-control-with-multi-agent-reinforcement-learning-for-multi-agent-cooperative-teaming-strategies)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：多智能体强化学习结合模型预测控制用于协作编队
-6. [A Multi-Operator Mixed-Reality Interface for Multi-Robot Control and Coordination: Co-Located and Private Workspace Collaboration](/202606/09/2606.07013v1-a-multi-operator-mixed-reality-interface-for-multi-robot-control-and-coordination-co-located-and-private-workspace-collaboration)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：多操作员多机器人控制与协调的混合现实界面
-7. [Continual Quadruped Robots Coordination via Semantic Skill Discovery](/202606/09/2606.08102v1-continual-quadruped-robots-coordination-via-semantic-skill-discovery)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：多四足机器人协调，持续学习，语义技能库
-8. [Motion planning for hundreds of floating robots](/202606/09/2606.09620v1-motion-planning-for-hundreds-of-floating-robots)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：可扩展的数百个漂浮机器人运动规划
+   evidence：质量多样性优化用于机器人设计生成
+5. [REACT: Environment-Adaptive Architecture for Continuous Formation Navigation of Wheeled Mobile Robots](/202606/10/2605.18441v1-react-environment-adaptive-architecture-for-continuous-formation-navigation-of-wheeled-mobile-robots)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：轮式移动机器人的编队导航环境自适应
+6. [A Barrier-Modulated Architecture for Safe Affine Formation Control in Second-Order Multi-Agent Systems](/202606/10/2606.08137v1-a-barrier-modulated-architecture-for-safe-affine-formation-control-in-second-order-multi-agent-systems)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：基于障碍函数和自适应动态规划的多智能体安全编队控制
 
 ### 速读区论文标签
-1. [MR-SLAM: Immersive Spatial Supervision for Multi-Robot Mapping via Mixed Reality](/202606/09/2605.16432v1-mr-slam-immersive-spatial-supervision-for-multi-robot-mapping-via-mixed-reality)  
+1. [Learning Altruistic Collaboration in Heterogeneous Multi-Team Systems](/202606/10/2605.21723v1-learning-altruistic-collaboration-in-heterogeneous-multi-team-systems)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多机器人SLAM和环境地图构建
-2. [HCLM: A Hierarchical Framework for Cooperative Loco-Manipulation with Dual Quadrupeds](/202606/09/2605.17300v1-hclm-a-hierarchical-framework-for-cooperative-loco-manipulation-with-dual-quadrupeds)  
+   evidence：异构多团队中的利他协作机器人分配
+2. [Auction-Consensus Algorithm with Learned Bidding Scheme for Multi-Robot Systems](/202606/10/2605.21932v1-auction-consensus-algorithm-with-learned-bidding-scheme-for-multi-robot-systems)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：双四足机器人协同操作，直接涉及多机器人协调
-3. [Heterogeneous Information-Bottleneck Coordination Graphs for Multi-Agent Reinforcement Learning](/202606/09/2605.17393v1-heterogeneous-information-bottleneck-coordination-graphs-for-multi-agent-reinforcement-learning)  
+   evidence：学习增强的拍卖共识算法用于多机器人任务分配
+3. [Acting on the Unseen: Communication-Free Collaborative Filtering for Decentralized Multi-Robot Task Allocation](/202606/10/2605.25584v1-acting-on-the-unseen-communication-free-collaborative-filtering-for-decentralized-multi-robot-task-allocation)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多智能体强化学习中的协调图，适用于多机器人协调
-4. [Seeing Together:Multi-Robot Cooperative Egocentric Spatial Reasoning with Multimodal Large Language Models](/202606/09/2605.18431v1-seeing-togethermulti-robot-cooperative-egocentric-spatial-reasoning-with-multimodal-large-language-models)  
+   evidence：无通信的分布式多机器人任务分配，直接解决多机器人协调问题
+4. [Multi-Robot Box Transport over Different Surfaces with Decentralized Role-based Proportional Control](/202606/10/2605.26430v2-multi-robot-box-transport-over-different-surfaces-with-decentralized-role-based-proportional-control)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：使用多模态大语言模型的多机器人协作空间推理
-5. [OSCAR: Omni-Embodiment Action-Conditioned World Model for Robotics](/202606/09/2606.04463v2-oscar-omni-embodiment-action-conditioned-world-model-for-robotics)  
+   evidence：分散式任务与运动规划用于仓库环境中的箱子运输
+5. [PerceptTwin: Semantic Scene Reconstruction for Iterative LLM Planning and Verification](/202606/10/2606.04226v1-percepttwin-semantic-scene-reconstruction-for-iterative-llm-planning-and-verification)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：跨机器人具身的动作条件世界模型
-6. [Consistent Distributed Cooperative Localization for Ultra Large-Scale Multi-agent Systems](/202606/09/2606.04872v1-consistent-distributed-cooperative-localization-for-ultra-large-scale-multi-agent-systems)  
+   evidence：语义场景重建用于生成仿真环境，与多机器人世界模型相关
+6. [RSC: Decentralized Rigid Formation Flocking for Large-Scale Swarms via Hybrid Predictive Control and Online Reconfiguration](/202606/10/2606.04248v1-rsc-decentralized-rigid-formation-flocking-for-large-scale-swarms-via-hybrid-predictive-control-and-online-reconfiguration)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：大规模多智能体系统的分布式协同定位
-7. [Learning Multi-Agent Communication Protocol: Study on Information Entropy Efficiency in MARL](/202606/09/2606.07200v1-learning-multi-agent-communication-protocol-study-on-information-entropy-efficiency-in-marl)  
+   evidence：分散式多机器人编队控制
+7. [Enhancing the MADDPG Algorithm for Multi-Agent Learning via Action Inference and Importance Sampling](/202606/10/2606.05021v1-enhancing-the-maddpg-algorithm-for-multi-agent-learning-via-action-inference-and-importance-sampling)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：用于协调的多智能体通信协议
-8. [Rapid co-design of Buoyancy-assisted robots for Challenging Locomotion using Gaussian Evolutionary Specialists](/202606/09/2606.07424v1-rapid-co-design-of-buoyancy-assisted-robots-for-challenging-locomotion-using-gaussian-evolutionary-specialists)  
+   evidence：通过动作推断和重要性采样增强MADDPG多智能体学习算法
+8. [Sample-efficient Low-level Motion Planning for Robotic Manipulation Tasks via Zero-shot Transfer Learning](/202606/10/2606.06041v1-sample-efficient-low-level-motion-planning-for-robotic-manipulation-tasks-via-zero-shot-transfer-learning)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：高斯进化专家用于机器人协同设计，属于进化优化方法
-9. [Learning Action-Conditional and Object-Centric Gaussian Splatting World Models for Rigid Objects](/202606/09/2606.01950v1-learning-action-conditional-and-object-centric-gaussian-splatting-world-models-for-rigid-objects)  
+   evidence：进化算法（iCEM）结合迁移学习用于运动规划，与进化优化相关
+9. [Scaling Datasets for Multi-Sensor, Multi-Agent, and Multi-Domain Learning in Autonomous Systems](/202606/10/2606.04444v1-scaling-datasets-for-multi-sensor-multi-agent-and-multi-domain-learning-in-autonomous-systems)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：以物体为中心的高斯世界模型，可迁移至多机器人世界模型
-10. [AirDreamer: Generalist Drone Navigation with World Models](/202606/09/2606.03252v1-airdreamer-generalist-drone-navigation-with-world-models)  
+   evidence：为多智能体协调和自主性生成数据集的数据管道
+10. [Generalization of World Models under Environmental Variability for Vision-based Quadrotor Navigation](/202606/10/2606.05015v1-generalization-of-world-models-under-environmental-variability-for-vision-based-quadrotor-navigation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：无人机导航世界模型，与多机器人世界模型相关
-11. [Multi-Robot Bearing-only Pose Estimation via Angle Rigidity](/202606/09/2606.03931v1-multi-robot-bearing-only-pose-estimation-via-angle-rigidity)  
+   evidence：世界模型用于机器人导航，与多机器人世界模型相关
+11. [Adaptive Model Predictive Control of Nonlinear Generic Urban Air Mobility Using Linear Parameter-Varying Systems](/202606/10/2606.08836v1-adaptive-model-predictive-control-of-nonlinear-generic-urban-air-mobility-using-linear-parameter-varying-systems)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：多机器人系统的分布式位姿估计器
+   evidence：多目标进化优化（NSGA-II）用于控制参数整定
 
 
 <div class="dpr-home-promo-card">
