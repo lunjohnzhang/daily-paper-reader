@@ -1,0 +1,582 @@
+Title: Spatio-Temporal Reconnection for Multi-Robot Networks using Adaptive Prescribed-Time CBFs
+
+URL Source: https://arxiv.org/pdf/2606.01526v1
+
+Published Time: Tue, 02 Jun 2026 01:52:32 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Spatio-Temporal Reconnection for Multi-Robot Networks using Adaptive Prescribed-Time CBFs 
+
+Hao Liu ∗ Yupeng Yang ∗∗ Yanze Zhang ∗ Wenhao Luo ∗∗ Department of Computer Science, University of Illinois Chicago, Chicago, IL 60607, USA (e-mail: hliu232,yzhan361,wenhao@uic.edu).  
+
+> ∗∗
+
+Department of Computer Science, University of North Carolina at Charlotte, Charlotte, NC 28223, USA (e-mail: yyang52@charlotte.edu) 
+
+Abstract: In multi-robot systems, maintaining persistent communication graph connectivity is often overly restrictive, especially when robots have limited communication ranges but operate in large environments. Instead, allowing robots to temporarily disconnect and later reconnect is often more desirable for efficient task execution while still ensuring timely information sharing across the team. In this paper, we propose an adaptive prescribed-time control barrier function 
+
+(adaptive PT-CBF) framework that enables robots to temporarily disconnect and re-enter the communication range within an adjustable and feasible prescribed time. Moreover, we introduce a reconnection triggering mechanism that jointly considers task execution and reconnection urgency, thereby providing a principled way to decide when reconnection should occur. Theoretical analysis justifies convergence to the satisfying reconnection within a prescribed finite time. Experimental results validate the performance of our proposed adaptive PT-CBF with improved task efficiency and satisfying reconnections. 1. INTRODUCTION Networked multi-robot systems often rely on wireless com-munication to coordinate tasks such as formation control, area coverage, and environment estimation. In this setting, 
+
+global connectivity is often required where all robots re-main in a single connected component, so that information from any robot can reach all others through available communication links (Sabattini et al., 2013). Due to limited communication ranges, however, constrain-ing robots’ motion to enforce pairwise connections within range at all times can be overly restrictive, and may hinder robots from effectively performing their primary tasks. Existing methods (Luo et al., 2020; Yang et al., 2024a,b) address this issue by only maintaining a minimum number of edges required for global connectivity, thereby preserving communication with flexible task execution. When temporary disconnection is acceptable, such per-sistent connectivity constraints may impose unnecessary motion restrictions and cause robots to deviate from their nominal task trajectories. In practice, communication re-quirements vary across tasks. While critical information such as robot states and control signals requires continuous sharing, high-bandwidth data (e.g., images and videos) may only need periodic synchronization among robots. This motivates a relaxed formulation of connectivity main-tenance. Under this setting, robots should be allowed to temporarily break global connectivity, disperse to different regions to carry out their individual tasks (e.g., collect local information), and return to within communication range at different times for periodic information exchange.  
+
+> ⋆This work was supported in part by the U.S. National Science Foundation under Award 2528997.
+
+This perspective highlights the importance of reconnec-tion , namely, the ability of a multi-robot team to progres-sively re-establish a connected communication topology even if the network becomes temporarily disconnected. While not originally developed for controlling robots’ mo-tion for reconnection, methods such as Finite-time Control Barrier Function (FT-CBF) (Li et al., 2018) provide a useful tool for enforcing finite-time convergence, with an upper bound on the convergence time determined by the initial system state. However, an exact convergence time cannot be pre-assigned by the user, which limits its appli-cability in scenarios where timely reconnection is critical. To design such a controller in terms of driving the robot back to a desired set with a prespecified time, Prescribed-time Control Barrier Functions (PT-CBF) (Abel et al., 2023) have been proposed to introduce time-varying gains that grow unbounded as the system approaches the pre-scribed time limit, thus enforcing convergence within the desired time. However, in the context of motion control for reconnection, it remains challenging to decide when the reconnection should occur within a mission, beyond timely system convergence (i.e., driving robots to within communication range) once activated. Due to these limitations, a separate line of work ad-dresses task-level scheduling of communication configura-tions (Wang et al., 2025; ¨Ozkahraman and ¨Ogren, 2020), but these approaches generally do not provide formal 
+
+guarantees that the required communication conditions can actually be realized within a desired time, particularly when robots initially lie outside the communication range. As a result, scheduled connectivity patterns may be dif-ficult to realize in practice when robot dynamics, control 
+
+> arXiv:2606.01526v1 [cs.RO] 1 Jun 2026
+
+limits, and task objectives interfere with required motion reconfiguration. In this paper, we propose an approach that allows robots to temporarily relax connectivity constraints while guar-anteeing reconnection within a prescribed time window. The contributions are summarized as follows: 1) we in-troduce an adaptive prescribed-time CBF that combines the state-dependent convergence bound of the finite-time Control Barrier Function (FT-CBF) with the prescribed-time structure of the Prescribed-Time Control Barrier Function (PT-CBF), enabling automatic selection of the prescribed time while guaranteeing reachability before the deadline, 2) we propose a spatio-temporal reconnection mechanism that adaptively triggers pairwise reconnection constraints for efficient multi-robot coordination, and 3) we provide theoretical analysis and experiments validating the effectiveness and scalability of the proposed approach. 2. PRELIMINARIES We consider a team of N mobile robots operating in a d-dimensional workspace. The dynamics of each robot 
+
+i ∈ { 1, . . . , N } are denoted by: ˙xi = fi(xi) + gi(xi)ui, (1) where fi : Rd 7 → Rd and gi : Rd 7 → Rd×q are locally Lipschitz continuous. ui ∈ Rq is the control input. 
+
+2.1 Collision Avoidance 
+
+Let x = {x1, . . . , xN } ∈ RdN denote the joint robot state, and let Rs > 0 be the minimum inter-robot safety distance. For each robot pair i and j, safety function is defined as 
+
+hs 
+
+> i,j
+
+(x) = ∥xi − xj ∥2 − R2s , ∀i > j. (2) The corresponding pairwise safe set can be defined by 
+
+hs 
+
+> i,j
+
+(x) ≥ 0. By combining these pairwise safety sets, the overall safe set of the robotic team is expressed as 
+
+Hs = \
+
+> i>j
+
+{x ∈ RdN : hs 
+
+> i,j
+
+(x) ≥ 0}. (3) Using the standard Control Barrier Function (CBF) condi-tion (Ames et al., 2019), the time derivative of each safety function is constrained by ˙h(x, u) + K(h(x)) ≥ 0, which prevents h(x) from becoming negative once it is initially nonnegative. Thus, the admissible control set that renders 
+
+Hs forward invariant is given by 1
+
+Bs(x) = 
+
+n
+
+u ∈ RqN : ˙hs 
+
+> i,j
+
+(x, u) + γh s 
+
+> i,j
+
+(x) ≥ 0, ∀i > j 
+
+o
+
+.
+
+2.2 Joint Global Connectivity 
+
+In this paper, we model inter-robot communication as a proximity-based undirected graph G(t) = ( V, E(t)), where 
+
+V = {1, . . . , N }. The edge set E(t) ⊆ V × V is induced by inter-robot distances as follows. Let Rc ∈ R>0 denote the communication range with Rc > R s. Given the joint robot state x, we define the communication set as 
+
+hc 
+
+> i,j
+
+(x) = R2c − xi − xj
+
+> 2
+
+, ∀(vi, v j ) ∈ E (t), (4) 
+
+Hc 
+
+> i,j
+
+= x ∈ RdN : hc 
+
+> i,j
+
+(x) ≥ 0 . (5)      
+
+> 1In the rest of this paper, we select K(h(·)) = γh (·) with γas a user-defined parameter (Ames et al., 2019).
+
+An undirected edge ( vi, v j ) ∈ E (t) exists when robots i and 
+
+j are within the communication range, i.e., x(t) ∈ H c 
+
+> i,j
+
+.The graph G(t) is globally connected if every pair of vertices is connected by a path. Note that, unlike conventional setting that require G(t) to be globally connected at all times, we assume edges in E(t) are short range and only need to be established temporarily (e.g., for exchanging high-bandwidth data periodically) so that global connec-tivity can be enforced over a prescribed time window through a sequence of edge reconnection. Coordination during disconnection is assumed to be maintained through external mechanisms that are not explicitly modeled in this work, e.g., via an auxiliary communication layer with a much larger effective range for continuous lightweight coordination information exchange (e.g., states and control signals) (Rouˇ cek et al., 2019). 
+
+Definition 1. Union of graph . Given a time-varying communication graph G(t), a time window length T > 0
+
+and a starting time t0 ≥ 0, we define the union of graph 
+
+Gu(t0) of G(t) over the interval [t0, t 0 + T ] as 
+
+Gu(t0, T ) ≜
+
+
+
+V, [  
+
+> τ∈[t0, t 0+T]
+
+E(τ )
+
+
+
+= ( V, Eu). (6) 
+
+An edge (vi, v j ) exists in Gu(t0, T ), if it is connected at least once during the time interval [t0, t 0 + T ].
+
+Based on the union graph, we define joint global connec-tivity as follows. 
+
+Definition 2. Joint global connectivity . Given a start time t0 and a time window length T , the communication graph G is said to satisfy joint global connectivity over 
+
+[t0, t 0 + T ], if the collection of all edges that appear during 
+
+[t0, t 0 + T ] contains a path between any two vertices, i.e., union of graph Gu(t0, T ) is connected. Such a communica-tion graph G is called jointly globally connected .
+
+As a result, joint global connectivity ensures that informa-tion available at t = t0 can be propagated from each robot to all others by t = t0 + T , even if G(t) is disconnected at intermediate times. This allows robots to temporarily split into separate components for efficient task execution while maintaining information flow. Given a prescribed globally connected union graph ¯Gu(t0, T )= ( V, ¯Eu), we define the desired set for satisfying joint global connectivity as 
+
+Hc
+
+> T
+
+  ¯Gu(t0, T ), t 0
+
+ =
+
+n
+
+x ∈ RdN |∀ (i, j ) ∈ ¯Eu, (7) 
+
+∃τ ∈ [t0, t 0 + T ], x(τ ) ∈ H c
+
+> i,j
+
+o
+
+.
+
+2.3 Problem Statement 
+
+In this paper, we assume each robot i has been as-signed a nominal task-related controller unom  
+
+> i
+
+∈ Rq ,and denote their joint nominal controller by unom =[unom 1 , . . . , unom  
+
+> N
+
+] ∈ RqN . The initial state x0 lies in the safety set Hs. Given the real-time proximity-based com-munication graph G(t) = ( V, E(t)) and a predetermined globally connected union of graph ¯Gu(t0, T ) = (V, ¯Eu)specifying the desired edge combination to be periodically realized for any kth time window [ t0 + kT, t 0 + ( k +1) T ), ∀k ∈ Z≥0, the objective is to design a joint multi-robot controller u(t) such that (i) the safety constraints are satisfied, (ii) the union of communication graphs G(t)for t ∈ [t0 + kT, t 0 + ( k + 1) T ) contains all edges in ¯Eu at least once to satisfy joint global connectivity with respect to G(t) (i.e., ¯Gu(t0, T ) is connected), and (iii) the resulting control deviation from the nominal joint controller unom is minimized. Formally, at each control update, we consider the following Quadratic Programming (QP) problem: 
+
+u∗ = argmin u
+
+> N
+
+X
+
+> i=1
+
+ui − unom  
+
+> i
+> 2
+
+(8) s.t. u ∈ B s(x), x ∈ H c
+
+> T
+
+  ¯Gu(t0, T ), t 0 + kT , ∀k ∈ Z≥0 (9) 
+
+∥ui∥ ≤ αi, ∀i = 1 , . . . , N. (10) where αi > 0 denotes the control bound for robot i.3. METHOD 
+
+3.1 Adaptive Prescribed-Time CBF 
+
+To enforce the desired reconnection condition in (7), we first derive control constraints for each selected edge. When an edge ( vi, v j ) is activated with hc 
+
+> i,j
+
+(x) < 0, the controller must drive the robot pair back into the com-munication set before the prescribed deadline. Prescribed-time control barrier functions (PT-CBF) (Abel et al., 2023) provide a natural tool for this purpose. 
+
+Definition 3. Blow-up function . A function η :[a, b ) → R≥0 with a < b is called a blow-up func-tion if it is continuous, strictly increasing, and satisfies 
+
+lim t→b− η(t) = + ∞.
+
+Using this definition, we now recall the standard definition of a prescribed-time control barrier function (PT-CBF). 
+
+Lemma 4. Prescribed-time control barrier function (PT-CBF) . [Summarized from (Abel et al., 2023)] Given a team of robots with each robot’s dynamics defined by (1) ,let h : Rn → R be continuously differentiable and define the safe set C = {x | h(x) ≥ 0}. The function h(x) is a 
+
+PT-CBF over the prescribed horizon [t0, t 0 + Tp) if there exist c > 0 and a blow-up function μ(t) such that 
+
+˙h(x) + c μ (t) h(x) ≥ 0, ∀t ∈ [t0, t 0 + Tp). (11) 
+
+If (11) holds, the system enters C no later than t0 + Tp,even when starting from h(x0) < 0.
+
+However, PT-CBF requires Tp to be specified a priori, which is restrictive in state-dependent settings. To ad-dress this, we introduce the Finite-Time Control Barrier Function (FT-CBF) framework to obtain a computable convergence-time bound. 
+
+Lemma 5. Finite-time control barrier function (FT-CBF) . [Summarized from (Li et al., 2018)] Given a team of robots with each robot’s dynamics defined by (1) ,let C = {x ∈ Rn | h(x) ≥ 0} be a desired set defined by a continuously differentiable function h : Rn → R. The function h is an FT-CBF on a set D if there exist c > 0
+
+and ρ ∈ [0 , 1) such 
+
+˙h(x, u) + c · sign( h(x)) |h(x)|ρ ≥ 0. (12) 
+
+Any continuous controller satisfying (12) renders C for-ward invariant when x0 ∈ C , and drives x(t) into C within a finite time TFTCBF = 1 
+
+> c(1 −ρ)
+
+|h(x0)|1−ρ when x0 ∈ D \ C .
+
+Unlike PT-CBF, FT-CBF guarantees convergence to the safe set within a finite time bound TFTCBF that depends on the initial state rather than a user-specified constant. However, this bound is often conservative. Motivated by this, we propose an Adaptive Prescribed-Time Control Barrier Function (Adaptive PT-CBF), which determines the prescribed time Tp online from the current state and thus reduces manual tuning. Theorem 6 establishes the existence of a control input that ensures convergence within the resulting adaptive time Tp.
+
+Theorem 6. Adaptive prescribed-time control bar-rier function . Given a team of robots with each robot’s dynamics defined by (1) , let h : Rn → R be a continuously differentiable function defining the desired set C := {x ∈
+
+Rn | h(x) ≥ 0}. Then h is an adaptive prescribed-time control barrier function if there exist real parameter 
+
+ρ ∈ (0 , 1) and c > 0, so that 
+
+˙h(x) + c μ (t) sign  h(x) h(x) ρ ≥ 0, (13) 
+
+holds for all t ∈ [0 , T p) where the time-varying scaling factor μ(t) is defined as 
+
+μ(t) = 
+
+ Tp
+
+Tp − t
+
+m
+
++ α, t ∈ [0 , T p), (14) 
+
+with α > 0 and m ∈ 2N (i.e., m is a positive even integer). The prescribed time Tp is chosen adaptively according to 
+
+Tp = |h(x0)| 1−ρ
+
+c(1 − ρ) μ0
+
+, μ0 = 1 + α > 1. (15) 
+
+With this, the following properties hold for the correspond-ing closed-loop solution x(t): 1) ( Forward invariance ) If 
+
+x0 ∈ C , then h(x(t)) ≥ 0 for all t ≥ 0; that is, the safe set C
+
+is forward invariant. 2) ( Prescribed-time reachability )If x0 /∈ C , i.e., h(x0) < 0, then there exists a time t⋆ ≤ Tp
+
+such that h(x(t⋆)) = 0 , and h(x(t)) ≥ 0 for all t ≥ t⋆.Proof. When h(x) < 0, (13) with sign( h) = −1 becomes ˙h(x) ≥ c μ (t) h(x) ρ. Define V (x) := |h(x)| = −h(x)in this region. Then ˙V (x) = − ˙h(x) ≤ −c μ (t) V (x)ρ.Since μ(t) ≥ μ0 for all t ∈ [0 , T p(x0)), we obtain the conservative inequality ˙V (x) ≤ −c μ 0 V (x)ρ, 0 <ρ < 1. By separation of variables and integration from 
+
+V (x0) = |h(x0)| down to 0, one obtains convergence bound 
+
+Tfinite ≤ |h(x0)| 1−ρ  
+
+> c(1 −ρ)μ0
+
+, which by construction, equals Tp
+
+in (15). This proves 2): starting outside C, the trajectory reaches h(x) = 0 within the prescribed time Tp(x0) and remains in C thereafter. For 1), when h(x) ≥ 0 we have sign( h) = 1 and (13) yields ˙h(x) ≥ −c μ (t) h(x)ρ, which is a standard control barrier condition (Ames et al., 2019). Thus, if h(x0) ≥ 0, trajectory remains in C for all t ≥ 0, establishing set forward invariance property. 
+
+Remark 1. Under Lemma 5, FT-CBF guarantees conver-gence within TFTCBF . Since (15) gives Tp = TFTCBF /μ 0
+
+with μ0 = 1 + α > 1, we have Tp < T FTCBF . Hence, adaptive PT-CBF yields a less conservative convergence-time bound than FT-CBF. 
+
+With Theorem 6, given any desired union of graph ¯Gu(t0, T ), the corresponding control set is defined as 
+
+Br(x) = 
+
+n
+
+u ∈ RqN ˙hc 
+
+> i,j
+
+(x)+ (16) 
+
+c μ (t) sign  hc 
+
+> i,j
+
+(x) |hc 
+
+> i,j
+
+(x)|ρ ≥ 0, ∀(vi, v j ) ∈ ¯Eu(t)
+
+o
+
+.
+
+Any control input u(t) ∈ Br(x(t)) guarantees that all desired pairwise reconnection edges satisfy the communi-cation constraint within the prescribed time horizon. 3.2 Spatio-temporal Reconnection Mechanism 
+
+We introduce a scheduling mechanism that activates each edge connection constraint only when reconnection is needed and deactivates it after the edge is realized for flexible task execution. To decide when each desired edge should reconnect, we first define a spatio-temporal edge weight for every ( vi, v j ) ∈ ¯Eu: 
+
+> wi,j (t) = ˙hc
+> i,j
+
+ x(t), unom    
+
+> i(t),unom
+> j(t)
+
+ − c μ (0) hc    
+
+> i,j (x(t)) ρ+ϕ(t),
+> (17)
+
+where first two terms measure spatial effort required for edge ( vi, v j ) to reconnect under nominal controls, while 
+
+ϕ(t) is blow-up temporal term satisfying lim t→(tk
+
+> max trigger )−
+
+ϕ(t) = + ∞. Thus, the reconnection urgency increases as the latest triggering time tk 
+
+> max trigger
+
+approaches. The edge ( vi, v j ) is activated when wi,j (t) > 0. Let τ ki,j 
+
+denote the triggering time and tki,j denote the reconnection time satisfying hc 
+
+> i,j
+
+(x(tki,j )) ≥ 0. By Theorem 6 and the definition of tk
+
+> max trigger
+
+, any edge triggered before 
+
+tk 
+
+> max trigger
+
+reconnects within the same window, i.e., tki,j ≤
+
+t0 + ( k + 1) T .Under the adaptive PT-CBF reconnection controller, once an edge (vi, v j ) is triggered at τ ki,j , Theorem 6 guar-antees the existence of a first reconnection time tki,j ∈
+
+[τ ki,j , τ ki,j + T max  
+
+> p
+
+] such that hc 
+
+> i,j
+
+(x(tki,j )) ≥ 0. Since each edge is triggered before the latest allowable triggering time 
+
+tk
+
+> max trigger
+
+, we have tki,j ≤ tk 
+
+> max trigger
+
++ T max  
+
+> p
+
+= t0 + ( k +1) T , which ensures that the reconnection is completed within the same time window. After the edge is connected for the first time in the kth window, its corresponding constraint is deactivated for the remainder of window. For any time t in the kth time window [ t0 + kT, t 0 + ( k +1) T ), we define the active edge set as 
+
+Eact  
+
+> k
+
+(t) = 
+
+n
+
+(vi, v j ) ∈ ¯Eu t ∈ [τ ki,j , t ki,j )
+
+o
+
+. (18) Thus, each edge constraint is active only between its triggering time τ ki,j and its first reconnection time tki,j , and is deactivated for the rest of window after reconnection. The corresponding admissible set applies adaptive PT-CBF constraints only to active edges: 
+
+Bc,k (x, t ) = 
+
+n
+
+u ∈ RqN ˙hc
+
+> i,j
+
+ x(t)+ (19) 
+
+c μ (t) sign  hc 
+
+> i,j
+
+(x(t))  hc 
+
+> i,j
+
+(x(t)) ρ ≥ 0, ∀(vi, v j ) ∈ E act  
+
+> k
+
+(t)
+
+o
+
+.
+
+At any time t ∈ [t0 + kT, t 0 + ( k + 1) T ), the control input is obtained by solving the following QP: 
+
+u∗(t) = arg min 
+
+> u
+> N
+
+X
+
+> i=1
+
+ui − unom  
+
+> i
+
+(t) 2 (20) s.t. u ∈ B s(x), u ∈ B c,k (x, t ), (21) 
+
+∥ui∥ ≤ αi, i = 1 , . . . , N. (22) Here Bs(x) enforces collision avoidance, while Bc,k (x, t )enforces reconnection only for active edges. The resulting problem is convex QP with linear control constraints, which can be solved efficiently using standard solvers. 
+
+Proposition 7. Joint global connectivity under the QP controller . Let ¯Gu(t0 + kT, T ) = ( V, ¯Eu) be a desired globally connected union graph. Under QP controller (20) –
+
+(22) , with triggering rule (17) and active edge set (18) ,every edge (vi, v j ) ∈ ¯Eu is realized at least once in each window [t0 + kT, t 0 + ( k + 1) T ). Consequently, ¯Eu ⊆ ˜Eu 
+
+> k
+
+=S 
+
+> t∈[t0+kT,t 0+( k+1) T)
+
+{(vi, v j ) | hc 
+
+> i,j
+
+(x(t)) ≥ 0}, and the resulting union graph ˜Gu 
+
+> k
+
+= ( V, ˜Eu 
+
+> k
+
+) is globally connected for every k. Hence, induced communication graph is jointly globally connected over every reconnection window. Proof. Consider a reconnection window interval [t0 +
+
+kT, t 0 + ( k + 1) T ) and any desired edge ( vi, v j ) ∈ ¯Eu. If 
+
+wi,j (t0 +kT ) > 0, the edge is triggered immediately; other-wise, the blow-up temporal term ϕ(t) in (17) ensures that there exists a triggering time τ ki,j ∈ [t0 + kT, t k
+
+> max trigger
+
+)such that wi,j (τ ki,j ) > 0. By (18), the edge remains active until its first reconnection time, so its adaptive PT-CBF constraint is enforced by the QP through Bc,k (x, t ). By Theorem 6, there exists tki,j ∈ [τ ki,j , τ ki,j + T max  
+
+> p
+
+] such that 
+
+hc 
+
+> i,j
+
+(x(tki,j )) ≥ 0. Since τ ki,j < t k 
+
+> max trigger
+
+and tk 
+
+> max trigger
+
++
+
+T max  
+
+> p
+
+= t0 + ( k + 1) T , this reconnection occurs before the window ends. Therefore, every edge in ¯Eu belongs to ˜Eu 
+
+> k
+
+.Since ¯Gu(t0 + kT, T ) is globally connected and ¯Eu ⊆ ˜Eu 
+
+> k
+
+,the union graph ˜Gu 
+
+> k
+
+(t0 + kT, T ) is globally connected. This proves joint global connectivity over every window. 4. RESULTS 
+
+4.1 Simulation Example 
+
+Case Study 1: To evaluate the proposed method, we first consider a two-robot reconnection scenario on the Robotarium platform (Pickem et al., 2017). The spatial component of the edge weight is kept constant, so the reconnection trigger depends only on the temporal term 
+
+ϕ(t) in (17). This setting allows a controlled comparison among the proposed Adaptive PT-CBF, standard PT-CBF (Abel et al., 2023) with Tp = 0 .5 s and Tp = 15 s, and FT-CBF (Li et al., 2018). The parameters in (11), (12), and (16) are set to c = 0.5 and ρ = 0.9, with communication range Rc = 2.5 m. Each robot follows single-integrator dynamics with bounded control input 
+
+∥ui∥ ≤ 3 m /s and is nominally controlled to remain near its initial position. After each successful reconnection, the robots remain within communication range for 2 s to emulate information exchange, after which ϕ(t) is reset for the next cycle. We instantiate ϕ(t) as a logistic blow-up function to ensure triggering before tmax trigger = 5 s. Fig. 2 compares the three methods using four metrics. Since all methods use the same temporal component, Fig. 2(a) shows identical edge-weight evolution. However, Fig. 2(b)–(c) show that Adaptive PT-CBF drives the com-munication barrier and inter-robot distance to the thresh-old Rc earlier than the baselines. In particular, PT-CBF with Tp = 0 .5 s fails to reconnect within the prescribed time, while Tp = 15 s leads to delayed response, illustrating the difficulty of manually selecting Tp. Fig. 2(d) further shows that Adaptive PT-CBF generates more effective motion, whereas FT-CBF weakens near the boundary and delays reconnection. 
+
+Case Study 2: We next evaluate the proposed method in a five-robot patrolling scenario. To ensure periodic in-formation exchange, we predefine a target union graph (a) Adaptive PT-CBF , t = 0s (b) Adaptive PT-CBF , t = 6 .81s (c) Adaptive PT-CBF , t = 15s           
+
+> (d) FT-CBF, t= 15s (e) PT-CBF ( Tp= 0 .5s), t= 15s (f) PT-CBF ( Tp= 15s), t= 15s
+
+Fig. 1. Snapshots comparing reconnection performance for Adaptive PT-CBF (ours) , FT-CBF, and PT-CBF.       
+
+> (a) Spatio-Temporal weight (b) R2c−D2
+> i,j (c) Inter-robot distance (d) Average speed
+
+Fig. 2. Comparison of the reconnection process under Adaptive PT-CBF (ours), FT-CBF, and PT-CBF. (a) The spatio-temporal weight. (b) Communication-barrier value R2c −D2 
+
+> i,j
+
+. (c) Inter-robot distance relative to the communication range Rc. (d) Average robot speed.    
+
+> (a) Original task (b) Our Adaptive PT-CBF (c) MCCST
+
+Fig. 3. Simulation snapshots and trajectories: bottom-right snapshot captured at t = 6 .2s, and all trajectories for the (a) Original Task, (b) Adaptive PT-CBF (ours) , and (c) MCCST baseline. ¯Gu = ( V, ¯Eu), where Robot 1 must reconnect with the other four robots: ¯Eu = {(v1, v 2), (v1, v 3), (v1, v 4), (v1, v 5)}.The communication range is Rc = 2 .5 m, and two con-secutive 30 s reconnection windows are considered, within which each required edge must be established once. The optimized single-integrator controls from (20) are mapped to unicycle commands. For adaptive PT-CBF, we set c = 0.5 and ρ = 0.9. The temporal component in (17) is chosen as ϕ(t) = 
+
+> 0.4ttmax trigger −t
+
++ 1, which increases as the trigger deadline approaches. The maximum expected reconnection time is 7 .36 s, yielding t1max trigger = 22 .63 s and t2max trigger =52 .63 s for the two windows. During the intervals (0 , 22 .63) and (30 , 52 .63), temporal gain ϕ(t) increases rapidly as t
+
+approaches right endpoint of each window, ensuring that all required edges are activated before the trigger deadline. We compare adaptive PT-CBF with the Minimum Con-nectivity Constraint Spanning Tree (MCCST) baseline (Luo et al., 2020), which maintains persistent global connec-tivity. The reported metrics include average distance to target, control deviation, and completion progress of the required communication edges, shown in Figs. 4 and 5. As shown in Fig. 3, adaptive PT-CBF allows robots to temporarily deviate from their nominal trajectories to reconnect while still completing their patrolling tasks. In contrast, MCCST preserves global connectivity at all times (a) (b) 
+
+Fig. 4. Comparison between our proposed adaptive PT-CBF and the MCCST baseline. (a) Average dis-tance to the assigned patrol target. (b) Aver-age control deviation from the nominal controller 
+
+> 15
+
+P5 
+
+> i=1
+
+unom  
+
+> i
+
+− u* 
+
+> i
+
+.
+
+Fig. 5. Cumulative trigger and reconnection progress of required communication edges.  
+
+> (a) (b)
+
+Fig. 6. Quantitative results of our Adaptive PT-CBF. (a) average control deviation for varying team sizes. (b) average control deviation for different reconnection-window durations Tmax reconn .but causes excessive deviation from the nominal controller, leading to poor task progress and deadlock-like behavior. 
+
+4.2 Quantitative Results 
+
+We quantitatively evaluate the proposed adaptive PT-CBF framework in CoppeliaSim, with results summarized in Fig. 6. We vary the team size and the reconnection window length Tmax reconn , and test three initial config-urations for each case. Fig. 6(a) shows that the average control deviation increases only slightly with team size, indicating that the added reconnection demands remain manageable. As shown in Fig. 6(b), longer windows reduce control deviation because robots have more time to recon-nect with smaller control modifications. These results show that adaptive PT-CBF maintains limited control deviation across different team sizes and window lengths. 5. CONCLUSION AND FUTURE WORK We presented an adaptive prescribed-time CBF frame-work for spatio-temporal reconnection in multi-robot sys-tems. The proposed method combines state-dependent prescribed-time selection with a spatio-temporal triggering mechanism, allowing robots to temporarily relax connec-tivity constraints while guaranteeing reconnection within each time window. Theoretical analysis and simulations show that the method achieves timely reconnection with lower control deviation than persistent-connectivity and baseline approaches. Future work will investigate dynamic and automatic selection of the desired union graph and reconnection schedule. REFERENCES Abel, I., Steeves, D., Krsti´ c, M., and Jankovi´ c, M. (2023). Prescribed-time safety design for strict-feedback nonlin-ear systems. IEEE Transactions on Automatic Control ,69(3), 1464–1479. Ames, A.D., Coogan, S., Egerstedt, M., Notomista, G., Sreenath, K., and Tabuada, P. (2019). Control barrier functions: Theory and applications. In 2019 18th Euro-pean control conference (ECC) , 3420–3431. Ieee. Li, A., Wang, L., Pierpaoli, P., and Egerstedt, M. (2018). Formally correct composition of coordinated behaviors using control barrier certificates. In 2018 IEEE/RSJ International Conference on Intelligent Robots and Sys-tems (IROS) , 3723–3729. IEEE. Luo, W., Yi, S., and Sycara, K. (2020). Behavior mix-ing with minimum global and subgroup connectivity maintenance for large-scale multi-robot systems. In 
+
+2020 IEEE International Conference on Robotics and Automation (ICRA) , 9845–9851. IEEE. ¨Ozkahraman, ¨O. and ¨Ogren, P. (2020). Combining control barrier functions and behavior trees for multi-agent underwater coverage missions. In 2020 59th IEEE Conference on Decision and Control , 5275–5282. IEEE. Pickem, D., Glotfelter, P., Wang, L., Mote, M., Ames, A., Feron, E., and Egerstedt, M. (2017). The robotarium: A remotely accessible swarm robotics research testbed. In 2017 IEEE International Conference on Robotics and Automation (ICRA) , 1699–1706. IEEE. Rouˇ cek, T., Pecka, M., ˇC´ ıˇ zek, P., Petˇ r´ ıˇ cek, T., Bayer, J., ˇSalansk` y, V., Heˇ rt, D., Petrl´ ık, M., B´ aˇ ca, T., Spurn` y, V., et al. (2019). Darpa subterranean challenge: Multi-robotic exploration of underground environments. In 
+
+International Conference on Modelling and Simulation for Autonomous Systems , 274–290. Springer. Sabattini, L., Secchi, C., Chopra, N., and Gasparri, A. (2013). Distributed control of multirobot systems with global connectivity maintenance. IEEE Transactions on Robotics , 29(5), 1326–1332. Wang, C., Jiang, Y., Zhu, S., Song, L., Du, X., and Guan, X. (2025). Collision-free connectivity topology switching and maintenance for autonomous underwater vehicles. 
+
+IEEE Transactions on Control Systems Technology .Yang, Y., Lyu, Y., Zhang, Y., Gao, I., and Luo, W. (2024a). Integrating online learning and connectivity maintenance for communication-aware multi-robot co-ordination. In 2024 IEEE/RSJ International Confer-ence on Intelligent Robots and Systems (IROS) , 5770– 5776. IEEE. Yang, Y., Lyu, Y., Zhang, Y., Yi, S., and Luo, W. (2024b). Decentralized Multi-Robot Line-of-Sight Connectivity Maintenance under Uncertainty. In Proceedings of Robotics: Science and Systems . Delft, Netherlands. doi: 10.15607/RSS.2024.XX.005.
