@@ -1,0 +1,819 @@
+Title: Learning Unions of Convex Sets via Invertible Latent Decomposition for Path Planning
+
+URL Source: https://arxiv.org/pdf/2606.12027v1
+
+Published Time: Thu, 11 Jun 2026 01:01:51 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# Learning Unions of Convex Sets via Invertible Latent Decomposition for Path Planning 
+
+Taerim Yoon 1
+
+Korea University 
+
+taerimyoon@korea.ac.kr 
+
+Dongho Kang 2
+
+ETH Zurich 
+
+kangd@ethz.ch 
+
+Kisang Park 1
+
+Korea University 
+
+kisangpark@korea.ac.kr 
+
+Junha Cha 1
+
+Korea University 
+
+junhacha@korea.ac.kr 
+
+Stelian Coros 2
+
+ETH Zurich 
+
+scoros@ethz.ch 
+
+Sungjoon Choi 1
+
+Korea University 
+
+sungjoon-choi@korea.ac.kr 
+
+Abstract: Collision-free path planning in cluttered, real-world environments re-lies on a representation of the collision-free space, and existing representations broadly fall into two categories. Explicit representations, such as unions of con-vex sets, can be plugged into optimization-based planners as hard collision-free constraints, but their parameters scale poorly with configuration-space dimen-sion. Implicit representations, by contrast, are flexible and scale well to com-plex geometries, yet typically lack such guarantees. We bridge this gap with ILD 
+
+(Invertible Latent Decomposition), a framework that jointly learns an invertible mapping and a union of explicit convex polytopes in the resulting latent space. Planning is carried out over these latent convex sets, and the invertible mapping decodes the resulting paths back to the original configuration space while pre-serving feasibility with respect to the refined explicit safe regions. We further propose Visibility-Guided Sampling (VGS) to keep the convex sets connected for path planning. Across 2D navigation, 6-DoF, and 14-DoF manipulation environ-ments, ILD achieves broader coverage, better inter-set connectivity, and higher path-planning success rates than prior baselines, with zero observed false posi-tives after test-time refinement. On a 14-DoF bimanual manipulator, we further demonstrate real-time collision-free planning, with test-time refinement adapting to scene-geometry changes during real-world deployment on a single 6-DoF arm. 
+
+Keywords: Combination of learning and planning in robotics, Robot safety, align-ment, and safe learning-based systems, Latent Convex Decomposition, Invertible Neural Networks 
+
+## 1 Introduction 
+
+Representing the collision-free region of a robot’s configuration space is a core building block which enables collision-free planning for a wide range of tasks including navigation and manipulation. Such representations broadly fall into two categories, depending on whether the region is described 
+
+explicitly or implicitly . Explicit representations characterize the collision-free region through ge-ometric primitives whose parameters are directly accessible, such as the convex sets consisting of hyperplanes [1, 2, 3] or the graph vertices and edges produced by sampling-based planners [4, 5]. This explicitness allows the representation to be plugged into planners as hard collision-free con-straints, but the parameters required for broad coverage grow rapidly with the dimensionality of the configuration space, limiting scalability [6, 7]. Implicit representations instead encode the col-lision boundary as the level set of a learned function, offering greater flexibility for complex ge-ometries [8, 9]. However, because the collision-free region is defined only implicitly, it cannot be incorporated as hard constraints in optimization-based planners, and therefore provides no explicit collision-free constraints. 
+
+> arXiv:2606.12027v1 [cs.RO] 10 Jun 2026
+
+To bridge these two directions, we aim to learn a union of convex polytopes in a structured la-tent space, combining the data-driven flexibility of learned representations with the hard-constraint structure required for explicit collision-free constraints. Each polytope is described by a small set of linear half-space constraints, so the resulting representation can be passed to an optimization-based planner as explicit hard constraints. The central challenge in this approach is that a region learned as collision-free in a latent space does not necessarily correspond to a collision-free region in the original configuration space. Our key insight is to learn this mapping with an invertible neural network, whose structural invertibility guarantees a one-to-one correspondence between the config-uration space and the latent space. Therefore, any latent region verified or refined to be collision-free can be mapped back consistently to the original configuration space. To this end, we propose ILD 
+
+(Invertible Latent Decomposition), which jointly learns the invertible mapping together with a union of convex polytopes in the resulting latent space. Crucially, the latent space is jointly shaped to be well-suited for convex covering, so the collision-free region admits a far more compact decom-position than in the original space, reducing both representation size and the cost of downstream planning. Since this mapping is invertible, plans optimized over the explicit convex sets in the latent space, for instance with the Graph of Convex Sets (GCS) framework [2], can be decoded back to the original configuration space while preserving feasibility with respect to the explicit safe regions. Around this core, we add two practical components. The first is Visibility-Guided Sampling (VGS), which encourages inter-region connectivity. The second is a test-time refinement procedure that corrects false positives at deployment. We evaluate the framework on 2D navigation, 6-DoF, and 14-DoF manipulation environments. The proposed method achieves broader collision-free region coverage, improves connectivity between convex sets, and increases path-planning success rates compared to baseline methods. Notably, after test-time refinement, the model attains precision = 1 .0 on the evaluated samples and on the false positives observed during deployment, without retraining. Our contributions are summarized as follows: • We propose ILD, which learns a compact union of convex polytopes in an invertible latent space, with broad coverage and zero observed false positives after test-time refinement. • VGS improves connectivity between convex sets, which results in higher planning success rates on optimization-based planners such as the Graph of Convex Sets (GCS) planner [2]. • We validate our approach on a 14-DoF bimanual manipulator, with deployment-time refinement enabling adaptation to scene-geometry changes on a single 6-DoF arm of the real-world platform without retraining. 
+
+## 2 Related Work 
+
+2.1 Explicit Representations Sampling-based methods A classical family of explicit methods builds a discrete graph in the collision-free region. Sampling-based planners such as Rapidly-exploring Random Tree (RRT) [4] and Probabilistic Roadmap (PRM) [5] populate this graph with verified configurations as vertices and locally checked transitions as edges, yielding paths that are collision-free by construction. GPU-parallel variants such as cuRobo [10] further amortize collision checks for fast per-query planning. However, since the collision-free space is characterized only as a discrete set of configurations and edges, the sample density needed for adequate coverage scales exponentially with the configuration-space dimension, a major bottleneck for high-DoF systems. 
+
+Region-based methods An alternative line of work represents the collision-free space as a union of convex sets, which can be integrated directly into optimization-based frameworks such as motion planning around obstacles with Graphs of Convex Sets (GCS) [2, 3]. Notably, algorithms like Itera-tive Regional Inflation by Semidefinite Programming (IRIS) [1] and its accelerated variants construct collision-free convex polytopes by alternating between finding separating hyperplanes and maximiz-2Seeding Decomposition Planning   
+
+> Start
+> Goal
+> Deploy
+> Start
+> Goal
+> gg1
+
+Figure 1: Overview of ILD on a 2D navigation task. ILD proceeds in four stages. (1) Seeding: 
+
+This example places two seeds s0, s 1 and one bridge c0 connecting them. Each seed sampling region Si covers the configurations visible from si (orange, blue), and the bridge sampling region 
+
+C0 covers a neighborhood around c0 (green ellipse). (2) Decomposition: We jointly optimize gθ
+
+with the explicit convex sets to cover each region in the latent space, partitioning Qfree into colored regions in configuration space. (3) Planning: In the latent space Z, a Graph of Convex Sets (GCS) solver [2, 3] returns a collision-free path through the convex sets, which we decode back to Q via 
+
+g−1 
+
+> θ
+
+. (4) Deploy: The decoded trajectory is executed on the robot, with collision-free guarantees inherited from the latent path by invertibility of gθ .ing inscribed ellipsoids. To mitigate the complexity of these representations, recent approaches such as that by Werner et al. [6] reduce the total number of required regions by computing clique covers of visibility graphs. Unlike sampling-based methods, these approaches expose the collision-free region at a volumetric level rather than through discrete samples, allowing optimization-based planners to enforce safety as continuous hard constraints over an entire region rather than routing between ver-ified edges. However, the number of required convex sets still scales poorly with dimensionality, inflating both the per-region construction cost and the downstream planner’s search complexity. While ILD shares the objective of generating explicit convex sets for optimization-based planners and inherits their explicit collision-free constraints, it shifts the construction process to a latent space by jointly learning the convex decomposition alongside an invertible mapping. 
+
+2.2 Implicit Representations 
+
+Another line of work models the collision-free region as an implicit function learned from data, enabling it to scale to more complex configurations and environments. Koptev et al. [8] learn neural signed distance functions in joint configuration space, enabling reactive control. Guo et al. [9] learn an implicit collision detection function from sampled configuration-label pairs, using a forward kinematics kernel and Fourier positional encoding to scale to high-DoF settings with inference time independent of training set size. While these approaches offer flexibility and scale effectively to complex geometries, they do not provide explicit collision-free constraints along decoded paths. ILD operates in the same data-driven setting, but produces explicit convex sets that can be directly used as hard constraints by optimization-based planners. 
+
+## 3 Methods 
+
+Let Q ⊂ Rn denote the robot’s configuration space and Qfree ⊆ Q its collision-free subset. ILD learns an invertible mapping that deforms Q into a latent space where Qfree can be compactly cov-ered by a union of convex polytopes. Invertibility guarantees that any path planned in the latent space decodes back to a valid, collision-free trajectory in the original space. We describe the latent decomposition and its training in Section 3.2. To encourage inter-region connectivity, we intro-duce a Visibility-Guided Sampling (VGS) strategy in Section 3.3, which is critical for path planning across the resulting decomposition. Finally, since the explicit linear boundaries allow local correc-tion without retraining, we describe a test-time refinement procedure for handling false positives in Section 3.4. 33.1 Problem Formulation 
+
+Our goal is to jointly learn an invertible mapping gθ : Q → Z and a union of convex polytopes 
+
+{P k}Nk=1 in the latent space Z such that ˆQfree = g−1 
+
+> θ
+
+(SNk=1 Pk) covers Qfree , where each polytope 
+
+Pk = {z ∈ Z | η⊤
+
+> k,i
+
+z + dk,i ≥ 0, i = 1 , . . . , B } is defined by linear half-space constraints in the latent space. The invertibility of gθ ensures that S 
+
+> k
+
+Pk and ˆQfree are in one-to-one correspondence. We aim for two objectives, zero false positives (precision = 1) and broad coverage (high recall), while using as few convex sets N as possible. Since an optimization-based planner over convex sets can only route paths within a single connected component, we maximize coverage restricted to the largest connected component of ˆQfree . These convex sets are then used directly as hard constraints by any planner that consumes a union of convex polytopes. In our experiments we instantiate this planner with the Graph of Convex Sets (GCS) framework [2, 3]. 
+
+3.2 Latent Convex Decomposition Invertible latent mapping. Covering Qfree using a union of convex polytopes is challenging, as 
+
+Qfree is typically non-convex, especially in high-DoF configuration spaces. To address this chal-lenge, we introduce an invertible mapping gθ : Q → Z that warps the configuration space into a latent space Z where Qfree admits a compact decomposition into a few convex polytopes. We imple-ment gθ as a stack of invertible linear layers with LU decomposition [11] interleaved with invertible nonlinear activations, with architectural details in Appendix A.1. 
+
+Region representation. For a latent point z = gθ (q), region k is defined by B hyperplanes with learnable parameters ηk,i ∈ Rn, dk,i ∈ R, and z is inside it iff all signed distances ϕk,i (z) = 
+
+η⊤
+
+> k,i
+
+z + dk,i are non-negative. We aggregate per-region membership and the union over regions by smooth Gumbel-Softmax surrogates of min and max :
+
+φk(z) ≈ min  
+
+> i
+
+ϕk,i (z), C(z) ≈ σ
+
+
+
+max  
+
+> k
+
+φk(z)
+
+
+
+, (1) where φk > 0 marks z as inside region k and C(z) ≥ 0.5 marks it as inside the union. We write Ck(z) = σ(φk(z)) for the per-region membership probability. We adopt the hyperplane parameterization of CvxNet [12], originally proposed for 3D shape modeling, and apply it to higher-dimensional configuration spaces ( n > 3). 
+
+Joint training objective. We jointly optimize the latent mapping gθ and the boundary parameters 
+
+H = {ηk,i , d k,i }N, B k=1 , i =1 by minimizing the classification loss Lclass together with the per-seed, per-bridge, and regularization terms: 
+
+ˆθ, ˆH = arg min   
+
+> θ, H
+
+Lclass + λseed Lseed + λvis Lvis + λbridge Lbridge + λreg Lreg , (2) where Lclass = BCE( Cgt , C (gθ (q); H)) is the per-sample binary cross-entropy between predicted probabilities and ground-truth collision labels. Geometrically, this objective encourages gθ to warp non-convex parts of Qfree to fit the convex polytopes (Appendix D). The per-seed, per-visible, and per-bridge losses Lseed , Lvis , Lbridge are introduced by the VGS strategy in Section 3.3, and the regularization losses Lreg , including an isometric loss Liso = E[( ∥gθ (q1) − gθ (q2)∥ − ∥ q1 − q2∥)2]
+
+so that latent shortest paths stay shortest in Q, are described in Appendix A.3. 
+
+3.3 Visibility-Guided Sampling 
+
+Convex decomposition methods such as IRIS [7] and CvxNet [12] grow each region around a seed 
+
+configuration, and the choice of seeds critically shapes the resulting safe region. We choose seeds based on visibility to improve coverage and connectivity, where two configurations are visible to each other if the straight-line segment between them is collision-free. The intuition is that since gθ
+
+can flexibly deform Q, a set of mutually visible configurations in Qfree can be mapped to a single convex polytope Pk in the latent space, even when they form a non-convex region in Q. For example, 4Nav 2D 
+
+> Start
+> Goal
+
+(a) Nav 2D Reach 6D  
+
+> Start
+> Goal
+
+(b) Reach 6D Biman 14D  
+
+> Start
+> Goal
+
+(c) Bimanual 14D (d) Bimanual 14D (Real) 
+
+Figure 2: Evaluation environments. Nav 2D is a 2D maze navigation task with circular obstacles and wall segments. Reach 6D is a 6-DoF planar reacher task requiring collision-free motion around a cylindrical obstacle. Reach 14D extends Reach 6D to 14-DoF and is omitted from the figure for space. Bimanual 14D is evaluated in both simulation and on a real-world 14-DoF bimanual manipulator. in Figure 1, gθ maps the blue visibility set of seed s1 to a single convex polytope in the latent space. In detail, VGS consists of seed sampling and bridge sampling , described below. 
+
+Seed sampling. Each seed sampling region aims to cover a large set of mutually visible configura-tions as a single convex polytope and thereby maximize coverage. We start by constructing a visibil-ity matrix over uniformly sampled candidate configurations. We then greedily pick Nseed seeds with the most visible points (Figure 1, step (1), with selection details in Appendix A.2). For each chosen seed sk, we draw qseed from a neighborhood of sk and qvis from its visible candidates, yielding two per-seed BCE terms Lseed = BCE( Cgt , C k(gθ (qseed ))) and Lvis = BCE( Cgt , C k(gθ (qvis ))) .
+
+Bridge sampling. Each bridge sampling region aims to connect two seeds and thereby improve inter-region connectivity. Two seeds si and sj form a visible pair if the straight-line interpolation between them lies entirely in Qfree . For each visible pair, we sample points along this line, compute at each point a noise radius that keeps the local collision-sample ratio within a predefined range, and draw bridge samples qbridge within these radii, yielding Lbridge = BCE( Cgt , C (gθ (qbridge ))) .
+
+3.4 Test-time Refinement 
+
+Learning from finite samples can leave safety-critical false positives in the predicted region, which we correct at test time by adjusting only the responsible explicit boundary parameters, without retraining. When a false positive configuration qfp is encountered during deployment, that is, a configuration predicted as collision-free that is actually in collision, the responsible boundary can be tightened by shifting its bias parameter inward: 
+
+ˆdk,i ← dk,i − ∆k,i , (3) where ∆k,i is computed from the signed distances of accumulated false positive points to hyper-plane i of region k. For each false positive zfp , only the boundary with the smallest positive signed distance to it is held responsible. Let Fk,i collect the false positives so assigned to boundary i
+
+of region k. Each boundary is then pulled inward by the worst violation across its assigned set, 
+
+∆k,i = max zfp ∈ F k,i ϕk,i (zfp ). This operation shrinks only the responsible boundary, leaving all other regions unchanged. This mechanism is aligned with the train-time BCE objective under mild assumptions (Appendix D). 
+
+## 4 Results 
+
+We evaluate the proposed method from three complementary perspectives. First, we show that the proposed representation achieves broader coverage and better inter-set connectivity than baselines, while retaining zero observed false positives after test-time refinement. Second, we demonstrate that the proposed method is suitable for downstream planning, resulting in improved path-planning 5success rates. Finally, we show that the proposed framework naturally supports test-time refinement, enabling real-time collision-free planning and practical adaptation to changes in scene geometry on a real bimanual manipulator setup. 
+
+Environments. As illustrated in Figure 2, we consider four environments: Nav 2D, Reach 6D, Reach 14D, and Bimanual 14D. In all environments, the goal is to represent the collision-free region and plan a collision-free path from a collision-free start configuration qs to a goal configuration qg.
+
+Baselines. For the representation evaluation (Section 4.1), we compare our framework against IRIS [7], a standard geometric convex-decomposition baseline, and IRIS-Sel, a variant matched to our region budget. We also conduct an ablation study using four methods, IRIS-Sel → Q-Cvx → Vis-Cvx → ILD, which form a progressive chain where each iteration introduces a single core compo-nent on top of the previous baseline. Specifically, Q-Cvx [12] replaces geometric construction with a learning-based decomposition that fits convex sets directly within the original configuration space. Vis-Cvx introduces Visibility-Guided Sampling (VGS) to ensure topological inter-region connectiv-ity. Finally, ILD (ours) incorporates the invertible latent mapping on top of these features. For the path-planning evaluation (Section 4.2), every region-based method above is paired with a Graph of Convex Sets (GCS) planner [2, 3], which routes a path through a union of convex sets. We additionally compare against widely used path planners that operate directly on the configuration space without an intermediate representation. RRT-Connect [4] and PRM [5] are classical sampling-based planners. cuRobo [10] is a GPU-accelerated path planner that we evaluate in two modes, its default mode (cuRobo) and its trajectory-optimization mode (cuRobo-Traj). 
+
+Metrics. For the representation evaluation (Section 4.1), we use three coverage metrics measuring the fraction of ground-truth collision-free configurations covered by the predicted region. Cvg q is sample-based, counting the fraction of sampled collision-free configurations covered. Cvg p and Cvg r are voxel-based, voxelizing the end-effector workspace (position and full pose, respectively) and counting the fraction of voxels reachable by collision-free configurations that are also reachable by the predicted region. All three count only configurations in the largest connected component, since planning is feasible only within one. Nav 2D is a point robot, so we omit Cvg p and Cvg r for that environment. We also report NIsl and N , the number of connected components and convex sets. For example, NIsl =1 with N =10 means all ten sets are connected. Details are in Appendix C.1. For the path-planning evaluation (Section 4.2), we report path-planning success rate (SR) and solve time. 
+
+Training details. We train gθ (24 invertible blocks, hidden dimension 32 ) jointly with the boundary parameters using Adam [13] for 10 epochs of 1000 iterations with batch size 1024. Outside (colli-sion) samples are weighted 10 × in the BCE loss to enforce zero false positives, and per-environment hyperparameters are listed in Appendix A.4. 
+
+4.1 Evaluating Collision-free Region Coverage and Connectivity 
+
+We evaluate the quality of the collision-free region representation for each method on a uniformly sampled set of configurations from Qfree . Table 1 reports both the raw decomposition and its re-fined counterpart after applying test-time refinement (Section 3.4) to observed false positives on this evaluated set, followed by three analyses along the baseline chain. 
+
+Learning-based decomposition improves coverage in high dimensions (IRIS-Sel vs. Q-Cvx). At a matched region count, the learning-based Q-Cvx more than quadruples the mean Cvg q of the geometric IRIS-Sel on the three manipulation environments ( 22 .2 vs. 5.2), and the gap widens ac-cording to the configuration-space dimension. Only in low-dimensional Nav 2D does the geometric baseline remain competitive, indicating that learning-based decomposition scales much better with dimensionality. 
+
+VGS improves connectivity (Q-Cvx vs. Vis-Cvx). Adopting VGS seeds (Vis-Cvx) in place of Q-Cvx’s random seeds more than halves the mean number of islands ( NIsl : 4 .75 → 2.0), with the largest drop on Nav 2D ( 11 → 3). VGS therefore improves the connectivity of the decomposition. 6Table 1: Collision-free region quality, pre- and post-refinement. Top group ( pre-refinement ) reports each method’s raw decomposition; bottom group applies test-time refinement (Section 3.4) to en-force precision = 1.0. We report precision (Prec.), coverage (Cvg q , Cvg p, Cvg r ), the number of convex sets ( N ), and connectivity as the number of connected components ( NIsl ). Among the re-fined methods, best Cvg q / Cvg p / Cvg r and smallest NIsl (ties included) are bolded.                                                                                                                                                                                                                                     
+
+> Nav 2D Reach 6D Reach 14D Bimanual 14D Method Prec. Cvg qNIsl NPrec. Cvg qCvg pCvg rNIsl NPrec. Cvg qCvg pCvg rNIsl NPrec. Cvg qCvg pCvg rNIsl N
+> Pre-refinement
+> IRIS [7] 99.98 89.7 129 92.99 88.8 99.4 93.8 152 76.37 82.2 99.8 99.4 227 63.41 77.1 77.1 77.1 290 IRIS-Sel 99.99 89.2 118 97.39 61.2 65.8 57.6 2384.20 54.1 99.7 97.0 1374.47 36.2 36.3 36.2 13Q-Cvx [12] 94.57 65.6 11 18 99.98 53.3 61.8 50.3 23 100.00 2.7 45.5 26.4 3399.76 22.6 56.7 25.7 33Vis-Cvx 66.22 88.3 218 99.90 39.2 60.7 46.4 2399.44 19.7 96.5 84.7 1395.18 60.9 88.0 63.8 13ILD (ours) 96.75 96.1 118 99.13 87.0 98.7 90.8 1399.65 37.1 98.0 93.0 1399.50 43.7 74.6 46.7 13
+> Post-refinement (precision = 1.0)
+> IRIS [7] 100.00 89.2 129 100.00 25.6 85.6 54.9 152 100.00 0.2 33.9 7.1 227 100.00 0.2 2.5 0.3 690 IRIS-Sel 100.00 88.6 118 100.00 15.3 49.2 30.0 23 100.00 0.1 17.2 3.4 13 100.00 0.1 0.7 0.1 13Q-Cvx [12] 100.00 58.0 11 18 100.00 52.9 61.7 49.9 23 100.00 2.7 45.5 26.4 33 100.00 11.1 38.9 13.5 33Vis-Cvx 100.00 48.3 318 100.00 36.7 57.8 43.9 23 100.00 10.2 79.1 58.4 23 100.00 14.8 46.4 17.6 13ILD (ours) 100.00 91.9 118 100.00 75.5 96.0 81.8 13 100.00 22.2 92.7 80.0 13 100.00 22.1 51.7 24.9 13
+
+Invertible latent mapping further improves coverage (Vis-Cvx vs. ILD). Adding the invertible latent mapping on top of Vis-Cvx yields ILD’s largest gain. It nearly doubles Cvg q averaged across the four environments ( 27 .5 → 52 .9), and the same ranking holds in task space (Cvg p, Cvg r ). The latent deformation is therefore what lets a compact set of convex regions conform to highly non-convex free regions in Q.
+
+4.2 Evaluating Downstream Path Planning 
+
+Table 2: Motion planning evaluation with and without test-time refinement. For every environment, we report two rows. The top row, labeled pre-refinement , gives the first-evaluation pass before test-time refinement, and the bottom row gives the result after refinement. Sampling-based baselines do not refine and are compared against the post-refinement rows. Higher SR and lower Time are better. Bold marks the best post-refinement result per row. 
+
+Sampling-based Region-based Env. Metric RRT [4] PRM [5] cuRobo [10] cuRobo-Traj [10] IRIS [7] IRIS-Sel Q-Cvx [12] Vis-Cvx ILD (ours) Nav 2D (pre-refinement) SR (%) - - - - 94.0 98.2 25.1 14.3 98.3 Time (s) - - - - 0.17 0.07 0.07 0.09 0.09 Nav 2D SR (%) 98.5 98.3 93.0 13.2 100.0 98.2 31.8 72.8 99.7 Time (s) 0.002 0.001 0.19 4.25 0.06 0.03 0.02 0.05 0.06 Reach 6D (pre-refinement) SR (%) - - - - 92.4 4.0 98.1 68.5 98.9 Time (s) - - - - 18.58 0.02 0.02 0.03 0.20 Reach 6D SR (%) 99.1 99.1 97.2 3.0 99.9 4.0 98.1 99.5 99.9 
+
+Time (s) 0.003 0.004 0.10 4.61 21.17 0.02 0.02 0.03 0.16 Reach 14D (pre-refinement) SR (%) - - - - 2.4 1.3 28.7 91.9 97.7 Time (s) - - - - 47.93 1.10 2.44 1.27 0.88 Reach 14D SR (%) 97.0 94.9 90.1 14.5 2.4 1.3 28.7 92.0 97.7 
+
+Time (s) 0.004 0.010 0.10 4.99 47.93 1.10 0.35 1.16 0.88 Bimanual 14D (pre-refinement) SR (%) - - - - 92.0 36.7 51.0 35.9 91.2 Time (s) - - - - 365.46 1.12 0.04 0.15 0.36 Bimanual 14D SR (%) 88.6 88.4 73.5 46.0 96.0 36.7 82.3 97.1 98.4 
+
+Time (s) 0.002 0.022 0.06 2.49 75.01 1.12 0.05 0.19 0.35 
+
+We evaluate whether the proposed representation enables effective downstream path planning. Each baseline uses its standard collision representation, with the collision margin tuned per environment (Appendix C.4). Table 2 reports the results across all environments. 
+
+Success rate. ILD achieves the highest SR across all environments, and the chain Q-Cvx → Vis-Cvx → ILD shows that both VGS and the invertible mapping contribute. IRIS drops in high dimen-sions because its post-refinement coverage is too low. RRT, PRM, and cuRobo rely on primitive (sphere/capsule) obstacle proxies, which inflate obstacle volume and close off tight passages, so their SR drops in Reach 14D and Bimanual 14D, whereas ILD stays near 98% by routing on the learned safe region that absorbs the full mesh geometry. Region-based methods apply test-time refinement, which raises SR consistently across all environments. 7Solve time. ILD outpaces IRIS by a widening margin as dimensionality grows. Averaged across the two 14D experiments (Reach 14D and Bimanual 14D), ILD solves in 0.45 s versus IRIS’s 
+
+51 .83 s, a ∼ 115 × speedup. The gap stems from ILD’s fewer, better-connected regions, which shrink the GCS graph the planner has to search. ILD is slower in absolute terms than the sampling-based baselines, but that gap reflects the cost those baselines avoid by approximating obstacles as primitives. ILD does not rely on such an approximation, which is consistent with its higher SR. 
+
+4.3 Evaluating Test-time Refinement in the Real World 
+
+We demonstrate that test-time refinement enables ILD to adapt to changes in scene geometry on a real bimanual manipulator (Figure 3). The task is to pick an object from a tabletop while clearing a wall between the base and the target. ILD is first trained with the wall at h=0 .20 m and then eval-uated on the same setup with the wall raised to h=0 .30 m without retraining. Test-time refinement (Section 3.4) is the only update applied at deployment. At h=0 .30 m the arm arcs noticeably higher to clear the raised wall before settling into the same grasp, confirming that ILD’s refined boundary transfers to deployment without retraining or hand-tuned waypoints. As a side note, only a 6-DoF arm (one arm, wrist roll locked) of the bimanual manipulator is used in this deployment, unlike Figure 2(d).     
+
+> approach grasp
+> Training env. ( h=0 .20 m)
+> approach grasp
+> Test-time env. ( h=0 .30 m)
+
+Figure 3: Test-time refinement under wall height changes. ILD is first trained with the wall at 
+
+h=0 .20 m and then refined at deployment to h=0 .30 m without retraining. As the wall is raised, the refined boundary forces the arm to arc higher while reaching the same grasp. 
+
+## 5 Limitations 
+
+ILD has two main limitations. First, the convex decomposition is fit to a single static scene, so it does not handle scenes that change over time. Test-time refinement only contracts boundaries to absorb false positives observed in the current scene, which trades coverage for safety. A natural extension is to amortize this per-scene fit into a feedforward network that emits the boundary pa-rameters from a scene representation, analogous to recent feedforward formulations of per-scene 3D representations [14, 15]. Second, the latent space is invertible but not isometric, so a path that minimizes length in the latent space is not necessarily shortest in configuration space. The isomet-ric regularizer encourages nearby configurations to remain nearby in the latent space and reduces this gap, but does not fully close it. Jointly training the planner and the latent mapping, so that the planning objective is defined directly in configuration space, is a promising direction. 
+
+## 6 Conclusion 
+
+Existing collision-free representations fall into two families with complementary strengths. Explicit representations expose hard collision-free constraints while implicit representations scale gracefully, but neither delivers both at once. We show that ILD (Invertible Latent Decomposition) bridges the two by combining an implicit invertible neural mapping with an explicit convex decomposition in the resulting latent space. Our framework retains explicit collision-free constraints and supports real-time deployment that adapts to scene-geometry changes. Our results show that ILD attains the highest path-planning success rate across all environments while solving over 100 × faster than the convex-decomposition baseline [7] at 14-DoF. Together, these results suggest that an invertible latent decomposition bridges the explicit and implicit families into an effective collision-free space representation for path planning. 8Acknowledgments 
+
+If a paper is accepted, the final camera-ready version will (and probably should) include acknowl-edgments. All acknowledgments go at the end of the paper, including thanks to reviewers who gave useful comments, to colleagues who contributed to the ideas, and to funding agencies and corporate sponsors that provided financial support. 
+
+## References 
+
+[1] R. Deits and R. Tedrake. Computing large convex regions of obstacle-free space through semidefinite programming. In Algorithmic Foundations of Robotics XI: Selected Contributions of the Eleventh International Workshop on the Algorithmic Foundations of Robotics , pages 109–124. Springer, 2015. [2] T. Marcucci, M. Petersen, D. Von Wrangel, and R. Tedrake. Motion planning around obstacles with convex optimization. Science robotics , 8(84):eadf7843, 2023. [3] R. Tedrake and the Drake Development Team. Drake: Model-based design and verification for robotics, 2019. URL https://drake.mit.edu .[4] J. J. Kuffner and S. M. LaValle. Rrt-connect: An efficient approach to single-query path planning. In Proceedings of the IEEE International Conference on Robotics and Automation (ICRA) , pages 995–1001. IEEE, 2000. [5] L. E. Kavraki, P. Svestka, J.-C. Latombe, and M. H. Overmars. Probabilistic roadmaps for path planning in high-dimensional configuration spaces. IEEE Transactions on Robotics and Automation , 12(4):566–580, 1996. [6] P. Werner, A. Amice, T. Marcucci, D. Rus, and R. Tedrake. Approximating robot configuration spaces with few convex sets using clique covers of visibility graphs. In 2024 IEEE Interna-tional Conference on Robotics and Automation (ICRA) , pages 10359–10365. IEEE, 2024. [7] P. Werner, T. Cohn, R. H. Jiang, T. Seyde, M. Simchowitz, R. Tedrake, and D. Rus. Faster algorithms for growing collision-free convex polytopes in robot configuration space. arXiv preprint arXiv:2410.12649 , 2024. [8] M. Koptev, N. Figueroa, and A. Billard. Neural joint space implicit signed distance functions for reactive robot manipulator control. IEEE Robotics and Automation Letters , 8(2):480–487, 2022. [9] G. Guo, J. Goldfeder, A. Ray, T. Dear, and H. Lipson. Deepcollide: Scalable data-driven high dof configuration space modeling using implicit neural representations. In Proceedings of the IEEE/CVF International Conference on Computer Vision Workshops (ICCVW) , 2025. [10] B. Sundaralingam, S. K. S. Hari, A. Fishman, C. Garrett, K. Van Wyk, V. Blukis, A. Millane, H. Oleynikova, A. Handa, F. Ramos, et al. Curobo: Parallelized collision-free robot motion generation. In 2023 IEEE International Conference on Robotics and Automation (ICRA) , pages 8112–8119. IEEE, 2023. [11] D. P. Kingma and P. Dhariwal. Glow: Generative flow with invertible 1x1 convolutions. In 
+
+Advances in Neural Information Processing Systems , volume 31, 2018. [12] B. Deng, K. Genova, S. Yazdani, S. Bouaziz, G. Hinton, and A. Tagliasacchi. Cvxnet: Learn-able convex decomposition. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 31–44, 2020. [13] D. P. Kingma and J. Ba. Adam: A method for stochastic optimization. In International Conference on Learning Representations (ICLR) , 2015. 9[14] D. Charatan, S. L. Li, A. Tagliasacchi, and V. Sitzmann. pixelsplat: 3d gaussian splats from image pairs for scalable generalizable 3d reconstruction. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 19457–19467, 2024. [15] Y. Chen, H. Xu, C. Zheng, B. Zhuang, M. Pollefeys, A. Geiger, T.-J. Cham, and J. Cai. Mvs-plat: Efficient 3d gaussian splatting from sparse multi-view images. In European conference on computer vision , pages 370–386. Springer, 2024. [16] D. Rezende and S. Mohamed. Variational inference with normalizing flows. In International conference on machine learning , pages 1530–1538. PMLR, 2015. [17] I. Kobyzev, S. J. Prince, and M. A. Brubaker. Normalizing flows: An introduction and review of current methods. IEEE transactions on pattern analysis and machine intelligence , 43(11): 3964–3979, 2020. 10 Appendix Overview 
+
+This appendix expands on the technical details, deployment procedure, and experimental setup of ILD. Section A covers training details, including the architecture of the invertible mapping, Visibility-Guided Sampling (VGS), regularization losses, and training hyperparameters. Section B covers deployment details, including the test-time refinement procedure, start- and goal-snap bridg-ing, and redundant facet pruning. Section C covers additional experimental details, including the coverage metric definitions, planning evaluation setup, path-planning dataset, full representation quality table, and baseline hyperparameter tuning. Section D provides a geometric interpretation of the joint objective, including its connection to test-time refinement. 
+
+## A Training Details 
+
+A.1 Invertible Latent Mapping: Architecture and Initialization Architecture. We model the invertible mapping gθ : Q → Z using an architecture similar to those used in normalizing flows [16, 17], composed of alternating invertible linear layers and affine coupling layers [11]. Concretely, the network has the following structure: 
+
+gθ = W0
+
+|{z} 
+
+> LU
+
+→
+
+Coupling 1 → W1
+
+| {z }
+
+> block
+
+ → · · · → 
+
+Coupling L → WL
+
+| {z }
+
+> block
+
+ ,
+
+where L is the number of blocks. We use L = 24 blocks for planning experiments, giving a total of 49 alternating layers. 
+
+Invertible linear layer (LU decomposition). Each Wi is an invertible linear layer parameterized via LU decomposition: 
+
+W = P LU, (4) where P ∈ Rn×n is a fixed permutation matrix, L is a lower-triangular matrix with unit diagonal, and U is an upper-triangular matrix with learnable diagonal entries S = diag( U ) stored in log-scale for numerical stability. The forward pass is z = xW and the inverse is x = zW −1, with 
+
+log | det W | = P 
+
+> i
+
+log |Si|.
+
+Affine coupling layer. Each coupling layer splits the input x ∈ Rn into two halves (x1, x2) and applies: 
+
+y1 = x1, y2 = x2 ⊙ exp( s(x1)) + t(x1), (5) where s(·) (scale) and t(·) (translate) are small MLPs of the form Linear( n/ 2, h) → ReLU →
+
+Linear( h, n/ 2), with hidden dimension h = 32 . The scale network additionally applies Tanh to bound the scaling factor. The inverse is x2 = ( y2 − t(y1)) ⊙ exp( −s(y1)) .
+
+Initialization: isometric initialization. Both layer types are initialized so that gθ begins as an orthogonal (distance-preserving) map. For each LU layer, a random matrix is QR-decomposed to obtain an orthogonal matrix Q, whose LU decomposition directly initializes W = Q. For each affine coupling layer, the final linear layers of s(·) and t(·) are zero-initialized, so s = 0 and t = 0 at the start, making each coupling layer the identity. In addition, gθ starts as a composition of orthogonal maps, ensuring ∥gθ (x)−gθ (y)∥ = ∥x−y∥ exactly at initialization. This isometric start is also what makes the isometric loss (Section A.3) meaningful. By anchoring gθ to the initial snapshot gθ0 and penalizing pairwise distance distortion, the mapping remains approximately isometric throughout training. 
+
+A.2 Visibility-Guided Sampling (VGS) 
+
+VGS has two stages, an offline precompute that runs once before training and a draw-only loop that runs every iteration. The offline stage selects seed configurations in Qfree (Section 3.3) and prepares the training samples used by the seed and bridge losses. Every training iteration then draws 11 mini-batches directly from this precomputed cache without invoking the collision oracle, so the per-iteration sampling cost stays negligible. 
+
+Seed selection. Algorithm 1 gives the full pseudocode used in Section 3.3. We first sample a pool of candidate configurations uniformly from Qfree and build a symmetric visibility matrix A
+
+by discretising each straight-line segment between candidates into Nintp = 100 interpolation points and querying the collision oracle on all of them in parallel. For each candidate we also compute its clearance to the nearest obstacle and convert it to a per-candidate rank in [0 , 1] , which makes the interior bias scale-invariant across very different workspaces. The greedy loop then grows a seed set one element at a time by selecting the candidate with the largest score. For candidate i, let gain i
+
+denote the number of currently uncovered candidates that are visible from i in A, i.e., the coverage that would be added if i were chosen next. The score is then score i = gain i · (1 + α · interior rank i),
+
+The first seed may be any candidate, but every subsequent seed must itself be already covered (i.e., visible from a previously chosen seed), so the chosen seed set stays inside a single connected com-ponent of the visibility graph. The loop terminates when the cumulative recall exceeds a target threshold, the best remaining coverage gain is zero, or the seed budget is exhausted. In our exper-iments, we pick seeds until the cumulative ratio of covered candidates reaches a target ratio ρtrgt ,set to 0.99 for Nav 2D and 0.95 for the manipulation environments (Reach 6D, Reach 14D, Biman-ual 14D). 
+
+Algorithm 1 Greedy visibility-based seed selection. 
+
+Inputs: candidate pool of size n with visibility matrix A; per-candidate interior-rank in [0 , 1] ; seed budget Nseed ; target recall ρtrgt ; interior weight α.
+
+Output: seed list s. 
+
+> 1:
+
+s ← ∅ , V ← ∅ ▷ seed list and covered set  
+
+> 2:
+
+for step = 1 , . . . , N seed do  
+
+> 3:
+
+E ← { 1, . . . , n } if s = ∅ else E ← V ▷ eligible candidates  
+
+> 4:
+
+for each i ∈ E do  
+
+> 5:
+
+gain i ← |{ j / ∈ V : Ai,j = 1 }|  
+
+> 6:
+
+score i ← gain i · (1 + α · interior rank i) 
+
+> 7:
+
+end for  
+
+> 8:
+
+i⋆ ← arg max i∈E score i 
+
+> 9:
+
+s ← s ∪ { i⋆}, V ← V ∪ { j : Ai⋆,j = 1 } 
+
+> 10:
+
+if |V| /n ≥ ρtrgt then break  
+
+> 11:
+
+end if  
+
+> 12:
+
+end for  
+
+> 13:
+
+return s
+
+Seed sampling. After seed selection, we sample for the per-seed BCE terms Lseed and Lvis in Section 3.3 as described in Algorithm 2. For each chosen seed sk, qseed is drawn from a fixed-radius neighborhood around sk with labels assigned by Cgt (·), while qvis is drawn uniformly from the candidates marked visible from sk by the visibility matrix A and labeled as collision-free by construction. The visible candidates are cached once after seed selection, so every training iteration draws both mini-batches without re-running any collision query. 12 Algorithm 2 Seed sampling for one seed. 
+
+Inputs: seed sk; cached visible candidates Vk; neighborhood radius rnb ; sample counts Tseed , T vis ;collision check Cgt .
+
+Output: (sample, label) pairs D. 
+
+> 1:
+
+D ← ∅  
+
+> 2:
+
+for τ = 1 , . . . , T seed do  
+
+> 3:
+
+ϵ ← sample from Uniform([ −rnb , r nb ]n) 
+
+> 4:
+
+qτ ← sk + ϵ 
+
+> 5:
+
+yτ ← Cgt (qτ ) 
+
+> 6:
+
+D ← D ∪ { (qτ , y τ )} 
+
+> 7:
+
+end for  
+
+> 8:
+
+for τ = 1 , . . . , T vis do  
+
+> 9:
+
+qτ ← uniform sample from Vk 
+
+> 10:
+
+D ← D ∪ { (qτ , 1) } 
+
+> 11:
+
+end for  
+
+> 12:
+
+return D
+
+Bridge sampling. For each visible seed pair (si, s j ) promoted to a bridge sampling region, we sample for the bridge BCE in Section 3.3 as described in Algorithm 3. We discretise the straight-line segment between si and sj into M interpolation points {pm}Mm=1 . For each pm, we precompute a radius rm such that Gaussian noise centered at pm with standard deviation rm keeps samples inside Qfree about 90% of the time (so roughly 10% land in collision). Each qbridge is then drawn by picking m uniformly at random from {1, . . . , M } and adding Gaussian noise scaled by rm, with the collision check Cgt (·) from Section 3.2 assigning the binary label. The minority of in-collision samples gives the BCE a nearby negative signal, which prevents the learned region from drifting and producing false positives near the bridge. 
+
+Algorithm 3 Bridge sampling for a visible pair. 
+
+Inputs: seed pair (si, s j ); pre-computed interpolation points {pm}Mm=1 and radii {rm}Mm=1 ; total sample count Ttotal ; collision check Cgt .
+
+Output: (sample, label) pairs D. 
+
+> 1:
+
+D ← ∅  
+
+> 2:
+
+for τ = 1 , . . . , T total do  
+
+> 3:
+
+m ← uniform sample from {1, . . . , M } 
+
+> 4:
+
+ϵ ← sample from N (0, r 2
+
+> m
+
+I) 
+
+> 5:
+
+qτ ← pm + ϵ 
+
+> 6:
+
+yτ ← Cgt (qτ ) 
+
+> 7:
+
+D ← D ∪ { (qτ , y τ )} 
+
+> 8:
+
+end for  
+
+> 9:
+
+return D
+
+A.3 Regularization Losses 
+
+Three additional regularization losses are applied during training to keep the latent mapping well-behaved and the region boundaries faithful to the collision-free criterion. 
+
+Isometric loss. The isometric loss keeps the latent map gθ close to a distance-preserving defor-mation of the configuration space. Without it, the joint optimization of (θ, H) can let gθ deform excessively, distorting the metric structure of Z and making paths that appear short in latent space correspond to unnecessarily long or winding trajectories once decoded back to Q. We use two terms, an anchor term that ties gθ to its initial snapshot gθ0 taken at the start of training, 
+
+Lanc = Eq
+
+ ∥gθ (q) − gθ0 (q)∥2  , (6) and a pairwise distance-preservation term over sampled pairs (q1, q2),
+
+Liso = Eq1,q2
+
+h  ∥gθ (q1) − gθ (q2)∥ − ∥ q1 − q2∥2 i
+
+. (7) 13 Together, the two terms are introduced so that paths planned in Z stay near-optimal when decoded back to Q.
+
+Box loss. The box loss enforces normalized joint-limit feasibility. We normalize the configuration space to [−1, 1] n and, for collision configurations q with Cgt = 0 that exceed the box of half-width 
+
+m ∈ (0 , 1] , weight the bound violation by the classifier output C(gθ (q)) :
+
+Lbox = Eq : Cgt =0 
+
+"
+
+C(gθ (q)) · X
+
+> i
+
+ReLU( |qi| − m)
+
+#
+
+. (8) The classifier is thus discouraged from including out-of-box collision configurations in any predicted region, keeping the learned convex sets within physically valid regions of the configuration space. The margin 1 − m provides a small safety buffer from the boundary. 
+
+False positive loss. The false positive loss is a hard-negative mining term that targets configurations the model currently misclassifies as inside a region. At each training step, we identify configurations with ground-truth label Cgt = 0 (in collision) but predicted class probability ≥ 0.5, and push them into a per-region ring buffer of current false positives. At loss time, we sample qfp from this buffer and apply a per-region BCE that drives the sampled points outside the region: 
+
+Lfp = 1
+
+N
+
+> N
+
+X
+
+> k=1
+
+BCE( Ck(gθ (qfp )) , 0) . (9) By focusing gradient updates on regions that are currently violating the zero-false-positive criterion, this term complements the global BCE that operates over uniformly sampled configurations and accelerates convergence toward strict precision. 
+
+A.4 Hyperparameters 
+
+This subsection consolidates the numerical hyperparameters used across the four environments. Table 3: Environment-specific hyperparameters. Nseed is the visibility-guided seed budget, Nbridge 
+
+is the number of bridge sampling regions, N = Nseed + Nbridge is the total convex set count, B is the number of half-spaces per region, m is the box-loss half-width, and λanc is the latent-distance anchor weight.                               
+
+> Env. Nseed Nbridge NBmλanc
+> Nav 2D 10 818 20 0.995 1.0 Reach 6D 213100 0.895 1.0 Reach 14D 213200 0.845 1.0 Bimanual 14D 213100 0.895 3.0
+
+Loss weights. Each BCE term, Lclass , Lseed , Lvis , Lbridge , applies an asymmetric weighting on outside (collision, Cgt = 0 ) and inside ( Cgt = 1 ) samples, 
+
+BCE( Cgt , ˆC) = − wout (1 − Cgt ) log(1 − ˆC) + Cgt log ˆC ,
+
+with wout = 10 biasing the BCE toward higher precision during training. The regularization term decomposes as 
+
+Lreg = λanc Lanc + λiso Liso + λbox Lbox + λfp Lfp ,
+
+where each term is defined in Appendix A.3. Table 4 lists the values of all weights in equation (2) and in the regularization decomposition. 
+
+Gumbel-Softmax smoothing. The Gumbel-Softmax surrogates of min and max in Section 3.2 approximate the maximum as 
+
+gmax τ (x) = X
+
+> i
+
+xi · softmax i(xi + τ g i) , gi ∼ Gumbel(0 , 1) ,
+
+14 Table 4: Loss weights used in equation (2) and in the regularization decomposition. The per-environment anchor weight λanc is listed in Table 3.                 
+
+> λseed λvis λbridge λreg wout λiso λbox λfp λanc
+> 0.51.00.51.010 0.11.00.75 Table 3
+
+with gmin τ (x) = − gmax τ (−x). We set the noise scale τ = 0 .01 , which keeps the surrogate close to the hard max/min while providing a non-zero gradient. 
+
+Bridge sampling ratio. For bridge sampling (Algorithm 3), per-interpolation-point radii are chosen so that approximately 10% of the resulting samples land in collision, providing a nearby negative signal for the bridge BCE. 
+
+Optimizer. We use Adam [13] with β1 = 0 .9, β2 = 0 .999 , no weight decay, and a constant learning rate ( 2×10 −3 for gθ and 0.1 for the boundary parameters η and d). The boundary parameters are initialized with scale 0.1.
+
+Hardware. All experiments are run on a single NVIDIA GeForce RTX 3090 with an AMD Ryzen Threadripper 3990X (64-core) CPU. 
+
+## B Deployment Details 
+
+B.1 Test-Time Refinement Procedure 
+
+Test-time refinement enforces precision = 1.0 by contracting any region that has admitted a collision configuration. We treat every false positive (a configuration the boundary classifier places inside aregion but that the collision oracle reports as unsafe) as evidence that the offending facet has drifted past the true obstacle, and we push that facet inward just enough to expel the offending point. 
+
+Refinement step. We use the notation of Section 3.4, where region k is Pk = {z : ϕk,i (z) ≥
+
+0, i = 1 , . . . , B } with signed distances ϕk,i (z) = η⊤
+
+> k,i
+
+z + dk,i , and a false positive zfp inside region k satisfies ϕk,i (zfp ) ≥ 0 for all i. Each zfp is assigned to its most narrowly violated facet 
+
+i⋆(zfp ) = arg min i ϕk,i (zfp ), giving per-facet sets Fk,i , and we apply a single batched update 
+
+dk,i ← dk,i −   ∆k,i + ε , ∆k,i = max 
+
+> zfp ∈F k,i
+
+ϕk,i (zfp ),
+
+where ε > 0 is a small constant close to zero that provides a tiny safety margin. After the update, every assigned zfp lies strictly outside Pk, while configurations on the safe side of each facet remain inside. The normals ηk,i are never modified, so each facet only translates along its own normal, meaning each region can only shrink and never grow. Because the update is independent across 
+
+(k, i ), all facets are updated in parallel in a single batched operation. 
+
+Source of false positives. We collect false positives from two complementary sources, applied iteratively until no new violators are observed. • Uniform sampling sweep. We repeatedly draw configuration-space samples (uniform on a per-environment domain), check them against the collision oracle, and surface every sample that is classified as inside some region Pk but is in fact in collision. This first pass corrects the bulk of facet overreach inherited from training. • Planning-and-deploy feedback. After the uniform sweep converges, we run the actual GCS path planner on a held-out batch of start–goal queries and densely interpolate every returned path. Any waypoint on a returned path that is in collision becomes a planning-time false positive and is fed back into the refinement step. This second pass catches violators that lie on the GCS-preferred routes specifically, which uniform sampling might never hit at a useful rate in high dimensions. Both passes only translate facets inward, so precision is monotonically non-decreasing across refine-ment iterations. We stop when neither pass produces any new false positive, with a cap of 10 outer 15 iterations. The safety margin is implemented as a small multiplicative offset on ∆k,i (ε ≈ 10 −6), and at each iteration we additionally inject 100 Gaussian perturbations of standard deviation 5 × 10 −3
+
+around the current false positives to surface nearby violators that the planner is likely to hit at de-ployment. 
+
+B.2 Start- and Goal-Snap Bridging 
+
+The learned region boundaries define a strict interior region of configurations classified as safe by the model. However, a start or goal configuration q may lie outside all region interiors while still being reachable from some region via a straight-line collision-free path in Z. To handle this, we assign q to the region it is most naturally connected to before invoking the planner. More formally, given z = gθ (q), we project z onto each region Pk along its most violated boundary: 
+
+i∗ = arg min  
+
+> i
+
+ϕk,i (z), z⊥ 
+
+> k
+
+= z − min( ϕk,i ∗ , 0) 
+
+∥ηk,i ∗ ∥2 ηk,i ∗ , (10) and assign q to the nearest region k∗ = arg min k ∥z⊥ 
+
+> k
+
+− z∥2. Since ϕk,i (z) = η⊤
+
+> k,i
+
+z + dk,i are already available as a single matrix multiply over all N × B boundaries, the entire procedure is closed-form with O(N Bn ) cost, negligible compared to the GCS solve. 
+
+Pool-based fallback via k-nearest neighbors. The analytic projection above only certifies that the snap point lies on a region facet. The straight-line latent segment from q to the snapped configuration may still cross collision once decoded. When this segment check fails, we fall back to a sample-based snap. In detail, we maintain a fixed-size pool of region-inside configurations {qpool  
+
+> j
+
+}Mj=1 ,drawn by uniform sampling and accepted only if the boundary classifier places them strictly inside some current region Pk. The pool is refreshed after every test-time refinement update so it tracks the active boundaries. Given a failing query q, we retrieve its top-k nearest pool points by configuration-space ℓ1 distance, linearly interpolate from z = gθ (q) to each candidate’s latent code in Z, decode the interpolants back to configuration space, and check that every decoded sample is collision-free. Among the candidates passing this check, we snap q to the one closest in ℓ1 distance. If no candidate passes the latent-linear check, we optionally retry the same procedure with interpolation directly in configuration space as a last-resort fallback, in which case the splice segment used at evaluation also switches to configuration-space linear interpolation for consistency. 
+
+B.3 Redundant Facet Pruning 
+
+Each region 
+
+Pk = {z ∈ Z : ϕk,i (z) ≥ 0, i = 1 , . . . , B }, ϕk,i (z) = η⊤
+
+> k,i
+
+z + dk,i , (11) often contains redundant facets whose removal leaves Pk unchanged. These facets inflate the pair-wise region-intersection checks used to build the GCS adjacency graph and the per-vertex convex programs solved during GCS optimization. We prune them once per active boundary set H and cache the result, so the cost is paid only at planner-time refinement updates and amortized over all evaluation queries. 
+
+Stage 1: Gram-matrix prefilter. For each region, let ˆηk,i = ηk,i /∥ηk,i ∥ and ˆdk,i = dk,i /∥ηk,i ∥.We form Gij = ˆ η⊤ 
+
+> k,i
+
+ˆηk,j and, for every pair with Gij > 1 − τcos , drop the facet with the larger ˆd.Two co-oriented parallel half-spaces are strictly nested, so dropping the larger- ˆd one preserves Pk
+
+exactly. We set τcos = 10 −10 so only floating-point duplicates are merged, and defer near-parallel but distinct facets to Stage 2. 
+
+Stage 2: Per-facet LP check. Surviving facets are tested sequentially with the linear program 
+
+ϕ⋆i = min  
+
+> z
+
+ϕk,i (z) s.t. ϕk,j (z) ≥ 0 ∀j ∈ K \ { i}, (12) where K is the current active index set. Facet i is dropped when the LP returns a bounded optimum with ϕ⋆i ≥ − τLP (τLP = 10 −7). Already-dropped facets are excluded from K before later facets are 16 tested, so no redundant facet is certified using another. Unbounded or numerically problematic LPs conservatively retain the facet. The procedure preserves the shape of every Pk to within floating-point noise and only reduces the description size handed to the GCS solver. 
+
+## C Additional Experimental Details 
+
+C.1 Coverage Metric Definitions 
+
+This appendix gives the full formal definitions of the three coverage metrics Cvg q , Cvg p, Cvg r used in Section 4.1 and Table 1. Let Ω = ˆQ(island ) 
+
+> free
+
+∩ Q free be the ground-truth collision-free samples lying in the largest connected component of the predicted region, so that only configurations the planner can actually route through are counted. The three metrics measure coverage in configuration space, end-effector position space, and end-effector pose space respectively, defined as Cvg q = |Ω||Q free | , Cvg p = |Vox(FK p(Ω)) ||Vox(FK p(Qfree )) | , Cvg r = |Vox(FK r (Ω)) ||Vox(FK r (Qfree )) | , (13) where FK p(·) maps a configuration to its end-effector position, FK r (·) concatenates the positions of multiple rigidly-attached keypoints (capturing both position and orientation implicitly), and Vox( ·)
+
+voxelizes the workspace. 
+
+Keypoints and voxel sizes. For FK r , we place keypoints on the last two link bodies of each arm, namely the end-effector link and the link immediately preceding it. For the single-arm reachers (Reach 6D, Reach 14D), the 2 keypoints are concatenated into a single position vector before vox-elization. For Bimanual 14D, a combined 12 -D voxel grid (4 keypoints × 3 dims) would be too sparse at any reasonable resolution, making coverage estimates unreliable. We therefore compute Cvg r per arm using each arm’s 2 keypoints concatenated into a 6-D vector, and average the two per-arm values. The Vox( ·) voxel size is 0.2 for Nav 2D, 0.02 for the reacher environments, and 
+
+0.05 for Bimanual 14D. 
+
+C.2 Planning Evaluation Setup 
+
+For downstream planning evaluation, we use a Drake-based GCS planner constructed on top of the learned collision-free region decomposition. We report path-planning success rate (SR) and planning time. A planning trial is counted as successful if the forward-kinematics keypoint error between the target configuration and the final planned configuration is below a predefined threshold. Unless otherwise noted, all methods are evaluated under the same environment setting and number of convex sets so that the results directly reflect differences in representation quality and planning utility. 
+
+C.3 Path Planning Dataset 
+
+For each environment, the evaluation set consists of 1,000 start–goal configuration pairs (qs, qg).Both endpoints are sampled uniformly from Qfree , and a pair is rejected if the straight-line segment between them lies entirely inside Qfree , since such trivial pairs do not exercise the region representa-tion. This procedure is repeated until 1,000 accepted pairs are collected. The one exception is IRIS on Bimanual 14D, where each per-pair GCS solve takes minutes due to its 90 -region decomposition in 14 dimensions, so we evaluate it on 50 pairs drawn from the same distribution instead. 
+
+C.4 Baseline Hyperparameter Tuning 
+
+The sampling-based baselines (RRT, PRM, cuRobo) approximate the world geometry with collision primitives whose effective shape depends on each environment’s robot model. Because the modeled obstacle and robot geometries differ across our environments (a 2D point robot in Nav 2D, planar manipulators in Reach 6D and Reach 14D, and a 3D bimanual manipulator in Bimanual 14D), a 17 single set of collision-margin hyperparameters does not transfer across environments. We therefore tune each baseline per-environment for a fair comparison. 
+
+RRT-Connect and PRM (OMPL, capsule primitives). Both planners run in OMPL with a MuJoCo state validity checker. Each robot link and obstacle is represented by its native cap-sule shell, so the underlying primitive is the capsule. Analogously to the cuRobo sphere-padding sweep, we sweep a per-environment collision margin m that inflates the non-robot col-lision geom radii while leaving the robot capsules untouched. The swept values are m ∈{0.001 , 0.002 , 0.005 , 0.010 , 0.020 , 0.050 , 0.100 } m, and for Table 2 we pick whichever value yields the highest post-validation SR per environment. 
+
+cuRobo (sphere primitives). cuRobo’s collision oracle expects a sphere-cloud representation of the robot, so we transcribe each capsule of the source robot model into a uniformly spaced set of spheres that covers the capsule’s swept volume exactly. For a capsule of length L and radius r, we place N = max(3 , ⌈L/r ⌉ + 1) spheres along its axis with radius R = pr2 + ( L/ (2( N − 1))) 2.This is the smallest N for which a uniformly spaced cover has no axial gap, and the chosen R keeps the sphere envelope tangent to the original capsule, so cuRobo’s robot-world collision boundary matches the MuJoCo geometry without arbitrary inflation. Self-collision ignore pairs are seeded from kinematic adjacency. Where thick-link envelopes always overlap with non-adjacent neigh-bors, we add link pairs that overlap in ≥ 95% of 500 randomly sampled configurations to the ignore list (pairs that overlap only sometimes are kept since they encode real near-collisions). We verify each resulting collision oracle against MuJoCo on 500 held-out random configurations and require agreement ≥ 95% with false-negative rate < 0.5% before running the planning eval-uation. We then sweep the robot-side collision sphere padding per environment with cuRobo’s graph-search variant and reuse the best value for the trajectory-optimization variant. The padding grids are {0.015 , 0.020 , 0.025 , 0.030 } m for Nav 2D, {0.001 , 0.002 , . . . , 0.010 } m (1 mm step) for Reach 6D and Reach 14D, and {0, 0.005 , 0.010 , . . . , 0.045 } m (5 mm step) for Bimanual 14D. Per environment we pick the padding with the highest SR (ties broken by lowest solve time), giving 
+
+{0.025 , 0.002 , 0.003 , 0.010 } m for the four environments respectively, and reuse that value for the trajectory variant. In contrast, ILD does not reduce the environment to either capsule shells or sphere clouds. Every obstacle’s full mesh is presented to the boundary-learning sampler, and the learned safe region is what GCS plans on top of. The SR advantage at higher dimensions reported in Table 2 reflects this primitive-free treatment of the obstacle geometry. 
+
+## D Geometric Interpretation of the Joint Objective 
+
+We show that the BCE objective in Section 3.2 geometrically encourages gθ to warp non-convex parts of Qfree into convex-friendly shapes so that the polytopes can match safe and unsafe regions. The derivation below makes precise how each gradient step acts on the signed distance from a sample to its closest polytope facet, and shows that the effect monotonically improves the sample’s classification. 
+
+Setup. With z = gθ (q) and s := max k φk(z), the BCE loss for sample q is 
+
+LBCE (q) = − Cgt log C(z) + (1 − Cgt ) log(1 − C(z)) , C(z) = σ(s),
+
+with Cgt ∈ { 0, 1} the ground-truth label at q. In the hard-max/min limit, s is realised at the argmax region k∗ = arg max k φk(z) and its argmin facet i∗ = arg min i ϕk∗,i (z), giving the local gradient 
+
+∂s/∂ z = ηk∗,i ∗ .
+
+Gradient identity. The standard BCE + sigmoid identity yields ∂LBCE /∂s = C(z) − Cgt . Chain-ing through z = gθ (q),
+
+∇θ LBCE =   C(z) − Cgt 
+
+ η⊤ 
+
+> k∗,i ∗
+
+∇θ gθ (q). (14) 18 Effect on the signed distance. A gradient step ∆θ = −α∇θ LBCE changes the signed distance 
+
+ϕk∗,i ∗ (gθ (q)) from the sample to its closest facet by 
+
+∆ϕk∗,i ∗ ≈ η⊤ 
+
+> k∗,i ∗
+
+∇θ gθ (q)
+
+| {z } 
+
+> ∂ϕ k∗,i ∗/∂θ
+
+·∆θ = −α   C(z) − Cgt 
+
+ η⊤ 
+
+> k∗,i ∗
+
+∇θ gθ (q) 2, (15) whose non-negative norm factor implies sign(∆ ϕk∗,i ∗ ) = −sign( C(z) − Cgt ), hence 
+
+∆ϕk∗,i ∗ ≤ 0 ⇐⇒ C(z) > C gt 
+
+| {z }
+
+> false positive
+
+, ∆ϕk∗,i ∗ ≥ 0 ⇐⇒ C(z) < C gt 
+
+| {z }
+
+> false negative
+
+. (16) A false positive is pushed across facet i∗ out of polytope k∗, while a false negative is pulled deeper inside. 
+
+Connection to test-time refinement (single-step). The bias gradient reduces to test-time refine-ment under a few explicit assumptions. In the hard limit s = ϕk∗,i ∗ (z), so ∂s/∂d k∗,i ∗ = 1 and 
+
+∂LBCE 
+
+∂d k∗,i ∗
+
+= C(z) − Cgt , ∆dk∗,i ∗ = −α  C(z) − Cgt 
+
+. (17) For a false positive ( Cgt = 0 ) this decreases dk∗,i ∗ , translating facet i∗ inward to expel the sample, the same direction as the test-time contraction dk∗,i ∗ ← dk∗,i ∗ − ∆k∗,i ∗ (Section 3.4). The two updates are not identical, but the gap closes under a few mild assumptions that make the train-time gradient collapse onto the test-time rule. • Frozen geometry. Test-time refinement holds gθ and the normals η fixed and moves only the bias, whereas training co-adapts all of them. • One-sided contraction. The train-time residual C(z) − Cgt is two-sided, contracting a facet on a false positive ( Cgt = 0 ) and expanding it on a false negative ( Cgt = 1 ). Test-time refinement keeps only the false-positive branch, so boundaries can only shrink and precision is monotone. • Raw margin in place of the squashed residual. The gradient step scales with the sigmoid-squashed residual C(z) − Cgt = σ(ϕk∗,i ∗ (z)) , a bounded probability in (0 , 1) applied repeatedly with learning rate α. Test-time refinement instead steps by the raw signed-distance violation, setting ∆k∗,i ∗ = max zfp ϕk∗,i ∗ (zfp ) and adding a small ε so that every assigned false positive lands strictly outside the contracted facet in a single shot. Under these assumptions the two updates coincide in direction and target facet. They differ only in whether the contraction is the soft, probability-weighted, repeated gradient step or the exact, geometric, single-shot margin. Because the test-time step is one-sided, iterating it like the gradient would over-contract, so it uses the minimal exact amount ∆k∗,i ∗ + ε rather than a repeated nudge, whereas during training the opposing false-negative gradients from safe samples on the inner side of the facet keep the boundary in balance. 
+
+Connection to test-time refinement (fixed-point). Beyond a single step, training and test-time refinement share a fixed point in the hard-sigmoid limit ( β → ∞ ), where the BCE gradient vanishes and the refinement update leaves d unchanged. Project each sample assigned to facet i∗ of region 
+
+k∗ onto the facet normal, tn := η⊤ 
+
+> k∗,i ∗
+
+zn, so ϕk∗,i ∗ (zn) = tn + d with d ≡ dk∗,i ∗ the only free variable. The classifier on this facet is σ β(tn + d), where β = 1 recovers the standard sigmoid and β → ∞ gives the hard step. With ∂s/∂d = 1 , stationarity of the two-sided BCE in d gives 
+
+X
+
+> n
+
+ σ(β(tn + d)) − Cgt ,n 
+
+ = 0 ⇐⇒ X
+
+> n:Cgt ,n =0
+
+σ(β(tn + d)) 
+
+| {z }
+
+> soft FP mass
+
+= X
+
+> n:Cgt ,n =1
+
+σ(−β(tn + d)) 
+
+| {z }
+
+> soft FN mass
+
+, (18) so the boundary settles where the predicted-inside mass of collision samples balances the predicted-outside mass of free samples. 19 Take the hard-sigmoid limit β → ∞ . Then σ(β(t + d)) → 1[t > −d] and the soft masses collapse into integer counts of mis-classified samples, 
+
+NFP (d) := |{ n : Cgt ,n = 0 , t n > −d}| , NFN (d) := |{ n : Cgt ,n = 1 , t n < −d}| , (19) and the balance reduces to NFP (d) = NFN (d). Dropping the FN term under the one-sided restriction leaves the constraint tn + d ≤ 0 for every collision n, the requirement that no collision sample is placed strictly inside the facet. The minimal-contraction choice, the largest d satisfying it, gives 
+
+d⋆ = − max  
+
+> n:Cgt ,n =0
+
+tn. (20) Substituting ∆k∗,i ∗ = max n:Cgt ,n =0 (tn + dold ) into the test-time refinement update, 
+
+dnew = dold − ∆k∗,i ∗ = − max  
+
+> n:Cgt ,n =0
+
+tn = d⋆, (21) so a single refinement step lands exactly on the fixed point of the hard-sigmoid one-sided problem. Removing either limit breaks the identity. Keeping the soft sigmoid replaces the count with a prob-ability mass that never hits zero, and keeping the FN term adds a competing pull that settles the boundary strictly inside the gap between collision and free samples. 20
