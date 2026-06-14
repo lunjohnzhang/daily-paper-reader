@@ -6,34 +6,38 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-13
-- 运行时间：2026-06-13 20:45:11 UTC
+- 最新运行日期：2026-06-14
+- 运行时间：2026-06-14 21:26:50 UTC
 - 运行状态：成功
-- 本次总论文数：4
-- 精读区：1
+- 本次总论文数：6
+- 精读区：3
 - 速读区：3
 
 ### 今日简报（AI）
-今日精选4篇前沿论文，聚焦无人机缓存优化与多智能体系统。  
-最推荐《Deterministic versus Stochastic Optimization...》中确定性优化在UAV路径规划中的优势，以及《ConMem》的无训练记忆引导策略。  
-建议读者进一步探索无人机网络动态调度与轻量级导航模拟器的结合应用。
-- 详情：[/202606/13/README](/202606/13/README)
+今日精选多智能体系统与机器人操作领域六篇论文，其中GPU加速多智能体规划与感知框架G-MAPP及Agentic AI规模化通信协调综述获9分最高评价。建议优先精读这两篇，它们分别聚焦实时运动生成与终端智能体联网，是当前研究热点。
+- 详情：[/202606/14/README](/202606/14/README)
 
 ### 精读区论文标签
-1. [Deterministic versus Stochastic Optimization for Joint Path Planning and Dynamic Time Splitting in Multiple-UAV-Cached IoT Networks](/202606/13/2606.09014v1-deterministic-versus-stochastic-optimization-for-joint-path-planning-and-dynamic-time-splitting-in-multiple-uav-cached-iot-networks)  
+1. [G-MAPP: GPU-accelerated Multi-Agent Planning and Perception for Reactive Motion Generation](/202606/14/2606.12579v1-g-mapp-gpu-accelerated-multi-agent-planning-and-perception-for-reactive-motion-generation)  
+   标签：评分：9.0/10、query:multi-robot
+   evidence：GPU加速的多智能体规划与感知
+2. [The Internet of Agentic AI: Communication, Coordination, and Collective Intelligence at Scale](/202606/14/2606.12835v1-the-internet-of-agentic-ai-communication-coordination-and-collective-intelligence-at-scale)  
+   标签：评分：9.0/10、query:multi-robot
+   evidence：多智能体通信与协调，大规模集体智能，直接匹配多机器人协调
+3. [Decentralized Multi-Agent Systems with Shared Context](/202606/14/2606.10662v1-decentralized-multi-agent-systems-with-shared-context)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多无人机联合路径规划与优化
+   evidence：分散式多智能体协调与共享上下文，强匹配多机器人协调
 
 ### 速读区论文标签
-1. [ConMem: Structured Memory-Guided Adaptation in Training-Free Multi-Agent Systems](/202606/13/2606.08702v1-conmem-structured-memory-guided-adaptation-in-training-free-multi-agent-systems)  
+1. [DARRMS -- An Efficient Algorithm for Dynamic Attention Radius in Resource-Constrained Multi-Agent Systems](/202606/14/2606.12614v1-darrms----an-efficient-algorithm-for-dynamic-attention-radius-in-resource-constrained-multi-agent-systems)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：无训练多智能体协调框架
-2. [Efficient-WAM: A 1B-Parameter World-Action Model with Low-Cost Future Imagination](/202606/13/2606.10040v1-efficient-wam-a-1b-parameter-world-action-model-with-low-cost-future-imagination)  
+   evidence：多智能体系统资源受限下的高效算法，与协调相关
+2. [A Reactive Redistribution Mechanism for STL Tasks in Multi-Agent Systems Under Time-Varying Communication](/202606/14/2606.13479v1-a-reactive-redistribution-mechanism-for-stl-tasks-in-multi-agent-systems-under-time-varying-communication)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：面向具身控制的世界-动作模型，用于未来视觉预测
-3. [IR-SIM: A Lightweight Skill-Native Simulator for Navigation, Learning, and Benchmarking](/202606/13/2606.08729v1-ir-sim-a-lightweight-skill-native-simulator-for-navigation-learning-and-benchmarking)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：轻量级导航模拟器，可用于仓储机器人路径规划和基准测试
+   evidence：时变通信下多智能体任务重分配，基于信号时态逻辑
+3. [$\texttt{WEAVER}$, Better, Faster, Longer: An Effective World Model for Robotic Manipulation](/202606/14/2606.13672v1-textttweaver-better-faster-longer-an-effective-world-model-for-robotic-manipulation)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：机器人操作的世界模型
 
 
 <div class="dpr-home-promo-card">
