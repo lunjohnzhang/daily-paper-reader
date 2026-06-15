@@ -6,38 +6,45 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-14
-- 运行时间：2026-06-14 21:26:50 UTC
+- 最新运行日期：2026-06-15
+- 运行时间：2026-06-15 22:05:01 UTC
 - 运行状态：成功
-- 本次总论文数：6
-- 精读区：3
+- 本次总论文数：7
+- 精读区：4
 - 速读区：3
 
 ### 今日简报（AI）
-今日精选多智能体系统与机器人操作领域六篇论文，其中GPU加速多智能体规划与感知框架G-MAPP及Agentic AI规模化通信协调综述获9分最高评价。建议优先精读这两篇，它们分别聚焦实时运动生成与终端智能体联网，是当前研究热点。
-- 详情：[/202606/14/README](/202606/14/README)
+今日精读4篇、速读3篇，聚焦多智能体协同与自主驾驶。
+
+最值得关注的是《Multi-Agent Embodied Autonomous Driving: From V2X Information Exchange to Shared World Models》（满分）和《α-fair heterogeneous agent reinforcement learning》（8分），前者开创V2X共享世界模型，后者提出异构智能体的公平性优化。
+
+建议普通读者优先研读这两篇，以理解多智能体系统在信息共享与公平性权衡上的前沿进展。
+- 详情：[/202606/15/README](/202606/15/README)
 
 ### 精读区论文标签
-1. [G-MAPP: GPU-accelerated Multi-Agent Planning and Perception for Reactive Motion Generation](/202606/14/2606.12579v1-g-mapp-gpu-accelerated-multi-agent-planning-and-perception-for-reactive-motion-generation)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：GPU加速的多智能体规划与感知
-2. [The Internet of Agentic AI: Communication, Coordination, and Collective Intelligence at Scale](/202606/14/2606.12835v1-the-internet-of-agentic-ai-communication-coordination-and-collective-intelligence-at-scale)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：多智能体通信与协调，大规模集体智能，直接匹配多机器人协调
-3. [Decentralized Multi-Agent Systems with Shared Context](/202606/14/2606.10662v1-decentralized-multi-agent-systems-with-shared-context)  
+1. [Multi-Agent Embodied Autonomous Driving: From V2X Information Exchange to Shared World Models](/202606/15/2606.13840v1-multi-agent-embodied-autonomous-driving-from-v2x-information-exchange-to-shared-world-models)  
+   标签：评分：10.0/10、query:multi-robot
+   evidence：多智能体共享世界模型
+2. [$α$-fair heterogeneous agent reinforcement learning](/202606/15/2606.13076v1--fair-heterogeneous-agent-reinforcement-learning)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：分散式多智能体协调与共享上下文，强匹配多机器人协调
+   evidence：用于协调的公平异构多智能体强化学习
+3. [AnyGoal: Vision-Language Guided Multi-Agent Exploration for Training-Free Lifelong Navigation](/202606/15/2606.13878v1-anygoal-vision-language-guided-multi-agent-exploration-for-training-free-lifelong-navigation)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：多机器人协同探索架构
+4. [Learning Coordinated Preference for Multi-Objective Multi-Agent Reinforcement Learning](/202606/15/2606.14693v1-learning-coordinated-preference-for-multi-objective-multi-agent-reinforcement-learning)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：多目标多智能体强化学习中的协调偏好学习
 
 ### 速读区论文标签
-1. [DARRMS -- An Efficient Algorithm for Dynamic Attention Radius in Resource-Constrained Multi-Agent Systems](/202606/14/2606.12614v1-darrms----an-efficient-algorithm-for-dynamic-attention-radius-in-resource-constrained-multi-agent-systems)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：多智能体系统资源受限下的高效算法，与协调相关
-2. [A Reactive Redistribution Mechanism for STL Tasks in Multi-Agent Systems Under Time-Varying Communication](/202606/14/2606.13479v1-a-reactive-redistribution-mechanism-for-stl-tasks-in-multi-agent-systems-under-time-varying-communication)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：时变通信下多智能体任务重分配，基于信号时态逻辑
-3. [$\texttt{WEAVER}$, Better, Faster, Longer: An Effective World Model for Robotic Manipulation](/202606/14/2606.13672v1-textttweaver-better-faster-longer-an-effective-world-model-for-robotic-manipulation)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：机器人操作的世界模型
+1. [Submodular Optimization with Applications to Decision and Control](/202606/15/2606.10192v1-submodular-optimization-with-applications-to-decision-and-control)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：子模优化在决策与控制中的应用综述，可用于多机器人协调和任务分配
+2. [How Task Structure Limits Multi-Agent Success: An Information-Theoretic Analysis](/202606/15/2606.13733v1-how-task-structure-limits-multi-agent-success-an-information-theoretic-analysis)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：任务结构如何限制多智能体成功的信息论分析，为多机器人协调设计提供指导
+3. [$μ_0$: A Scalable 3D Interaction-Trace World Model](/202606/15/2606.13769v1-0-a-scalable-3d-interaction-trace-world-model)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：可扩展的3D交互轨迹世界模型用于机器人学习
 
 
 <div class="dpr-home-promo-card">
