@@ -6,38 +6,34 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-17
-- 运行时间：2026-06-17 20:46:36 UTC
+- 最新运行日期：2026-06-18
+- 运行时间：2026-06-18 20:52:16 UTC
 - 运行状态：成功
-- 本次总论文数：6
-- 精读区：2
-- 速读区：4
+- 本次总论文数：4
+- 精读区：1
+- 速读区：3
 
 ### 今日简报（AI）
-今天聚焦机器人操作与具身智能，精读了两种高分世界模型（HiMem-WAM和Qwen-RobotWorld）。最值得关注的是层级记忆门控机制与语言条件视频生成框架，分别得分8/10。建议优先精读这两篇，把握世界模型在机器人学习中的前沿应用。
-- 详情：[/202606/17/README](/202606/17/README)
+今日精读一篇高分论文，并速读三项机器人相关研究。  
+最值得关注的是通过CBBA与凸集图实现动态杂乱环境下的任务分配与运动规划，以及FlashNav的20秒超快导航策略训练。  
+建议下一步重点关注语言条件视频生成统一具身世界模型（Qwen-RobotWorld）和人机团队协作的情景记忆机制。
+- 详情：[/202606/18/README](/202606/18/README)
 
 ### 精读区论文标签
-1. [HiMem-WAM: Hierarchical Memory-Gated World Action Models for Robotic Manipulation](/202606/17/2606.10363v1-himem-wam-hierarchical-memory-gated-world-action-models-for-robotic-manipulation)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：具有分层记忆的世界动作模型，用于机器人操作
-2. [Qwen-RobotWorld Technical Report: Unifying Embodied World Modeling through Language-Conditioned Video Generation](/202606/17/2606.17030v2-qwen-robotworld-technical-report-unifying-embodied-world-modeling-through-language-conditioned-video-generation)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：语言条件视频世界模型，统一具身世界建模
+1. [Task Allocation and Motion Planning in Dynamic, Cluttered Environments via CBBA and Graphs of Convex Sets](/202606/18/2606.18516v1-task-allocation-and-motion-planning-in-dynamic-cluttered-environments-via-cbba-and-graphs-of-convex-sets)  
+   标签：评分：10.0/10、query:multi-robot
+   evidence：基于CBBA和凸集图的多智能体任务分配与运动规划
 
 ### 速读区论文标签
-1. [HATS: A Human-Agent Teleoperation System for Multi-Arm Data Collection](/202606/17/2606.16491v1-hats-a-human-agent-teleoperation-system-for-multi-arm-data-collection)  
+1. [Qwen-RobotWorld Technical Report: Unifying Embodied World Modeling through Language-Conditioned Video Generation](/202606/18/2606.17030v3-qwen-robotworld-technical-report-unifying-embodied-world-modeling-through-language-conditioned-video-generation)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：多臂遥操作数据采集系统，支持多机器人协调
-2. [Qwen-RobotWorld Technical Report: Unifying Embodied World Modeling through Language-Conditioned Video Generation](/202606/17/2606.17030v1-qwen-robotworld-technical-report-unifying-embodied-world-modeling-through-language-conditioned-video-generation)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：语言条件世界模型，可用于多机器人环境表示
-3. [Co-Evolved Spiking Neural Network Ensembles via Marginal Contribution Fitness](/202606/17/2606.13985v1-co-evolved-spiking-neural-network-ensembles-via-marginal-contribution-fitness)  
+   evidence：用于具身智能的语言条件视频世界模型
+2. [FlashNav: Ultra-Fast Policy Training for Robot Navigation within 20 Seconds](/202606/18/2606.15846v1-flashnav-ultra-fast-policy-training-for-robot-navigation-within-20-seconds)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：基于边际贡献的共进化集成用于SNN，可应用于多机器人进化优化
-4. [Causal Object-Centric Models for Planning with Monte Carlo Tree Search](/202606/17/2606.14418v1-causal-object-centric-models-for-planning-with-monte-carlo-tree-search)  
+   evidence：超快机器人导航训练，可应用于仓储自动化
+3. [Improving Human-Robot Teamwork in Urban Search and Rescue Through Episodic Memory of Prior Collaboration](/202606/18/2606.18836v1-improving-human-robot-teamwork-in-urban-search-and-rescue-through-episodic-memory-of-prior-collaboration)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：对象中心世界模型，可用于环境表示
+   evidence：通过情节记忆改善人机团队协作
 
 
 <div class="dpr-home-promo-card">
