@@ -6,66 +6,60 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-19
-- 运行时间：2026-06-19 20:46:38 UTC
+- 最新运行日期：2026-06-20
+- 运行时间：2026-06-20 21:39:01 UTC
 - 运行状态：成功
-- 本次总论文数：14
-- 精读区：6
-- 速读区：8
+- 本次总论文数：12
+- 精读区：1
+- 速读区：11
 
 ### 今日简报（AI）
-今日处理14篇论文，精读2篇高分研究：深度展开协同与神经形态强化学习路径规划。
+今日精选12篇文献，聚焦机器人导航与多智能体系统，其中精读1篇高分拥堵感知路径规划。
 
-最值得关注的是机器人协同优化框架（9分）和基于神经形态计算的路径规划方法（9分），两者均聚焦于智能体高效决策。
+重点关注《Congestion-Aware Robot Tour Planning in Crowded Environments》提出的拥挤环境动态路径优化方法，以及《Metis: A Generalizable and Efficient World-Action Model》展现的自动驾驶通用行动建模思路。
 
-建议优先精读这两篇高分论文，并跟进速读中多智能体故障识别与组合设计的前沿趋势。
-- 详情：[/202606/19/README](/202606/19/README)
+建议优先精读拥堵感知路径规划论文，对理解现实场景下的服务机器人调度具有直接参考价值。
+- 详情：[/202606/20/README](/202606/20/README)
 
 ### 精读区论文标签
-1. [Deep-Unfolded Coordination](/202606/19/2606.19920v1-deep-unfolded-coordination)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：用于分布式多智能体优化的深度展开框架；直接解决多机器人协调问题
-2. [A Neuromorphic Reinforcement Learning Framework for Efficient Pathfinding in Robotic Mobile Fulfillment Systems](/202606/19/2606.20031v1-a-neuromorphic-reinforcement-learning-framework-for-efficient-pathfinding-in-robotic-mobile-fulfillment-systems)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：机器人移动货运系统中的路径规划
-3. [Residual-Space Evolutionary Optimization via Flow-based Generative Models](/202606/19/2606.20084v1-residual-space-evolutionary-optimization-via-flow-based-generative-models)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：结合流生成模型的进化优化
-4. [Formal Verification of Learned Multi-Agent Communication Policies via Decision Tree Distillation](/202606/19/2606.19632v1-formal-verification-of-learned-multi-agent-communication-policies-via-decision-tree-distillation)  
+1. [Congestion-Aware Robot Tour Planning in Crowded Environments](/202606/20/2606.19031v1-congestion-aware-robot-tour-planning-in-crowded-environments)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多智能体通信策略的形式验证，用于协调
-5. [Weight Adaptation for Improving Parallel Performance of Adaptive Stochastic Natural Gradient](/202606/19/2606.19861v1-weight-adaptation-for-improving-parallel-performance-of-adaptive-stochastic-natural-gradient)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：概率进化算法中面向并行性能的权重自适应
-6. [An Infrastructure-less, Control-Independent Solution to Relative Localisation of a Team of Mobile Robots using Ranging Measurements](/202606/19/2606.20365v1-an-infrastructure-less-control-independent-solution-to-relative-localisation-of-a-team-of-mobile-robots-using-ranging-measurements)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：机器人团队的分布式相对定位，支持多机器人协调
+   evidence：拥挤环境中仓库机器人配送的巡游规划
 
 ### 速读区论文标签
-1. [Fail-RAG : A Retrieval Augmented Generation Informed Framework for Robot Failure Identification](/202606/19/2606.19598v1-fail-rag--a-retrieval-augmented-generation-informed-framework-for-robot-failure-identification)  
+1. [Multi-Stage Stochastic Optimization and Reinforcement Learning Approaches for Dynamic Inspection of Infrastructure Systems](/202606/20/2606.15840v1-multi-stage-stochastic-optimization-and-reinforcement-learning-approaches-for-dynamic-inspection-of-infrastructure-systems)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：仓储机器人故障识别；直接与仓储自动化和路径规划相关
-2. [SIGMA: Skill-Incidence Graphs for Compositional Multi-Agent Design](/202606/19/2606.19758v1-sigma-skill-incidence-graphs-for-compositional-multi-agent-design)  
+   evidence：多车辆基础设施巡检的路径规划与调度
+2. [Metis: A Generalizable and Efficient World-Action Model for Autonomous Driving and Urban Navigation](/202606/20/2606.15869v1-metis-a-generalizable-and-efficient-world-action-model-for-autonomous-driving-and-urban-navigation)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：技能关联图框架用于组合式多智能体设计；与多机器人协调相关
-3. [Multi-Agent Transactive Memory](/202606/19/2606.19911v1-multi-agent-transactive-memory)  
+   evidence：用于自动驾驶的世界动作模型
+3. [Skill-MAS: Evolving Meta-Skill for Automatic Multi-Agent Systems](/202606/20/2606.18837v1-skill-mas-evolving-meta-skill-for-automatic-multi-agent-systems)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：多智能体知识共享以促进协调
-4. [Co-VLA: Coordination-Aware Structured Action Modeling for Dual-Arm Vision-Language-Action Systems](/202606/19/2606.20285v1-co-vla-coordination-aware-structured-action-modeling-for-dual-arm-vision-language-action-systems)  
+   evidence：基于LLM的元技能进化用于自动多智能体系统
+4. [DF-ExpEnse: Diffusion Filtered Exploration for Sample Efficient Finetuning](/202606/20/2606.19656v1-df-expense-diffusion-filtered-exploration-for-sample-efficient-finetuning)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：面向双机械臂操作的协调感知结构动作建模
-5. [EA-WM: Event-Aware World Models with Task-Specification Grounding for Long-Horizon Manipulation](/202606/19/2606.13053v1-ea-wm-event-aware-world-models-with-task-specification-grounding-for-long-horizon-manipulation)  
+   evidence：跨智能体通信促进多机器人协作探索
+5. [Safe Local Navigation for Ackermann-Steered Robots in Unmapped Environments](/202606/20/2606.19672v1-safe-local-navigation-for-ackermann-steered-robots-in-unmapped-environments)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：阿克曼转向机器人的局部导航方法
+6. [VOiLA: Vectorized Online Planning with Learned Diffusion Model for POMDP Agents](/202606/20/2606.19729v1-voila-vectorized-online-planning-with-learned-diffusion-model-for-pomdp-agents)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：基于学习模型的不确定性在线规划
+7. [DREAM-Chunk: Reactive Action Chunking with Latent World Model](/202606/20/2606.18589v1-dream-chunk-reactive-action-chunking-with-latent-world-model)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：机器人操作的世界模型，与环境表示相关
-6. [GraphWorld: Long-Horizon Planning with World Models for End-to-End Autonomous Driving](/202606/19/2606.16274v1-graphworld-long-horizon-planning-with-world-models-for-end-to-end-autonomous-driving)  
+   evidence：潜在世界模型用于动作分块
+8. [Mem-World: Memory-Augmented Action-Conditioned World Models for Persistent Robot Manipulation](/202606/20/2606.18960v2-mem-world-memory-augmented-action-conditioned-world-models-for-persistent-robot-manipulation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：提出基于图的世界模型用于长视距规划，可适配多机器人环境建模
-7. [Knowledge Reutilization in Meta-Reinforcement Learning](/202606/19/2606.18132v1-knowledge-reutilization-in-meta-reinforcement-learning)  
+   evidence：机器人操作的世界模型
+9. [SWAP: Symmetric Equivariant World-Model for Agile Robot Parkour](/202606/20/2606.19928v1-swap-symmetric-equivariant-world-model-for-agile-robot-parkour)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：异构多机器人系统中跨智能体的元知识重用
-8. [One-to-Two Acting: A Novel Framework for Single-arm Agent Action Expansion to Dual Arms](/202606/19/2606.19897v1-one-to-two-acting-a-novel-framework-for-single-arm-agent-action-expansion-to-dual-arms)  
+   evidence：用于机器人跑酷的等变对称世界模型
+10. [FlowMaps: Modeling Long-Term Multimodal Object Dynamics with Flow Matching](/202606/20/2606.20209v1-flowmaps-modeling-long-term-multimodal-object-dynamics-with-flow-matching)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：单臂到双臂动作扩展及无碰撞协调
+   evidence：多机器人世界模型用于环境表示
+11. [A Multi-Agent system for Multi-Objective constrained optimization](/202606/20/2606.20236v1-a-multi-agent-system-for-multi-objective-constrained-optimization)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：多智能体系统用于多目标约束优化
 
 
 <div class="dpr-home-promo-card">
