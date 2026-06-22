@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-06-22 <!--dpr-date:20260622-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202606/22/2606.18610v1-sc3-eval-evaluating-robot-foundation-models-via-self-consistent-video-generation" data-sidebar-item="{&quot;title&quot;: &quot;SC3-Eval: Evaluating Robot Foundation Models via Self-Consistent Video Generation&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2606.18610v1-sc3-eval-evaluating-robot-foundation-models-via-self-consistent-video-generation&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;动作条件视频世界模型用于策略评估&quot;}">SC3-Eval: Evaluating Robot Foundation Models via Self-Consistent Video Generation</a>
   * 2026-06-21 <!--dpr-date:20260621-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202606/21/2606.16533v1-kairos-a-native-world-model-stack-for-physical-ai" data-sidebar-item="{&quot;title&quot;: &quot;Kairos: A Native World Model Stack for Physical AI&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2606.16533v1-kairos-a-native-world-model-stack-for-physical-ai&quot;, &quot;score&quot;: &quot;9.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;多机器人世界模型&quot;}">Kairos: A Native World Model Stack for Physical AI</a>
