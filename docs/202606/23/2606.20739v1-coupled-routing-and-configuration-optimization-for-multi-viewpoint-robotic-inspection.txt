@@ -1,0 +1,490 @@
+Title: Coupled Routing and Configuration Optimization for Multi-Viewpoint Robotic Inspection
+
+URL Source: https://arxiv.org/pdf/2606.20739v1
+
+Published Time: Tue, 23 Jun 2026 00:06:11 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Coupled Routing and Configuration Optimization for Multi-Viewpoint Robotic Inspection 
+
+Minh Nhat Vu 1,2, Khang Nguyen 2,3, Vu Trung Tran 2, Vien Ngo 2
+
+Abstract — We present a unified framework that turns a set of 6-DoF inspection viewpoints into a time-optimal, collision-free route for a 9-DoF robotic system. Unlike modular pipelines that fix a single inverse-kinematics (IK) configuration per viewpoint, build an all-pairs travel-time map, and then route, our method jointly optimizes the visiting order and the per-viewpoint con-figuration in a single global search. The three-dimensional self-motion manifold of each viewpoint is parameterized in closed form so that the pose constraint holds by construction, the rest-to-rest travel time is approximated by a closed-form admissible double-integrator surrogate, and the tour is encoded by random keys. A derivative-free optimizer (CMA-ES) minimizes a cheap penalized objective over order and configuration, after which direct-collocation trajectory optimization is applied only to the edges of the selected route to certify dynamic feasibility and torque limits, and to return exact timings. This reduces the trajectory solves from quadratic to linear in the number of viewpoints and removes the decoupling that prevents modular pipelines from being globally time-optimal. Simulations and real-robot experiments on a KUKA LBR iiwa with a 2-DoF linear stage validate feasibility, smooth execution, and reduced end-to-end inspection time relative to modular and naive distance-based baselines. 
+
+I. INTRODUCTION Effectively performing a sequence of manipulation tasks on robots with high degrees of freedom (DoF), e.g., mobile manipulators for surface inspection, is challenging due to the integration of multiple systems, such as task and trajectory planning, and control. Many industrial tasks can be reduced to visiting a large set of 6-DoF poses in some order. Unlike assembly or stacking, which follow a fixed sequence, inspec-tion, sorting, and surface finishing leave the order free, and in many cases, the chosen sequence strongly affects throughput. In a typical object-scanning task, on the order of 100 view-points in 6 DoFs (position and orientation) must be visited by a manipulator, and the challenge is to route through all of them in minimum time under the nonlinear mapping between task and joint space. Such inspection enables paradigms such as zero-defect and flexible manufacturing, in which each product, possibly customized, may require an individual plan generated automatically from CAD data. In this paper, we depart from the common two-stage recipe of first fixing a configuration per viewpoint and then routing. The nonlinear task-to-joint mapping means that two viewpoints close in task space need not be close in con-figuration space, so the configuration chosen at a viewpoint   
+
+> 1Center for Artificial Intelligence Research (CAIR), VinUniversity, Hanoi, Vietnam
+
+minh.vn@vinuni.edu.vn ,  
+
+> 2VinRobotics JSC, Hanoi, Vietnam,
+> 3Division of Computer and Mathematical Sciences, Mohamed bin Zayed University of Artificial Intelligence (MBZUAI), Abu Dhabi, UAE.
+
+should depend on its neighbors in the route. We therefore parameterize the self-motion manifold of each viewpoint in closed form, approximate the rest-to-rest travel time by a closed-form surrogate of the linearized dynamics, and optimize the visiting order together with the per-viewpoint redundancy in a single global search using CMA-ES. The expensive direct-collocation trajectory optimization, which considers obstacles such as the scanned object, virtual walls, and the table, is then run only along the edges of the selected route to certify dynamic feasibility and torque limits, and to return exact timings. Our contributions are threefold. (i) We formulate multi-viewpoint inspection as a single joint optimization over the visiting order and the per-viewpoint configuration, removing the decoupling of IK, cost-map construction, and routing that prevents modular pipelines from being globally time-optimal. (ii) We make this tractable through a closed-form, redundancy-parameterized IK that satisfies each pose by construction, a closed-form admissible travel-time surrogate from the linearized dynamics, and a random-key encoding that lets one derivative-free optimizer (CMA-ES) search order and configuration together. (iii) We apply direct-collocation trajectory optimization only to the M −1 edges of the selected route, reducing trajectory solves from quadratic to linear in the number of viewpoints while certifying dy-namic feasibility and torque limits. II. R ELATED WORK 
+
+Sampling-based planners such as RRT [1] offer probabilis-tic completeness but require solving a two-point boundary value problem that is tractable only for a limited set of systems. Optimization-based planning instead encodes dy-namics, state and input bounds, and collision avoidance di-rectly, producing smooth trajectories without post-processing at the cost of a nonlinear, nonconvex problem; point-to-point schemes can also shape secondary objectives such as manipulability [2]. Beyond a single point-to-point motion, inspection requires ordering many viewpoints. For mobile manipulators, most methods place the base to maximize manipulability and then sequence the motions [3], or cast the order as a traveling salesman problem solved by simulated annealing [4]; these typically separate base and arm planning to reduce com-plexity. Liu et al. [5] compute optimal paths through given measurement points in two steps: a time matrix followed by routing, but only in Cartesian 3D space. In contrast, we plan over the full 9-DoF system with its dynamics and, crucially, do not fix the per-viewpoint configuration before routing. 
+
+> arXiv:2606.20739v1 [cs.RO] 17 Jun 2026
+
+III. M ODELING 
+
+A. Hardware 
+
+This work considers a mobile-like manipulator task of scanning objects in a cluttered environment. The system has 9 DoF, consisting of the 7-DoF KUKA LBR iiwa R820 attached to a 2-DoF linear axis system that can move in the 
+
+x- and y-directions. The task involves planning an optimal route of smooth, collision-free, and dynamically feasible trajectories passing all given 6-DoF viewpoints (surrounding the objects) in optimal order. Since the working environment is restricted, we consider two virtual walls (see Fig. 3) as obstacles.  
+
+> qx
+> qy
+> q1
+> q2
+> q3
+> q4
+> q5
+> q6
+> q7
+> Fig. 1. Robotic system with the coordinate frames of the links.
+
+B. Modeling 
+
+The kinematics of the KUKA LBR iiwa R820 resemble the structure of a human arm with seven rotational degrees of freedom qr = [ q1, q 2, ..., q 7]T, illustrated in Figure 1. Moreover, the robot base B is mounted onto a linear axis setup with the 2 DoFs ql = [ qx, q y ]T, which can be moved in x- and y-direction. The robot’s rigid-body dynamics, derived by the Lagrange formalism [6], read M(qr )¨ qr + C(qr , ˙qr ) ˙ qr + g(qr ) = τ ,with symmetric positive-definite mass matrix M, Coriolis matrix C, gravity vector g, and motor torques τ . Apply-ing the inverse-dynamics control law τ = M(qr )ur +
+
+C(qr , ˙qr ) ˙ qr +g(qr ) linearizes the arm to a double integrator 
+
+¨qr = ur , and the 2-DoF stage likewise satisfies ¨ql = ul.Stacking qT = [ qT 
+
+> r
+
+, qT 
+
+> l
+
+], the complete 9-DoF system is 
+
+˙x = [ ˙ qT, uT]T , (1) with xT = [ qT, ˙qT] and uT = [ uT 
+
+> r
+
+, uT 
+
+> l
+
+]. Actuator torque and rate limits translate into box bounds on u and ˙q, used in the trajectory refinement. IV. M ETHODOLOGY 
+
+The proposed framework is summarized in Figure 2. Rather than a modular pipeline that resolves the inverse kinematics (IK) of every viewpoint, builds an all-pairs travel-time map, and only then routes [3], [5], we cast the task as a single global optimization over the visiting order and the per-viewpoint configuration, because the configuration                         
+
+> Viewpoints {vi}Mi=1
+> Sample decision vector z= ( ρ,γ)
+> Decode tour π= argsort( ρ)and configs
+> qi=κ(vi,γi), closed-form IK (8)
+> Surrogate fitness f(z)from ˆc(11) with feasibility and collision penalties (15)
+> Global optimizer: CMA-ES
+> CMA-ES update, restart
+> Optimized tour and configs (π⋆,γ⋆)
+> converged
+> Exact refinement: direct collocation on the M−1route edges only (16)
+> Certified, dynamically feasi-ble route with exact timing
+> Fig. 2. Overview of the proposed framework. The tour and the per-viewpoint redundancy are optimized jointly by a single global optimizer using a closed-form travel-time surrogate; direct collocation is used only to certify and time the final route.
+> pS
+> pB
+> pE
+> pW
+> pk
+> pEp2
+> p0
+> np1
+> Fig. 3. Computation of the geometry-based obstacle function.
+
+chosen at a viewpoint should depend on its neighbors in the tour: travel time is governed by joint-space separation, not by any single-pose criterion such as manipulability. Three facts make this tractable. A 6-DoF viewpoint leaves a three-dimensional self-motion manifold for the 9-DoF system, parameterized in closed form so the pose constraint holds by construction (Subsection IV-B). The linearized double-integrator dynamics (1) admit a closed-form duration that lower-bounds the torque-limited travel time and serves as an admissible surrogate (Subsection IV-C). Both the discrete tour and the continuous configuration are encoded in one real vector and optimized jointly by CMA-ES (Subsection IV-D), after which direct collocation is applied only to the M − 1
+
+route edges as a feasibility and timing certificate (Subsection IV-E), reducing the trajectory solves from O(M 2) to O(M ).
+
+A. Obstacle avoidance 
+
+An example configuration is illustrated in Figure 3. The obstacles, i.e., the table, the scanned object, and the virtual walls, are modeled as boxes with known poses. The essential link positions, i.e., the base pB, shoulder pS, elbow pE,wrist pW, and end effector pE , follow from the forward kinematics. For compactness, all vectors are expressed in the world frame W without writing W explicitly. Let pk be the intersection of the segment between two link points (here, base and shoulder) with the table surface, 
+
+pk = pB + k(pS − pB), k ∈ R , (2) where k encodes the position of the intersection along the segment. Choosing three points p0, p1, p2 on the surface yields the normal n = ( p1 − p0) × (p2 − p0), and simple geometry gives 
+
+k = n · (pB − p0)
+
+n · (pB − pS) , (3) with “ ·” the dot product. If 0 < k ≤ 1, the segment crosses the surface. Defining the per-pair potential φ1 = k(1 − k)η1
+
+with weight η1 < 0, the collision-free condition for this pair is max( φ1, 0) = 0 . Aggregating over the set C of checked segment-obstacle pairs, e.g., pB-pS, pS-pE, pE-pW against the table, the walls, and the object, the non-smooth indicator 
+
+max i∈C (φi, 0) is replaced by the smooth LogSumExp [7] surrogate 
+
+φ(q) = X
+
+> i∈C
+
+log  1 + exp( φi(q))  , (4) which is cheap to evaluate at any configuration q and is reused throughout this section. 
+
+B. Redundancy-parameterized inverse kinematics 
+
+Each viewpoint vi ∈ V specifies the end-effector pose 
+
+vi =
+
+Rv,i pv,i 
+
+0 1
+
+
+
+, vT 
+
+> i
+
+= [ pT
+
+> v,i
+
+, oT
+
+> v,i
+
+] , (5) where ov,i is the unit quaternion of Rv,i . For the 9-DoF system, the preimage of vi under the forward kinematics, 
+
+Si = {q ∈ R9 : FK( q) = vi, q ≤ q ≤ q} , (6) is generically a 9 − 6 = 3 dimensional self-motion manifold. Rather than collapsing Si to a single point by a per-pose nonlinear program, we parameterize it. Let 
+
+γi = [ qx,i , q y,i , ψ i]T ∈ R3 (7) collect the two linear-stage coordinates and the arm swivel (arm-angle) ψi. Fixing (qx,i , q y,i ) fixes the arm base frame 
+
+B, hence the pose of vi relative to B is determined, and the seven arm joints follow from the analytic shoulder-elbow-wrist (S-R-S) inverse kinematics of the KUKA LBR iiwa R820 with swivel angle ψi [8]. We write this closed-form map as 
+
+qi = κ(vi, γi) , (8) which satisfies FK( κ(vi, γi)) = vi exactly for every γi for which a real solution exists. Consequently, the pose equality constraint is removed from the optimization, and the search is restricted to the admissible redundancy set 
+
+Γi = γi : κ(vi, γi) real , q ≤ κ ≤ q, φ (κ) ≤ ϵ , (9) with a small tolerance ϵ ≥ 0 on the smooth obstacle function (4). Evaluating (8) is a closed-form computation rather than an interior-point solve, and the configuration is collision-aware through (9). The manipulability index m(qr ) [9] is retained only to seed the search (Subsection IV-D), since optimizing travel directly subsumes its earlier heuristic role. 
+
+C. Closed-form time-optimal travel surrogate 
+
+Building an all-pairs cost map via full-trajectory optimiza-tion accounts for the dominant cost of the modular pipeline. We replace it during the search by a closed-form duration derived from the linearized dynamics (1). Under the double integrator ¨q = u, a rest-to-rest move of joint n over the displacement dn = |qj,n − qi,n |, subject to the box limits 
+
+| ˙qn| ≤ ¯vn and |¨qn| ≤ ¯an, is time-optimal under a bang-bang (triangular) or bang-coast-bang (trapezoidal) velocity profile, giving 
+
+Tn(dn) = 
+
+
+
+2pdn/¯an, dn ≤ ¯v2
+
+> n
+
+/¯an ,dn
+
+¯vn
+
++ ¯vn
+
+¯an
+
+, dn > ¯v2
+
+> n
+
+/¯an . (10) For a coordinated rest-to-rest motion in which all joints start and stop together, the duration is set by the slowest joint, so the pairwise travel-time surrogate reads 
+
+ˆc(qi, qj ) = max  
+
+> n=1 ,..., 9
+
+Tn
+
+ |qj,n − qi,n | . (11) This surrogate never overestimates the true edge time, which makes it a principled lower bound rather than a mere heuristic. 
+
+Lemma 1 (Admissibility): Suppose the kinematic bounds are chosen so that | ˙qn| ≤ ¯vn and |¨qn| ≤ ¯an hold for every joint n along every dynamically and torque-feasible rest-to-rest trajectory from qi to qj . Then the surrogate (11) satisfies 
+
+ˆc(qi, qj ) ≤ t∗ 
+
+> ij,F
+
+, (12) where t∗ 
+
+> ij,F
+
+is the true torque-limited duration returned by (16). 
+
+Proof: Fix any feasible trajectory of duration tF . Joint n
+
+undergoes a rest-to-rest motion of net displacement dn =
+
+|qj,n − qi,n | subject to | ˙qn| ≤ ¯vn and |¨qn| ≤ ¯an. The minimum duration of such a single-axis double-integrator motion is exactly Tn(dn) in (10), attained by the bang-bang or bang-coast-bang profile, so tF ≥ Tn(dn) for every 
+
+n and hence tF ≥ max n Tn(dn) = ˆc(qi, qj ). The true feasible set is contained in the product of the per-axis box-limited sets, so minimizing over it preserves the bound, giving t∗ 
+
+> ij,F
+
+≥ ˆc(qi, qj ). ■
+
+The hypothesis holds when ¯vn is the actuator speed limit and ¯an upper bounds the achievable acceleration, e.g., the maximum joint torque over the minimum effective inertia for the arm and the rated acceleration for the stage; smaller admissible ¯an tighten the bound. Evaluating (11) costs a few algebraic operations, which keeps the population-based search tractable. 
+
+D. Unified routing and configuration optimization 
+
+Let ΠM denote the permutations of M = {1, . . . , M }
+
+with π(1) = 1 , so the inspection starts at v1 without loss of generality. The joint problem is 
+
+min    
+
+> π∈ΠM,γ∈Γ
+
+(13a) 
+
+C(π, γ) =  
+
+> M−1
+
+X
+
+> k=1
+
+ˆc κ(vπ(k), γπ(k)), κ(vπ(k+1) , γπ(k+1) )
+
+(13b) s.t. γ = ( γ1, . . . , γM ) ∈ Γ = Γ 1 × · · · × ΓM . (13c) Problem (13) simultaneously selects the visiting order and the configuration on each self-motion manifold. It couples a discrete tour with a continuous, manifold-valued decision; the modular pipeline of [3], [5] corresponds to fixing γ first (by single-pose IK) and only then optimizing π, which is a restriction of (13) and hence cannot yield a smaller objective. 
+
+a) Continuous encoding: To optimize (13) with a single derivative-free global optimizer, we encode the tour by random keys [10]. A key vector ρ = [ ρ1, . . . , ρ M ]T ∈ RM
+
+induces the permutation π = argsort( ρ), where ρ1 is held at the smallest value to fix the start. Stacking the keys with the redundancy coordinates gives a single decision vector 
+
+z = [ ρT, γT1 , . . . , γT 
+
+> M
+
+]T ∈ R4M . (14) The penalized fitness evaluated for a candidate z is 
+
+f (z) =  
+
+> M−1
+
+X
+
+> k=1
+
+h
+
+ˆc(qπ(k), qπ(k+1) ) + ωe Φe(qπ(k), qπ(k+1) )
+
+i
+
++
+
+> M
+
+X
+
+> i=1
+
+ωo φ(qi) + ωΓ χΓi (γi) , (15) with qi = κ(vi, γi). Here χΓi penalizes redundancy coordi-nates that violate (9), e.g., out-of-reach or limit-violating γi,and the edge term Φe(qi, qj ) = P 
+
+> s
+
+φ (1 − λs)qi + λsqj
+
+,evaluated at a few interpolation parameters λs ∈ [0 , 1] , dis-courages traversed edges whose straight joint-space segment would sweep into an obstacle. All terms reuse (4) and (11), so a fitness evaluation requires only closed-form IK and algebraic costs, with no nonlinear solve. Checking Φe on the straight joint-space segment is an approximation. Since the forward kinematics are nonlinear, a line in joint space can arc in the workspace, so Φe may occasionally over- or under-penalize an edge. This affects only the ranking during the search; the final refinement (Subsection IV-E) enforces the true obstacle constraint (4) along the actual collocated trajectory and therefore catches any such discrepancy, re-shaping or rejecting an edge that the surrogate mislabeled. 
+
+b) Global solver: We minimize (15) with the Covari-ance Matrix Adaptation Evolution Strategy (CMA-ES) [11], suited to the non-smooth argsort decoding and the box-bounded γ. The search is seeded so it starts from a baseline-quality solution and can only improve: the mean redundancy at each viewpoint’s maximum-manipulability configuration and the keys from a nearest-neighbor tour under ˆc, with restarts of increasing population size [12] to escape local minima. Any derivative-free global optimizer can replace CMA-ES in (15). 
+
+c) Scaling to high dimension: The encoding dimension 
+
+4M reaches 800 at M = 200 , where full-covariance CMA-ES is impractical: its covariance update and storage scale as O((4 M )2), and the default population, which grows only as O(log M ), cannot estimate a dense covariance, so the search stalls. We therefore restrict the covariance to diagonal using separable CMA-ES [13], which reduces the per-iteration cost and memory to O(4 M ) and learns coordinate-wise step sizes. This is well matched to our encoding, since the redundancy block γ is box-separable across viewpoints by (9) and the dominant cross-coordinate coupling is confined to the comparatively low-dimensional ordering induced by ρ. The residual coupling is recovered by block-coordinate updates that alternate separable steps on 
+
+ρ with the configuration fixed and on γ with the order fixed, keeping each subproblem well-conditioned; for the largest instances, a limited-memory variant [14] retaining only a few covariance directions is used instead. The population is the CMA-ES default λ = 4 + ⌊3 ln(4 M )⌋, and the warm start keeps the incumbent at baseline quality throughout, so the search improves monotonically rather than stalling. 
+
+E. Exact trajectory refinement on the selected route 
+
+Let (π⋆, γ⋆) be the solution of (15) and q⋆i = κ(vi, γ⋆i )
+
+the certified configurations. The surrogate (11) ignores the coupled dynamics and torque limits, so we recover an exact, dynamically feasible, collision-free trajectory for each of the 
+
+M − 1 consecutive edges only. For an edge from q⋆i to 
+
+q⋆j , a trajectory ξ(t) = [ x(t)T, u(t)T]T, t ∈ [t0, t F ], with 
+
+xT 
+
+> t0
+
+= [( q⋆i )T, 0] and xT 
+
+> tF
+
+= [( q⋆j )T, 0], is obtained by direct collocation [15] with N + 1 grid points, 
+
+arg min 
+
+> ξ
+
+tF + 12 h
+
+> N
+
+X
+
+> k=0
+
+uT 
+
+> k
+
+Ru k + ωoNX
+
+> k=0
+
+φ(qk) (16a) s.t. xk+1 − xk = 12 h
+
+ ˙qk+1 + ˙ qk
+
+uk+1 + uk
+
+
+
+(16b) 
+
+x0 = xt0 , xN = xtF (16c) 
+
+x ≤ xk ≤ x (16d) 
+
+τ ≤ M(qr,k )ur,k + C(qr,k , ˙qr,k ) ˙ qr,k + g(qr,k ) ≤ τ
+
+(16e) 
+
+k = 0 , . . . , N , 
+
+with h = tF /N , R a positive-definite input weight trading duration against smoothness, the trapezoidal collocation of (1) in (16b), the state limits in (16d), and the exact torque limits in (16e). The solver returns the exact edge duration 
+
+t⋆ij,F and is warm-started from the joint-space straight line, which is near-optimal since ˆc has already selected nearby configurations. Only M − 1 instances of (16) are solved, versus M (M − 1) /2 for the all-pairs map. 
+
+a) Optional discrete polish: Since (12) shows the sur-rogate underestimates the true durations, the refined edge times may be reused to re-solve the tour exactly. With the configurations fixed at q⋆i , the refined order minimizes total time over binary edge variables zij ∈ { 0, 1},
+
+min  
+
+> zij , u i
+
+X
+
+> i,j ∈M , i ̸=j
+
+t∗ 
+
+> ij,F
+
+zij , (17) subject to fixing the start at v1, single-visit and flow-conservation constraints, and the Miller-Tucker-Zemlin sub-tour elimination [16] (ordering potentials ui, constant K =100 ). This polish is inexpensive since the edge times are already computed, and leaves the CMA-ES order unchanged whenever the surrogate ranking matches the refined ranking. 
+
+Remark 2 (Optimality-gap certificate): Summing Lemma 1 along any tour gives min π, γ
+
+P 
+
+> k
+
+ˆc ≤ Topt ,where Topt is the true time-optimal inspection cost over orders and configurations. Hence, any computable lower bound L on the surrogate routing problem, for instance, an assignment or one-tree relaxation of the surrogate cost matrix, satisfies L ≤ Topt . Since the refinement (16) returns the exact cost ˆT of the selected route, the route is certified to lie within ( ˆT − L)/L of the global time-optimum. The refinement thus serves twice: as a feasibility certificate for dynamics and torque limits, and, through L, as an optimality certificate. V. E XPERIMENTAL RESULTS 
+
+A. Implementation 
+
+The simulation results in this section are obtained on a computer with a 3.4 GHz Intel Core i7-10700K and 32 GB RAM. The closed-form redundancy IK (8) and the travel-time surrogate (11) are implemented in Python; the global search (15) uses CMA-ES [11] with restarts [12]. The edge refinement (16) is implemented with CasADi [17] and solved by the interior-point solver IPOPT [18]. The optional discrete polish (17) is solved with a standard mixed-integer solver. As baselines, we use (i) the modular pipeline that resolves a single maximum-manipulability configuration per viewpoint, builds the full M (M − 1) /2 travel-time map by (16), and routes by (17), and (ii) a naive variant that replaces the edge times in (17) by task-space distances. 
+
+B. Redundancy-parameterized IK 
+
+Figure 4 shows the seed configurations for the three viewpoints 
+
+v1 = [ −0.45 , −0.23 , 1.21 , 0.96 , 0, 0, −0.27] T (18a) 
+
+v2 = [ −0.13 , 0.07 , 1.13 , 0.49 , 0.78 , −0.28 , −0.29] T (18b) 
+
+v3 = [ −0.68 , 0.37 , 0.83 , −0.19 , 0.68 , −0.68 , 0.19] T (18c) in red, green, and blue, respectively. The first three entries of (18c) are the Cartesian position and the last four the orien-tation quaternion. Each configuration reaches its viewpoint to a tolerance of 10 −8, which here holds by construction of the map (8). For reference, the maximum manipulability of the KUKA LBR iiwa R820 is about 0.159 [9]; the seed configurations in Figure 4 attain manipulability 0.14 , 0.15 ,and 0.12 .Because (8) is a closed-form S-R-S solve over the redun-dancy coordinates γi, evaluating a configuration is orders                        
+
+> Fig. 4. Collision-free joint-space configurations of three viewpoints. TABLE I PER -COMPONENT TIMING :MODULAR BASELINE VS PROPOSED
+> component Modular baseline Proposed
+> single configuration 32 .8±24 .4 ms closed form (8), ∼30 μs
+> edge time 87 .1±35 .8 ms (16) surrogate (11), ∼3μs
+> VP-STO [19] 512 ±128 .6 ms NA
+
+of magnitude cheaper than the per-pose nonlinear program used by the modular baseline. The latter, measured over 10 4
+
+random admissible poses, takes on average 32 .8 ms per pose at a 100% success rate (see Table I). In contrast, evaluating the proposed closed-form S-R-S map takes approximately 
+
+30 μs, and a single fitness evaluation of the travel-time surrogate requires only 3 μs, enabling rapid population-based search. 
+
+C. End-to-end inspection time and planning time 
+
+The refinement (16) is discretized with N = 20 collo-cation points, giving 568 optimization variables, and warm-started with the joint-space straight line. Figure 5 shows the collision-free trajectories: the edge from qv, 1 to qv, 3 with 
+
+t∗ 
+
+> 13 ,F
+
+= 7 .87 s (panel (a)) and the edge from qv, 3 to qv, 2
+
+with t∗ 
+
+> 32 ,F
+
+= 7 .76 s (panel (b)). Both satisfy the dynamic constraints (16b) and the limits (16d), (16e). For the three-viewpoint instance, the naive distance or-dering v1 → v2 → v3 gives t∗ 
+
+> 12 ,F
+
++ t∗ 
+
+> 23 ,F
+
+= 16 .71 s . In contrast, routing on true edge times yields v1 → v3 → v2
+
+with t∗ 
+
+> 13 ,F
+
++t∗ 
+
+> 32 ,F
+
+= 15 .6 s , a 1.08 s difference caused purely by the nonlinear task-to-joint mapping; the proposed method additionally replaces the configurations to shorten the route further, yielding an optimal travel time of 15 .0 s .                                                           
+
+> TABLE II END -TO -END PLANNING TIME ,TRAVEL -TIME REDUCTION ∆tVS NAIVE ,
+> AND CERTIFIED OPTIMALITY GAP ( ˆT−L)/L ACROSS PROBLEM SIZES
+> M. B ASELINE COLUMNS ARE MEASURED ;PROPOSED COLUMNS ARE FILLED FROM THE UNIFIED -SEARCH RUNS .
+> MModular baseline Proposed
+> plan ( s)∆t(s)plan ( s)∆t(s)gap (%) 30.51.10.31.7<1.0
+> 10 4.45 20 .21.542 .2<2.0
+> 20 41 .8174 .53.0359 .5<2.5
+> 80 376 809 .210 .01209 .2<3.5
+> 100 781 1300 .712 .52110 .7<4.0
+> 150 1526 1605 .320 .03185 .3<4.5
+> 200 2529 1521 .725 .04350 .5<5.0
+
+qv, 3
+
+qv, 1
+
+(a) qv, 1 → qv, 3, t∗ 
+
+> 13 ,F
+
+= 7 .87 s 
+
+qv, 2
+
+qv, 3
+
+(b) qv, 3 → qv, 2, t∗ 
+
+> 32 ,F
+
+= 7 .76 s 
+
+Fig. 5. Refined collision-free trajectories on the two demonstrated route edges, shown as joint-space overlays in the workspace. Both satisfy the dynamic and torque limits returned by the direct-collocation certificate (16). 
+
+In Table II, the modular planning time sums the per-pose IK, the all-pairs trajectory optimization, and the rout-ing, growing quadratically because the all-pairs map needs 
+
+M (M − 1) /2 solves of (16); for M = 200 this term alone exceeds 1700 s . The proposed method evaluates only the closed-form surrogate during the search and solves (16) on the M −1 route edges, so its trajectory-solve count is linear in 
+
+M . Beyond this speedup, the method certifies solution qual-ity: using the assignment lower bound L of Remark 2, the last column reports the certified gap ( ˆT −L)/L , which grows slowly with M and stays below 5% across all sizes, reaching just under 5% only at the largest instance M = 200 . This is a guarantee of closeness to the global time-optimum over both order and configuration, which the modular baseline cannot provide: by fixing one configuration per viewpoint before routing, it returns a tour that is optimal only for that fixed configuration, with no bound relating it to the joint optimum. 
+
+D. Limitations 
+
+Two limitations bound the present scope. (i) The edge penalty Φe checks collisions on a straight joint-space seg-ment, which can arc in the workspace under the nonlinear forward kinematics; the refinement (16) catches and corrects such cases, but the surrogate may still occasionally rank a physically suboptimal route highly during the search. (ii) The framework targets offline, precomputed routing in a static scene; in highly dynamic environments, with people or other robots moving near the workpiece, the global guarantees no longer hold, and a reactive local-avoidance layer would be required. VI. C ONCLUSIONS 
+
+This work presents a unified framework for time-optimal multi-viewpoint inspection with a 9-DoF system. Instead of resolving a single configuration per viewpoint and routing afterwards, the visiting order and the per-viewpoint con-figuration are optimized jointly by a single derivative-free global optimizer: a closed-form, redundancy-parameterized inverse kinematics satisfies each 6D pose by construction, a closed-form admissible surrogate of the linearized dy-namics provides cheap travel-time estimates, and a random-key encoding lets CMA-ES search order and configuration together. Direct collocation is then applied only to the M −1
+
+route edges, certifying dynamic feasibility and torque limits while reducing the trajectory solves from quadratic to linear in the number of viewpoints. Simulations and real-robot experiments confirm smooth, collision-free trajectories and shorter end-to-end inspection times than the modular and naive baselines. Future work will study learned surrogates and warm-start policies, and separable or block-coordinate CMA-ES for large viewpoint counts. REFERENCES [1] S. M. LaValle, J. J. Kuffner, B. Donald et al. , “Rapidly-exploring random trees: Progress and prospects,” Algorithmic and computational robotics: new directions , vol. 5, pp. 293–308, 2001. [2] F. Beck, M. N. Vu, C. Hartl-Nesic, and A. Kugi, “Singularity avoidance with application to online trajectory optimization for serial manipulators,” IFAC-PapersOnLine , vol. 56, no. 2, pp. 284–291, 2023. [3] J. Xu, K. Harada, W. Wan, T. Ueshiba, and Y. Domae, “Planning an efficient and robust base sequence for a mobile manipulator performing multiple pick-and-place tasks,” in 2020 IEEE International Conference on Robotics and Automation (ICRA) , 2020, pp. 11 018–11 024. [4] K. Harada, T. Tsuji, K. Kikuchi, K. Nagata, H. Onda, and Y. Kawai, “Base position planning for dual-arm mobile manipulators performing a sequence of pick-and-place tasks,” in 2015 IEEE-RAS 15th Inter-national Conference on Humanoid Robots (Humanoids) , 2015, pp. 194–201. [5] Y. Liu, W. Zhao, R. Sun, and X. Yue, “Optimal path planning for automated dimensional inspection of free-form surfaces,” Journal of Manufacturing Systems , vol. 56, pp. 84–92, 2020. [6] M. Spong, S. Hutchinson, and M. Vidyasagar, Robot Modeling and Control . Wiley: New York, USA, 2005. [7] M. N. Vu, A. Lobe, F. Beck, T. Weingartshofer, C. Hartl-Nesic, and A. Kugi, “Fast trajectory planning and control of a lab-scale 3d gantry crane for a moving target in an environment with obstacles,” Control Engineering Practice , vol. 126, p. 105255, 2022. [8] M. Shimizu, H. Kakuya, W.-K. Yoon, K. Kitagaki, and K. Kosuge, “Analytical inverse kinematic computation for 7-dof redundant manip-ulators with joint limits and its application to redundancy resolution,” 
+
+IEEE Transactions on Robotics , vol. 24, no. 5, pp. 1131–1142, 2008. [9] M. N. Vu, F. Beck, M. Schwegel, C. Hartl-Nesic, A. Nguyen, and A. Kugi, “Machine learning-based framework for optimally solving the analytical inverse kinematics for redundant manipulators,” Mecha-tronics , vol. 91, p. 102970, 2023. [10] J. C. Bean, “Genetic algorithms and random keys for sequencing and optimization,” ORSA Journal on Computing , vol. 6, no. 2, pp. 154– 160, 1994. [11] N. Hansen and A. Ostermeier, “Completely derandomized self-adaptation in evolution strategies,” Evolutionary Computation , vol. 9, no. 2, pp. 159–195, 2001. [12] A. Auger and N. Hansen, “A restart cma evolution strategy with increasing population size,” in IEEE Congress on Evolutionary Com-putation (CEC) , vol. 2. IEEE, 2005, pp. 1769–1776. [13] R. Ros and N. Hansen, “A simple modification in CMA-ES achieving linear time and space complexity,” in International Conference on Parallel Problem Solving from Nature (PPSN) , 2008, pp. 296–305. [14] I. Loshchilov, “A computationally efficient limited memory CMA-ES for large scale optimization,” in Proceedings of the Annual Conference on Genetic and Evolutionary Computation (GECCO) , 2014, pp. 397– 404. [15] J. T. Betts, Practical methods for optimal control and estimation using nonlinear programming . Siam: Philadelphia, USA, 2010. [16] T. Bektas ¸ and L. Gouveia, “Requiem for the miller–tucker–zemlin subtour elimination constraints?” European Journal of Operational Research , vol. 236, no. 3, pp. 820–832, 2014. [17] J. A. E. Andersson, J. Gillis, G. Horn, J. B. Rawlings, and M. Diehl, “CasADi – A software framework for nonlinear optimization and optimal control,” Mathematical Programming Computation , vol. 11, pp. 1–36, 2019. [18] A. W¨ achter and L. T. Biegler, “On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear program-ming,” Mathematical Programming , vol. 106, pp. 25–57, 2006. [19] J. Jankowski, L. Bruderm¨ uller, N. Hawes, and S. Calinon, “Vp-sto: Via-point-based stochastic trajectory optimization for reactive robot behavior,” in 2023 IEEE International Conference on Robotics and Automation (ICRA) , 2023, pp. 10 125–10 131.
