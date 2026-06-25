@@ -1,0 +1,1845 @@
+Title: Commerge: Communication-Efficient, Robust, and Fast LiDAR Map Merging Framework for Multi-Robot Coordination in Resource-Constrained Scenarios
+
+URL Source: https://arxiv.org/pdf/2606.25386v1
+
+Published Time: Thu, 25 Jun 2026 00:34:19 GMT
+
+Number of Pages: 32
+
+Markdown Content:
+# Commerge: Communication-Efficient, Robust and Fast LiDAR Map Merging Framework for Multi-Robot Coordination in Resource-Constrained Scenarios 
+
+> Journal Title XX(X):1–32 ©The Author(s) 2016 Reprints and permission: sagepub.co.uk/journalsPermissions.nav DOI: 10.1177/ToBeAssigned www.sagepub.com/
+
+SAGE 
+
+Hogyun Kim 1, Jiwon Choi 1, Juwon Kim 1, Geonmo Yang 1, Seokhwan Jeong 1,Hyungtae Lim 2†, and Younggun Cho 1†
+
+Abstract 
+
+By maintaining global consistency across robot teams, multi-robot light detection and ranging (LiDAR) map merging enables faster exploration and efficient area coverage. However, map merging requires exchanging massive sensor data between the server and robots, making communication the bottleneck, especially in communication-constrained environments. Therefore, we present Commerge , a communication-efficient map merging framework that achieves bandwidth reduction through graph-theoretic selective data exchange. By doing so, our Commerge reduces inter-robot communication by up to 5,000 × while maintaining alignment accuracy. Our key insight is that only a small subset of carefully selected scans is sufficient for robust map merging. We formulate this as a three-stage cascaded optimization problem on an exchange graph, where vertices represent robot keyframes and edges denote candidate inter-robot loops. Through three cascade stages, we select a sequentially overlapped, balanced-transmission-cost, and geometrically-perceptually optimal scan subset that preserves alignment quality while reducing communication. Unlike existing approaches that either transmit whole scans, which require GB-scale data exchange, or employ na¨ ıve downsampling, our approach exchanges only MB-scale data while achieving comparable alignment accuracy. Extensive evaluation on five public datasets and four in-house datasets covering cave, planetary-analog, indoor, and outdoor campus environments shows up to 99.98% reduction in data exchange (e.g., from 7,000 MB to 1.3 MB on the HeLiPR dataset), while maintaining alignment performance across embedded to desktop platforms. Furthermore, we demonstrate that our proposed framework operates on resource-constrained hardware where existing methods fail, enabling real-world multi-robot deployment in bandwidth-limited field operations. Finally, we validate system robustness under a real-world non-line-of-sight (NLOS) communication environment with up to 73.3% dropout rate, as well as under emulated network degradation scenarios including delay, bandwidth limitation, and packet loss, confirming reliable map merging even under severely degraded connectivity. The supplementary materials are available at https://sparolab.github.io/research/commerge .
+
+Keywords 
+
+Communication, Multi-Robot, Map Merging, Data Exchange, Efficiency, Graph Theory 
+
+1. Introduction 
+
+Multi-robot light detection and ranging (LiDAR)-based map merging associates the global descriptors and raw scans of multiple robots to estimate inter-robot relative poses. A central entity, known as a server (or central robot), typically coordinates these frameworks, managing not only global descriptors matching and loop closure detection but also allocating shared resources such as bandwidth, battery power, memory, and computational capacity (Burgard et al. 2005; Khamis et al. 2015; Madridano et al. 2021; Cort´ es and Egerstedt 2017). Such map merging frameworks are indispensable in large-scale missions, including faster exploration, frontier allocation, and coverage planning, where maintaining a consistent global frame boosts coverage efficiency and reduces exploration time in the field. Moreover, as autonomous systems move toward real-time operation in unknown environments, scalable and efficient multi-robot map merging has become a critical capability for the robotics community (Arm et al. 2023; Best et al. 2024; Orr and Dutta 2023; Zhou et al. 2021; Kim et al. 2025; Jeong et al. 2025). With recent advances in high-bandwidth mobile net-works, several LiDAR-based map merging frameworks have demonstrated impressive performance under ideal communi-cation conditions (Kim and Kim 2022; Gil et al. 2025; Wei et al. 2024; Zou et al. 2024; Kang et al. 2025; Yin et al. 2023). However, two major challenges still hinder their practical deployment in the field. First, the server or each robot must execute computationally intensive operations, such as loop closure detection and descriptor generation, despite being equipped with limited onboard processors. Second, the          
+
+> 1Dept. of Electrical and Computer Engineering, INHA University, S.Korea
+> 2Laboratory for Information and Decision Systems (LIDS), Mas-sachusetts Institute of Technology, Cambridge, MA, USA
+> Corresponding authors:
+> Younggun Cho, Hyungtae Lim Email: yg.cho@inha.ac.kr, shapelim@mit.edu
+> Prepared using sagej.cls [Version: 2017/01/17 v1.20]
+> arXiv:2606.25386v1 [cs.RO] 24 Jun 2026
+
+2 Journal Title XX(X) (a)  Intra-robot SLAM (Sec. 4.1)          
+
+> (d) Balanced Vertex Cover (Sec. 4.4)
+> (c) Sequential Matching (Sec. 4.3)
+> (b)  Inter-robot Place Recognition (Sec. 4.2)
+> Server
+> (g) Submap Merging (Sec. 4.7)
+> (a)  Intra-robot SLAM (Sec. 4.1)
+> Submap Generation using Exchanged Scans
+> SOLiD Desc.
+> Pose
+> Scan
+> SOLiD Desc.
+> Pose
+> Scan
+> (f)  Exchange Policy (Sec. 4.6)
+> (e) Maximum Edge-Weighted Clique Selection (Sec. 4.5) Local Submap
+> Output: Globally Consistent Map
+> Local Map Local Map Local Submap
+> : Selected edge : Vertex : Edge : Overlapping region ,: Local robot : Server : Communication : Database : Transmission
+
+Figure 1. Overall pipeline of Commerge , a communication-efficient, robust, and fast multi-robot LiDAR map merging framework. (a) Each robot ( ) runs intra-robot SLAM (Section 4.1) to generate SOLiD descriptors, poses, and scans, producing local maps. (b) The server ( ) receives SOLiD descriptors and poses via communication ( ) and constructs an affinity matrix for inter-robot place recognition (Section 4.2). (c) Sequential matching (Section 4.3) identifies sequentially overlapped candidate inter-robot links ( ), forming an exchange graph where and vertices represent keyframes from the two robots. (d) Balanced vertex cover (Section 4.4) selects a balanced set of vertices to cover all candidate edges, ensuring complete coverage with balanced transmission requirements. (e) Maximum edge-weighted clique selection (Section 4.5) further refines the selection to retain only pairwise consistent loops ( ), identifying high-overlapped regions that maintain inter-robot consistency with minimal communication overhead. (f) The server ( ) computes an exchange policy specifying which scans to transmit and sends this policy back to the robots ( ) via communication ( ) (Section 4.6). (g) Each robot then transmits only the scans incident to the selected edges ( ), reducing data exchange from GB-scale local maps to MB-scale submaps. The server builds compact submaps from these exchanged scans and performs submap merging (Section 4.7) to maintain inter-robot alignment. As a result, our proposed pipeline achieves communication-efficient, fast, and robust multi-robot map merging by transmitting only partial scans from submaps instead of all scans from local maps, while preserving global consistency. 
+
+server must exchange and process massive amounts of global descriptors or sensor data, which quickly exhausts bandwidth and drains battery power. In larger-scale missions (e.g., more area to explore or more robots), maintaining accurate inter-robot relative pose estimates becomes more challenging under limited resources. To address these challenges, researchers have explored two mainstream strategies for multi-robot 3D LiDAR map merging: centralized (Kim and Kim 2022; Gil et al. 2025; Wei et al. 2024; Zou et al. 2024; Stathoulopoulos et al. 2024, 2023; Kang et al. 2025; Yin et al. 2023; Damigos et al. 2024; Lim et al. 2025) and distributed frameworks (Huang et al. 2021; Zhong et al. 2023; Kim et al. 2025; He et al. 2025; Lajoie et al. 2025; Chang et al. 2025; Lajoie and Beltrame 2023; Liu et al. 2025; Chang et al. 2022; Lajoie et al. 2025). Most centralized frameworks aggregate all robot data on a server for global optimization, providing effective coordination. However, they require continuous high-bandwidth communication and create scalability bottlenecks as data volume grows with mission duration. Most distributed frameworks reduce server reliance through peer-to-peer data exchange during robot encounters, offering better scalability. However, due to the lack of explicit selection mechanisms, these frameworks often transmit entire data backlogs at each encounter, leading to bursty communications and redundant data exchange. Although these multi-robot map merging frameworks adopt resource-saving strategies such as downsampling, heuristic pruning, conditional keyframing, or representation compression (Zheng et al. 2024) to mitigate these issues, they primarily reduce data volume without explicitly considering the selection of informative inter-robot loop closures. Consequently, geometric detail may be sacrificed and valuable correspondences discarded, degrading overall map quality. Moreover, most works implicitly assume stable and high-speed communication links, overlooking bandwidth and energy constraints as well as practical issues such as scalability and bursty data transmission in real-world operations. As a result, there is a potential gap between controlled experimental demonstrations and field-deployable or resource-aware multi-robot mapping systems. To address this gap, we propose Commerge , a multi-robot 3D LiDAR map merging framework designed for bandwidth- and resource-constrained environments, with a focus on selective data exchange. Unlike existing multi-robot map merging frameworks, our proposed method mitigates both scalability limitations and bursty communication patterns by leveraging server-guided global management while transmitting only essential scans through balanced selective data exchange. As shown in Fig. 1, our method uses graph-theoretic filtering to extract scans that optimally represent inter-robot relative poses (i.e., Fig. 1(c), Fig. 1(d), and Fig. 1(e)). The selected scans are then aggregated into compact submaps and aligned in a single step by the server’s fast and robust coarse-to-fine registration (i.e., Fig. 1(g)). This design enables server-guided management while drastically reducing massive global descriptors or sensor data exchange and computation. In summary, our contributions are as follows: • We propose Commerge, a system-level and communication-aware multi-robot 3D LiDAR map merging framework that achieves high mapping accuracy with lower communication and computation   
+
+> Prepared using sagej.cls Kim et al. 3
+
+costs, making it practical for communication-constrained field deployments. • We formulate a communication-efficient exchange graph and solve a three-stage cascaded optimization problem (i.e., sequential matching, balanced vertex cover, and maximum edge-weighted clique selection) to select an optimal subset of inter-robot loops while suppressing redundant scan transfers. Rather than formulating a single globally optimal end-to-end objective, our cascade framework provides complementary structural roles at each stage, namely reliability filtering, balance-aware reduction, and consistency enforcement, while making the next stage computationally tractable. • We validate Commerge through extensive experiments on five public datasets and four in-house datasets covering cave, planetary-analog, indoor, and out-door campus environments, demonstrating substan-tial bandwidth efficiency and comparable or better mapping accuracy than state-of-the-art map merg-ing approaches. Furthermore, we demonstrate system robustness under real-world non-line-of-sight (NLOS) communication with up to 73.3% dropout rate, as well as under emulated network degradation scenarios including delay, bandwidth limitation, and packet loss. Building on our previous work (Kim et al. 2025), we demonstrate that fast descriptor exchange and robust registration can accelerate multi-robot map merging. Nevertheless, the overall volume of exchanged descriptors and scans is effectively the same as in centralized systems that ship all data, so bandwidth remains a critical bottleneck in practice. As a result, bandwidth and hardware resources are still quickly saturated in real-world deployments, especially when mission time increases or network quality fluctuates. These observations motivate the need for anew framework that achieves robust and fast map merging while drastically reducing data transmission through acommunication-efficient module. 
+
+2. Related Works 
+
+Mobile robots are inherently constrained by the limited resources they can carry onboard, such as processing power and wireless communication modules. In multi-robot systems, these constraints become even more critical as teams must coordinate their limited resources while sharing communication bandwidth and computational tasks. A key challenge in this setting is not only reducing the volume of transmitted data, but also determining which inter-robot correspondences should be exchanged under resource constraints. In particular, as the number of potential inter-robot correspondences increases, transmitting all candidate data becomes inefficient and often impractical. To address this challenge, this section reviews prior work from three perspectives: (i) inter-robot association, including loop closure detection (Section 2.1) and point cloud registration (Section 2.2); (ii) multi-robot map merg-ing frameworks, covering centralized (Section 2.3) and dis-tributed (Section 2.4) approaches; and (iii) communication-efficient strategies for bandwidth optimization (Section 2.5), with a focus on selective data exchange. 
+
+2.1. Loop Closure Detection for Multi-Robot 3D Point Cloud Map Merging 
+
+To construct a globally aligned 3D multi-robot map, robots first perform inter-robot loop closure detection (i.e., place recognition) to identify correspondences between scans collected by different robots. Traditional descriptors such as Scan Context (Kim and Kim 2018), LiDAR-Iris (Wang et al. 2020), STD (Yuan et al. 2023), BTC (Yuan et al. 2024), RING++ (Xu et al. 2023), SOLiD (Kim et al. 2024), and OSK (Zhang et al. 2024) encode geometric features into compact representations, enabling lightweight and robust loop detection. With the rise of deep learning, numerous researchers have also studied learning-based approaches. For exam-ple, deep learning-based descriptors, including Point-NetVLAD (Uy and Lee 2018), OverlapTransformer (Ma et al. 2022), LoGG3D-Net (Vidanapathirana et al. 2022), CVTNet (Ma et al. 2023), BEVPlace++ (Luo et al. 2025), and 3DEG (Stathoulopoulos et al. 2024), further improve viewpoint robustness through learned feature representa-tions, but their larger data sizes and high computational costs limit their use in embedded systems. While these methods improved matching robustness and recall, they primarily focused on generating candidate cor-respondences and did not address which inter-robot loop closures should be selected and transmitted under commu-nication constraints. In multi-robot settings, this distinction becomes critical. Unlike intra-robot loop closures, where all loop candidates can be locally verified, inter-robot loop detection requires transmitting candidate information across bandwidth-limited communication links. Therefore, beyond accurate detection, selecting a compact and reliable subset of inter-robot loop closures is essential for scalable and communication-efficient multi-robot map merging. Additionally, incorrect inter-robot loop closures can propagate errors across all connected robot maps, making robustness a key requirement. To improve reliability, several approaches leverage sequential consistency among neighboring loop candidates to enforce temporal and spatial coherence (Milford and Wyeth 2012; Siam and Zhang 2017; Oishi et al. 2019). For instance, AutoMerge (Yin et al. 2023) employs SeqSLAM-based window identification followed by clustering and geometric verification to filter unreliable candidates. However, such pipelines retain a large number of intermediate candidates throughout the verification process, resulting in substantial computational and communication overhead in multi-robot settings, and highlighting the need for more efficient selection mechanisms. 
+
+2.2. Point Cloud Registration For Multi-Robot 3D Point Cloud Map Merging 
+
+Following loop closure detection, point cloud registration estimates the relative pose between the loop pair. In multi-robot settings, accurate and robust registration is essential, as alignment errors can propagate across multiple robots and degrade the consistency of the global map. Most multi-robot mapping frameworks adopt local registration methods such as ICP and its variants (Segal et al. 2009; Pomerleau et al. 2013; Koide et al. 2021; Besl and McKay 1992). These methods can converge to accurate   
+
+> Prepared using sagej.cls 4Journal Title XX(X)
+
+solutions when good initial alignment is available, but suffer from narrow convergence basins and often fail under large pose discrepancies. To address this limitation, global registration approaches such as FGR (Zhou et al. 2016), Go-ICP (Yang et al. 2015), and PHASER (Bernreiter et al. 2021) search over a wider pose space to mitigate local minima, at the cost of increased computational complexity. More recent approaches, including learning-based methods such as Predator (Huang et al. 2021), BUFFER (Ao et al. 2023), and BUFFER-X (Seo et al. 2025), further improve robustness under challenging conditions by leveraging learned feature correspondences and context-aware matching. In addition, several place recognition methods such as BEVPlace++ (Luo et al. 2025) and RING++ (Xu et al. 2023) inherently provide coarse pose estimates without explicit feature matching. However, most existing registration methods operate at the scan level, focusing on pairwise alignment between individual point clouds. While computationally efficient, such approaches rely on limited geometric information and are sensitive to noise, partial overlap, and large viewpoint changes. In contrast, map-level registration aligns accumulated maps composed of multiple scans, providing richer geometric and structural information that enables more robust and accurate alignment. This is particularly important in multi-robot scenarios, where reliable global map merging requires strong geometric constraints across diverse viewpoints and environments. However, as the size of the accumulated maps increases, the number of correspondences grows substantially, leading to increased computational cost. Our prior work, KISS-Matcher (Lim et al. 2024), mit-igates this trade-off by integrating feature extraction, cor-respondence pruning, and efficient pose estimation into a unified framework. Nevertheless, as mission scale grows, even efficient map-level registration becomes computation-ally demanding when operating on full accumulated maps, motivating more compact aggregation strategies for scalable multi-robot mapping. 
+
+2.3. Centralized Multi-Robot 3D Point Cloud Map Merging Frameworks 
+
+Centralized frameworks aggregate all global descriptors and scans at a server, which performs global optimization across all robots. These approaches provide server-managed coordination and global optimization across all robots, enabling comprehensive map integration (Kim and Kim 2022; Gil et al. 2025; Wei et al. 2024; Zou et al. 2024; Stathoulopoulos et al. 2024, 2023; Kang et al. 2025; Yin et al. 2023). Multi-robot systems built on this paradigm also benefit from inherent redundancy and fault tolerance, as overlapping observations across robots can overcome sensor uncertainties (Burgard et al. 2005). However, centralized approaches incur heavy communica-tion and computation costs. Even with aggressive downsam-pling or keyframing, the server must handle large volumes of data, and the bandwidth demand grows rapidly with mission duration and data size. Furthermore, reliance on a single server introduces bottlenecks and potential single points of failure, limiting scalability in real-world deployments where stable network links are rarely guaranteed. These limitations highlight the need for scalable strategies that preserve the benefits of centralized coordination while mitigating data transmission and computational bottlenecks. 
+
+2.4. Distributed Multi-Robot 3D Point Cloud Map Merging Frameworks 
+
+Distributed frameworks reduce dependence on a central server by allowing robots to exchange locally acquired data only when they encounter each other (Huang et al. 2021; Zhong et al. 2023; Kim et al. 2025; He et al. 2025; Chang et al. 2025). This peer-to-peer strategy improves scalability and eliminates the need for continuous high-bandwidth links, making it attractive for multi-robot systems. However, since robots cannot communicate when spatially separated, distributed systems require robots to be in proximity for data exchange. When robots do encounter each other, they often transmit all accumulated keyframes or scans collected since their last meeting, resulting in large and bursty transmissions with substantial redundancy (Schmuck et al. 2021; Xu et al. 2024). Furthermore, when encounters are infrequent, teams also have to coordinate rendezvous timing and location, which delays inter-robot corrections and leaves drift unchecked, undermining timely and consistent map alignment (Roy and Dudek 2001; Ko et al. 2003). Recent approaches, such as Multi-Proxy (Wang et al. 2026), propose communication-robust distributed mapping frameworks with an asynchronous smoothing backend. In addition, robots exchange compact proxy representations derived from key geometric features, e.g., STD (Yuan et al. 2023) corner points, to reduce communication overhead. However, as the overlap between robots increases, the number of potential inter-robot loop candidates grows rapidly, and the corresponding scans for each candidate must still be transmitted for verification and alignment, leading to bursty transmissions that can saturate bandwidth in large-scale multi-robot systems. These limitations suggest that reducing per-message data size alone is insufficient; rather, selectively determining which loop-related scans to transmit within overlapping regions is essential for efficient multi-robot map merging. 
+
+2.5. Communication-Efficient Strategies for Multi-Robot Map Merging Frameworks 
+
+Multi-robot map merging often suffers from substantial communication overhead due to the continuous exchange of large scans or detailed descriptors. Common methods such as uniform downsampling and periodic keyframing have been widely used to reduce communication overhead by decreasing the size of transmitted data. Recent approaches further optimize keyframe selection to reduce redundancy, such as the minimal subset approach (MSA) (Stathoulopoulos et al. 2025), which formulates keyframe selection as an optimization problem to retain informative frames while minimizing transmission. In addition, environment and point cloud compression methods such as Draco (De Queiroz and Chou 2016), geometry-based point cloud compression (G-PCC) (Graziosi et al. 2020), and real-time compressed point cloud coding (RCPCC) (Cao et  
+
+> Prepared using sagej.cls
+
+Kim et al. 5
+
+al. 2025) reduce bandwidth usage by encoding geometric information into compact forms before sharing across robots. In particular, Zheng et al. (2024) target real-time environment sharing in multi-robot cooperative systems by compressing environmental point clouds into compact panoramic representations for efficient transmission. While effective in reducing transmission size and computational overhead, such approaches focus on how to compress and share environment representations, rather than explicitly addressing which inter-robot loop-related data should be retained and transmitted within overlapping regions. More sophisticated approaches focus on conditional or incremental data exchange. Cieslewski and Scaramuzza (2017) introduce a distributed visual place recognition scheme in which only a subset of compact query words is initially transmitted, followed by larger keypoint or descriptor packets only when a promising loop candidate is identified. In their subsequent work (Cieslewski et al. 2018), a two-stage decentralized map merging pipeline is proposed: robots first broadcast a single NetVLAD descriptor (Arandjelovic et al. 2016) to query potential loops, and exchange detailed data only upon successful verification. These studies demonstrate that selective and incremental transmission substantially lowers bandwidth consumption while preserving map accuracy. Building on this foundation, graph-theoretic approaches emerge to optimize data exchange patterns. Several works (Giamou et al. 2018; Tian et al. 2018; Tian et al. 2021; Lajoie and Beltrame 2023) introduce the concept of an exchange graph for distributed loop closure detection, in which vertices represent robot poses and edges correspond to potential inter-robot loops. They formulate the data selection challenge as finding the minimal-cost subset that covers all potential loops, where costs represent practical metrics such as CPU time or network bandwidth. By solving this as a minimum bipartite vertex-weighted cover, their frameworks determine optimal data exchanges while minimizing transmission overhead. This approach also enables workload balancing based on available robot resources for resource-aware multi-robot systems. However, these formulations may lead to unbalanced solutions, where selected vertices are concentrated on a single robot, resulting in asymmetric communication patterns. Such a communication pattern can overload specific robots while underutilizing others, which is undesirable in real-world multi-robot systems with limited resources. Furthermore, in practical multi-robot deployments, assigning accurate transmission costs remains challenging because CPU time and wireless bandwidth fluctuate during operation, so costs measured during optimization do not accurately predict actual transmission costs, and continuous remeasurement introduces additional overhead (Lajoie et al. 2022; Kulkarni et al. 2019; Gielis et al. 2022; Formis et al. 2023). Therefore, reducing data size alone is insufficient. Instead, scalable and efficient multi-robot map merging requires selectively transmitting informative data within overlapping regions while maintaining balanced data exchange between robots. 
+
+3. Preliminaries 
+
+In this section, we introduce the fundamental concepts and theoretical foundation of the exchange graph, which serves as the core algorithm of our Commerge . We first present the notation of variables and then formally define the problem of optimal data selection using the exchange graph. As shown in Fig. 2, we solve this problem through three cascaded stages: 
+
+step (A) from Fig. 2(a) to Fig. 2(b), step (B) from Fig. 2(b) to Fig. 2(c), and step (C) from Fig. 2(c) to Fig. 2(d). 
+
+3.1. Notation 
+
+We assume robot α provides a set of observation tuples Vα =
+
+{vαi }Ni=1 , where each vαi = ( Tαi , Pαi , Dαi ) for indices i ∈Iα := {1, . . . , N } (resp. robot β provides Uβ = {uβj }Mj=1 
+
+where uβj = ( Tβj , Pβj , Dβj ) for j ∈ J β := {1, . . . , M }; see Section 4.1). Here, Tαi (resp. Tβj ) denotes a 6-DoF keyframe pose in SE(3) ; for example, Tαc =
+
+Rαc tαc
+
+0⊤ 1
+
+
+
+∈ SE (3) 
+
+with Rαc ∈ SO(3) and tαc ∈ R3  resp. Tβq =
+
+Rβq tβq
+
+0⊤ 1
+
+
+
+∈
+
+SE (3) ; Pαi ∈ RLi×3 (resp. Pβj ) is the LiDAR scan with 
+
+Li points; and Dαi ∈ RE (resp. Dβj ) is an E-dimensional compact global descriptor extracted from Pαi . Using these observations, we define the exchange graph for robots α and 
+
+β as a bipartite weighted undirected graph as follows: 
+
+Gα,β =
+
+
+
+Vα ∪ U β , Eα,β , Wα,β 
+
+, (1) where Eα,β is the edge set of inter-robot correspondences, and Wα,β contains edge weights. Next, let L := Iα × J β denote the set of potential inter-robot loop candidates (see Section 4.2). Let Lseq := 
+
+Iα 
+
+> seq
+
+× J β 
+
+> seq
+
+denote the sequentially matched subset (see Section 4.3), i.e., Lseq ⊆ L . Here, let the sequentially selected index ranges be Iα 
+
+> seq
+
+⊆ I α (resp. J β 
+
+> seq
+
+⊆ J β ), and the vertex sets are as follows: 
+
+Vα 
+
+> seq
+
+= {vαc | c ∈ I α
+
+> seq
+
+}, Uβ 
+
+> seq
+
+= {uβq | q ∈ J β
+
+> seq
+
+}, (2) where vαc and uβq denote the c-th and q-th sequentially matched observations, respectively. Accordingly, the edge set of the exchange graph is defined as follows: 
+
+Eα,β  
+
+> seq
+
+=
+
+n
+
+eα,β c,q = {vαc , u βq } (c, q ) ∈ L seq 
+
+o
+
+. (3) Here, the relative transformation for an edge eα,β c,q is Tα,β c,q =(Tαc )−1Tβq =
+
+Rα,β c,q tα,β c,q 
+
+0⊤ 1
+
+
+
+∈ SE (3) with Rα,β c,q ∈ SO(3) 
+
+and tα,β c,q ∈ R3. Finally, the weight set is defined as follows: 
+
+Wα,β  
+
+> seq
+
+=
+
+n
+
+wα,β c,q eα,β c,q ∈ E α,β 
+
+> seq
+
+o
+
+, (4) where each weight is induced by an edge–weighted function, fw(·) : eα,β c,q ∈ E α,β  
+
+> seq
+
+7 → R≥0. Concretely, each scan is encoded into a compact descriptor via a mapping function, fSOLiD (·), e.g., Dαi = fSOLiD (Pαi )  resp. Dβj =
+
+fSOLiD (Pβj ), and we then compute wα,β c,q in (4) from descriptor similarity as follows: 
+
+wα,β c,q = fw
+
+ eα,β c,q 
+
+ = fsim 
+
+ Dαc , Dβq
+
+. (5)  
+
+> Prepared using sagej.cls
+
+6 Journal Title XX(X) step (A) step (B) step (C) Robot  !       
+
+> 00.2km
+> Robot  "
+> Exchange Data 7,000 MB
+> Exchange Data 7,300 MB
+> (a) 00.01km
+> Exchange Data 60.0 MB
+> Exchange Data 50.1 MB (b) 00.01km
+> Exchange Data 25.9 MB
+> Exchange Data 26.9 MB (c) 00.01km
+> Exchange Data 1.3 MB
+> Exchange Data 1.3 MB (d)
+
+Figure 2. Submaps and associated exchange data sizes across modules in our framework. (a) Without selection, each robot requires approximately 7,000 MB of exchanged data from intra-robot SLAM. The cyan boxes highlight sequentially overlapping regions that are selected in step (A). (b) After sequential matching, i.e., step (A), the exchange volume is reduced to 60.0 MB for robot 
+
+α and 50.1 MB for robot β. (c) With balanced vertex cover, i.e., step (B), the required data is further reduced to 25.9 MB and 26.5 MB, respectively. (d) Finally, the maximum edge-weighted clique selection, i.e., step (C) reduces the exchanged data to just 1.3 MB per robot. This progressive reduction demonstrates the communication efficiency of our proposed map merging pipeline, achieving an overall 99.98% reduction in transmission cost (from 7,000 MB to 1.3 MB), while still enabling successful submap merging. 
+
+As a result, the undirected exchange graph from sequential matching is defined as follows: 
+
+Gα,β  
+
+> seq
+
+=
+
+
+
+Vα 
+
+> seq
+
+∪ U β
+
+> seq
+
+, Eα,β  
+
+> seq
+
+, Wα,β 
+
+> seq
+
+
+
+, (6) where Gα,β  
+
+> seq
+
+⊆ G α,β . In this work, processing all potential loops in (1) would be computationally prohibitive. There-fore, we employ a three-stage approach: step (A) identifies sequentially overlapped regions (i.e., from (1) to (6)), fol-lowed by step (B) and step (C) , which refine the selection to identify scans that substantially reduce computational cost while preserving essential inter-robot correspondences. 
+
+3.2. Problem Definition 
+
+Based on the notations above, our goal is to select an optimal subset of loop closures that are both informative and minimal in size. Given the candidate inter-robot loops L = Iα × J β ,we select the final subset through three nested stages as follows: step (A) sequential matching, step (B) transmission cost minimization, and step (C) consistency-based filtering. First, step (A) is defined as follows: 
+
+Lseq := arg min 
+
+> L′⊆L
+
+Jseq (L′), (7) where Jseq (·) finds the partial loop subset Lseq that best represents sequential overlap from the whole potential loop set L.Second, taking Lseq in (7) as input, step (B) is defined as follows: 
+
+LV := arg min 
+
+> L′
+> seq ⊆L seq
+
+JV(L′
+
+> seq
+
+). (8) That is, JV(·) removes redundant loops from the sequentially overlapped Lseq to find LV with minimal transmission cost. Third, with LV in (8), step (C) is defined as follows: 
+
+LK := arg max 
+
+> L′
+> V⊆L V
+
+JK(L′
+
+> V
+
+). (9) Here, JK(·) chooses the subset LK from the minimal transmission cost loops LV to preserve strong pairwise consistency. From the definitions of Lseq , LV, and LK, we obtain the nested selection as follows: 
+
+LK ⊆ L V ⊆ L seq ⊆ L . (10) We therefore cast loop selection as a three-stage cascaded optimization over the objectives, Jseq (·), JV(·), and JK(·).The resulting solution of this cascade, LK, is both informative and compact, and it is the key to our Commerge’s communication-efficient, fast, and robust multi-robot 3D LiDAR map merging. 
+
+4. Commerge: Communication-Efficient, Robust and Fast Map Merging Framework 
+
+In this section, we describe the overall algorithm of our proposed method, Commerge , as shown in Fig. 1. Unlike existing multi-robot map merging frameworks, our proposed method bridges the dichotomy between effective coordination and scalability by leveraging a server-guided global management while transmitting only essential scans through balanced selective data exchange. The entire process proceeds in seven stages: (i) intra-robot SLAM, (ii) inter-robot place recognition, (iii) inter-robot sequential matching, (iv) balanced vertex cover (BVC) in exchange graph, (v) maximum edge-weighted clique selection in exchange graph, (vi) exchange policy generation, and (vii) submap-based map merging framework. From intra-robot SLAM at the local level to map merging at the server level, each robot and the server communicate organically and refine candidate loops incrementally, ensuring that only the most informative and mutually consistent data are exchanged.  
+
+> Prepared using sagej.cls
+
+Kim et al. 7
+
+4.1. Intra-Robot SLAM for Local Mapping 
+
+Each robot in the team first estimates its trajectory and builds a local map using a LiDAR-based SLAM system. Following the notation introduced in Section 3.1, we denote the keyframe poses of robots α and β as X α = {Tαi | i ∈Iα} and X β = {Tβj | j ∈ J β }, respectively. These pose sets correspond to the vertices in our exchange graph formulation. Without loss of generality, we describe the trajectory estimation process for robot α; robot β follows an identical procedure. Then, the intra-robot trajectory estimation is formulated as a maximum a posteriori (MAP) estimation problem as follows: 
+
+X α∗ = arg max  
+
+> Xα
+
+P (X α | z) = arg min  
+
+> Xα
+
+{− log P (X α | z)},
+
+(11) where z represents all LiDAR measurements. Assuming Gaussian noise on relative pose measurements, (11) reduces to the pose graph optimization as follows: 
+
+X α∗ = arg min  
+
+> Xα
+
+X
+
+> (t,t +1) ∈C odom intra
+
+(Tαt )−1Tαt+1 ⊟ Todom 
+
+> t,t +1
+> 2
+> Ωodom
+> t,t +1
+
++ X
+
+> (a,b )∈C loop intra
+
+(Tαa )−1Tαb ⊟ Tloop 
+
+> a,b
+> 2
+> Ωloop
+> a,b
+
+,
+
+(12) where Codom intra is an odometry constraint set between two temporally consecutive t-th and (t + 1) -th poses of the robot α, and Cloop intra is a loop constraint set between two non-consecutive a-th and b-th poses of the robot α (i.e., 
+
+a + 1 ̸ = b) corresponding to intra-robot revisits, detected by loop detection. Here, ⊟ denotes the box-minus operator, the manifold analogue of subtraction, which returns the tangent-space increment that takes Y to X; specifically, for 
+
+X, Y ∈ SE (3) , X ⊟ Y := log  Y−1X ∈ se (3) ≃ R6 (He et al. 2021). The measurements Todom  
+
+> t,t +1
+
+and Tloop  
+
+> a,b
+
+correspond to the observed relative poses from odometry (Xu et al. 2022) and registration with loop detection, respectively, and each residual is weighted by its associated information matrix, 
+
+Ωodom  
+
+> t,t +1
+
+or Ωloop  
+
+> a,b
+
+. The squared Mahalanobis norm ∥ · ∥ 2
+
+> Ω
+
+accounts for measurement uncertainty, and the optimization seeks the trajectory X α∗ that best explains all relative constraints under Gaussian noise assumptions. To correct the accumulated drift in odometry as shown in Fig. 3(a), we incorporate loop closure constraints, identified through place recognition using our lightweight global descriptor, SOLiD. As explained in Section 3.1, for each i-th keyframe point cloud, Pαi , we extract a compact descriptor 
+
+Dαi using the SOLiD generation function, fSOLiD (·). For a detailed description of SOLiD, please refer to our previous paper (Kim et al. 2024). To efficiently retrieve loop closure candidates, we build a Kd-tree over the descriptor set Dα = {Dαi | i ∈ I α}. Given the a-th frame Dαa as a query, we search over the index set excluding a short temporal window (to avoid trivial matches) as follows: 
+
+b = arg min 
+
+> b′∈T a
+
+Dαa − Dαb′ 2, (13) where Ta := φ ∈ I α 1 ≤ φ ≤ a − τwindow and τwindow ∈
+
+N is a user-defined parameter. This ignores indices φ ∈{a − τwindow + 1 , . . . , a } (i.e., the current frame and the last τwindow − 1 past frames). If a − τwindow < 1, then Ta =
+
+∅ and no candidate is returned. A Kd-tree built over 
+
+{Dαφ}φ∈T α is used only to accelerate the search over Ta. We then accept a loop candidate only if the descriptor distance is below a threshold using (5), as follows: 
+
+fsim (Dαa , Dαb ) = Dαa − Dαb 2 ≤ τ intra SOLiD . (14) While each loop candidate (a, b ) is retrieved from descriptor similarity, we verify it geometrically via point-to-point ICP, which estimates the relative poses RICP  
+
+> a,b
+
+, tICP 
+
+> a,b
+
+between the associated point clouds Pαa and Pαb as follows: 
+
+RICP  
+
+> a,b
+
+, tICP  
+
+> a,b
+
+= arg min 
+
+> R∈SO (3)
+> t∈R3
+
+X  
+
+> (pϖ,qϖ)∈C inlier
+> a,b
+
+(R p ϖ + t) − qϖ
+
+> 22
+
+,
+
+(15) where Cinlier  
+
+> a,b
+
+= (pϖ , qϖ ) Niter  
+
+> ϖ=1
+
+is the inlier correspondence set, which is updated at each ICP iteration, with Niter 
+
+pairs pϖ ∈ Pαa and qϖ ∈ Pαb . During each iteration of ICP, a total of Niter candidate correspondences Ca,b =
+
+(pϖ , qϖ ) Niter  
+
+> ϖ=1
+
+are obtained by Kd-tree-based point-to-point nearest neighbor search on the warped points; the inlier set Cinlier  
+
+> a,b
+
+⊆ C a,b is then produced via distance-based thresholding and/or a robust kernel. We accept the geometric verification if the mean squared residual is below a threshold as follows: 
+
+εICP  
+
+> a,b
+
+:= 1
+
+Ninlier 
+
+X  
+
+> (pϖ,qϖ)∈C inlier
+> a,b
+
+(RICP  
+
+> a,b
+
+pϖ + tICP  
+
+> a,b
+
+) − qϖ
+
+> 22
+
+,
+
+(16) 
+
+εICP  
+
+> a,b
+
+≤ τICP . (17) If (17) holds, we set the loop measurement Tloop  
+
+> a,b
+
+:= 
+
+RICP  
+
+> a,b
+
+tICP 
+
+> a,b
+
+0⊤ 1
+
+
+
+and add (a, b ) to Cloop intra with the corresponding information matrix Ωloop  
+
+> a,b
+
+based on the point-wise residuals. In summary, each observation tuple consists of a pose, a point cloud, and a global descriptor, formally defined as: 
+
+vαi = ( Tαi , Pαi , Dαi ) , i = 1 , . . . , N, (18) where the SLAM state can be equivalently represented as a triplet of sets, Vα = ( X α∗, Pα, Dα), with Vα =
+
+{vαi }Ni=1 , X α∗ = {Tαi }Ni=1 , Pα = {Pαi }Ni=1 , and Dα =
+
+{Dαi }Ni=1 
+
+ resp. Uβ =  X β∗, Pβ , Dβ  . As illustrated in Fig. 3(b), our SOLiD-based SLAM demonstrates robust, lightweight, and efficient performance, effectively mitigating drift. Moreover, it maintains robust performance across diverse LiDAR scan types and configurations; see our previous paper (Kim et al. 2024). As shown in Fig. 1(a), each robot in the team performs intra-robot SLAM while communicating with the server by transmitting SOLiD descriptor database Dα (resp. Dβ ) and pose database X α∗ (resp. X β∗). The server then generates a selective transmission policy (see Section 4.2, Section 4.3, Section 4.4, and Section 4.5), instructing robots to send only partial scan subsets (see Section 4.6) rather than the entire scan database Pα (resp. Pβ ).  
+
+> Prepared using sagej.cls
+
+8 Journal Title XX(X) w/o Loop Closure                        
+
+> (a) w/ Loop Closure (b)
+> Figure 3. Qualitative comparison of LiDAR map reconstruction on the Mulran dataset, which is acquired by an Ouster OS1-64 sensor (Kim et al. 2020). (a) Without loop closure. Accumulated drift leads to noticeable misalignments and structural inconsistencies (red box). (b) With loop closure. The global map exhibits improved structural alignment and reduced distortion, with well-aligned overlapping regions (green box). This demonstrates that SOLiD-based loop closure effectively maintains global consistency and enables accurate map alignment.
+
+4.2. Inter-Robot Place Recognition 
+
+From the received descriptor databases Dα and Dβ from each robot, the server conducts inter-robot place recognition. This section serves as a preprocessing step for step (A) ,
+
+step (B) , and step (C) defined in Section 3.2, constructing the affinity matrix used to determine the sequentially overlapped subset of loop closures. Let R ∈ { 1, . . . , r, . . . , N robot } denote the robot index (e.g., r = α, β ), and define the set of keyframes for robot r among deployed Nrobot robots. Then, we can let the observations Vα = {vαi }Ni=1 and Uβ = {uβj }Mj=1 in (18), where i and j are used to index the keyframes from robot α
+
+and robot β, respectively, as presented in Section 4.1. Given the global descriptors sets Dα = {Dαi }Ni=1 and 
+
+Dβ = {Dβj }Mj=1 from observation Vα and Uβ in (18), we measure inter-robot similarity using (5) as follows: 
+
+fsim (Dαi , Dβj ) = Dαi − Dβj 2. (19) We collect similarity scores over all index pairs in the complete candidate domain L := Iα × J β . These scores are arranged in an affinity matrix as follows: 
+
+Ai,j = fsim (Dαi , Dβj ), ∀(i, j ) ∈ L , (20) where A ∈ R|I α|×|J β | is the affinity matrix. Low values in 
+
+A indicate strong place matches and serve as loop closure candidates as shown in Fig. 4(a). In subsequent processing stages, we use A for matrix-based computations, while 
+
+L and its subsets represent the corresponding set-theoretic formulation. Unlike in Section 4.1, we avoid Kd-tree-based approxi-mate retrieval because sparse or approximate neighbor selec-tion can break the diagonal connectivity patterns in B that are essential for sequential overlap detection. Specifically, we need to preserve diagonal connections at positions (i, j ),
+
+(i ± 1, j ± 1) in the affinity matrix to identify coherent sequential matches. Instead, leveraging SOLiD’s comparably fast computation advantages, we compute the dense affinity through brute force scoring to examine all possible corre-spondences. The resulting dense affinity matrix facilitates robust sequential overlap analysis by preserving complete spatial connectivity patterns in Section 4.3. 
+
+4.3. Inter-Robot Sequential Matching 
+
+We now provide a detailed procedure of step (A) , the first stage of our cascaded three-stage approach introduced in Section 3.2. This step introduces sequential matching for robust inter-robot place recognition by detecting temporally contiguous correspondence, defining the sequential set Lseq 
+
+in (7). Formally, given A, each of whose elements are defined by (20), we first threshold it to obtain a binary matrix B ∈{0, 1}N ×M whose each element is defined as follows: 
+
+Bi,j =
+
+(
+
+1 if Ai,j ≤ τ inter SOLiD ,
+
+0 otherwise , (21) where τ inter SOLiD is a user-defined threshold that filters out low confidence pairs. Given B, we apply 8-connected component labeling with a structuring element S =
+
+1 1 11 1 11 1 1
+
+ to cluster connected regions. This algorithm groups neighboring 1-valued cells into clusters. Each cluster represents contiguous regions of strong place matches (similarities lower τ inter SOLiD ) forming coherent sequences of matches between the trajectories of the two robots. This produces Nlabel clusters, where they are assigned a label ℓ ∈ { 1, . . . , N label }. Importantly, each cluster contains sequential rows and columns, that is, sequential nodes from robot α and robot β, where each node contributes to forming at least one inter-robot loop within the cluster. This inter-robot relationship is leveraged in Section 4.4. Let S = {S ℓ}Nlabel  
+
+> ℓ=1
+
+denote the set of all labeled clusters. To select the most informative cluster (i.e., Lseq ) from S, for each cluster Sℓ, we first compute its rectangular span in the affinity matrix A as follows: 
+
+Span( Sℓ) = i(ℓ)min , i (ℓ)max 
+
+ × j(ℓ)min , j (ℓ)max 
+
+, (22) where Span( ·) is obtained from the minimum and maximum row and column indices over all pairs (i, j ) ∈ S ℓ. We then score each cluster by its average similarity as follows: 
+
+favg (Sℓ) = 1
+
+|S ℓ|
+
+X
+
+> (i,j )∈S ℓ
+
+Ai,j . (23) Here, | · | denotes the cardinality of the set. As illustrated in Fig. 4(b), we pick the best one among Nlabel clusters whose span area exceeds a threshold τarea as follows: 
+
+S∗ = arg min   
+
+> ℓ:|Span( Sℓ)|≥ τarea
+
+favg (Sℓ). (24) Here, |Span( ·)| denotes the area of the rectangular region. Finally, we set the most informative subset of sequentially matched loop candidates to Lseq := S∗.In summary, from the input L in (20), we compute the affinity matrix A. Subsequently, using A as input, we obtain clusters S through (21) and S. Finally, we identify the  
+
+> Prepared using sagej.cls
+
+Kim et al. 9TP (↑)        
+
+> FP (↓)
+> Top traj: Robot !(Nnodes) Bottom traj: Robot "(Mnodes)
+> (a) High Low
+
+M
+
+N
+
+!∗ (b)                
+
+> Figure 4. Visualization of inter-robot place recognition results and the corresponding affinity matrix (see Section 4.2). (a) Detected inter-robot loop closures between trajectories consisting of
+
+N nodes (robot α) and M nodes (robot β), where green edges represent true positives and red edges represent false positives. (b) N × M affinity matrix A constructed from SOLiD descriptor distances, where the N columns correspond to robot α’s descriptors and the M rows correspond to robot β’s descriptors. The cyan box highlights a sequentially consistent low distance region, Sℓ, grouped by connected white diagonal patterns S in binary matrix B representing sequential matches that form a coherent cluster. This cluster becomes a candidate subset for S∗, whereas the yellow box shows scattered high-distance responses that are excluded during connected component labeling (see Section 4.3). 
+
+most informative cluster via (24). This process implements 
+
+Jseq (·) from (7), taking the input L and completing the sequential matching stage, fulfilling step (A) of our framework. Following the index convention in Section 3.1, we relabel pairs in Lseq as (c, q ) with c ∈ I α 
+
+> seq
+
+and q ∈ J β
+
+> seq
+
+for robots α and β, respectively. 
+
+4.4. Balanced Vertex Cover in Exchange Graph 
+
+Building on the sequential matching results from step (A) ,we now present step (B) of our cascaded framework explained in Section 3.2. Given a set of potential inter-robot loop closures Lseq obtained from sequential matching in (24), the next critical challenge is to select which subset of scans should be transmitted among robots for efficient communication. We exploit the key property from Section 4.3 that every sequential node participates in loop formation. Our sequential matching design explicitly exploits this property to construct a complete matching on a selected partition. In real-world deployments, continuously exchanging complete scans is prohibitively expensive due to bandwidth, energy, and CPU constraints. Inspired by Giamou et al. (2018), which formulates data exchange as a graph-theoretic optimization problem, we can cast the scan selection problem as a minimum weighted vertex cover (MWVC) on the bipartite exchange graph in (6): choose a minimum cost subset of vertices so that the selected scans collectively cover all candidate loop edges in (3), thereby maintaining complete spatial coverage while minimizing transmission cost. Formally, let π : Vα ∪ U β → { 0, 1} indicate whether a scan is transmitted and let wx > 0 denote its transmission cost (e.g., CPU time or network bandwidth), where x
+
+represents any vertex in our exchange graph. The MWVC is employed as follows: 
+
+π⋆ = arg min 
+
+> π
+
+X
+
+> x∈V α
+> seq ∪ U β
+> seq
+
+wx π(x)
+
+s.t. π(vαc ) + π(uβq ) ≥ 1, ∀ { vαc , u βq } ∈ E α,β  
+
+> seq
+
+,π(x) ∈ { 0, 1}, ∀ x ∈ V α 
+
+> seq
+
+∪ U β
+
+> seq
+
+.
+
+(25) However, as discussed in Section 2.5, assigning the transmission cost wx reliably is infeasible in practice because CPU time and wireless bandwidth fluctuate during operation (Lajoie et al. 2022; Kulkarni et al. 2019; Gielis et al. 2022; Formis et al. 2023). To avoid these limitations, we adopt uniform weights 
+
+wx = 1 for all x. This strategy prioritizes minimizing worst-case system complexity over optimizing for uncertain metrics, making the vertex count a robust proxy for communication cost while simplifying the problem into an (unweighted) minimum vertex cover (MVC). Under this assumption, (25) reduces to the MVC as follows: 
+
+π⋆ = arg min 
+
+> π
+
+X
+
+> x∈V α
+> seq ∪ U β
+> seq
+
+π(x)
+
+s.t. π(vαc ) + π(uβq ) ≥ 1, ∀ { vαc , u βq } ∈ E α,β  
+
+> seq
+
+,π(x) ∈ { 0, 1}, ∀ x ∈ V α 
+
+> seq
+
+∪ U β
+
+> seq
+
+.
+
+(26) By doing so, this design allows us to leverage fundamental graph-theoretic results. Recall from Section 4.3 that every sequential node from both robots participates in at least one inter-robot loop formation within Lseq , which removes isolated vertices and yields well-formed bipartite components. Specifically, in our multi-robot setting, inter-robot loop closures are established by pairing keyframes from robot α
+
+and β, which naturally form a bipartite exchange graph. For each connected component produced by the sequential matching process (Section 4.3), we consider the two keyframe sets Vα 
+
+> seq
+
+and Uβ 
+
+> seq
+
+with cardinalities Nseq and Mseq ,respectively. Without loss of generality, assume Nseq ≤ Mseq . By construction, the sequential matching process ensures that each connected component admits a complete matching on the smaller partition. Under this component-wise selection, the selected partition is fully covered by a matching, and Hall’s condition (Schrijver 2003) holds for that partition. Formally, for a bipartite graph G = ( X ∪ Y , E), there exists a matching that covers all vertices in X if and only if for every subset Z ⊆ X , |N (Z)| ≥ |Z| , as characterized by Hall’s theorem. Consequently, the maximum matching size for the selected partition equals NMM = |X | , i.e., NMM =
+
+Nseq (resp. NMM = Mseq when Mseq ≤ Nseq ). We consider the resulting unweighted bipartite exchange graph. By K¨ onig’s theorem (Schrijver 2003), which states that in unweighted bipartite graphs the size of a minimum vertex cover equals the size of a maximum matching, the minimum vertex cover size is given as follows: 
+
+Nvertex = NMM . (27) This result provides a tight lower bound on the number of scans that must be transmitted to preserve full coverage of all candidate inter-robot loop closures.  
+
+> Prepared using sagej.cls
+
+10 Journal Title XX(X) Exchange Data 2.2 MB    
+
+> Exchange Data 47.9 MB
+> (a) Minimum Vertex Cover (MVC) Exchange Data 25.9 MB
+> Exchange Data 26.9 MB (b) Balanced Vertex Cover (BVC; Proposed)
+
+Map by robot ! Map by robot "  
+
+> Figure 5. Comparison of submaps generated under (a) standard minimum vertex cover (MVC) and (b) balanced vertex cover (BVC). The magenta and cyan frames indicate scans from robot
+
+α and robot β, respectively, with the transmitted data size shown in MB. While standard MVC achieves lower total transmission volume (2.2 + 47.9 = 50.1 MB vs 25.9 + 26.9 = 52.8 MB), it produces submaps with reduced overlap despite being taken from the same location, increasing the likelihood of failure in the submap merging stage. Moreover, standard MVC creates monologue transmissions where one robot sends disproportionately large data volumes (2.2 MB vs 47.9 MB), concentrating transmission on a single robot, which can be undesirable under practical resource constraints. In contrast, BVC ensures more even data distribution (25.9 MB vs 26.9 MB) and maintains sufficient overlap to achieve better registration, demonstrating the importance of geometric diversity over pure transmission minimization. 
+
+While this lower bound is theoretically optimal, standard MVC optimization can lead to a monologue problem, where the solution selects vertices predominantly from one partition while ignoring the other. For example, if robot α has keyframes with higher connectivity, the MVC might select most observations from Vα 
+
+> seq
+
+and few from Uβ 
+
+> seq
+
+(Fig. 5(a)). Consequently, it leads to unbalanced communication loads and reduces the geometric diversity of the selected scans, eventually degrading subsequent registration quality. To avoid these issues while leveraging the tight bound 
+
+NMM , we define a BVC that prevents the monologue solution by constraining each robot to contribute a minimum share of the selected scans. To this end, we employ Shannon entropy (Shannon 1948) as a principled measure of participation balance across robots. Shannon entropy for a discrete distribution p = {pr }Nrobot 
+
+> r=1
+
+is defined as follows: 
+
+H(p) = − X
+
+> r
+
+pr log 2 pr , (28) where pr represents an abstract proportion of contribution assigned to robot r for balancing purposes. The effective number of participating robots is given by 2H(p).Using this entropy-derived quantity, we impose the balance constraints as follows: 
+
+X
+
+> v∈V α
+> seq
+
+π(v) ≥ NMM 
+
+2H(p) , X
+
+> u∈ U β
+> seq
+
+π(u) ≥ NMM 
+
+2H(p) . (29) Here, pr represents an abstract participation ratio used solely to prevent degenerate (monologue) solutions in scan selection. Since our objective is scan cardinality rather than bandwidth, we do not interpret pr as an online estimate of link capacity. For the two-robot setting in our experiments, we set pα = pβ = 1 /2, yielding an equal-share constraint that promotes geometric diversity from both robots. This choice encourages balanced scan selection from both robots and avoids degenerate solutions dominated by one robot. We incorporate these balance constraints into (26), yielding the BVC formulation. Although our experiments focus on two robots (where pα = pβ = 1 /2
+
+and the constraint reduces to an equal-share form), the entropy-based formulation provides a principled way to generalize the minimum-share constraint to larger teams and asymmetric participation settings (Cover 1999; Kelly et al. 1998). With these constraints, the BVC selects a minimum cost set of scans that still covers every candidate loop edge (full coverage of Eα,β  
+
+> seq
+
+), while preventing monologue solutions where one robot dominates the transmission as shown in Fig. 5(b). This balance ensures that subsequent clique selection in Section 4.5 has access to geometrically diverse scans from both robots, improving registration robustness. In addition, this approach distributes communication loads evenly across robots, preventing single-robot dominance and providing more stable, implementation-friendly scan exchange behavior. In summary, given the sequential matching result Lseq 
+
+from (24), we extract the vertices incident to each edge defined in (3). We select these vertices by solving the BVC formulation: the optimization JV(·) in (8) minimizes the objective in (26) while satisfying the balance constraints in (29), yielding the optimal solution π⋆(·). From π⋆(·), we construct the vertex cover sets as follows: 
+
+Vα 
+
+> V
+
+=
+
+n
+
+vαc ∈ V α 
+
+> seq
+
+| π⋆(vαc ) = 1 
+
+o
+
+, (30) 
+
+Uβ 
+
+> V
+
+=
+
+n
+
+uβq ∈ U β 
+
+> seq
+
+| π⋆(uβq ) = 1 
+
+o
+
+. (31) The resulting loop set LV contains all edges whose at least one endpoint is selected as follows: 
+
+LV =
+
+n
+
+(c, q ) ∈ L seq | vαc ∈ V α 
+
+> V
+
+or uβq ∈ U β
+
+> V
+
+o
+
+. (32) This completes step (B) of our three-stage framework. To avoid notation clutter, we use tildes for indices of selected nodes at the BVC stage: Iα 
+
+> V
+
+:= { ˜c | vα 
+
+> ˜c
+
+∈ V α 
+
+> V
+
+} and 
+
+J β 
+
+> V
+
+:= { ˜q | uβ 
+
+> ˜q
+
+∈ U β 
+
+> V
+
+}. Accordingly, pairs in LV will be written as (˜ c, ˜q) with ˜c ∈ I α 
+
+> V
+
+and ˜q ∈ J β 
+
+> V
+
+. 
+
+> Prepared using sagej.cls
+
+Kim et al. 11 
+
+4.5. Maximum Edge-Weighted Clique Selection in Exchange Graph 
+
+Building on the vertex cover results from step (B) , which reduces the search space to a tractable size, we proceed to 
+
+step (C) of our cascaded framework to optimize geometric consistency and further reduce transmission requirements. Section 4.4 reduces communication overhead by selecting a subset of scans that covers all candidate inter-robot loops. However, step (B) optimizes coverage from a graph-theoretic perspective in terms of vertex cardinality, not actual geometric overlap between two robots. While the graph nodes may be fully covered at the graph level (i.e., vertex coverage), the corresponding geometric spaces may still have little spatial overlap, with most 3D points observing different parts of the physical scene. Moreover, even with balanced selection, the transmission volume can remain substantial for large-scale missions with high-resolution sensors or long durations, potentially exceeding practical bandwidth constraints in field deployments. To minimize both the geometric mismatch and commu-nication overhead, we need a more sophisticated selection criterion beyond simple graph coverage. Inspired by the con-sistency checking approach in Mangelson et al. (2018), we recognize that positional consistency can measure whether two inter-robot loops maintain geometric overlap under transformation. However, positional validation alone cannot ensure information-rich correspondences because geometri-cally consistent loops may observe different scene content or exhibit poor perceptual quality (e.g., in a factory environ-ment where identical shelf arrangements are repeated across multiple zones). To address these limitations, we develop a novel pairwise consistency (i.e., compatibility score) framework that combines both positional and perceptual consistency through the received pose databases X α∗ and X β∗ described in Section 4.1 and SOLiD descriptors, respectively. Building on this compatibility score, we construct a compatibility graph using the poses and SOLiD descriptors corresponding to the loop set LV as follows: 
+
+Gcomp = ( Vcomp , Ecomp , Wcomp ), (33) 
+
+Vcomp = LV = { ˜eC = (˜ cC , ˜qC ) }Ncomp  
+
+> C=1
+
+, (34) where Ncomp = |L V| is the number of loops selected from step (B) , and ˜eC represents the C-th loop connecting keyframe ˜cC from robot α and keyframe 
+
+˜qC from robot β. We define the index set Icomp := 
+
+{1, 2, · · · , ϑ 1, ϑ 2, . . . , N comp } to enumerate all candidate loops. Each vertex in Vcomp represents a loop, each edge in 
+
+Ecomp connects two loop pairs (e.g., ˜eϑ1 and ˜eϑ2 ), and each weight in Wcomp measures the compatibility score between two loop pairs. By solving a graph-theoretic problem on this graph, we select the final scan indices that must be transmitted, maximizing communication efficiency while preserving essential correspondences. Without loss of generality, consider loops indexed by ϑ1
+
+and ϑ2. We then denote the compatibility score, ξϑ1,ϑ 2 ∈Wcomp , between loops ˜eϑ1 and ˜eϑ2 , defined as follows: 
+
+ξϑ1,ϑ 2 = exp( −κϑ1 · κϑ1,ϑ 2 · κϑ2 ), (35) where κϑ1,ϑ 2 measures the positional consistency between the two loops and κϑ1 and κϑ2 represent the individual perceptual consistency for loops ˜eϑ1 and ˜eϑ2 , respectively. For the positional consistency (i.e., κϑ1,ϑ 2 ), full SE(3) transformation checks can be employed as in Mangelson et al. (2018). However, our SOLiD framework is designed to be rotationally invariant, meaning that robots may visit the same physical location from different orientations, and SOLiD would correctly identify these as loop closure candidates regardless of viewpoint differences. A full SE(3)-based consistency check would penalize such geometrically valid loops due to orientation discrepancies, potentially rejecting correct correspondences that are rotationally displaced but spatially overlapping. Therefore, inspired by the compatibility test in Shi et al. (2021), we focus on translational error, allowing rotational freedom while ensuring spatial proximity between loop candidates. Let Tα 
+
+> ˜c
+
+∈ X α∗ and Tβ 
+
+> ˜q
+
+∈ X β∗ denote the received poses from the transmitted databases, and let tα 
+
+> ˜c
+
+, tβ 
+
+> ˜q
+
+∈ R3 denote their respective translation components. We then define the positional consistency as follows: 
+
+κϑ1,ϑ 2 = ∥tα
+
+> ˜cϑ1
+
+− tα
+
+> ˜cϑ2
+
+∥2 − ∥ tβ
+
+> ˜qϑ1
+
+− tβ
+
+> ˜qϑ2
+
+∥2 . (36) For perceptual consistency (i.e., κϑ1 and κϑ2 ), since our framework employs SOLiD descriptors throughout the pipeline, we utilize SOLiD-based similarity in (5) as follows: 
+
+κϑ1 := wα,β   
+
+> ˜cϑ1,˜qϑ1
+
+∈ R≥0, κϑ2 := wα,β   
+
+> ˜cϑ2,˜qϑ2
+
+∈ R≥0.
+
+(37) Finally, using (36) and (37), we define the complete compatibility score ξϑ1,ϑ 2 in (35) that combines both positional and perceptual consistency. Since our goal is to identify mutually compatible loop sets, we seek subsets in which every pair of loops satisfies a compatibility condition. To this end, we construct acompatibility graph by explicitly separating feasibility from compatibility strength. We first define a binary feasibility mask M ∈{0, 1}Ncomp ×Ncomp as follows: 
+
+Mϑ1,ϑ 2 =
+
+(
+
+1, if ϑ1 < ϑ 2 ∧ κϑ1,ϑ 2 < τ con ,
+
+0, otherwise . (38) This mask determines whether a pair of loops is geometrically admissible and defines the edge set of the compatibility graph. For admissible loop pairs, we assign a continuous compatibility score ξϑ1,ϑ 2 defined in (35). The final compatibility matrix C△ is then defined as follows: 
+
+C△ = M ⊙ Ξ, (39) where Ξϑ1,ϑ 2 := ξϑ1,ϑ 2 and ⊙ denotes the Hadamard product. Equivalently, this can be written entrywise as follows: 
+
+C△ 
+
+> ϑ1,ϑ 2
+
+=
+
+(
+
+ξϑ1,ϑ 2 , if ϑ1 < ϑ 2 ∧ κϑ1,ϑ 2 < τ con ,
+
+0, otherwise . (40) Accordingly, we define the edge set as Ecomp := 
+
+{(ϑ1, ϑ 2) | Mϑ1,ϑ 2 = 1 } and assign edge weights by  
+
+> Prepared using sagej.cls
+
+12 Journal Title XX(X) 
+
+Wcomp (ϑ1, ϑ 2) := C△ 
+
+> ϑ1,ϑ 2
+
+. In summary, as illustrated in Fig. 6(a), C△ assigns each matrix cell a unified pairwise compatibility weight by combining positional consistency 
+
+κϑ1,ϑ 2 and perceptual consistency κϑ, while infeasible pairs are masked out by M (set to zero). For loop selection, we could apply a standard maximum clique approach to identify the largest set of mutually com-patible loops. However, similar to the limitation discussed in Section 4.4, this approach optimizes graph-theoretic cov-erage rather than geometric overlap quality. It prioritizes the cardinality of compatible loops without considering the actual spatial intersection between robot observations or the informativeness of individual correspondences. To address this limitation, we adopt an edge-weighted clique formu-lation that incorporates both aspects. Unlike the standard maximum clique selection, which treats all compatible loops equally, our approach weights each loop by its compatibility. This ensures that selected loops are perceptually and geomet-rically consistent. We now solve a maximum edge-weighted clique problem on the compatibility graph. Let K ⊆ I comp represent a subset of loop indices. The optimization is formulated as follows: 
+
+fK (K) := X
+
+> ϑ1<ϑ 2∈K
+
+C△ 
+
+> ϑ1,ϑ 2
+
+, (41) 
+
+K⋆ = arg max    
+
+> Mϑ1,ϑ 2=1 ∀ϑ1<ϑ 2∈K
+
+fK(K), (42) where the clique constraint Mϑ1,ϑ 2 = 1 ensures that every pair of loops in K forms a clique, meaning all selected loops are mutually compatible. The objective fK(·) maximizes loop quality (via κϑ1,ϑ 2 , κϑ1 , κϑ2 ), selecting informationally rich and mutually compatible loops as shown in Fig. 6(b). By doing so, we can map the selected indices back to loops as: 
+
+LK := { ˜eϑC ∈ L V | C ∈ K ⋆ }. (43) In summary, using the loop set LV from (29) and the received pose databases X α∗ and X β∗ from each robot, we construct the compatibility matrix as defined in (39). We then identify the maximum edge-weighted clique from this compatibility graph through the optimization in (42). This process is denoted by JK(·), completing step (C) 
+
+as defined in (9). Accordingly, we write pairs in LK as 
+
+(c⋆, q ⋆) with c⋆ ∈ I α 
+
+> K
+
+:=  c⋆ | (c⋆, q ⋆) ∈ L K and q⋆ ∈J β 
+
+> K
+
+:=  q⋆ | (c⋆, q ⋆) ∈ L K .
+
+4.6. Exchange Policy Generation 
+
+Once the optimal subset is identified through solving the three-stage cascaded problem, the server generates an exchange policy that instructs robots to transmit only the scans incident to the selected loops. Upon receiving this policy from the server, each robot transmits the minimal scan subsets back to the server, which are necessary to maintain inter-robot alignment while achieving substantial bandwidth reduction. Specifically, given LK in (43), the server requests only the unique endpoint scans of all selected loops as follows: 
+
+Iα 
+
+> K
+
+:=  c⋆ (c⋆, q ⋆) ∈ L K , (44) 
+
+J β 
+
+> K
+
+:=  q⋆ (c⋆, q ⋆) ∈ L K . (45) High Low                      
+
+> !!"#$ ×! !"#$
+> : Selected edge
+> (a) : Vertex
+> : Selected vertex : Edge
+> : Selected edge (b)
+> Figure 6. Visualization of the compatibility graph and its matrix representation for maximum edge-weighted clique selection. (a) Compatibility matrix where each cell represents a potential edge between two loops. Selected edges (i.e., magenta circles) indicate high compatibility pairs that form the clique. (b) Compatibility graph representation where vertices (i.e., grey nodes) represent inter-robot loops between robots
+
+α and 
+
+β, and edges (i.e., grey lines) encode compatibility scores. The maximum edge-weighted clique selection identifies optimal vertices (i.e., blue nodes) and edges (i.e., magenta lines) with the highest mutual consistency. For example, the magenta circles within the cyan box in (a) correspond directly to the connections between selected vertices highlighted in the cyan region of (b). Only scans incident to the selected loops (i.e., blue nodes) are transmitted to the server. 
+
+Robots then transmit only the scans corresponding to these selected indices back to the server, reducing communication load while preserving essential geometric information for robust alignment. 
+
+4.7. Submap-Based Map Merging 
+
+Upon receiving the selected scans specified by the exchange policy (44) and (45), the server constructs submaps by aggregating the corresponding point clouds transformed to the global frame as follows: 
+
+Mα := [
+
+> c⋆∈I α
+> K
+
+{Rαc⋆ ps + tαc⋆ | ps ∈ Pαc⋆ }, (46) 
+
+Mβ := [ 
+
+> q⋆∈J β
+> K
+
+{Rβq⋆ qs + tβq⋆ | qs ∈ Pβq⋆ }, (47) where Pαc⋆ and Pβq⋆ denote the LiDAR point clouds at keyframes c⋆ and q⋆ in their respective local sensor frames, and Rαc⋆ , tαc⋆ and Rβq⋆ , tβq⋆ are the corresponding rotation matrices and translation vectors extracted from the pose databases X α∗ and X β∗ used in Section 4.5. With the compact submaps Mα and Mβ constructed from the minimal scan subsets in Section 4.6, the server performs global alignment using a coarse-to-fine registration approach, completing the efficient map merging process. The coarse registration stage employs KISS-Matcher for robust initial alignment, followed by fine registration using small-GICP for precise pose refinement. We begin with coarse registration using KISS-Matcher to establish initial correspondences between the two submaps. Let Ainit be the set of initial point correspondences between the submaps Mα and Mβ considered by KISS-Matcher, and let F ⊆ A init denote the pairs flagged as outliers. We then estimate the initial rigid transformation ˆTα,β  
+
+> init
+
+= 
+
+> Prepared using sagej.cls
+
+Kim et al. 13 w/o Merging 
+
+> (a)
+
+w/ Merging (b) Map by robot ! Map by robot "   
+
+> Figure 7. Results before and after applying Commerge for multi-robot map merging in the Multi-Campus Dataset (MCD) acquired with a Livox Mid-70 LiDAR sensor. The magenta box highlights a building structure, and the cyan box highlights trees, both of which appear well-aligned after merging without distortion.
+
+ ˆRα,β  
+
+> init
+
+ˆtα,β 
+
+> init
+
+0⊤ 1
+
+
+
+∈ SE (3) as follows: 
+
+ˆRα,β  
+
+> init
+
+, ˆtα,β  
+
+> init
+
+= arg min 
+
+> R∈SO(3)
+> t∈R3
+
+X 
+
+> (p,q)∈A init \F
+
+ρ
+
+
+
+Rp + t − q 22
+
+
+
+,
+
+(48) where p ∈ R3 and q ∈ R3 are corresponding 3D points sampled from Mα and Mβ , respectively, and ρ(·) is a robust loss used to suppress the influence of residual large errors. For detailed algorithmic descriptions of KISS-Matcher, please refer to our previous work (Lim et al. 2024). Next, we apply a lightweight local registration, i.e., small-GICP (Koide 2024), to achieve fine alignment initialized at ˆTα,β  
+
+> init
+
+. This coarse-to-fine approach combines the robustness of global registration for handling large initial misalignment with the precision of local optimization for accurate final alignment. Let Afine be the set of local correspondences established around ˆTα,β  
+
+> init
+
+, where each correspondence (p′, q′) ∈ A fine consists of points p′ =ˆRα,β  
+
+> init
+
+p + ˆ tα,β  
+
+> init
+
+(transformed from Mα) and q′ ∈ M β . The refined solution ˆTα,β  
+
+> fine
+
+:= 
+
+ ˆRα,β  
+
+> fine
+
+ˆtα,β 
+
+> fine
+
+0⊤ 1
+
+
+
+∈ SE (3) is defined as follows: 
+
+ˆRα,β  
+
+> fine
+
+, ˆtα,β  
+
+> fine
+
+= arg min 
+
+> R∈SO(3)
+> t∈R3
+
+X 
+
+> (p′,q′)∈A fine
+
+R p ′ + t − q′ 22.
+
+(49) Finally, we obtain the global transformation by composing the coarse and fine transformations using (48) and (49) as: 
+
+Tα,β  
+
+> final
+
+=
+
+Rα,β  
+
+> final
+
+tα,β 
+
+> final
+
+0⊤ 1
+
+
+
+= ˆTα,β  
+
+> fine
+
+ˆTα,β  
+
+> init
+
+. (50) As shown in Fig. 7, we then transform Mα (Fig. 7(a)) using the final transformation in (50) and fuse it with 
+
+Mβ (Fig. 7(b)) as follows: 
+
+Mα, aligned :=  Rα,β  
+
+> final
+
+p + tα,β  
+
+> final
+
+p ∈ M α , (51) 
+
+Mmerged := Mα, aligned ∪ M β . (52) This pipeline leverages overlap-rich submaps to stabilize one-shot global registration, while achieving dramatic communication efficiency: transmitting only the scans corresponding to K⋆ typically reduces data exchange from GB-scale to MB-scale. 
+
+5. Implementation Details 
+
+5.1. Intra-Robot SLAM Configuration 
+
+For intra-robot SLAM, we adopt a standard pose graph optimization framework implemented in GTSAM * (Dellaert 2012). Each robot incrementally builds its local submap by registering LiDAR scans and optimizing the trajectory using odometry and loop closure constraints. The GTSAM back-end allows efficient non-linear least squares optimization with factor graphs, providing accurate and consistent intra-robot maps that serve as inputs to our multi-robot pipeline. 
+
+5.2. Graph-Theoretic Problem Solvers 
+
+To minimize the number of scans that robots must transmit to the server, we formulate and solve graph-theoretic optimization problems using the SOLiD descriptors and poses received from multiple robots. Specifically, we construct the exchange graph where vertices represent robot keyframes and edges denote potential inter-robot loops, then solve the three-stage cascade optimization using Gurobi †.In particular, the BVC problem is NP-hard because vertex cover is a canonical NP-hard problem whose search space grows combinatorially with the number of vertices. To address this, we formulate the BVC as a mixed-integer linear program (MILP) with binary decision variables π(x) ∈{0, 1} indicating scan selection. The MILP is solved using Gurobi’s branch-and-bound procedure, which returns the optimal solution whenever it completes within the solver time limit, and a near-optimal solution otherwise. Similarly, the maximum edge-weighted clique selection problem is also NP-hard, as finding the clique with the maximum sum of edge weights requires exploring an exponential number of vertex combinations. However, since the exchange graph is substantially pruned after the MVC  
+
+> ∗https://gtsam.org/
+> †https://www.gurobi.com/
+> Prepared using sagej.cls
+
+14 Journal Title XX(X) 
+
+stage, the problem size becomes more manageable. We also formulate maximum edge-weighted clique selection as a mixed-integer quadratic program (MIQP), where binary variables indicate clique membership and quadratic terms capture edge weights between selected vertices. Gurobi handles the quadratic constraints via its branch-and-cut procedure, returning the optimal solution whenever it completes within the solver time limit, and a near-optimal solution otherwise. 
+
+5.3. Parameters of Commerge 
+
+Table 1 summarizes the parameters used throughout our pipeline, organized by processing robot-side in Section 5.1 and server-side in Section 5.2. Further implementation details are available in our open-source release. 
+
+6. Experiments 
+
+6.1. Experiments Setup 
+
+We first specify the hardware platform for the server that performs multi-robot map merging operations. To verify practical field deployability, we selected three representative hardware configurations with varying computational capabil-ities: a desktop workstation with Intel Core i7-12700KF (12 cores, 3.6 GHz, and 32 GB RAM; Intel-i7 ), an industrial mini PC (IPC-6000 series with Intel Core i5-8265U and 8 GB RAM; IPC-6000 ), and an NVIDIA Jetson Nano (quad-core ARM Cortex-A57 with 4 GB RAM; Jet-Nano ). Note that we assume each platform serves as the central server that coordinates data selection and performs map merging across robots. We evaluate algorithmic aspects (Sections 7.1, 7.2) such as overall map merging performance on Intel-i7 to ensure consistent evaluation conditions across all methods, while system-level aspects (Sections 7.3, 7.4) including scalability, resource efficiency, and runtime are evaluated across all three platforms ( Intel-i7 , IPC-6000 , and Jet-Nano )to compare deployment feasibility under varying hardware constraints. 
+
+6.2. Evaluation Metrics 
+
+Next, we employ three evaluation metrics for map merging performance, used in Section 7, and six evaluation metrics for the ablation study on place recognition and registration, used in Section 9. In all metrics, 1st , 2nd, and 3rd indicate ranking. The first metric for map merging is defined as follows: 
+
+ermse = fRMSE 
+
+
+
+TGT  
+
+> α
+
+Tαβ Tβj , Tβ, GT 
+
+> j
+
+
+
+, (53) which evaluates inter-robot alignment quality through the following procedure (Section 7.1). Specifically, given robot 
+
+α’s estimated trajectory and its ground truth trajectory, we compute the optimal alignment transformation TGT 
+
+> α
+
+using Umeyama alignment (Umeyama 1991). Each method estimates the inter-robot transformation Tαβ that aligns robot 
+
+α’s frame to robot β’s frame. To evaluate this estimated transformation, we apply both TGT  
+
+> α
+
+and Tαβ to robot β’s estimated trajectory, Tβj , and compute the root mean square 
+
+Table 1. Parameter configuration for the Commerge framework. For loop detection, τ intra SOLiD is stricter than τ inter SOLiD to ensure high-quality local maps, while inter-robot parameters can be more permissive due to sequential matching’s filtering capability. Note that τICP varies based on LiDAR scanning patterns (lower for repetitive patterns, higher for non-repetitive scan patterns).                     
+
+> Params. Description Value Commerge
+> (robot)  ∆νVoxel size for point cloud downsampling 1.0 m
+> ∆dKeyframe spacing distance 1.0 m
+> τICP ICP fitness threshold for loop verification 0.3 m / 2.0 m
+> τwindow Temporal window for loop exclusion 100
+> τintra SOLiD Intra-robot loop detection threshold 0.05 / 0.01
+> (server)
+> τinter SOLiD Inter-robot loop detection threshold 0.10 / 0.05
+> τarea Minimum cluster area for sequential matching 10,000
+> τcon Positional consistency threshold 5 m
+
+error (RMSE) against robot β’s ground truth trajectory, 
+
+Tβ, GT  
+
+> j
+
+, using the EVO toolkit (Grupp 2017). Next, the second metric is defined as follows: 
+
+tcomm =
+
+> Nrobot
+
+X
+
+> r=1
+
+(t(r) 
+
+> Ntx
+
+− t(r)1 ), (54) which measures the total communication time elapsed from the first transmission to the last transmission across all robots, where t(r) 
+
+> Ntx
+
+and t(r)1 are the final and initial transmission timestamps for robot r (Sections 7.3 and 7.4). In addition, the third metric is defined as follows: 
+
+dexch =
+
+> Nrobot
+
+X 
+
+> r=1
+> N(r)
+> tx
+
+X
+
+> n=1
+
+b(r) 
+
+> n
+
+, (55) which measures the cumulative payload size of all transmitted messages, where b(r) 
+
+> n
+
+represents the payload size (in bytes) of the n-th message (i.e., global descriptor or scan) from robot r (Sections 7.3 and 7.4). In particular, (53) is evaluated on Intel-i7 , while (54) and (55) are evaluated on an actual wireless communication infrastructure with IPC-6000 , whose detailed configuration is described in Section 6.5. Furthermore, the three metrics for the place recognition ablation study are defined as follows: • Recall@1 = TP 1 
+
+> NGT
+
+,• AUC Score = R 10 Precision (r),• F1 Score = 2 × Precision ×Recall  
+
+> (Precision +Recall )
+
+,where NGT is the number of ground truth loop closures in the dataset, TP 1 is the number of queries where the top-ranked match is a true positive, Precision (r) denotes the precision at recall level r, Precision = TP TP +FP , Recall = TP TP +FN , and TP, FP, and FN denote true positives, false positives, and false negatives from descriptor matching against ground truth correspondences. Finally, the three metrics for the registration ablation, namely relative translation error (RTE), relative rotation error (RRE), and success rate, are defined as follows: • RTE = 1
+
+> Nsuccess
+
+PNsuccess  
+
+> n=1
+
+tn, GT − ˆtn
+
+> 22
+
+,• RRE = 180 
+
+> πN success
+
+PNsuccess  
+
+> n=1
+
+cos −1
+
+ Tr ( ˆR⊤ 
+
+> nRn, GT )−12
+
+
+
+,• Success Rate = Nsuccess  
+
+> Ntotal
+
+× 100 % , 
+
+> Prepared using sagej.cls
+
+Kim et al. 15 
+
+Table 2. Summary of datasets used in our experiments. We evaluate Commerge across diverse environments with varying scale (i.e., map size or duration time), team sizes (denoted by ), sensor types ( : spinning LiDAR, : non-repetitive scan pattern LiDAR), trajectory overlap degrees ( : complete overlap where all robots traverse the almost same area, : moderate overlap with substantial shared regions, : partial overlap with minimal shared trajectories), and environments.                                                                        
+
+> Dataset HeLiPR (Jung et al. 2024) Kimera-Multi (Tian et al. 2023) WildPlaces (Knights et al. 2023) MCD (Nguyen et al. 2024) Botanic Garden (Liu et al. 2024) Sequence Roundabout Town Outdoor Tunnel Venman NTU 1006-01
+> GT Alignment ✓✓✓✗✗✓✗
+> Map size 7.6 GB 7.3 GB 217.0 MB 337.3 MB 26.4 GB 211.9 MB 130.6 MB Duration Avg. 2,729.761 sec 2,414.119 sec 1,159.260 sec 916.697 sec 2,293.620 sec 597.900 sec 600.300 sec Robot Num.
+> Overlap Deg. Complete ( )Complete ( )Partial ( )Partial ( )Complete ( )Moderate ( )Partial ( )LiDAR sensor Ouster OS2-128 ( )Ouster OS2-128 ( )Velodyne VLP-16 ( )Velodyne VLP-16 ( )Submap ( )Livox Mid-70 ( )Livox Avia ( )Environment Urban Urban Campus Indoor Jungle Campus Park Central Map 00.3km 00.25km 00.15km 00.05 km 00.2km 00.15km 00.1km
+
+(a) INHA-Cave (b) INHA-Planetary (c) INHA-Indoor (d) INHA-Outdoor 
+
+Figure 8. Real-world robot deployments for in-house multi-robot dataset acquisition. (a) Subterranean lava cave with a custom rover. (b) Planetary-analog terrain with a legged robot. (c) Indoor corridor with a wheeled robot. (d) Nighttime campus with a wheeled robot. 0 10m 
+
+(a) INHA-Cave 0 20m (b) INHA-Planetary 0 10m (c) INHA-Indoor 0 60m (d) INHA-Outdoor 
+
+Figure 9. Multi-robot map merging results produced by Commerge on each in-house dataset, where different colors indicate maps acquired by different robots. (a) Cave. (b) Planetary-analog terrain. (c) Indoor corridor. (d) Outdoor campus, overlaid on a satellite map for reference. 
+
+Figure 10. Point clouds from robot α (left, orange) and robot β (right, blue) in the INHA-Outdoor sequence. Red boxes indicate dynamic pedestrians. 
+
+where Nsuccess is the number of registration attempts that converge within acceptable error thresholds (i.e., RTE < 2 mand RRE < 5◦), Ntotal is the total number of registration attempts, tn, GT and ˆtn are the ground truth and estimated translations, and Rn, GT and ˆRn are the ground truth and estimated rotations. 
+
+Prepared using sagej.cls 16 Journal Title XX(X) 
+
+6.3. Public Datasets 
+
+In addition, we conducted experiments across various datasets to evaluate the performance of Commerge . Table 2 summarizes the datasets used in our experiments, including diverse characteristics that affect multi-robot mapping performance (e.g., map size, mission duration, robot number, overlap degree, LiDAR sensor type, and environment). Since public datasets with truly simultaneous multi-robot data acquisition are scarce, we follow the standard evaluation protocol used in prior multi-robot mapping literature: single-robot sequences are converted into multi-robot scenarios through temporal alignment (Huang et al. 2021; Zhong et al. 2023; Kim et al. 2025; Wei et al. 2024). Specifically, all robot sequences are time-shifted to align with a designated central sequence, creating synchronized multi-robot trajectories. This processing enables controlled evaluation of map merging algorithms under various perspectives while maintaining reproducibility and fair comparison across methods. Note that quantitative evaluation is limited for certain datasets: the Botanic Garden dataset lacks ground truth alignment between robot trajectories, while WildPlaces and Kimera-Multi’s Tunnel sequences present geometrically degenerate environments where LiDAR odometry exhibits substantial drift, preventing reliable assessment. In these cases, we employ qualitative assessment through visual consistency and quantitative evaluation using ground truth trajectories with arbitrary rotations, respectively. 
+
+6.4. In-House Datasets 
+
+We further validate the practicality of Commerge on our own in-house multi-robot datasets (i.e., INHA-Cave , INHA-
+
+Planetary , INHA-Indoor , and INHA-Outdoor ) as summarized in Fig. 8 and Fig. 9, respectively. To this end, we conduct network-aware experiments in Section 8 under two complementary settings. Note that INHA-Cave and INHA-Planetary datasets shown in Figs. 8(a) and 8(b) do not permit real wireless infrastructure due to the harshness of the environments, so we emulate delay, bandwidth limitation, and packet loss using NetEm (Hemminger 2005). In contrast, INHA-Indoor and INHA-Outdoor datasets shown in Figs. 8(c) and 8(d) allow us to construct an actual wireless network infrastructure that reproduces non-line-of-sight (NLOS) conditions and real packet dropout. In particular, INHA-Outdoor dataset further contains a large number of dynamic pedestrians, as shown in Fig. 10, which makes map merging even more challenging. The hardware setup for communication is detailed in the following section. 
+
+6.5. Communication Setup 
+
+Finally, we configured a controlled wireless infrastructure using TP-Link Omada EAP245 WiFi access points, as shown in Fig. 11, to evaluate tcomm , dexch , and practicality under realistic network conditions. Since Intel-i7 lacks portability for field deployment due to its desktop form factor, we adopt IPC-6000 as the server platform for our communication experiments, balancing computational capability with practical deployability. A detailed evaluation of system behavior under realistic network degradation scenarios is presented in Sections 7.3, 7.4, and 8. Server (PC IPC-6000)                  
+
+> Figure 11. Field communication setup used in our experi-ments. A central server (i.e., industrial mini PC IPC-6000 )communicates with robots through two Omada WiFi Access Points (left/right), forming aWLAN for outdoor trials. This infrastructure was used to exchange global descriptors and LiDAR scans via ROS/ZeroMQ and to measure communication time ( tcomm ) and total exchange volume ( dexch ).
+
+7. Experimental Results 
+
+In our experiments, we compare against well-known centralized multi-robot mapping frameworks, as server-based coordination enables effective global management. The baseline methods are as follows. LT-Mapper (Kim and Kim 2022) extends Scan Context to multi-robot scenarios using anchor-based pose graph optimization and dynamic object filtering. ELite (Gil et al. 2025) employs point-level temporal-spatial context to filter ephemeral objects for lifelong mapping. Uni-Mapper (Kang et al. 2025) integrates dynamic object removal and multi-modal LiDAR fusion based on DynaSTD. LAMM (Wei et al. 2024) combines BTC descriptors (Yuan et al. 2024) with dynamic removal for efficient place recognition and dynamic filtering. KISS-Matcher (Lim et al. 2024) performs fast map-level global registration for robot alignment. Here, the main differences between our proposed 
+
+Commerge and these methods are explained. LT-Mapper, ELite, Uni-Mapper, and LAMM continuously transmit scan data at each communication step during the mission. KISS-Matcher transmits voxelized maps segment-by-segment when robots are in proximity, where each segment covers the trajectory between consecutive encounter points. Note that KISS-Matcher assumes robots can detect proximity through signal strength indicators (e.g., RSSI) or similar metrics. In contrast, our method transmits only lightweight SOLiD descriptors at each communication step and sends carefully selected scans only after identifying consistent loop closures. For fair comparison, all methods used FAST-LIO2 (Xu et al. 2022) as the odometry estimator with 1.0 m keyframe spacing to obtain poses, and all scans corresponding to each pose were voxelized with a 1.0 m voxel size. Additionally, global descriptors were extracted from individual scans at each keyframe without point accumulation from adjacent frames. Note that to improve data transmission efficiency, KISS-Matcher first accumulates the voxelized scans into a map based on estimated poses, then applies additional 1.0 m voxelization to the accumulated map before transmission.  
+
+> Prepared using sagej.cls
+
+Kim et al. 17 
+
+Table 3. Map merging performance comparison (i.e., ermse ) against state-of-the-art multi-robot map merging methods on the 
+
+Intel-i7 platform across four representative datasets with varying scales and complexity (from small-scale NTU to large-scale 
+
+Town , left to right). Out-of-Memory (OOM) indicates methods that exhausted 32 GB RAM and failed to execute.                                                                                                                     
+
+> Sequence NTU Outdoor Roundabout Town
+> Robot Info. 01-02 01-10 Avg. A01-A02 A01-H01 A01-S01 A01-S02 Avg. 01-02 01-03 Avg. 01-02 01-03 Avg. LT-mapper 3.679 m 3.340 m 3.510 m 121.195 m 4.328 m 270.756 m 86.612 m 121.973 m 7.787 m 11.691 m 9.739 m 9.653 m 9.352 m 9.503 m ELite 149.194 m 245.532 m 197.363 m 168.183 m 333.118 m 251.057 m 49.770 m 200.532 m OOM OOM OOM OOM OOM OOM LAMM 172.979 m 227.212 m 200.096 m 4.154 m380.226 m 254.106 m 10.512 m 79.925 m OOM OOM OOM OOM OOM OOM Uni-Mapper 63.354 m 226.885 m 145.120 m 131.386 m 2.884 m254.398 m 10.509 m99.794 m OOM OOM OOM OOM OOM OOM KISS-Matcher 0.679 m1.817 m1.248 m20.427 m 11.870 m 22.020 m37.532 m 22.926 m 15.726 m 19.753 m 17.740 m 3.940 m 8.883 m 6.412 m Ours 1.783 m 2.594 m 2.189 m 9.624 m 7.818 m 30.265 m 14.853 m 15.640 m1.843 m3.807 m2.825 m2.657 m8.580 m5.619 m
+
+(a) Raw scan 
+
+(b) Scan Context (Kim and Kim 2018) 
+
+(c) SOLiD (Kim et al. 2024) 
+
+Figure 12. Qualitative comparison between Scan Context (Kim and Kim 2018) and SOLiD (Kim et al. 2024) descriptors. (a) Top view of a query scan (blue) and its matched candidate scan (orange) from NTU 01-10 . (b) Scan Context descriptors of the query (left) and candidate retrieved from database (right). (c) SOLiD descriptors of the query (left) and candidate retrieved from database (right). 
+
+(a) LT-Mapper (Kim and Kim 2022) 
+
+(b) ELite (Gil et al. 2025) 
+
+(c) Uni-Mapper (Kang et al. 2025) 
+
+(d) LAMM (Wei et al. 2024) 
+
+(e) KISS-Matcher (Lim et al. 2024) (f) Ours Map by robot ! Map by robot " Map by robot # Map by robot $ Map by robot %
+
+Figure 13. Multi-robot map merging results on the Kimera-Multi-Outdoor sequence acquired with an Ouster OS1-64 LiDAR sensor. (a)–(d) Baseline methods exhibit substantial misalignment and structural inconsistencies. (e) KISS-Matcher and (f) our method yield tighter alignment in the overlap regions, with zoom-in views highlighting the resulting structural consistency. 
+
+7.1. Map Merging Performance Analysis with State-of-the-Art Methods 
+
+First, Table 3 reports ermse across four datasets, where our method consistently ranks within the top three and demonstrates competitive or better performance than existing approaches. Specifically, the leftmost columns show competitive performance on the NTU sequences acquired with non-repetitive scan pattern LiDAR ( ), verifying robustness beyond conventional spinning LiDAR. In contrast, given the raw scans shown in Fig. 12(a), Scan Context (Kim and Kim 2018), which serves as the core place recognition module of ELite and LT-Mapper, fails to produce consistent descriptors between the query and candidate under non-repetitive scan patterns, as shown in Fig. 12(b). In comparison, SOLiD (Kim et al. 2024) adopted in our Commerge yields stable descriptors, as shown in Fig. 12(c). The middle columns, together with Fig. 13, present the Kimera-Multi Outdoor 
+
+sequence, where our method attains the best average ermse 
+
+even under partial trajectory overlap ( ), indicating that large errors in one robot pair are less likely to propagate 
+
+Prepared using sagej.cls 18 Journal Title XX(X)          
+
+> (a) LT-Mapper (Kim and Kim 2022)
+> (b) KISS-Matcher (Lim et al. 2024)
+> (c) Ours Map by robot !Map by robot "Map by robot #
+> Figure 14. (a)–(c) Multi-robot map merging performance comparison between baseline approaches and ours for three robots (
+
+α,
+
+β, γ) on the Town (top) and Roundabout (bottom) sequences acquired with an Ouster OS2-128 LiDAR sensor. As highlighted in zoom boxes, note that our method demonstrates high inter-robot alignment quality. 
+
+to others. The rightmost columns, together with Fig. 14, highlight the Roundabout and Town sequences, where our method attains the lowest ermse despite large-scale nature. Therefore, we conclude that Commerge is a map merging framework robust to scan pattern, trajectory overlap, and operational scale. 
+
+7.2. Robustness in Challenging Scenarios 
+
+One notable aspect of our Commerge is sufficient robustness in challenging scenarios. As shown in Fig. 15, our method successfully merges robot maps in repetitive indoor structures that cause perceptual aliasing, even under partial trajectory overlap ( ). In contrast, STD (Yuan et al. 2023), which serves as the core place recognition module of Uni-Mapper and LAMM, fails to produce reliable loop closures in such indoor environments, as shown in Fig. 16. Furthermore, as shown in Figs. 17 and 18, our method successfully performs map merging in unstructured vegetated environments such as forests, where dense foliage and repetitive natural textures degrade geometric distinctiveness. Specifically, Fig. 17 demonstrates robustness on the large-scale WildPlaces dataset, where LiDAR and LiDAR-inertial odometry methods typically fail due to the lack of geometric structure, while Fig. 18 validates  
+
+> Prepared using sagej.cls
+
+Kim et al. 19 
+
+(a) Input (b) Proposed Map by robot ! Map by robot " Map by robot # Map by robot $ Map by robot %
+
+Figure 15. Multi-robot map merging in geometrically degenerate indoor environments using the Kimera-Multi-Tunnel dataset. (a) Input: Two locally consistent robot maps built from ground truth trajectories with deliberately injected yaw bias to simulate misalignment. (b) Output: Successfully merged map showing tight color co-registration between robots. The cyan and magenta boxes highlight regions where even ground truth-based maps exhibit inherent degeneracy and misalignment due to indoor geometric ambiguity, yet our method successfully recovers valid inter-robot transformation and produces a coherent global map. 
+
+(a) (b) (c) (d) 
+
+Figure 16. STD descriptor’s false positive matches in repetitive indoor environments across four Kimera-Multi’s Tunnel sequences: (a) A01-A02 , (b) A01-AP01 , (c) A01-H01 , (d) A01-S02 . Black and blue trajectories represent the two robots’ paths, respectively. Cyan and magenta boxes highlight locations that STD incorrectly identifies as the same place despite being at different positions along the trajectories. The zoomed views reveal structurally similar structures, which cause STD to generate nearly identical geometric descriptions for distinct locations. These false matches explain STD’s failure in repetitive indoor environments. 
+
+Table 4. Scalability and resource efficiency comparison (i.e., dexch and tcomm ) against state-of-the-art multi-robot map merging methods on the IPC-6000 platform across four representative datasets with varying scales and complexity (from small-scale NTU 
+
+to large-scale Town , left to right). Time out (T/O) indicates communication time exceeding 1 hour, rendering the method impractical for real-time operation.                                                                                                                                   
+
+> Sequence NTU Outdoor Roundabout Town
+> Robot Info. 01-02 01-10 Avg. A01-A02 A01-H01 A01-S01 A01-S02 Avg. 01-02 01-03 Avg. 01-02 01-03 Avg.
+> dexch  Baselines 252.4 MB 332.0 MB 292.2 MB 328.4 MB 389.6 MB 424.0 MB 308.3 MB 362.7 MB 13.9 GB 15.4 GB 14.7 GB 14.3 GB 15.2 GB 14.8 GB KISS-Matcher 5.5 MB 7.5 MB 6.5 MB 4.5 MB 4.8 MB 5.0 MB 5.6 MB 5.0 MB 67.1 MB 77.6 MB 72.4 MB 43.8 MB 42.7 MB 43.3 MB Ours 2.9 MB 3.9 MB 3.4 MB 2.2 MB 2.4 MB 2.9 MB 2.8 MB 2.6 MB 19.0 MB 14.3 MB 16.8 MB 12.9 MB 14.4 MB 13.7 MB
+> tcomm  Baselines 5.284 min 7.891 min 6.588 min 24.172 min 27.112 min 31.908 min 22.441 min 26.408 min T/O T/O T/O T/O T/O T/O KISS-Matcher 7.738 sec 11.490 sec 9.682 sec 17.812 sec 15.149 sec 11.621 sec 21.353 sec 16.100 sec 79.390 sec 82.114 sec 81.875 sec 45.212 sec 42.113 sec 43.673 sec Ours 3.449 sec 4.637 sec 4.042 sec 2.616 sec 2.854 sec 3.449 sec 3.330 sec 3.092 sec 22.592 sec 17.003 sec 19.976 sec 15.343 sec 17.122 sec 16.290 sec
+
+robustness under partial trajectory overlap ( ) with non-repetitive scan pattern LiDAR ( ). Notably, these results confirm that Commerge reliably operates across diverse conditions where LiDAR-based perception typically struggles. These conditions include perceptually aliased indoor structures, unstructured outdoor environments, large operational scale, partial trajectory overlap, and non-repetitive scan patterns. 
+
+7.3. Scalability and Transmission Efficiency Analysis 
+
+Next, the top section of Table 4 and Fig. 19 show that our Commerge transmits substantially less data overall compared to the baselines, and also reduces the per-round burst volume compared to KISS-Matcher, which transmits all matched scans at once upon loop detection. Notably, this advantage becomes more pronounced as operational scale increases from Fig. 19(a) to Fig. 19(c), demonstrating that our selective data exchange strategy scales favorably with growing map size and team size. Furthermore, as shown in Fig. 20, our method scales favorably with growing team size. The baselines exhibit steeply stacked growth as each robot continuously transmits all scans (Fig. 20(a)), whereas our method maintains a much lower growth rate with occasional discrete jumps corresponding to the transmission of optimally selected scans (Fig. 20(b)). 
+
+Prepared using sagej.cls 20 Journal Title XX(X)   
+
+> (a)
+> (b) (c) (d)
+
+Corresponding distance 0 < 5 m (e) Map by robot ! Map by robot " Map by robot #
+
+Figure 17. Visualization of map merging results on the WildPlaces dataset (Knights et al. 2023). (a) Full merged map with improved color scheme. (b) Zoomed-in view of the merged result. (c)–(e) Point-to-point corresponding distances between robot pairs: V02-V03 (6 month gap), V03-V04 (8 month gap), and V02-V04 (14 month gap). Elliptical regions in (d) and (e) highlight areas where V04 exhibits larger corresponding distances due to environmental changes over longer temporal gaps.                    
+
+> (a) LT-Mapper (Kim and Kim 2022) (b) ELite (Gil et al. 2025) (c) Uni-Mapper (Kang et al. 2025)
+> (d) LAMM (Wei et al. 2024) (e) KISS-Matcher (Lim et al. 2024) (f) Ours Map by robot !Map by robot "Map by robot #Map by robot $Map by robot %
+
+Figure 18. Multi-robot map merging results on the Botanic Garden dataset acquired with a Livox Avia LiDAR sensor. (a–f) Mapping results from different methods, where colored point clouds represent different robots. The red and purple boxes (cyan boxes) highlight critical overlap regions that should align if inter-robot alignment is successful.  
+
+> Prepared using sagej.cls
+
+Kim et al. 21 0.2 0.4             
+
+> Time step (min) Exchange Data (MB)
+> 24681.0
+> (a) 0.6 1.2
+> 20.0 816 24 32 40
+> Time step (min) Exchange Data (MB) (b) 0.005 0.020 30.00
+> 50.00
+> 10 520 15 30 25 35
+> Baselines
+> Time step (min) Exchange Data (GB) (c)
+
+Figure 19. Exchange data over time for each merging round on the (a) NTU 01-10 (Nguyen et al. 2024), (b) Town 01-03 (Jung et al. 2024), and (c) V02-V03-V04 (Knights et al. 2023) sequences. Exchange Data (MB)  800 600 400 200 16 12 84 
+
+> Time step (min)
+> (a) 8.0 6.0 4.0 2.0 16 12 84
+> Time step (min) (b)
+
+Robot ! Robot " Robot # Robot $ Robot %
+
+Figure 20. Cumulative data exchange from five robots to the server over time on the Kimera-Multi-Outdoor sequence. The colored regions represent individual robot contributions (i.e., from robot α to robot ϵ). (a) Baseline methods, where each robot continuously transmits all scans, result in stacked growth reaching approximately 800 MB. (b) Our method’s communication pattern exhibits a continuous exchange of lightweight SOLiD descriptors (448 bytes per robot per keyframe), resulting in gradual baseline growth, punctuated by four discrete jumps where optimally selected scans are transmitted. 
+
+Table 5. Onboard feasibility across three hardware tiers, 
+
+Jet-Nano , IPC-6000 , and Intel-i7 , on the Town 01-02 
+
+sequence. A checkmark ( ✓) indicates the method executed without Out-of-Memory (OOM); an x mark ( ✗) indicates failure to run due to the OOM.                      
+
+> Hardware Jet-Nano IPC-6000 Intel-i7
+> Method
+> LT-Mapper ✗✗✓
+> ELite ✗✗✗
+> Uni-Mapper ✗✗✗
+> LAMM ✗✗✗
+> KISS-Matcher ✗✓✓
+> Ours ✓✓✓
+
+Overall, Commerge achieves both scalability, along the axes of operational scale and team size, and transmission effi-ciency by avoiding bursty transmission patterns, establishing its suitability for large-scale multi-robot deployment. 
+
+7.4. Communication and Resource Efficiency Analysis 
+
+Finally, the bottom section of Table 4 and Table 5demonstrate the resource efficiency of our Commerge. Owing to the substantially reduced data volume, our method achieves the shortest communication time tcomm across  
+
+> (a) (b)
+
+Figure 21. Comparison of peak RAM usage (x-axis) and total exchange data sent to the server (y-axis, both in log scale) for different map merging methods on Intel-i7 
+
+across two datasets: (a) Kimera-Multi-Outdoor (VLP-16) and (b) HeLiPR (OS2-128). In (b), several baseline methods are not shown as they encountered OOM failures due to the GB-level data scale exceeding available memory capacity. 4.0 3.0 2.0 1.0 0.3 0.2     
+
+> RAM consumption (GB)
+> (a) 28.0 26.0 8.0 6.0 1.5 1.0 (b) LT Mapper ELite
+> Uni-Mapper LAMM Ours
+> KISS-Matcher
+
+Figure 22. RAM consumption of each method across merging rounds on the (a) Kimera-Multi-Outdoor (Tian et al. 2023) and (b) Town (Jung et al. 2024) sequences. 
+
+all sequences without time out (T/O), while the minimal memory footprint enables deployment even on embedded platforms such as Jet-Nano , where all baseline methods fail due to Out-of-Memory (OOM). Specifically, as shown in Figs. 21 and 22, the minimal exchange data volume of our Commerge leads to the smallest peak RAM consumption, avoiding the OOM failures encountered by the baselines. Taken together, these findings confirm that Commerge is communication- and resource-efficient, enabling reliable deployment even on resource-constrained embedded plat-forms.  
+
+> Prepared using sagej.cls
+
+22 Journal Title XX(X) 
+
+8. Practicality 
+
+Building on the analysis in Section 7, we further validate the practicality of our Commerge on in-house datasets under two complementary settings. First, we evaluate robustness under emulated network degradation in harsh environments where deploying real wireless infrastructure is infeasible. Since centralized systems often fail to provide fair comparisons in real-world deployments due to system-level failures (Tian et al. 2023), we compare against the recent distributed system Multi-Proxy (Wang et al. 2026) under identical NetEm-based degradation (Hemminger 2005). Second, we verify the end-to-end operability of Commerge on an actual wireless communication infrastructure constructed with real access points (Section 6.5). 
+
+8.1. Evaluation under Emulated Network Degradation 
+
+First, as shown in Figs. 23 and 24, our Commerge success-fully performs map merging under various communication degradation scenarios, including network delay, bandwidth limitation, and packet loss. This robustness stems from the compactness of our descriptor: as shown in Table 6, SOLiD occupies only 448 B per descriptor, whereas Multi-Proxy transmits 1,585 B. Since a smaller descriptor fits within fewer network packets, it is inherently less susceptible to bandwidth saturation and packet loss. Consequently, under mild conditions (i.e., 2 ms delay, ≤20 Mbit/s bandwidth, and 10% packet loss), both methods experience no descriptor drop since their packets are delivered within the available network budget. However, as the degradation intensifies (i.e., 2,000 ms delay, ≤2 Mbit/s bandwidth, and 50% packet loss), the larger descriptors of Multi-Proxy are more likely to be truncated or lost during transmission, resulting in substantially higher drop rates than our method (e.g., 92.52% vs. 62.64% drop under 2 Mbit/s bandwidth, and 99.43% vs. 75.91% drop under 50% packet loss), leaving our method with a sufficient pool of surviving descriptors to recover successful map merging. Overall, Commerge remains practically operable under realistic network impairments that typically disrupt multi-robot mapping systems. 
+
+8.2. Evaluation on Real Wireless Infrastructure 
+
+In addition, as shown in Figs. 25 and 26, our method also operates reliably on the real wireless infrastructure described in Section 6.5, where Figs. 25 and 26 present the per-robot and server-side merged maps, respectively. Notably, despite the non-line-of-sight (NLOS) conditions caused by indoor walls in Fig. 26(a) and by outdoor buildings in Fig. 26(b), which induce the disconnection and packet drops reported in Table 7, our Commerge still achieves successful map merging in both environments. Taken together, these findings confirm the end-to-end deployability of Commerge on practical wireless networks, validating its readiness for real-world multi-robot missions. 
+
+9. Ablation Studies 
+
+In addition, we conduct ablation studies along three axes. First, we analyze the contribution of each stage       
+
+> Table 6. Average descriptor size and drop ratio under various network degradation conditions on the INHA-
+
+Planetary                                                  
+
+> dataset. Drop ratio is defined as the percentage of descriptors that fail to be successfully delivered. A lower value indicates better communication robustness.
+> Method Multi-Proxy (Wang et al. 2026) Proposed Avg. descriptor size [B] ↓1,585 448
+> Drop ratio [%]  ↓ Delay (2 ms) 00Delay (2,000 ms) 2.54 0.31
+> Bandwidth ( ≤20 Mbit/s) 00Bandwidth ( ≤2 Mbit/s) 92.52 62.64
+> Packet loss (10%) 00Packet loss (50%) 99.43 75.91
+> Table 7. Descriptor dropout statistics under real communication conditions on the INHA dataset. Total scans transmitted by each robot ( ) and successfully received by the server ( ) are reported, along with the resulting dropout ratio.
+> Sequence Indoor Outdoor
+> Robot robot αrobot βrobot γrobot αrobot β
+> Total scans ( )3,265 2,050 1,346 7,204 5,773 Total scans ( )2,326 1,876 1,234 2,029 1,541 Dropout ratio [%] 28.8 8.5 8.3 71.8 73.3
+
+in our three-stage loop closure selection pipeline through (iii) sequential matching, (iv) balanced vertex cover, and (v) maximum edge-weighted clique selection on datasets ranging from the small-scale NTU to the large-scale Town 
+
+sequences (Section 9.1). Second, we verify the robustness of our Commerge framework through (vi) descriptor-agnostic applicability on the Kimera-Multi-Outdoor sequence, where multi-robot partial trajectory overlap ( ) causes Scan Context-based methods such as LT-Mapper and ELite to fail, and (vii) reliability across mission duration on the large-scale HeLiPR Town sequence (Section 9.2). Finally, we validate the choice of constituent modules through (i) place recognition performance on the MCD NTU sequences acquired with non-repetitive scan pattern LiDAR ( )and (ii) registration performance on the Kimera-Multi-
+
+Tunnel sequence, where repetitive geometric features make registration particularly challenging (Section 9.3). 
+
+9.1. Stage-wise Contribution of the Three-Stage Pipeline 
+
+9.1.1. Sequential Matching First, as shown in Fig. 27, we compare our sequential matching stage with the SeqSLAM-based adaptive loop closure detection pipeline of AutoMerge (Yin et al. 2023), which refines candidate win-dows via K-means clustering and RANSAC-based geomet-ric verification. While AutoMerge retains many low-value candidates and yields a dense affinity pattern (Fig. 27(a)), our method produces a substantially sparser and more struc-tured affinity matrix (Fig. 27(b)), reducing exchange data from 934.1 MB to 232.9 MB and runtime from 1,943.714 sec to 1.070 sec, while also improving ermse from 5.727 m to 2.988 m. Therefore, our sequential matching stage selects fewer but more reliable loop closure candidates, jointly improving  
+
+> Prepared using sagej.cls
+
+Kim et al. 23 Delay = 10 ms Delay = 2,000 ms 
+
+0 20m  
+
+> (a) Multi-Proxy (Wang et al. 2026)
+
+Delay = 10 ms Delay = 2,000 ms (b) Proposed Bandwidth ≤ 20 Mbit/s Bandwidth ≤ 2 Mbit/s  
+
+> (c) Multi-Proxy (Wang et al. 2026)
+
+Bandwidth ≤ 20 Mbit/s Bandwidth ≤ 2 Mbit/s (d) Proposed Packet loss = 10% Packet loss = 50%  
+
+> (e) Multi-Proxy (Wang et al. 2026)
+
+Packet loss = 10% Packet loss = 50% (f) Proposed Map by robot ! Map by robot "
+
+Figure 23. Qualitative comparison with Multi-Proxy (Wang et al. 2026) under network degradation simulated via NetEm (Hemminger 2005) on the planetary terrain dataset. (a)–(b) Network delay (10 ms vs. 2,000 ms), (c)–(d) bandwidth limitation ( ≤20 Mbit/s vs. 
+
+≤2 Mbit/s), (e)–(f) packet loss (10% vs. 50%). Green and red boxes indicate successful and failed merging.  
+
+> Prepared using sagej.cls
+
+24 Journal Title XX(X) 0 10m        
+
+> (a) (b) (c) (d) (e) Map by robot !Map by robot "
+
+Figure 24. Multi-robot map merging results on a subterranean cave dataset under various network conditions. (a) Before map merging. (b) Map merging without network degradation. (c) Map merging under 2000 ms delay. (d) Map merging under 2 Mbit/s bandwidth limit. (e) Map merging under 50% packet loss. 0 10m 
+
+> (a)
+
+0 60m (b) Map by robot ! Map by robot " Map by robot #
+
+Figure 25. Multi-robot map merging results on the (a) INHA-Indoor and (b) INHA-Outdoor . Left: individual robot maps before merging. Right: merged map produced by Commerge. 0 10m 
+
+> (a)
+
+0 60m (b) Map by robot ! Map by robot " Map by robot #
+
+Figure 26. Multi-robot map merging results on the (a) INHA-Indoor and (b) INHA-Outdoor datasets, where each robot transmits its data to the server over a real wireless network and the server performs map merging using the received data. Left: individual robot maps before merging. Right: merged map produced by Commerge. The icon indicates the actual location of the server on each map, where signals are blocked by walls or buildings, causing non-line-of-sight (NLOS)-induced disconnection and dropout.  
+
+> Prepared using sagej.cls
+
+Kim et al. 25 Exchange data: 934.1 MB Runtime: 1943.714 sec    
+
+> (a) AutoMerge (Yin et al. 2023) Exchange data: 232.9 MB Runtime: 1.070 sec (b) Proposed
+
+Figure 27. Sequential matching comparison on the HeLiPR dataset (Jung et al. 2024) between (a) AutoMerge (Yin et al. 2023) and (b) our proposed method. For each method, the left panel shows the affinity matrix where the highlighted box indicates the sequentially matched region, and the right panel shows the merged submap constructed from the submaps of robot α and robot β
+
+corresponding to the selected region. 
+
+Table 8. Ablation study on the three-stage loop closure selection pipeline. Each row incrementally adds a stage to the baseline sequential matching ( ): balanced vertex cover ( ), maximum edge-weighted clique ( ), and their combination. We utilize map merging accuracy ( ermse ), computation time ( tcomm ), and data exchange volume ( dexch ) as evaluation metrics.                                          
+
+> (a) NTU 01-10 (Nguyen et al. 2024)
+> Evaluation ermse tcomm dexch
+> 1.826 m 24.137 sec 20.3 MB +2.148 m 14.268 sec 12.0 MB +1.792 m131.141 sec 3.9 MB
+> ++1.792 m4.637 sec 3.9 MB
+> (b) Town 01-03 (Jung et al. 2024)
+> Evaluation ermse tcomm dexch
+> 2.988 m 276.932 sec 232.9 MB +3.464 m 140.190 sec 117.9 MB +2.887 m283,637.921 sec 209.8 MB ++3.005 m 17.122 sec 14.4 MB
+
+communication efficiency, computational cost, and down-stream alignment accuracy. 
+
+9.1.2. Balanced Vertex Cover and Maximum Edge-Weighted Clique Selection Next, Table 8 and Figs 28 and 29 analyze the contribution of the remaining two stages, (balanced vertex cover) and (maximum edge-weighted clique selection), on top of sequential matching ( ). As described in Section 4.4, regulates per-robot contribution via entropy-based balance constraints to avoid the monologue problem inherent in standard MVC. As reported in Tables 8(a) and 8(b), the + configuration consistently reduces both tcomm and dexch compared to 
+
+alone, confirming that effectively regulates the per-robot transmission load. Likewise, as described in Section 4.5, incorporates descriptor similarity as edge weights to select a more distinctive and reliable subset among geometrically valid candidates, instead of treating all compatible loops equally as in a standard maximum clique. As reported in Tables 8(a) and 8(b), the + configuration achieves the lowest ermse and dexch but incurs prohibitive tcomm (e.g., 283,637.921 sec on Town 01-03 ) because the clique search over unfiltered candidates becomes combinatorially expensive. Finally, the full pipeline + + combines the complementary strengths of both stages: regulates the candidate pool to keep the clique search tractable, while 
+
+selects the most reliable subset from the regulated pool. Consequently, the full pipeline attains the best tcomm 
+
+and dexch across both datasets while maintaining ermse 
+
+comparable to the best individual configuration, as further illustrated by the progressive data reduction in Fig. 29 from 100–200 MB (Fig. 29(a)) down to 0.4 MB (Fig. 29(d)) per RMSE  (m)      
+
+> +++
+> (a) +++(b)
+
+: Seq. Matching : BVC : Max. Edge-Weighted Clique 
+
+Figure 28. Box plot analysis of RMSE distribution across different pipeline configurations on (a) MCD NTU 01-10 and (b) HeLiPR Town 01-03 sequences. , , and represent the sequential matching, balanced minimum vertex cover, and maximum edge-weighted clique selection, respectively. The 
+
+∗∗∗∗ annotations indicate measurements with a p-value < 10 −4
+
+after a paired t-test. 
+
+robot, corresponding to a 99.6% reduction in transmission cost while preserving successful map merging. In summary, and play complementary roles in our pipeline, jointly enabling Commerge to achieve minimal communication cost, maximal transmission efficiency, and reliable map merging across both small- and large-scale environments. 
+
+9.2. Robustness of the Commerge Framework 
+
+9.2.1. Descriptor-Agnostic Applicability In addition, Fig. 30 demonstrates that our Commerge remains applicable even when SOLiD is replaced with a weaker descriptor such as Scan Context, which causes LT-Mapper and ELite to fail on the Kimera-Multi-Outdoor sequence due to  
+
+> Prepared using sagej.cls
+
+26 Journal Title XX(X) step (A) step (B) step (C) Robot  !Robot  "       
+
+> Exchange Data 210.9 MB
+> Exchange Data 119.4 MB
+> 00.15km
+> (a) Exchange Data 8.1 MB
+> Exchange Data 9.0 MB
+> 00.001km (b) Exchange Data 4.8 MB
+> Exchange Data 4.1 MB
+> 00.001km (c) Exchange Data 0.3 MB
+> Exchange Data 0.4 MB
+> 00.001km (d)
+
+Figure 29. Submaps and associated exchange data sizes across modules in our framework. (a) From intra-robot SLAM, each robot would require approximately 100 MB–200 MB of exchanged data. The cyan boxes highlight sequentially overlapping regions that are selected in step (A). (b) After sequential matching, i.e., step (A), the exchange volume is reduced to 8.1 MB for robot α and 9.0 MB for robot β. (c) With balanced minimum vertex cover, i.e., step (B), the required data is further reduced to 4.8 MB and 4.1 MB, respectively. (d) Finally, the maximum edge-weighted clique selection, i.e., step (C) reduces the exchanged data to just 0.4 MB per robot. This progressive reduction demonstrates the communication efficiency of our proposed map merging pipeline, achieving an overall 99.6% reduction in transmission cost (from 100 MB–200 MB to 0.4 MB), while still enabling successful submap merging.    
+
+> (a) (b) (c) (d)
+
+Figure 30. Validation of our three-stage optimization with Scan Context descriptors on Kimera-Multi-Outdoor partial overlap scenario to demonstrate the effectiveness of descriptor-agnosticism. (a) Affinity matrix constructed from Scan Context similarities, where sequential matching identifies the optimal cluster (cyan box) representing sequentially coherent inter-robot correspondences despite the less discriminative descriptor. (b)–(c) Carefully selected scans from robot α and robot β extracted through our cascaded optimization, forming a compact submap covering critical overlap, respectively. (d) Final merged map showing successful global alignment across all robots using the Scan Context descriptor. 
+
+partial trajectory overlap ( ). From the Scan Context affinity matrix with the sequentially matched cluster highlighted in Fig. 30(a), our pipeline extracts scans from robot α (Fig. 30(b)) and robot β (Fig. 30(c)), and merges the selected submaps into the globally consistent map shown in Fig. 30(d). In other words, the three-stage optimization of Commerge provides robustness independent of the specific descriptor choice, establishing the descriptor-agnostic applicability of our framework. 
+
+9.2.2. Reliability across Mission Duration Furthermore, Table 9 and Fig. 31 evaluate our method across four mission-duration scenarios ( scenario (A) to scenario (D) ), ranging from early stages exploration to fully completed missions. As the mission progresses, the growing intra-robot positional consistency enables our method to select increasingly coherent partial maps, progressively reducing 
+
+ermse while keeping tcomm and dexch bounded regardless of mission length. Overall, Commerge remains reliable across short-, medium-, and long-term operations, achieving robust alignment even without intra-robot loop closures in early stages and maintaining stable communication overhead as missions extend. 
+
+9.3. Module-Level Validation 
+
+9.3.1. Place Recognition Performance Additionally, as shown in Table 10, SOLiD achieves consistently strong performance relative to its descriptor size. While RING++, OSK, and CVTNet also exhibit competitive performance, their descriptor sizes remain substantially larger than that of SOLiD, which occupies only 448 bytes.  
+
+> Prepared using sagej.cls
+
+Kim et al. 27   
+
+> (a) (b)
+> (c) (d)
+
+Map by robot ! Map by robot "
+
+Figure 31. Temporal evolution of map merging quality on HeLiPR Town 01-03 sequence at different mission stages. Each scenario shows the merged global map constructed at the server (top) and the selected submaps transmitted from the robots to the server under the proposed exchange policy (bottom). (a) Both robots after covering the first quarter of the mission (10 min): successful alignment despite neither robot having established intra-robot loop closures yet. (b) Both robots, after completing roughly one-third of the mission (15 min), improved alignment as one robot began to accumulate intra-robot loop closures. (c) Robot α
+
+at roughly one third progress and Robot β already fully mapped: an asymmetric situation similar to multi-session SLAM, where a fully optimized reference map is merged with an ongoing exploration session. (d) Both robots have completed the mission with fully converged local maps: optimal alignment with the highest geometric consistency. 
+
+Therefore, SOLiD offers the most favorable trade-off between descriptor compactness and recognition accuracy, justifying its selection as the place recognition module of our Commerge. 
+
+9.3.2. Registration Performance Finally, as shown in Table 11, KISS-Matcher alone does not achieve the most robust scan-level registration performance. However, owing to its fast runtime, KISS-Matcher can be complemented with G-ICP or PLANE-ICP in a coarse-to-fine manner while still maintaining comparable or faster runtime than the baselines. Specifically, KISS-Matcher combined with PLANE-ICP attains the highest success rate on three out of four sequences, confirming the effectiveness of the coarse-to-fine strategy. Furthermore, in our map-level registration setting, this runtime advantage becomes even more pronounced, and the robustness gain is further amplified, justifying the choice of KISS-Matcher as the registration module of our Commerge.  
+
+> Prepared using sagej.cls
+
+28 Journal Title XX(X) Jet-Nano 
+
+IPC-6000 
+
+Intel-i7 
+
+(a) Jet-Nano 
+
+IPC-6000 
+
+Intel-i7 0.4 0.6 0.8 1.0 1.2 (b) Sequential Matching Balanced Vertex Cover Maximum Edge-Weighted Clique Submap-based Map Merging 
+
+Figure 32. Execution time breakdown across hardware platforms ( Intel-i7 : Intel i7, IPC-6000 : IPC-6000, Jet-Nano : Jetson Nano) and operational scales: (a) small-scale NTU 01-10 and (b) large-scale Town 01-03 sequences. 
+
+Table 9. Temporal evolution of map merging performance on HeLiPR Town 01-03 sequence across four mission scenarios. scenario (A), scenario (B), scenario (C), and scenario (D) indi-cate both robots at the first quarter (10 min) without intra-robot loops, both at one-third (15 min) with emerging loops, one robot at one-third and the other complete, and both missions complete with fully optimized local maps, respectively. 
+
+Evaluation ermse tcomm dexch Method  scenario (A) 3.867 m 13.555 sec 11.4 MB 
+
+scenario (B) 3.653 m 25.803 sec 21.7 MB 
+
+scenario (C) 3.129 m 20.451 sec 17.2 MB 
+
+scenario (D) 3.005 m 17.122 sec 14.4 MB 
+
+Table 10. Place recognition performance comparison on MCD dataset (Nguyen et al. 2024) with non-repetitive scan pattern LiDAR sensor (Livox Mid-70). Descriptors are evaluated on two sequences ( NTU 01-02 and NTU 01-10 ).                                                                                 
+
+> Method Size [B] ↓Recall@1 ↑AUC score ↑F1 max ↑
+> NTU 01-02
+> Histogram 928 0.422 0.330 0.376 M2DP 1,664 0.338 0.136 0.384 Scan Context 10,016 0.175 0.017 0.113 RING++ 345,728 0.787 0.454 0.417 OSK 1,600 0.557 0.404 0.522 OverlapTransformer 1,152 0.206 0.067 0.112 LoGG3D-Net 2,176 0.508 0.387 0.480 CVTNet 3,200 0.528 0.481 0.486 SOLiD 448 0.587 0.587 0.608
+> NTU  01-10
+> Histogram 928 0.299 0.449 0.502 M2DP 1,664 0.199 0.214 0.377 Scan Context 10,016 0.092 0.026 0.169 RING++ 345,728 0.471 0.801 0.712
+> OSK 1,600 0.347 0.540 0.605 OverlapTransformer 1,152 0.206 0.067 0.112 LoGG3D-Net 2,176 0.288 0.475 0.512 CVTNet 3,200 0.354 0.479 0.504 SOLiD 448 0.351 0.740 0.689
+
+10. Runtime Analysis 
+
+Finally, we investigate the runtime of our Commerge to demonstrate its computational efficiency across different hardware platforms: resource-constrained embedded sys-tem ( Jet-Nano ), industrial mini PC ( IPC-6000 ), and high-performance workstation ( Intel-i7 ). On small-scale sequences, our Commerge demon-strates real-time feasibility across all hardware platforms (Fig. 32(a)). In contrast, large-scale HeLiPR sequences exhibit exponential time increases with decreasing hard-ware capability, indicating that real-time execution remains challenging on IPC-6000 and Jet-Nano platforms (Fig. 32(b)). It is noteworthy that despite extended execution times on resource-constrained platforms, all hardware tiers 
+
+Table 11. Scan-level registration performance evaluation on Kimera-Multi-Tunnel . STD fails to provide reliable correspondences (N/A) due to the lack of distinctive features and repetitive indoor structures.                                                                                                                   
+
+> Method RTE [m] ↓RRE [°] ↓Success Rate [ %]↑
+> A01-A02
+> STD N/A N/A N/A RING++ 0.461 1.737 84.639 BEVPlace++ 0.948 1.431 80.120 G-ICP 0.186 1.166 43.173 PLANE-ICP 0.189 1.429 38.253 Predator 0.186 1.766 76.205 KISS-Matcher 0.266 2.660 47.590 KISS-Matcher + G-ICP 0.181 1.405 88.755 KISS-Matcher + PLANE-ICP 0.190 1.128 89.056
+> A01-AP01
+> STD N/A N/A N/A RING++ 0.554 1.939 74.301
+> BEVPlace++ 0.992 1.732 58.635 G-ICP 0.223 1.183 32.490 PLANE-ICP 0.233 1.406 30.493 Predator 0.342 2.506 33.023 KISS-Matcher 0.404 2.899 18.375 KISS-Matcher + G-ICP 0.377 1.528 65.113 KISS-Matcher + PLANE-ICP 0.313 1.284 65.379
+> A01-H01
+> STD N/A N/A N/A RING++ 0.668 1.710 73.360 BEVPlace++ 1.006 1.261 70.738 G-ICP 0.160 0.927 41.098 PLANE-ICP 0.193 1.414 31.593 Predator 0.203 1.662 73.628 KISS-Matcher 0.287 2.720 45.382 KISS-Matcher + G-ICP 0.220 1.595 82.062 KISS-Matcher + PLANE-ICP 0.209 1.146 84.605
+> A01-S02
+> STD N/A N/A N/A RING++ 0.606 1.914 63.600 BEVPlace++ 1.027 1.516 58.501 G-ICP 0.186 1.256 32.800 PLANE-ICP 0.241 1.546 25.067 Predator 0.286 2.081 55.333 KISS-Matcher 0.463 2.913 23.867 KISS-Matcher + G-ICP 0.268 1.840 67.867 KISS-Matcher + PLANE-ICP 0.305 1.355 69.733
+
+successfully complete map merging without OOM or T/O, demonstrating deployability even on embedded systems. 
+
+11. Conclusion 
+
+This paper presents Commerge , a communication-efficient multi-robot LiDAR map merging framework that achieves bandwidth reduction through graph-theoretic selective data exchange. The key insight is that only a small subset of carefully selected scans is sufficient for robust map merging. Building on this principle, our method transmits MB-scale data instead of complete GB-scale datasets while preserving alignment accuracy in large-scale and long-term missions. Extensive evaluation on five public datasets demonstrates up to 99.98 % reduction in data exchange with competitive alignment performance across embedded to desktop platforms. Furthermore, evaluations on our in-house datasets, covering subterranean cave, planetary-analog, and campus indoor/outdoor environments under 
+
+Prepared using sagej.cls Kim et al. 29 
+
+both NetEm-emulated network degradation and real wireless infrastructure with non-line-of-sight conditions, confirm the practical deployability of Commerge in realistic multi-robot missions. Despite these encouraging results, there is further space for improvement. Although our method operates across diverse hardware platforms, execution time on resource-constrained systems remains a practical limitation for large-scale scenarios. Future work will focus on optimizing the sequential matching stage, which dominates computational cost, to enable real-time map merging on embedded platforms. In addition, we plan to extend Commerge toward a fully decentralized system that removes the reliance on a central server in communication-restricted environments. 
+
+12. Funding 
+
+This work was supported by National Research Foundation of Korea (NRF) grant (No. RS-2026-2555148 and RS-2025-02217000) and Institute of Information & communications Technology Planning & Evaluation (IITP) grant (RS-2022-II220448) funded by the Korea government(MSIT). 
+
+References 
+
+Ao S, Hu Q, Wang H, Xu K and Guo Y (2023) BUFFER: Balancing accuracy, efficiency, and generalizability in point cloud registration. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 1255– 1264. Arandjelovic R, Gronat P, Torii A, Pajdla T and Sivic J (2016) NetVLAD: CNN architecture for weakly supervised place recognition. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pp. 5297– 5307. Arm P, Waibel G, Preisig J, Tuna T, Zhou R, Bickel V, Ligeza G, Miki T, Kehl F, Kolvenbach H and others (2023) Scientific exploration of challenging planetary analog environments with a team of legged robots. Science Robotics 8(80): eade9548. Bernreiter L, Ott L, Nieto J, Siegwart R and Cadena C (2021) PHASER: A robust and correspondence-free global pointcloud registration. IEEE Robotics and Automation Letters 6(2): 855– 862. Besl PJ and McKay ND (1992) Method for registration of 3-D shapes. In: Sensor Fusion IV: Control Paradigms and Data Structures, volume 1611, pp. 586–606. Best G, Garg R, Keller J, Hollinger GA and Scherer S (2024) Multi-robot, multi-sensor exploration of multifarious environments with full mission aerial autonomy. The International Journal of Robotics Research 43(4): 485–512. Burgard W, Moors M, Stachniss C and Schneider FE (2005) Coordinated multi-robot exploration. IEEE Transactions on Robotics 21(3): 376–386. Cao Y, Wang Y and Chen H (2025) Real-time LiDAR point cloud compression and transmission for resource-constrained robots. In Proceedings of the IEEE International Conference on Robotics and Automation (ICRA), pp. 12789–12795. Chang Y, Ebadi K, Denniston CE, Ginting MF, Rosinol A, Reinke A, Palieri M, Shi J, Chatterjee A, Morrell B and others (2022) LAMP 2.0: A robust multi-robot SLAM system for operation in challenging large-scale underground environments. IEEE Robotics and Automation Letters 7(4): 9175–9182. Chang G, Shen H, Hui Y, Zhang X, Lu J, Lu H and Tian B (2025) LiDAR-based decentralized collaborative localization and mapping for multi-UAV with stable triangle descriptor. IEEE Transactions on Instrumentation and Measurement. Cieslewski T and Scaramuzza D (2017) Efficient decentralized visual place recognition using a distributed inverted index. IEEE Robotics and Automation Letters 2(2): 640–647. Cieslewski T, Choudhary S and Scaramuzza D (2018) Data-efficient decentralized visual SLAM. In: Proceedings of the 2018 IEEE International Conference on Robotics and Automation (ICRA), pp. 2466–2473. Cort´ es J and Egerstedt M (2017) Coordinated control of multi-robot systems: A survey. SICE Journal of Control, Measurement, and System Integration 10(6): 495–503. Cover TM (1999) Elements of Information Theory . John Wiley & Sons. Damigos G, Stathoulopoulos N, Koval A, Lindgren T, Niko-lakopoulos G (2024) Communication-Aware Control of Large Data Transmissions via Centralized Cognition and 5G Net-works for Multi-Robot Map Merging. Journal of Intelligent & Robotic Systems 110(1): 22. De Queiroz RL and Chou PA (2016) Compression of 3D point clouds using a region-adaptive hierarchical transform. IEEE Transactions on Image Processing 25(8): 3947–3956. Dellaert F (2012) Factor graphs and GTSAM: A hands-on introduction. Technical Report GT-RIM-CP&R-2012-002, Georgia Institute of Technology. Fischler MA and Bolles RC (1981) Random sample consensus: A paradigm for model fitting with applications to image analysis and automated cartography. Communications of the ACM 24(6): 381–395. Formis G, Scanzio S, Cena G, Valenzano A (2023) Predicting wireless channel quality by means of moving averages and regression models. In: Proceedings of the 19th IEEE International Conference on Factory Communication Systems (WFCS), pp. 1–8. Giamou M, Khosoussi K and How JP (2018) Talk resource-efficiently to me: Optimal communication planning for distributed loop closure detection. In: Proceedings of the 2018 IEEE International Conference on Robotics and Automation (ICRA), pp. 3841–3848. Gielis J, Shankar A, Prorok A (2022) A Critical Review of Communications in Multi-Robot Systems. Current Robotics Reports 3(4): 213–225. Gil H, Lee D, Kim G and Kim A (2025) Ephemeral-ity meets LiDAR-based lifelong mapping. arXiv preprint arXiv:2502.13452. Graziosi D, Nakagami O, Kuma S, Zaghetto A, Suzuki T and Tabatabai A (2020) An overview of ongoing point cloud compression standardization activities: Video-based (V-PCC) and geometry-based (G-PCC). APSIPA Transactions on Signal and Information Processing 9: e13. Grupp M (2017) evo: Python package for the evaluation of odometry and SLAM. Available at: https://github. com/MichaelGrupp/evo .He D, Xu W, Zhang F (2021) Kalman filters on differentiable manifolds. arXiv preprint arXiv:2102.03804.  
+
+> Prepared using sagej.cls
+
+30 Journal Title XX(X) 
+
+He K, Jia R, Hong H, Wang N and Hu Y (2025) LDG-CSLAM: Multi-robot collaborative SLAM based on curve analysis, normal distribution, and factor graph optimization. Journal of Field Robotics. Hemminger S (2005) Network emulation with NetEm. In: Proceedings of Linux Conf Au, vol. 5. Huang S, Gojcic Z, Usvyatsov M, Wieser A and Schindler K (2021) Predator: Registration of 3D point clouds with low overlap. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 4267–4276. Huang Y, Shan T, Chen F and Englot B (2021) Disco-SLAM: Distributed scan context-enabled multi-robot LiDAR SLAM with two-stage global-local graph optimization. IEEE Robotics and Automation Letters 7(2): 1150–1157. Jeong S, Kim H and Cho Y (2025) MARSCalib: Multi-robot, Automatic, Robust, Spherical Target-based Extrinsic Calibration in Field and Extraterrestrial Environments. arXiv preprint arXiv:2507.17130. Jung M, Yang W, Lee D, Gil H, Kim G and Kim A (2024) HeLiPR: Heterogeneous LiDAR dataset for inter-LiDAR place recognition under spatiotemporal variations. The International Journal of Robotics Research 43(12): 1867–1883. Kang G, Kim H, Choi B, Jeong S, Shin Y-S and Cho Y(2025) Uni-Mapper: Unified Mapping Framework for Multi-modal LiDARs in Complex and Dynamic Environments. IEEE Transactions on Intelligent Vehicles. Kelly FP, Maulloo AK, Tan DKH (1998) Rate Control for Communication Networks: Shadow Prices, Proportional Fairness and Stability. Journal of the Operational Research Society 49(3): 237–252. Khamis A, Hussein A and Elmogy A (2015) Multi-robot task allocation: A review of the state-of-the-art. In: Cooperative Robots and Sensor Networks 2015, pp. 31–51. Kim G and Kim A (2018) Scan Context: Egocentric spatial descriptor for place recognition within 3D point cloud map. In: Proceedings of the 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pp. 4802–4809. Kim G, Park YS, Cho Y, Jeong J and Kim A (2020) Mulran: Multimodal range dataset for urban place recognition. In: Proceedings of the 2020 IEEE International Conference on Robotics and Automation (ICRA), pp. 6246–6253. Kim G and Kim A (2022) LT-Mapper: A modular framework for LiDAR-based lifelong mapping. In: Proceedings of the 2022 IEEE International Conference on Robotics and Automation (ICRA), pp. 7995–8002. Kim J, Kim H, Jeong S, Shin Y, Cho Y (2025) DiTer++: Diverse terrain and multi-modal dataset for multi-robot SLAM in multi-session environments. In: Proceedings of the IEEE International Conference on Robotics and Automation (ICRA), pp. 12187–12193. Kim H, Choi J, Sim T, Kim G and Cho Y (2024) Narrowing your FOV with SOLiD: Spatially organized and lightweight global descriptor for FOV-constrained LiDAR place recognition. IEEE Robotics and Automation Letters. Kim H, Choi J, Kim J, Yang G, Cho D, Lim H and Cho Y (2025) SKiD-SLAM: Robust, Lightweight, and Distributed Multi-Robot LiDAR SLAM in Resource-Constrained Field Environments. arXiv preprint arXiv:2505.08230. Knights J, Vidanapathirana K, Ramezani M, Sridharan S, Fookes C and Moghadam P (2023) WILD-Places: A large-scale dataset for LiDAR place recognition in unstructured natural environments. In: Proceedings of the 2023 IEEE International Conference on Robotics and Automation (ICRA), pp. 11322–11328. Ko J, Stewart B, Fox D, Konolige K and Limketkai B (2003) A practical, decision-theoretic approach to multi-robot mapping and exploration. In: Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2003) ,Vol. 4, pp. 3232–3238. Koide K, Yokozuka M, Oishi S and Banno A (2021) Voxelized GICP for fast and accurate 3D point cloud registration. In: 2021 IEEE International Conference on Robotics and Automation (ICRA), pp. 11054–11059. Koide K (2024) small gicp: Efficient and parallel algorithms for point cloud registration. Journal of Open Source Software 9(100): 6948. doi:10.21105/joss.06948. Kulkarni A, Seetharam A, Ramesh A, Herath JD (2019) DeepChannel: Wireless Channel Quality Prediction Using Deep Learning. IEEE Transactions on Vehicular Technology 69(1): 443–456. Lajoie P-Y, Ramtoula B, Wu F, Beltrame G (2022) Towards Collaborative Simultaneous Localization and Mapping: ASurvey of the Current Research Landscape. Field Robotics 2: 971–1000. Lajoie P-Y and Beltrame G (2023) Swarm-SLAM: Sparse decentralized collaborative simultaneous localization and mapping framework for multi-robot systems. IEEE Robotics and Automation Letters 9(1): 475–482. Lajoie P-Y, Ramtoula B, De Martini D and Beltrame G (2025) 3D foundation model-based loop closing for decentralized collaborative SLAM. IEEE Robotics and Automation Letters. Lajoie P-Y, Soma K, Bong HM, Lemieux-Bourque A, Zhang R, Varadharajan VS and Beltrame G (2025) Multi-robot decentralized collaborative SLAM in planetary analogue environments: Dataset, challenges, and lessons learned. IEEE Transactions on Field Robotics. Lim H, Kim D, Shin G, Shi J, Vizzo I, Myung H, Park J and Carlone L (2024) KISS-Matcher: Fast and robust point cloud registration revisited. arXiv preprint arXiv:2409.15615. Lim H, Kim D, Myung H (2025) Multi-Mapcher: Loop Closure Detection-Free Heterogeneous LiDAR Multi-Session SLAM Leveraging Outlier-Robust Registration for Autonomous Vehicles. arXiv preprint arXiv:2511.00635. Liu Y, Fu Y, Qin M, Xu Y, Xu B, Chen F, Goossens B, Sun PZ, Yu H, Liu C and others (2024) BotanicGarden: A high-quality dataset for robot navigation in unstructured natural environments. IEEE Robotics and Automation Letters 9(3): 2798–2805. Liu J, Xu X, Lu S, Wang S, Wang C, Xiong R and Wang Y (2025) Sparse hierarchical LiDAR bundle adjustment for online collaborative localization and mapping. IEEE Robotics and Automation Letters. Luo L, Cao S-Y, Li X, Xu J, Ai R, Yu Z and Chen X (2025) BEVPlace++: Fast, robust, and lightweight LiDAR global localization for unmanned ground vehicles. IEEE Transactions on Robotics. Ma J, Zhang J, Xu J, Ai R, Gu W and Chen X (2022) OverlapTransformer: An efficient and yaw-angle-invariant  
+
+> Prepared using sagej.cls
+
+Kim et al. 31 
+
+transformer network for LiDAR-based place recognition. IEEE Robotics and Automation Letters 7(3): 6958–6965. Ma J, Xiong G, Xu J and Chen X (2023) CVTNet: A cross-view transformer network for LiDAR-based place recognition in autonomous driving environments. IEEE Transactions on Industrial Informatics 20(3): 4039–4048. Madridano A, Al-Kaff A, Mart´ ın D and De La Escalera A (2021) Trajectory planning for multi-robot systems: Methods and applications. Expert Systems with Applications 173: 114660. Mangelson JG, Dominic D, Eustice RM and Vasudevan R (2018) Pairwise consistent measurement set maximization for robust multi-robot map merging. In: Proceedings of the 2018 IEEE International Conference on Robotics and Automation (ICRA), pp. 2916–2923. Milford MJ and Wyeth GF (2012) SeqSLAM: Visual route-based navigation for sunny summer days and stormy winter nights. In: Proceedings of the 2012 IEEE International Conference on Robotics and Automation (ICRA), pp. 1643–1649. Nguyen T-M, Yuan S, Nguyen TH, Yin P, Cao H, Xie L, Wozniak M, Jensfelt P, Thiel M, Ziegenbein J and others (2024) MCD: Diverse large-scale multi-campus dataset for robot perception. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 22304–22313. Oishi S, Inoue Y, Miura J and Tanaka S (2019) SeqSLAM++: View-based robot localization and navigation. Robotics and Autonomous Systems 112: 13–21. Orr J and Dutta A (2023) Multi-agent deep reinforcement learning for multi-robot applications: A survey. Sensors 23(7): 3625. Pomerleau F, Colas F, Siegwart R and Magnenat S (2013) Comparing ICP variants on real-world data sets: Open-source library and experimental protocol. Autonomous Robots 34(3): 133–148. Roy N and Dudek G (2001) Collaborative robot exploration and rendezvous: Algorithms, performance bounds and observa-tions. Autonomous Robots 11(2): 117–136. Schmuck P, Ziegler T, Karrer M, Perraudin J and Chli M (2021) COVINS: Visual-inertial SLAM for centralized collaboration. In: Proceedings of the IEEE International Symposium on Mixed and Augmented Reality Adjunct (ISMAR-Adjunct) ,pp. 171–176. Schrijver A (2003) Combinatorial Optimization: Polyhedra and Efficiency. Algorithms and Combinatorics, vol. 24. Segal A, Haehnel D and Thrun S (2009) Generalized-ICP. In: Robotics: Science and Systems (RSS). Seattle, WA, USA, pp. 435. Seo M, Lim H, Lee K, Carlone L and Park J (2025) BUFFER-X: Towards zero-shot point cloud registration in diverse scenes. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), pp. 3851–3862. Shannon CE (1948) A Mathematical Theory of Communication. The Bell System Technical Journal 27(3): 379–423. Shi J, Yang H and Carlone L (2021) ROBIN: A graph-theoretic approach to reject outliers in robust estimation using invariants. In: Proceedings of the 2021 IEEE International Conference on Robotics and Automation (ICRA), pp. 13820–13827. Siam SM and Zhang H (2017) Fast-SeqSLAM: A fast appearance based place recognition algorithm. In: Proceedings of the 2017 IEEE International Conference on Robotics and Automation (ICRA), pp. 5702–5708. Stathoulopoulos N, Koval A, Agha-mohammadi A-A and Nikolakopoulos G (2023) Frame: Fast and robust autonomous 3D point cloud map-merging for egocentric multi-robot exploration. arXiv preprint arXiv:2301.09213. Stathoulopoulos N, Lindqvist B, Koval A, Agha-Mohammadi AA and Nikolakopoulos G (2024) FRAME: A modular framework for autonomous map-merging: Advancements in the field. IEEE Transactions on Field Robotics. Stathoulopoulos N, Koval A and Nikolakopoulos G (2024) 3DEG: Data-driven descriptor extraction for global re-localization in subterranean environments. Expert Systems with Applications 237: 121508. Stathoulopoulos N, Kanellakis C and Nikolakopoulos G (2025) A minimal subset approach for informed keyframe sampling in large-scale SLAM. IEEE Robotics and Automation Letters 11(1): 738–745. Tian Y, Chang Y, Quang L, Schang A, Nieto-Granda C, How JP, Carlone L (2023) Resilient and Distributed Multi-Robot Visual SLAM: Datasets, Experiments, and Lessons Learned. arXiv preprint arXiv:2304.04362. Tian Y, Khosoussi K, Giamou M, How JP and Kelly J (2018) Near-optimal budgeted data exchange for distributed loop closure detection. arXiv preprint arXiv:1806.00188. Tian Y, Khosoussi K and How JP (2021) A resource-aware approach to collaborative loop-closure detection with provable performance guarantees. The International Journal of Robotics Research 40(10–11): 1212–1233. Umeyama S (1991) Least-squares estimation of transformation parameters between two point patterns. IEEE Transactions on Pattern Analysis and Machine Intelligence 13(4): 376–380. Uy MA and Lee GH (2018) PointNetVLAD: Deep point cloud based retrieval for large-scale place recognition. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pp. 4470–4479. Vidanapathirana K, Ramezani M, Moghadam P, Sridharan Sand Fookes C (2022) LoGG3D-Net: Locally guided global descriptor learning for 3D place recognition. In Proceedings of the IEEE International Conference on Robotics and Automation (ICRA), pp. 2215–2221. Wang J, Cai C, Tan J and Chen H (2026) Communication-Robust Asynchronous Distributed LiDAR Collaborative Smoothing and Mapping. IEEE Robotics and Automation Letters. Wang Y, Sun Z, Xu C-Z, Sarma SE, Yang J and Kong H (2020) LiDAR Iris for loop-closure detection. In: Proceedings of the 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pp. 5769–5775. Wei H, Li R, Cai Y, Yuan C, Ren Y, Zou Z, Wu H, Zheng C, Zhou S, Xue K and others (2024) Large-scale multi-session point-cloud map merging. IEEE Robotics and Automation Letters. Xu H, Liu P, Chen X and Shen S (2024) D 2SLAM: Decentralized and distributed collaborative visual-inertial SLAM system for aerial swarm. IEEE Transactions on Robotics 40: 3445–3464. Xu W, Cai Y, He D, Lin J, Zhang F (2022) Fast-LIO2: Fast direct lidar-inertial odometry. IEEE Transactions on Robotics 38(4): 2053–2073. Xu X, Lu S, Wu J, Lu H, Zhu Q, Liao Y, Xiong R and Wang Y (2023) RING++: Roto-translation invariant Gram for global localization on a sparse scan map. IEEE Transactions on Robotics 39(6): 4616–4635.  
+
+> Prepared using sagej.cls
+
+32 Journal Title XX(X) 
+
+Yang J, Li H, Campbell D and Jia Y (2015) Go-ICP: A globally optimal solution to 3D ICP point-set registration. IEEE Transactions on Pattern Analysis and Machine Intelligence 38(11): 2241–2254. Yin P, Zhao S, Lai H, Ge R, Zhang J, Choset H and Scherer S (2023) Automerge: A framework for map assembling and smoothing in city-scale environments. IEEE Transactions on Robotics 39(5): 3686–3704. Yuan C, Lin J, Zou Z, Hong X and Zhang F (2023) STD: Stable triangle descriptor for 3D place recognition. In: Proceedings of the 2023 IEEE International Conference on Robotics and Automation (ICRA), pp. 1897–1903. Yuan C, Lin J, Liu Z, Wei H, Hong X and Zhang F (2024) BTC: A binary and triangle combined descriptor for 3D place recognition. IEEE Transactions on Robotics 40: 1580–1599. Zhang Z, Huang Y, Si S, Zhao C, Li N and Zhang Y(2024) OSK: A novel LiDAR occupancy set key-based place recognition method in urban environment. IEEE Transactions on Instrumentation and Measurement 73: 1–15. Zheng L, Xu K, Jiang J, Wei M, Zhou B and Cheng H (2024) Real-time efficient environment compression and sharing for multi-robot cooperative systems. IEEE Transactions on Intelligent Vehicles. Zhong S, Qi Y, Chen Z, Wu J, Chen H and Liu M (2023) DCL-SLAM: A distributed collaborative LiDAR SLAM framework for a robotic swarm. IEEE Sensors Journal 24(4): 4786–4797. Zhou QY, Park J and Koltun V (2016) Fast global registration. In: European Conference on Computer Vision (ECCV), pp. 766– 782. Zhou Z, Liu J and Yu J (2021) A survey of underwater multi-robot systems. IEEE/CAA Journal of Automatica Sinica 9(1): 1–18. Zhu Y, Kong Y, Jie Y, Xu S and Cheng H (2023) GRACO: A multimodal dataset for ground and aerial cooperative localization and mapping. IEEE Robotics and Automation Letters 8(2): 966–973. Zou Z, Yuan C, Xu W, Li H, Zhou S, Xue K and Zhang F (2024) LTA-OM: Long-term association LiDAR–IMU odometry and mapping. Journal of Field Robotics 41(7): 2455–2474.
