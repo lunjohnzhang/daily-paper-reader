@@ -1,0 +1,858 @@
+Title: A Closed-Form 4-DoF Inter-Robot Pose Estimator using Bearing-only Measurements
+
+URL Source: https://arxiv.org/pdf/2606.26616v1
+
+Published Time: Fri, 26 Jun 2026 00:31:39 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+> 1
+
+# A Closed-Form 4-DoF Inter-Robot Pose Estimator using Bearing-only Measurements 
+
+Qixin De, Ao Zhuang, Yechen Zhang, Zhuozhou Qian, Danping Zou †
+
+Abstract —Bearing-odometry-based cooperative localization has attracted increasing research interest due to its minimal infrastructure requirements, low communication bandwidth and broad applicability in complex environments. However, existing 6-DoF approaches still face challenges in rapidly obtaining accurate and reliable inter-robot pose estimation, as the system is prone to observability degeneracy under specific motion patterns. To address these issues, we first propose a closed-form 4-DoF inter-robot pose estimator, which relaxes nonlinear constraints for rotations estimation and employs error projection for translations estimation. We then conduct a theoretical analysis of the system’s observability, identifying degeneracy under two typical motion patterns: collinear and shape-preserving formations. The analysis further shows that the proposed 4-DoF system requires less stringent motion excitation for observability, enabling reliable estimation under a broader range of cooperative maneuvers. Furthermore, an observability test module is introduced to au-tonomously determine the optimal estimation instant, eliminating reliance on a predefined fixed-length sliding window. Extensive simulations and real-world experiments demonstrate that the proposed algorithm achieves higher estimation accuracy with significantly low computational cost, and the observability test module ensures estimation reliability while minimizing the data collection interval. 
+
+I. I NTRODUCTION 
+
+# MULTI-ROBOT systems (MRS) have demonstrated su-perior capabilities, efficiency, and reliability over single-robot systems in complex tasks like surveillance [1], search and rescue [2], and exploration [3]. Inter-robot pose estimation, also referred to as relative pose estimation, is a fundamental problem in multi-robot systems. It provides a common reference frame for expressing robot poses and sensor measurements, and is essential for coordination tasks such as collision avoidance and cooperative task execution. In GPS-denied environments, MRS increasingly rely on onboard odometry and inter-robot measurements [4], [5]. Among available inter-robot observations, bearing measure-ments, defined as the direction of other robots extracted from images, are particularly attractive due to their long sensing range and minimal reliance on environmental geometry or ex-ternal infrastructure. Existing bearing-based methods [4], [6], [7] typically estimate the full six-degree-of-freedom (6-DoF) relative poses. Despite their generality, 6-DoF formulations suffer from severe degeneracies, and can lead to unreliable estimates. For instance, as noted in [7], the relative poses 
+
+> †
+
+Corresponding Author. All authors are with Shanghai Jiao Tong Univer-sity, Shanghai 200240, China (e-mail: dpzou@sjtu.edu.cn). This work was supported in part by the National Key R&D Program of China under Grant 2022YFB3903802 and in part by the National Science Foundation of China under Grant 62073214. 
+
+Fig. 1. An overview of proposed 4-DoF inter-robot pose estimator. The rotation and translation are estimated in close-form for high efficiency. An observability test module is employed to automatically determine the optimal solving time instead of relying on a predefined fixed-length sliding window. 
+
+becomes unobservable during common coplanar motions, even with random robot trajectories. Such planar motions frequently occur in real-world robotic applications. Although active mo-tion planning can mitigate this, it complicates system design and restricts many feasible motion patterns. In IMU-based odometry systems, such as visual-inertial odometry (VIO), roll and pitch angles are observable [8]. As a result, the relative poses can be reduced to 4-DoF, consisting of yaw angle and translation vector per robot. This reduced representation has the potential to alleviate the degeneracy issues inherent in 6-DoF bearing-based methods, yet it has received little attention. Existing 4-DoF work [9] requires additional depth measurements, which make the relative trans-lation directly observable and reduce the problem to yaw estimation only. Nevertheless, such depth measurements are often difficult to obtain at large inter-robot distances. This limitation motivates us to develop an efficient and reliable estimator using only bearing measurements. In this paper, we propose a novel closed-form 4-DoF bearing-only inter-robot pose estimator. Our approach solves yaw angles by relaxing nonlinear constraints, and subsequently determine relative translations by projecting errors onto unit sphere to eliminate distance variables and solving a total least-squares problem. As both yaws and translations admit closed-form solutions, the proposed method is computationally efficient. Our observability analysis reveals that under this 4-DoF setting, yaw angles become unobservable only when all robots lie on a common vertical line, which is a sig-nificantly less restrictive condition than 6-DoF degeneracies. For translation estimation, the system remains unobservable in collinear and shape-preserving formations, which is a limi-tation that applies universally to all bearing-based estimators. Based on this analysis, we further develop an observability 
+
+> arXiv:2606.26616v1 [cs.RO] 25 Jun 2026 2
+
+test module to trigger reliable estimation as soon as sufficient information is accumulated. Validated via simulations and real-world experiments, our method achieves superior accuracy and robustness while running significantly faster than the state-of-the-art methods based on semi-definite programming (SDP), making it suitable for real-time multi-robot systems. The main contributions of our work are summarized as follows: 1) We present a closed-form solution to 4-DoF inter-robot pose estimation using bearing and VIO measurements, which is highly efficient and able to scale to large-scale robotic swarms. 2) We conduct a theoretical observability analysis and iden-tify specific motion patterns that cause observability degeneracy in bearing-odometry-based systems. 3) We design a novel observability test module to ensure the solution can be obtained with the minimum number of measurements. II. R ELATED WORK 
+
+Existing MRS inter-robot pose estimation methods can be categorized into map-based, ranging-based, and vision-based approaches. Map-based methods [10]–[13] rely on sharing local maps among robots to build and maintain a global map, which requires substantial communication bandwidth. Their performance strongly depends on sufficient inter-robot field-of-view overlap and reliable loop-closure detection. As a result, their effectiveness degrades when robots are widely sep-arated or operate in environments with repetitive or ambiguous visual features. Range-based methods [14]–[17] utilize ultra-wideband (UWB) or similar hardware to estimate relative poses. These approaches can provide meter- to decimeter-level relative positioning and operate independently of visual appearance, while requiring only low communication band-width. However, the reliance on additional ranging hardware increases system complexity and may be restrictive in sce-narios where lightweight or minimalist hardware designs are desired. Vision-based methods encompasses bearing-only [4], [6], [7], [18], [19] and bearing–range [9], [20], [21] methods. Other methods directly regress the full six-degree-of-freedom (6-DoF) relative pose from images [22]. Comparing bearing-only approaches, bearing–range ones rely on additional sensors such as UWB or depth cameras, while direct 6-DoF regression is typically limited to close-range scenarios with clear visual observations. Therefore, bearing-only measurements provide a more general and lightweight sensing modality. Traditional filter-based methods [18], [19] employed the Extended Kalman Filter to fuse bearings with odometry. While these approaches can handle data association through probabilistic filtering [19], they remain highly sensitive to initial state estimates and are prone to divergence due to the system’s inherent nonlinearity. To overcome these limitations, initialization-free approaches using convex optimization have been developed. Early al-gebraic solutions [4] provided direct estimates between two robots. Nevertheless, this algorithm yields suboptimal results when extended to MRS for failing to exploit all available measurements. To achieve global optimality in robotic swarms, [6] jointly optimize poses of all robots and formulated as a SDP problem using partially bearing measurements. A major limitation of this method is that the tightness of convex relaxation is not guaranteed in the presence of noise, and under high-noise scenarios, the estimated solutions may be-come unstable or exhibit random behavior. Subsequently, [7] present a certifiably globally optimal SDP-based algorithm, and provided a theoretical analysis of how detection noise and swarm motion influence localization optimality. Their analysis reveals that the 6-DoF formulations fail to recover rotations when robots move coplanarly, thereby reducing their practical applicability. Furthermore, above initialization-free approaches typically rely on fixed-length sliding windows. The lack of an adaptive strategy for window size creates a critical trade-off between ensuring system observability and minimizing data collection latency. Additionally, recent works [23], [24] exploit interior angle measurements, which can also be derived from bearings. However, these methods require each robot to simultaneously observe at least two other robots, significantly limiting their applicability in sparse or occlusion-prone environments, and making them unsuitable for small-scale MRS. III. C LOSED -F ORM INTER -R OBOT POSE ESTIMATION 
+
+In this section, we begin with notations and problem formu-lation. Then a closed-form 4-DoF inter-robot pose estimation algorithm using bearing-only measurement is proposed. 
+
+A. Notations 
+
+In this paper, lowercase and uppercase letters such as g
+
+and B are reversed for vectors and matrices, respectively. Calligraphic letters V represent sets and | · | is the cardinality of a set. We use Id ∈ Rd×d for identity matrix, ei ∈ Rd for the 
+
+i-th unit coordinate vector, 1d ∈ Rd for all-ones vector, and 
+
+0d1×d2 ∈ Rd1×d2 for all-zeros matrix. For a vector z, z[d] ∈ R
+
+refers to its d-th element, while z[d1:d2] ∈ Rd2−d1+1 refers to the subvector consisting of elements d1 through d2, and ∥g∥
+
+is the Euclidian norm. For matrices A and B, A ⊗ B denotes Kronecker product and det( A) denotes the determinant. The block-diagonal matrix formed by A1, · · · , A n is written as 
+
+diag( A1, · · · , A n), and vstack( A1, · · · , A n) denotes the ver-tical concatenation. The d-th column of matrix A is denoted by A[d], and the submatrix consisting of columns d1 through 
+
+d2 is A[d1:d2]. Let rank( ·) and Null( ·) be the rank and null space of a matrix, respectively, and span( ·) is the spanned space of vectors or a matrix’s column space base. 
+
+B. Problem Formulation 
+
+Consider a MRS consists of n robots and a common global frame Σg , and let Σi be the local frame of robot 
+
+i, i ∈ { 1, · · · , n }. The unknown 4-DoF relative transformation in Σg of Σi can be parameterized by        
+
+> qi=
+> h
+> t⊤
+> i, θ i
+> i⊤
+> ,i∈ { 1,· · · , n }(1)
+
+where ti ∈ R3 and θi ∈ R are translation and yaw angle, respectively. The corresponding 3D and 2D rotation matrix of 3
+
+θi are denoted as Ri ∈ R3×3 and ¯Ri ∈ R2×2, respectively. The state vector for the system is defined as 
+
+q =
+
+h
+
+t⊤ 
+
+> 1
+
+, · · · , t ⊤ 
+
+> n
+
+, θ 1, · · · , θ n
+
+i⊤
+
+(2) 
+
+For robot i in MRS, its pose in local frame at moment 
+
+τ , denoted as pτi ∈ R3 for translation and Cτi ∈ R3×3
+
+for rotation, is obtained from real-time odometry. Since the transformation between camera frame, body frame and local frame are known, bearings can be transformed from camera frame to local frame, which is called local bearings. Local bearing of robot j respect to robot i at moment τ is represented as a unit vector 
+
+bτij = Ri⊤ tj − ti + Rj pτj − Ripτi
+
+∥tj − ti + Rj pτj − Ripτi ∥ (3) 
+
+To estimate the relative transformation, odometry and bear-ings are collected over a period of time M = {τ0, · · · , τ e}.For clarity of representation, the topology of MRS is modeled as an undirected multigraph G = ( V, E), which consists of a vertex set V = {v1, · · · , v n} and an edge set E ⊆ V × V × M 
+
+with m = |E| . Node vi corresponds to robot i, and edge 
+
+(vi, v j , τ ) ≜ ϵτij indicates that bearing pair {bτij , b τji } is available at moment τ , as illustrated in Fig. 1 (b). We define an edge function of G that maps the state vector to the bearings associated with the kth edge ϵτij as 
+
+hk (q) = bτij , b τji 
+
+⊤ (4) 
+
+C. Rotations Estimation 
+
+Focused on robot i and robot j, the constrain obtained from bearing pair {bτij , b τji } in noisy-free case is 
+
+Ribτij + Rj bτji = 0 ⇔ ¯Ri¯bτij + ¯Rj¯bτji = 0 (5) 
+
+where ¯bτij = bτij [1:2] /∥bτij [1:2] ∥. Defining Θi = [ cosθ i, sinθ i]⊤
+
+and Θ = Θ⊤ 
+
+> 1
+
+, · · · , Θ⊤
+
+> n
+
+⊤, (5) can be reformulated as 
+
+Gτij Θ = 0 (6) 
+
+where 
+
+Gτij = · · · , U τij , · · · , U τji , · · ·  ,U τij =
+
+bτij,x −bτij,y 
+
+bτij,y bτij,x 
+
+
+
+, U τji =
+
+bτji,x −bτji,y 
+
+bτji,y bτji,x 
+
+
+
+. (7) 
+
+In noise cases, Θ can be estimated by solving following optimization problem 
+
+min 
+
+> Θ
+
+X 
+
+> ϵτij ∈E
+
+∥Gτij Θ∥2
+
+s.t. Θ1 = [1 , 0] ⊤
+
+cosθ 2 
+
+> i
+
++ sinθ i2 = 1 , i = 1 , · · · , n 
+
+(8) 
+
+where Σ1 is selected as the global frame Σg without loss of generality. (8) is a nonconvex quadratically constrained quadratic programming and can be solved by semidefinite programming relaxation as in [7] [9]. To achieve higher com-putational efficiency, we relax the nonconvex trigonometric constraint. Define matrix G = vstack( Gτ0
+
+> 12
+
+, · · · , G τe
+
+> (n−1) n
+
+) ∈
+
+R2m×2n and ¯Θ = Θ⊤ 
+
+> 2
+
+, · · · , Θ⊤
+
+> n
+
+⊤, the rotation estimation problem (8) can be solved in close-form 
+
+¯Θ∗ = arg min 
+
+> ¯Θ
+
+∥GΘ∥2
+
+= arg min 
+
+> ¯Θ
+
+∥G[3:2 n] ¯Θ + G[1] ∥2
+
+= −
+
+
+
+G⊤
+
+> [3:2 n]
+
+G[3:2 n]
+
+−1
+
+G⊤
+
+> [3:2 n]
+
+G[1] 
+
+(9) 
+
+The optimal estimation of original yaw angle θ∗ 
+
+> i
+
+can be recovered by projecting the solution Θ∗ 
+
+> i
+
+onto the S1 manifold as follows, which is detailed in Appendix A 
+
+θ∗ 
+
+> i
+
+= arctan ( Θ∗
+
+> i[2]
+
+Θ∗
+
+> i[1]
+
+) (10) 
+
+where Θ∗ 
+
+> i[1]
+
+and Θ∗ 
+
+> i[2]
+
+corresponding to scaled cosθ i and sinθ i,respectively. The rotation matrix R∗ 
+
+> i
+
+is then obtained. 
+
+D. Translations Estimation  
+
+> Fig. 2. Illustration of projected translation error on a unit sphere.
+
+As the rotations of each robot in global frame have been solved, global bearings can be obtained by gτij = R∗ 
+
+> i
+
+bτij .Define optimization variables as t = t⊤ 
+
+> 1
+
+, · · · , t ⊤
+
+> 2
+
+⊤ where 
+
+t1 = [0 , 0, 0] ⊤, and ¯t = [ t2, · · · , t 2]⊤. Based on (3), a linear-form error can be defined as 
+
+eτij = tj − ti + R∗ 
+
+> j
+
+pτj − R∗ 
+
+> i
+
+pτi − dτij gτij (11) 
+
+where dτij = ∥tj − ti + Rj pτj − Ripτi ∥ is the distance between robots at sampling moments. To eliminate these unnecessary unknown variables in the optimization problem, a projection matrix Pgτij = I3 − gτij gτij ⊤ is introduced to project the error onto the tangent plane, as illustrated in Fig. 2 
+
+eτij,proj = Pgτij 
+
+ tj − ti + R∗ 
+
+> j
+
+pτj − R∗ 
+
+> i
+
+pτi
+
+ (12) 
+
+The properties of Pgτij can be found in [25], and here Pgτij gτij =0 is applied. (12) can be further rewritten as 
+
+eτij,proj = Aτij t + βτij (13) 
+
+where 
+
+Aτij =
+
+h
+
+· · · , −Pgτij , · · · , P gτij , · · · 
+
+i
+
+,βτij = Pgτij 
+
+ R∗ 
+
+> j
+
+pτj − R∗ 
+
+> i
+
+pτi
+
+ . (14) 
+
+Define matrix A = vstack 
+
+
+
+Aτ0
+
+> 12
+
+, · · · , A τe
+
+> (n−1) n
+
+
+
+∈ R3m×3n
+
+and β = vstack 
+
+
+
+βτ0
+
+> 12
+
+, · · · , β τe
+
+> (n−1) n
+
+
+
+∈ R3m. Substituting 
+
+t1 = [0 , 0, 0] ⊤ into the error expression At + β yields ¯A¯t + β,where ¯A = A[4:3 n]. For greater precision in the results, the translation vector is solved by Total Least Squares (TLS) [26], which considers noise both in ¯A and β
+
+min 
+
+> ∆ ¯A, ∆β, ¯t
+
+∥∆ ¯A∥2 
+
+> F
+
++ ∥∆β∥2
+
+s.t. ( ¯A + ∆ ¯A)¯ t + β + ∆ β = 0 
+
+(15) 
+
+where ∥ · ∥ F is the Frobenius norm of a matrix. The TLS so-lution can be obtained by using singular value decomposition (SVD) on matrix C =  ¯A, β 
+
+C =
+
+> 3n−2
+
+X
+
+> u=1
+
+σuyuz⊤ 
+
+> u
+
+, σ 1 ≥ σ2 ≥ · · · ≥ σ3n−2 ≥ 0 (16) 
+
+where σu are singular values, yu and zu are left and right singular vectors. Let z∗ = z3n−2 ∈ R3n−2, which is the 4
+
+Algorithm 1 Fast and Reliable Inter-Robot Pose Estimation 
+
+Input: Buffers of local bearings Bbij , i, j ∈ { 1, · · · , n },buffers of local odometry Boi , i ∈ { 1, · · · , n }.
+
+Output: relative transformation q∗
+
+I ← set sleep interval 
+
+DR ← ∅ , Dt ← ∅ , Bbij ← ∅ , Boi ← ∅ 
+
+while true do 
+
+sleep( I)
+
+for each bτij ∈ B bij do 
+
+bτji , p τi , p τj ← SYNC IF POSSIBLE( bτij , Bbji , Boi , Boj )
+
+DR ← D R ∪ { bτij , b τji , p τi , p τj }Dt ← D t ∪ { bτij , p τi , p τj }
+
+end for 
+
+Bbij ← ∅ , Boi ← ∅ 
+
+R∗ ← ESTIMATE ROTATION( DR)
+
+A, β ← FORMULATE COEFF( Dt, R ∗)
+
+if OBSERVABILITY TEST( A) = true then 
+
+t∗ ← ESTIMATE TRANSLATION( A, β )
+
+return q∗
+
+end if end while 
+
+singular vector of the smallest singular value. The solution of problem (11) is given by   
+
+> ¯t∗=z∗
+> [1:3 n−3]
+> z∗
+> [3 n−2]
+> (17)
+
+Unlike existing methods [4], [6], [7] employ fixed sliding window optimization, our algorithm introduces an observabil-ity test module that autonomously determines the optimal solv-able moment based on system observability, thereby obtaining a reliable estimation as early as possible. The pseudo-code is presented in Algorithm 1. The algorithm consists of serveral functions: SYNC IF POSSIBLE, which searches the nearest time message in data buffer and return None if no match is found; ESTIMATE ROTATION is detailed in III-C; FOR-MULATE COEFF and ESTIMATE TRANSLATION are (14) and (17), respectively; OBSERVABILITY TEST is designed based on the observability analysis of the system, which will be detailed in IV-C. IV. O BSERVABILITY ANALYSIS 
+
+In this section, we analyze the observability of the 4-DoF bearing-only systems. The observability matrix for the linearized system can be constructed following [8]    
+
+> O=
+> 
+> O1
+> O2
+> ...
+> Om
+> =
+> 
+> H1
+> H2Φ2
+> ...
+> HmΦm
+> (18)
+
+where Hk = ∂h k(q)/∂q is the measured Jacobian of the bearing pair associated with the kth edge in G, and Φk is the state transformation function from τ0 to sampling moment 
+
+τ . The detailed expression of Ok and all proofs of theorems presented in this section are provided in Appendix B. 
+
+A. Unobservable Dimensions Analysis 
+
+Matrix Ok can be expressed as Ok = LkJk, where Lk is an invertible matrix. Define L = diag( L1, · · · , L m) and J =vstack ( J1, · · · , J m), the observability matrix of the system is 
+
+O = LJ . Due to L is not singular, we have   
+
+> rank( O) = rank( J),Null( O) = Null( J)(19)
+
+which implies that analyzing the matrix J are equivalent to the observability matrix O. The observation Jacobian J possesses following characteristics: 
+
+Theorem 1: Observation Jacobian always satisfies (a) 
+
+rank( J) ≤ 4n − 4; (b) span 
+
+ 1n ⊗ I3
+
+0n×3
+
+
+
+,
+
+(1 n ⊗ S) t
+
+1n
+
+ 
+
+⊆
+
+Null( J), where t is the ground truth translation configuration and S is the skew-symmetric matrix of e3.If J is full column rank, the system is fully observable. However, Theorem 1 implies that the bearing-odometry-based system is partially observable and at least four unobservable dimensions including global translation and global yaw angle. Therefore, it is necessary to designate global frame in estima-tion as in (8) and (15) for estimation. 
+
+B. Observability Degeneracy Analysis 
+
+In some cases, the system may exhibit an unobservable subspace with dimensions greater than four. Such degenerate cases are categorized into two classes. The first class results in rotation degeneracy, such as copplanar motion in 6-DoF systems [7]. The second class leads to translation degeneracy, which is applicable to both 4-DoF and 6-DoF. In the consid-ered 4-DoF system, the rotation is restricted to the yaw only, and the singular configurations leading to yaw unobservability is following. 
+
+Theorem 2: The yaw angles are unobservable if all robots move in a vertical line. In practice, the aforementioned situations are rarely encoun-tered. Moreover, they constitute a special case of collinear configurations, which represent a fundamental motion pattern leading to translation observability degeneracy in bearing-only systems, as formalized in the following theorem. 
+
+Theorem 3: Following are two motion patterns that result in translation observability degeneracy: 1) Collinear Formation : A configuration where all robots are positioned along a straight line, as illustrated in Fig. 1 (c) and Fig. 3 (a). 2) Shape-Preserving Formation : A configuration where all robots preserve the geometric pattern during motion, as illustrated in Fig. 1 (d) and Fig. 3 (b). 
+
+C. Observability Test Module 
+
+Based on Theorem 2 and 3, it can be concluded that the singular configurations in the 4-DoF system primarily arise in translation estimation. To enhance the robustness of the proposed algorithm, we introduce an observability test module prior to translation estimation, as shown in Fig.1. Once the sys-tem observability satisfies the required conditions, the transla-tion can be reliably solved, thereby avoiding unnecessary data 5 
+
+> Fig. 3. Observability degeneracy motion patterns. Gray dashed lines represent global bearings directions, solid lines denote odometry, solid circles indicate the true poses of the robots at sampling moments, and hollow circles represent poses that also satisfy the constraints. Different robots are distinguished by distinct colors. (a) Collinear formation; (b) Shape-preserving formation.
+
+acquisition. Note that the observability Jacobian associated with translations is identical to the coefficient matrix A used for translations estimation in (14), which can be construct accurately after yaws estimation and have following properties: 
+
+Theorem 4: Translation observation Jacobian always satis-fies (a) rank( A) ≤ 3n − 3; (b) span  1n ⊗ I3
+
+ ⊆ Null( A).According to above theorem, the three smallest singular values of A is naturally zero, corresponding to the un-observable global translation of MRS. The fourth smallest singular value, denoted as σ4(A), is the smallest non-zero singular value of A. It characterizes how far the system is from additional rank deficiency and reflect the sensitivity of the estimation process to measurement noise [27]. To detect potential degeneracy, we evaluate both the efficient condition number κ(A) = σmax (A)/σ 4(A) and σ4(A) to determine the appropriate timing for solving. Specifically, the triggering conditions are selected as follows: 1) The variance of the most recent l efficient condition numbers κ(A) is below the threshold δ, ensuring the observability structure has stabilized, and 2) The latest fourth smallest singular value σ4(A) exceeds the threshold σths , ensuring the observability degree is sufficient for reliable estimation. In real-world scenarios, motion patterns that lead to ex-act observability degeneracy seldom occur exactly. However, motions that approximate such patterns can result in inaccu-rate and unreliable solutions. The proposed observability test module is also capable of detecting those near-degeneracy situations, thereby enhancing the overall reliability of the estimation process. V. E XPERIMENTAL RESULT 
+
+In experiments, several methods are selected for compar-ison, including algebraic approach [4] and two SDP-based methods SDP-Graph [6] and SDP-Cert [7]. Both simulation and real-world experiments are implemented in C++ with Eigen 1 for Algebraic and Ours and MOSEK 2 for the SDP-based ones. All experiments run on NVIDIA Jetson Orin NX onboard computers. 
+
+A. Simulations 
+
+For simulation data generation, we randomly produce five waypoints for each robot and then use B-spline to construct 
+
+> 1[Online]. Available: https://eigen.tuxfamily.org/
+> 2[Online]. Available: https://www.mosek.com/
+
+the 6-dof trajectories. We uniformly sample 100 poses along each trajectory to obtain bearing and odometry measurements. Noisy bearings are generated following the model in [28], and the standard deviation of noise is denoted as ξ.In accuracy benchmark experiments, we change ξ to sim-ulate different noise level cases. The absolute rotation eR
+
+and translation error et are defined as the same in [7], and the distribution of errors are illustrated in Fig. 4. The results demonstrate that our method achieves superior rotation estima-tion accuracy, whereas the SDP-Cert method performs slightly worse. This indicates that the relaxation of trigonometric constraints remains tight even in the presence of significant noise. In contrast, the SDP-Graph method based on partial bearing measurements exhibits significantly larger rotation errors, particularly under extreme noise conditions, suggesting that its relaxation is no longer tight. Regarding translation estimation, the Algebraic method shows inadequate accuracy due to its suboptimal nature. Since the translation solution of each method depends on the prior rotation estimation, the SDP-Graph method also yields low translational accuracy. Our method consistently achieves the highest accuracy across various noise levels and swarm sizes. Moreover, the runtime of each algorithm is measured under varying robots number to evaluate computational efficiency. The results are shown in the Fig. 5. The reported runtime includes only the rotation and translation estimation time, excluding data processing and preparation steps. As shown, the Algebraic method achieves the highest computational effi-ciency, with our method performing comparably. While both SDP-Cert and SDP-Graph incorporate inter-robot distances at each sampling moment as state variables when solving for translations, leading to a rapidly increase in computation time as the robots number grows. When the swarm size reaches ten, these methods basically fail to meet real-time requirements. To further distinguish the contributions of our acceleration strategies from those of dimensionality reduction, we imple-mented 4-DoF versions of all baseline methods and compare their performance on ten robots swarm dataset, as summarized in Table I. While the reduction in DoF accelerates all methods as expected, the improvements are marginal compared to the significant performance gap offered by our approach. Remark-ably, our method achieves a computational speed comparable to, and even slightly exceeding, the Algebraic method in yaw estimation. Furthermore, the efficiency advantage over SDP-based baselines is even more significant in translation estimation. These results validate the effectiveness of proposed nonlinear constraint relaxation and error projection strategy, and confirm that our method scales well to large-scale swarms while preserving real-time capability. 
+
+B. Real-world Experiments 
+
+We conducted real-world evaluation using three quadrotors adapted from the platform in [22] and is shown in Fig. 6. Each drone is equipped with an Intel RealSense D435i and OAK-FFC-4P camera module. IMU measurements and stereo images from the D435i serve as the input to VIO system, VINS-Fusion [29]. Bearings are obtained via the 6                                    
+
+> Fig. 4. Distribution of estimation errors with different noise ξand robots number. Our method achieves highest accuracy nearly across all situations.
+> Fig. 5. Average runtime with different robots number. Our method can always run in real-time even in large-scale robotic swarms. TABLE I ESTIMATION RUNTIME OF TEN ROBOTS SWARM IN SIMULATION
+> Method Yaw Rot. Trans. Total Algebraic (4) 0.0247 –0.0070 0.0316 Algebraic (6) –0.0895 0.0071 0.0966 SDP-Graph (4) 203.27 –1811.3 2014.6 SDP-Graph (6) –1146.2 1823.8 2970.0 SDP-Cert (4) 20.456 –3630.4 3650.9 SDP-Cert (6) –26.670 3639.9 3666.6 Ours (4) 0.0222 –0.1315 0.1537 Unit: time (ms). Degrees of freedom are shown in parentheses.
+
+omnidirectional vision provided by OAK-FFC-4P. To enable non-anonymous bearing detection, each drone utilizes a unique colored LED-strip for visual identification and classified into different classes. The Yolo11n model [30] was fine-tuned on our collected dataset, and the SORT tracking algorithm [31] was customized to achieve robust tracking, as shown in Fig. 7. The detection network was quantized to FP16 and deployed as a TensorRT model on the onboard computer. During experiments, bearing detection and VIO output fre- 
+
+> Fig. 6. Quadrotor platforms used in real-world experiments. Each platform is equipped with an omnidirectional vision system for bearing measurement.
+
+quencies were configured at 10Hz and 200Hz, respectively. Data were collected over thirteen tests with various trajectory configurations, illustrated in Fig. 8 and Fig. 9. Experiments 01 to 08 were conducted under robot trajectories with sufficient motion excition. Conversely, experiments 09 to 13 involved constrained motions to evaluate the robustness of approaches against observability degeneracy. Ground-truth poses were provided by high-precise VICON system at 200Hz.  
+
+> Fig. 7. Bearing extraction workflow. This module integrates the YOLO detector with the SORT tracker to facilitate real-time swarm identification and bearing measurement for each quadrotor.
+
+We implemented two versions of our proposed method. The first adopts a sliding window strategy, consistent with the baseline approaches, and is denoted as Ours (SW). The window length is fixed at 10 seconds. Another integrates observability test module and is denoted as Ours (OT), with parameters set to l = 3 , δ = 1 .0, and σths = 5 .0. Table II summarizes the average results over three runs. We first analyze the results of Exp.01 to 08, where sufficient motion excitation is present. While our method remains com-petitive, its rotation estimation accuracy is slightly lower than that of full 6-DoF formulations in some cases. This is mainly caused by small discrepancies in gravity estimation among robots, leading to minor roll and pitch offsets. Nevertheless, such errors are bounded in practical VIO systems [29], and can be effectively mitigated by subsequent nonlinear refinement as in [4]. In contrast, the proposed method achieves the best translation accuracy across all experiments. Compared to Ours (SW), Ours (OT) generally enables earlier estimation while preserving high accuracy. As illustrated in Fig.8.(a) and (b), in Exp.01, sufficient motion excitation is achieved at 7.5s, allowing reliable estimation without waiting for the full 10s window. In several cases, the accuracy even improved slightly. This can be attributed to the reduced impact of long-term accumulated odometry drift when avoiding unnecessarily data 7                                                                                                                                                                                                                            
+
+> Fig. 8. Robots trajectories at solving moments. In Exp.01, the observability test module enabled an earlier estimation without compromising accuracy. In Exp.13, all robots began in a nearly collinear formation, and our algorithm effectively guaranteed the reliability of the result. TABLE II ESTIMATION ERROR AND RUNTIME IN REAL WORLD EXPERIMENTS
+> Exp. Algebraic [4] SDP-Graph [6] SDP-Cert [7] Ours (SW) Ours (OT) Rot. Trans. Time Rot. Trans. Time Rot. Trans. Time Rot. Trans. Time Rot. Trans. τe
+> 01 3.340 0.652 0.08 5.499 0.308 44.36 2.765 0.093 26.13 2.190 0.083 0.17 2.168 0.081 7.500
+> 02 5.111 0.508 0.07 6.730 0.371 44.42 5.084 0.214 29.61 4.572 0.176 0.18 4.596 0.182 6.200
+> 03 3.059 1.038 0.08 118.725 3.937 48.58 2.686 0.213 31.48 3.088 0.127 0.15 3.012 0.122 6.580
+> 04 1.870 0.847 0.07 5.826 0.342 50.32 2.616 0.150 39.92 3.474 0.149 0.15 3.426 0.118 6.391
+> 05 2.104 0.672 0.08 3.183 0.167 51.14 1.827 0.125 32.66 3.972 0.107 0.15 3.701 0.118 5.500
+> 06 2.260 1.340 0.07 3.297 0.126 44.31 2.532 0.150 36.88 4.038 0.144 0.16 3.388 0.127 4.400
+> 07 3.208 0.932 0.07 2.693 0.167 44.13 3.284 0.177 33.47 3.468 0.108 0.14 3.260 0.082 7.930
+> 08 2.427 0.357 0.07 3.797 0.177 51.19 2.379 0.069 35.51 1.617 0.057 0.17 2.345 0.123 4.730
+> 09 1.669 1.980 0.32 69.249 2.034 42.49 59.641 3.691 37.23 1.557 0.146 0.17 1.578 0.163 6.453
+> 10 2.702 1.156 0.07 118.741 3.279 62.03 117.700 3.198 36.54 2.793 0.137 0.15 5.038 0.230 3.832
+> 11 42.923 1.135 0.08 95.447 1.133 55.07 94.105 1.114 38.74 1.051 0.116 0.18 1.052 0.082 11.520 12 11.504 3.243 0.06 1.868 0.437 30.64 11.394 0.997 31.46 1.614 0.273 0.13 1.688 0.101 19.900 13 5.549 1.510 0.09 2.942 0.187 50.31 2.233 0.336 35.00 3.135 0.235 0.13 3.124 0.085 17.600 Results are averaged over three runs. The first and second best results are ranked. Units: Rot. (deg), Trans. (m), Time (ms), and τe(s).
+> Fig. 9. Estimated and ground-truth trajectory in real-world experiments.
+
+collection time. Moreover, our approach represents a speedup of over 100 times compared to current SOTA, SDP-Cert, highlighting its computational efficiency. We next evaluate the performance in observability-degenerate scenarios. In Exp.09 and 10, robots moved within a horizontal plane, resulting in rotation observability degen-eracy for the 6-DoF methods SDP-Graph and SDP-Cert. Their rotation estimates diverge, which subsequently leads to large translation errors. In Exp.11, the robots maintained a horizontal configuration in which robot 1 moved along a straight line, robot 2 remained stationary on the extension of this line, and robot 3 was also stationary. Under this motion pattern, the bearings from robot 2 to robots 1 and 3 remained collinear, respectively, making the 3-DoF rotation of robot 2 singular for the Algebraic method. Consequently, its rotation error increases significantly, revealing the limitations of this approach under specific configurations. In contrast, the proposed 4-DoF method remains well-conditioned in all these scenarios without suffering from degeneracy, and consistently achieves the lowest estimation errors. Exp.12 and Exp.13 each consist of two distinct stages. In the first stage, robots in Exp.12 maintain a shape-preserving formation, while those in Exp.13 form a collinear configuration. Both cases lead to translation observability degeneracy for all approaches. The trajectories of this stage in Exp.13 is illustrated in Fig.8.(c). In the second stage, robots executed motions with sufficient ex-citation. For these experiments, fixed-window methods exhibit poor translation accuracy, as they are unaware of the lack of observability during the first stage. In contrast, Ours (OT) post-poned computation until sufficient observability is detected in the second stage, as shown in Fig. 8(d), and produces substantially more accurate estimates. Overall, these results demonstrate that the proposed 4-DoF method maintains ro-bustness under both rotational and translational degeneracies, effectively avoiding estimation during unobservable motions and consistently outperforming baseline approaches in terms of accuracy. VI. C ONCLUSION AND DISCUSSION 
+
+This paper presents a closed-form 4-DoF inter-robot pose estimator. Extensive simulations and real-world experiments 8
+
+verify its high estimation accuracy with significantly low computational cost. Leveraging observability analysis, we in-troduce and validate an observability test module that enables reliable relative pose estimation at well-conditioned moments, ensuring robust performance even in challenging scenarios. The effectiveness of our 4-DoF framework is fundamentally supported by the error characteristics of IMU-based odometry systems. In particular, roll and pitch errors remain bounded due to gravity observability, thereby preserving the geometric validity of the 4-DoF formulation. Although translation and yaw are subject to unbounded drift, the proposed estimator only relies on local odometry consistency rather than global consistency, thus limiting the impact of accumulated drift. Our observability test module safeguards inter-robot pose initialization by preventing unreliable estimation under insuffi-cient excitation, and can further be used to identify potentially degenerate configurations in real time. However, under pro-longed degenerate formations, errors in unobservable dimen-sions, particularly inter-robot distance, will inevitably accu-mulate. While our approach is capable of identifying such de-generacy, passive estimation alone cannot eliminate its effects. Future work will therefore investigate active observability-aware trajectory planning to maintain informative geometric configurations for long-term robust cooperative localization. APPENDIX ANote that the solution to (9) for robot i, Θ∗ 
+
+> i
+
+=
+
+h
+
+Θ∗
+
+> i[1]
+
+, Θ∗
+
+> i[2]
+
+i⊤
+
+, is a scaled version of the unit vector Θi =[cos( θi), sin( θi)] ⊤. To enforce the unit-norm constraint, we project Θ∗ 
+
+> i
+
+onto the S1 manifold by finding its best approx-imation in the minimum euclidean norm sense, similarly to [32]. Specifically, one can solve the following problem: 
+
+min  
+
+> Θi∈S1
+
+∥Θi − Θ∗ 
+
+> i
+
+∥2
+
+(20) 
+
+Substituting Θi = [cos( θi), sin( θi)] ⊤, the optimization prob-lem can be reformulated as 
+
+min 
+
+> θi
+
+∥cos (θi) − Θ∗
+
+> i[1]
+
+∥2 + ∥sin (θi) − Θ∗
+
+> i[2]
+
+∥2 (21) 
+
+which is an unconstrained optimization problem with respect to the scalar variable θi. Taking the first-order derivative of the objective function and setting it to zero yields 
+
+2Θ ∗ 
+
+> i[1]
+
+· sin (θi) − 2Θ ∗ 
+
+> i[2]
+
+· cos (θi) = 0 (22) 
+
+Therefore, the projection onto the S1 manifold can be obtained as in (10). APPENDIX B
+
+A. Observability Matrix Derivation 
+
+Since state q consists of relative transformations, which do not change over time, Φk for k = 1, · · · , m in (18) are all identity matrices. Thus, one can obtain Ok = Hk
+
+and the observability is only corresponding to the Jacobian matrix. Suppose function hk(q) = bτij ; bτji 
+
+ and define tτij =
+
+R⊤
+
+> i
+
+ tj − ti + Rj pτj
+
+−pτi , thus bτij = tτij /∥tτij ∥. It follows that 
+
+∂b τij 
+
+∂t τij 
+
+= 1
+
+∥tτij ∥
+
+
+
+I3 − bτij bτij 
+
+> ⊤
+
+
+
+= 1
+
+dτij 
+
+Pbτij (23) 
+
+The Jacobian matrix of q with respect to tτij is given by 
+
+∂t τij 
+
+∂t i
+
+= −R⊤
+
+> i
+
+∂t τij 
+
+∂t j
+
+= R⊤
+
+> i
+
+∂t τij 
+
+∂θ i
+
+= −R⊤ 
+
+> i
+
+S  tj − ti + Rj pτj
+
+
+
+∂t τij 
+
+∂θ j
+
+= R⊤ 
+
+> i
+
+SR j pτj
+
+(24) 
+
+where S is the skew-symmetric matrix of vector [0 , 0, 1] ⊤.Jacobian of other variables are all zero. By the chain rule, the final Jacobian results of states would contain term Pbτij R⊤ 
+
+> i
+
+,which can be reformulated as 
+
+Pbτij R⊤ 
+
+> i
+
+=
+
+
+
+I3 − bτij bτij 
+
+> ⊤
+
+
+
+R⊤ 
+
+> i
+
+= R⊤
+
+> i
+
+
+
+I3 − gτij gτij 
+
+> ⊤
+
+
+
+= R⊤ 
+
+> i
+
+Pgτij 
+
+(25) 
+
+The detailed expression for Ok is presented at the bottom of this page. Moreover, Ok can be expressed as Ok = LkJk,where Lk is an invertible matrix. 
+
+B. Proof of Theorem 1 
+
+Suppose a vector x ∈ R4n is in the spanned space, it can be formulated as 
+
+x =
+
+1n ⊗ I3
+
+0n×3
+
+
+
+μ1 +
+
+(1 n ⊗ S) t
+
+1n
+
+
+
+μ2 (26) 
+
+where μ1 ∈ R3 and μ2 ∈ R are arbitrary. Substituting (26) into Jkx, it is easy to prove that Jkx = 0 , and consequently 
+
+Jx = 0 . Thus, x ∈ Null( J) and completes to the proof of (b). It follows immediately that rank( J) ≤ 4n − 4. □
+
+C. Proof of Theorem 2 
+
+We prove from the perspective of solving yaw angles. For all robots in swarm under this assumption, they only obtain vertical bearings [0 , 0, 1] ⊤ or [0 , 0, −1] ⊤. In this case, the coefficient matrix G in (7) is a zero matrix. Thus the yaw angles cannot be estimated and remain unobservable. □
+
+Ok =
+
+
+
+> R⊤
+> i
+> dτij
+
+00 R⊤
+
+> j
+> dτij
+
+| {z }
+
+> Lk
+
+ · · · − Pgτij · · · Pgτij · · · − Pgτij S  tj − ti + Rj pτj
+
+ · · · Pgτij SR j pτj · · · · · · − Pgτij · · · Pgτij · · · − Pgτij SR ipτi · · · Pgτij S (ti − tj + Ripτi ) · · · 
+
+| {z }
+
+> Jk9
+
+D. Proof of Theorem 3 
+
+A common property of aforementioned formations is that the bearings between each pair of robots in swarm are all parallel. Let gij denote the global bearing from robot i to robot 
+
+j, which satisfies dτ0 
+
+> ij
+
+gij = tj − ti. Define y = t⊤, 01×n
+
+⊤ ∈
+
+R4n and y lies outside the inherent unobservable subspace of J detailed in Theorem 1. Each row of the product Jy is 
+
+Pgij (tj − ti) = dτ0 
+
+> ij
+
+Pgij gij = 0 . Thus, y ∈ Null( J) and the system is observability degeneracy. □
+
+E. Proof of Theorem 4 
+
+This theorem can be proved in the same manner as Theorem 1. Suppose a vector x ∈ R3n is in the spanned space, it can be formulated as 
+
+x = 1n ⊗ I3
+
+ μ = 1 n ⊗ μ (27) 
+
+where μ ∈ R3 is arbitrary. By substituting (27) into Akx, it is easy to prove that Akx = 0 , and consequently Ax = 0 . Thus, 
+
+x ∈ Null( A) and completes to the proof of (b). It follows immediately that rank( A) ≤ 3n − 3. □
+
+REFERENCES [1] I. Roman-Ballesteros and C. F. Pfeiffer, “A framework for cooperative multi-robot surveillance tasks,” in Electronics, Robotics and Automotive Mechanics Conference (CERMA’06) , vol. 2. IEEE, 2006, pp. 163–170. [2] J. P. Queralta, J. Taipalmaa, B. C. Pullinen, V. K. Sarker, T. N. Gia, H. Tenhunen, M. Gabbouj, J. Raitoharju, and T. Westerlund, “Collaborative multi-robot search and rescue: Planning, coordination, perception, and active vision,” Ieee Access , vol. 8, pp. 191 617–191 643, 2020. [3] C. Wang, C. Yu, X. Xu, Y. Gao, X. Yang, W. Tang, S. Yu, Y. Chen, F. Gao, Z. Jian et al. , “Multi-robot system for cooperative exploration in unknown environments: A survey,” arXiv preprint arXiv:2503.07278 ,2025. [4] N. Trawny, X. S. Zhou, K. Zhou, and S. I. Roumeliotis, “Interrobot transformations in 3-d,” IEEE Transactions on Robotics , vol. 26, no. 2, pp. 226–243, 2010. [5] X. S. Zhou and S. I. Roumeliotis, “Determining 3-d relative transforma-tions for any combination of range and bearing measurements,” IEEE Transactions on Robotics , vol. 29, no. 2, pp. 458–474, 2012. [6] Y. Wang, X. Wen, Y. Cao, C. Xu, and F. Gao, “Bearing-based relative localization for robotic swarm with partially mutual observations,” IEEE Robotics and Automation Letters , vol. 8, no. 4, pp. 2142–2149, 2023. [7] Y. Wang, X. Wen, and F. Gao, “Certifiable mutual localization and trajectory planning for bearing-based robot swarm,” arXiv preprint arXiv:2401.07784 , 2024. [8] J. A. Hesch, D. G. Kottas, S. L. Bowman, and S. I. Roumeliotis, “Con-sistency analysis and improvement of vision-aided inertial navigation,” 
+
+IEEE Transactions on Robotics , vol. 30, no. 1, pp. 158–176, 2014. [9] Y. Li, A. Zhao, Y. Wang, Z. Xu, X. Zhou, C. Xu, J. Zhou, and F. Gao, “Fact: Fast and active coordinate initialization for vision-based drone swarms,” IEEE Robotics and Automation Letters , 2024. [10] P. Schmuck and M. Chli, “Ccm-slam: Robust and efficient centralized collaborative monocular simultaneous localization and mapping for robotic teams,” Journal of Field Robotics , vol. 36, no. 4, pp. 763–781, 2019. [11] A. Cunningham, M. Paluri, and F. Dellaert, “Ddf-sam: Fully distributed slam using constrained factor graphs,” in 2010 IEEE/RSJ International Conference on Intelligent Robots and Systems . IEEE, 2010, pp. 3025– 3030. [12] Y. Tian, Y. Chang, F. H. Arias, C. Nieto-Granda, J. P. How, and L. Carlone, “Kimera-multi: Robust, distributed, dense metric-semantic slam for multi-robot systems,” IEEE Transactions on Robotics , vol. 38, no. 4, 2022. [13] H. Xu, P. Liu, X. Chen, and S. Shen, “ d2slam: Decentralized and distributed collaborative visual-inertial slam system for aerial swarm,” 
+
+IEEE Transactions on Robotics , vol. 40, pp. 3445–3464, 2024. [14] X. S. Zhou and S. I. Roumeliotis, “Robot-to-robot relative pose estima-tion from range measurements,” IEEE Transactions on Robotics , vol. 24, no. 6, pp. 1379–1393, 2008. [15] M. Li, G. Liang, H. Luo, H. Qian, and T. L. Lam, “Robot-to-robot relative pose estimation based on semidefinite relaxation optimization,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2020, pp. 4491–4498. [16] T. Ziegler, M. Karrer, P. Schmuck, and M. Chli, “Distributed formation estimation via pairwise distance measurements,” Ieee robotics and automation letters , vol. 6, no. 2, pp. 3017–3024, 2021. [17] T. H. Nguyen and L. Xie, “Relative transformation estimation based on fusion of odometry and uwb ranging data,” IEEE Transactions on Robotics , vol. 39, no. 4, pp. 2861–2877, 2023. [18] A. Martinelli, F. Pont, and R. Siegwart, “Multi-robot localization using relative observations,” in Proceedings of the 2005 IEEE international conference on robotics and automation . IEEE, 2005, pp. 2797–2802. [19] T. Nguyen, K. Mohta, C. J. Taylor, and V. Kumar, “Vision-based multi-mav localization with anonymous relative measurements using coupled probabilistic data association filter,” in 2020 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2020, pp. 3349–3355. [20] H. Xu, L. Wang, Y. Zhang, K. Qiu, and S. Shen, “Decentralized visual-inertial-uwb fusion for relative state estimation of aerial swarm,” in 
+
+2020 IEEE international conference on robotics and automation (ICRA) .IEEE, 2020, pp. 8776–8782. [21] R. Murai, J. Ortiz, S. Saeedi, P. H. Kelly, and A. J. Davison, “A robot web for distributed many-device localization,” IEEE Transactions on Robotics , vol. 40, pp. 121–138, 2023. [22] P. Liu, C. Feng, Y. Xu, Y. Ning, H. Xu, and S. Shen, “Omninxt: A fully open-source and compact aerial robot with omnidirectional visual perception,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2024, pp. 10 605–10 612. [23] L. Chen, C. Liang, S. Yuan, M. Cao, and L. Xie, “Relative localizability and localization for multirobot systems,” IEEE Transactions on Robotics ,vol. 41, pp. 2931–2949, 2025. [24] C. Liang, L. Chen, B. Cui, and J. Mei, “3-d relative localization for multi-robot systems with angle and self-displacement measurements,” 
+
+The International Journal of Robotics Research , p. 02783649251363276, 2025. [25] S. Zhao and D. Zelazo, “Bearing rigidity and almost global bearing-only formation stabilization,” IEEE Transactions on Automatic Control ,vol. 61, no. 5, pp. 1255–1268, 2015. [26] I. Markovsky and S. Van Huffel, “Overview of total least-squares methods,” Signal processing , vol. 87, no. 10, pp. 2283–2302, 2007. [27] A. J. Krener and K. Ide, “Measures of unobservability,” in Proceedings of the 48h IEEE Conference on Decision and Control (CDC) held jointly with 2009 28th Chinese Control Conference , 2009, pp. 6401–6406. [28] J. Li, Z. Ning, S. He, C.-H. Lee, and S. Zhao, “Three-dimensional bearing-only target following via observability-enhanced helical guid-ance,” IEEE Transactions on Robotics , vol. 39, no. 2, pp. 1509–1526, 2023. [29] T. Qin, P. Li, and S. Shen, “Vins-mono: A robust and versatile monocular visual-inertial state estimator,” IEEE Transactions on Robotics , vol. 34, no. 4, pp. 1004–1020, 2018. [30] G. Jocher and J. Qiu, “Ultralytics yolo11,” 2024. [Online]. Available: https://github.com/ultralytics/ultralytics [31] A. Bewley, Z. Ge, L. Ott, F. Ramos, and B. Upcroft, “Simple online and realtime tracking,” in 2016 IEEE International Conference on Image Processing (ICIP) , 2016, pp. 3464–3468. [32] J. A. Cadzow, “Total least squares, matrix enhancement, and signal processing,” Digital Signal Processing , vol. 4, no. 1, pp. 21–39, 1994.

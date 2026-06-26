@@ -6,41 +6,35 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-25
-- 运行时间：2026-06-25 20:46:43 UTC
+- 最新运行日期：2026-06-26
+- 运行时间：2026-06-26 21:53:15 UTC
 - 运行状态：成功
-- 本次总论文数：7
+- 本次总论文数：5
 - 精读区：3
-- 速读区：4
+- 速读区：2
 
 ### 今日简报（AI）
-今日聚焦多机器人协同中的通信高效性与鲁棒性。推荐精读《Commerge》的LiDAR地图合并框架与《CKM-Driven》的无人机轨迹优化。建议优先关注这两篇论文，以深入理解资源受限场景下的协同方案。
-- 详情：[/202606/25/README](/202606/25/README)
+今日共处理5篇推荐论文，精读3篇、速读2篇。最值得关注的是《IDEA》（9.0分）在多智能体控制迁移中解决动态失配，以及《KRVF》（8.0分）为边缘移动操作提供语义体素表示。建议优先精读《IDEA》探索其效果对齐方法。
+- 详情：[/202606/26/README](/202606/26/README)
 
 ### 精读区论文标签
-1. [Commerge: Communication-Efficient, Robust, and Fast LiDAR Map Merging Framework for Multi-Robot Coordination in Resource-Constrained Scenarios](/202606/25/2606.25386v1-commerge-communication-efficient-robust-and-fast-lidar-map-merging-framework-for-multi-robot-coordination-in-resource-constrained-scenarios)  
+1. [IDEA: Insensitive to Dynamics Mismatch via Effect Alignment for Sim-to-Real Transfer in Multi-Agent Control](/202606/26/2606.26575v1-idea-insensitive-to-dynamics-mismatch-via-effect-alignment-for-sim-to-real-transfer-in-multi-agent-control)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：通过高效地图合并实现多机器人协调
-2. [CKM-Driven Communication-Aware UAV Intelligent Trajectory Optimization for Urban Inspection](/202606/25/2606.24979v1-ckm-driven-communication-aware-uav-intelligent-trajectory-optimization-for-urban-inspection)  
+   evidence：多智能体控制与仿真到真实迁移
+2. [KRVF: A Source-Aware Semantic Voxel World Representation for Edge Mobile Manipulation](/202606/26/2606.26321v1-krvf-a-source-aware-semantic-voxel-world-representation-for-edge-mobile-manipulation)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：面向多无人机任务的通信感知路径规划，使用扩散模型进行多智能体轨迹优化。
-3. [Offline Multi-agent Continual Cooperation via Skill Partition and Reuse](/202606/25/2606.25389v1-offline-multi-agent-continual-cooperation-via-skill-partition-and-reuse)  
+   evidence：面向移动操作臂的语义体素世界表示
+3. [A Closed-Form 4-DoF Inter-Robot Pose Estimator using Bearing-only Measurements](/202606/26/2606.26616v1-a-closed-form-4-dof-inter-robot-pose-estimator-using-bearing-only-measurements)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多智能体持续协作通过技能划分与复用
+   evidence：机器人间位姿估计支持协作定位
 
 ### 速读区论文标签
-1. [SPACE: Enabling Learning from Cross-Robot Data Toward Generalist Policies](/202606/25/2606.24049v1-space-enabling-learning-from-cross-robot-data-toward-generalist-policies)  
+1. [Offline Reinforcement Learning for Warehouse SLAM Throughput Control](/202606/26/2606.23978v1-offline-reinforcement-learning-for-warehouse-slam-throughput-control)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：跨机器人数据学习通用策略，支持多机器人协调
-2. [Swarm-Inspired Generation of Collective Behaviors in Graph Dynamical Systems](/202606/25/2606.24958v1-swarm-inspired-generation-of-collective-behaviors-in-graph-dynamical-systems)  
+   evidence：仓储SLAM吞吐控制的离线强化学习
+2. [GCT-MARL: Graph-Based Contrastive Transfer for Sample-Efficient Cooperative Multi-Agent Reinforcement Learning](/202606/26/2606.25073v1-gct-marl-graph-based-contrastive-transfer-for-sample-efficient-cooperative-multi-agent-reinforcement-learning)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：群体启发的集体行为生成用于多智能体协调
-3. [HEART: Coordination of Heterogeneous Expert Agents for Physically Grounded Robotic Task Planning](/202606/25/2606.25404v1-heart-coordination-of-heterogeneous-expert-agents-for-physically-grounded-robotic-task-planning)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：通过异构大语言模型智能体实现多机器人协调
-4. [Skill-MAS: Evolving Meta-Skill for Automatic Multi-Agent Systems](/202606/25/2606.18837v2-skill-mas-evolving-meta-skill-for-automatic-multi-agent-systems)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：用于多智能体系统的可进化元技能
+   evidence：基于图对比迁移的合作多智能体强化学习
 
 
 <div class="dpr-home-promo-card">
