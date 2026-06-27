@@ -1,0 +1,600 @@
+Title: Context-Aware Synthesis of Optimization Pipelines for Warehouse Optimization
+
+URL Source: https://arxiv.org/pdf/2606.26852v1
+
+Published Time: Fri, 26 Jun 2026 01:00:35 GMT
+
+Number of Pages: 28
+
+Markdown Content:
+# Context-Aware Synthesis of Optimization Pipelines for Warehouse Optimization 
+
+Janik Bischo ff a, Anne Meyer a, Uta Mohring b, Fabian Dunke c, Maximilian Barlang d, Özge Nur Subas c, Hadi Kutabi a, Stefan Nickel c, Kai Furmans d
+
+> aInstitute for Information Management in Engineering, Karlsruhe Institute of Technology, Germany
+> bDepartment of Business Administration, University of Zurich, Switzerland
+> cInstitute for Operations Research, Karlsruhe Institute of Technology, Germany
+> dInstitute for Material Handling and Logistics,Karlsruhe Institute of Technology, Germany
+
+Abstract 
+
+Order fulfillment in manual picker-to-goods warehouses involves interconnected decisions such as item assignment, order batching, and picker routing. While integrated models capture interactions between these decisions, practical warehouse systems often require decomposed approaches due to organizational boundaries, di ff ering responsibilities, or limited data availability. Existing studies primarily evaluate algorithms for isolated subproblems or fixed subproblem combinations for specific warehouse settings, but lack a general mechanism to determine applicable algorithm configurations, compose them into valid solution pipelines, and assess their performance. With Context-Aware Synthesis of Optimization Pipelines (CASOP), we propose a framework for constructing and evaluating context-specific optimization pipelines and apply these to order fulfillment. The framework comprises: (1) a modular repository of algorithms for common order fulfillment problems; (2) semantic data and algorithm cards to describe warehouse context and algorithm requirements; (3) a taxonomy that structures order fulfillment problems into relevant subproblems; (4) a pipeline synthesizer that identifies applicable algorithms for a given warehouse context and composes all valid optimization pipelines; and (5) a pipeline evaluator that assesses all resulting pipelines. We demonstrate the framework on 7 benchmark instance sets covering four problem classes, resulting in 1,063,044 valid pipelines. The framework supports researchers and practitioners in designing, automatically synthesizing, and selecting valid, high-performing algorithmic pipelines for warehouse operations. The software is open-source and available at github.com /kit-dsm /ware_ops_pipes and github.com /kit-dsm /ware_ops_algos. 
+
+Keywords: Warehouse optimization, Algorithm selection, Pipeline synthesis, Order fulfillment 
+
+1. Introduction 
+
+Warehouse systems di ff er widely in their physical layout, technical equipment, IT systems, degree of automation, and operating processes. Figure 1 illustrates this variation with examples ranging from robotic fulfillment systems over manual distribution centers to block-stacking warehouses. These di ff erences a ff ect not only operational performance, but also which optimization problems arise and which solution approaches can be applied. In the broader context of warehouse optimization, this paper focuses on order fulfillment in manual picker-to-goods systems, where pickers walk to storage locations to retrieve items ordered by customers, typically using carts to carry the retrieved items. Unlike automated warehouse systems, whose fixed hardware capacity is typically dimensioned for peak loads and may therefore remain underutilized during periods of lower demand, manual picker-to-goods systems retain substantial operational flexibility (Boysen and de Koster, 2025). However, this flexibility can only be e ff ectively exploited if the arising operational decision problems are addressed. Order fulfillment comprises several interrelated decision problems: item assignment, order batching, picker routing, and picker scheduling. The item assignment problem selects, for each requested article, the storage location(s) from which it is picked. The order batching problem groups customer orders into sets retrieved in a single picker tour, subject to picker capacity. The picker routing problem determines the path for collecting items from a given pick list, typically modeled as a variant of the traveling salesperson problem (TSP). The picker scheduling problem assigns batches or tours to pickers and orders their execution, with objectives such as tardiness or makespan. 
+
+> arXiv:2606.26852v1 [cs.AI] 25 Jun 2026 Figure 1: Overview of di ff erent types of warehouse systems. A robotic mobile fulfillment center of Amazon (left, Amazon.com, Inc. (2024), reproduced with permission). The distribution center of a grocery retailer (center, photo by Nick Saltmarsh, CC BY 2.0, via Wikimedia Commons). A block-stacking warehouse for metal profiles (right, courtesy of Protektorwerk Florenz Maisch GmbH & Co. KG, reproduced with permission).
+
+Each subproblem has been extensively studied in isolation and partially integrated approaches have also been studied, combining, for example, batching and routing; we refer to (de Koster et al., 2007; Gu et al., 2007; Boysen et al., 2019; Pardo et al., 2024; Bock et al., 2025) for comprehensive reviews. Although integrated solution approaches for subsets of these problems in order fulfillment exist (see e.g. van Gils et al. (2019)), their applicability in practical settings is limited due to organizational boundaries, heterogeneous scopes of responsibility, or limited data availability (Boysen and de Koster, 2025). Motivated by this, Boysen and de Koster (2025) recently raised the following important research question: which planning problems in warehouse operations can be decomposed into independently solved models while still preserving substantial solution quality relative to a comprehensive model? This shifts the focus from proposing ever-larger integrated models to understanding which decompositions are valid, practically applicable, and well-performing in a given warehouse context. Existing work provides only partial answers to this question. For example, Pardo et al. (2024) propose a taxonomy to structure variants of order batching problems into subproblems. However, the taxonomy does not cover the full order fulfillment process considered here. In particular, it does not consider item assignment, treats routing as a batching-related task, and does not represent picker scheduling as a separate subproblem. In general, benchmark studies from the warehouse literature often compare a limited set of manually selected algorithms for a specific problem setting (Petersen and Schmenner, 1999; van Gils et al., 2019; Bahçeci and Öncan, 2022). This becomes limiting when a larger number of order fulfillment subproblems and possible configurations of individual algorithms are considered simultaneously. A solution approach may solve the subproblems sequentially, or it may solve selected parts in an integrated way, for example, batching and routing. The algorithms themselves might be configurable, and di ff erent configurations might perform better or worse depending on the warehouse context. Furthermore, not every algorithm is applicable to a given warehouse context, and not every combination of algorithms forms a valid solution approach. Algorithms may exploit specific layout structures such as those of parallel-aisle warehouse layouts (Heßler and Irnich, 2024). Other solution approaches for subproblems, such as item assignment, are only required if the warehouse follows a scattered storage policy. Therefore, answering the decomposition question raised by Boysen and de Koster (2025) requires a framework that is able to not only select the best algorithm based on performance, but also identify applicable algorithms, compose them into valid optimization pipelines, and evaluate them in a given warehouse context. This connects warehouse optimization to three related research streams. Algorithm selection provides methods for choosing among alternative solvers for a given problem instance (Xu et al., 2008; Bischl et al., 2016). Semantic modeling provides means to describe domain knowledge and make assumptions explicit (Negri et al., 2017; Knoll et al., 2019). Type-based synthesis approaches, such as the Combinatory Logic Synthesizer, show how repositories of typed components can be used to generate valid compositions, for example, for scheduling heuristics (Mäckel et al., 2021). CLS-Luigi extends this idea to the generation and execution of executable data pipelines from algorithm repositories (Meyer et al., 2024). However, their integration for complex warehouse optimization remains largely unexplored. None of the existing frameworks links warehouse context, algorithm requirements, pipeline construction, and performance evaluation across multiple order fulfillment problems. 2We propose CASOP, a framework for context-aware synthesis of optimization pipelines for warehouse optimization. As we illustrate in Figure 2, we use a taxonomy to decompose problems into their subproblems and go beyond traditional algorithm selection by explicitly considering warehouse context and algorithm requirements in the form of semantic data and algorithm cards. This allows us to compose and identify well-performing and valid optimization pipelines from an algorithm repository tailored to a warehouse context. CASOP comprises the following features: 1. A modular algorithm repository : Reusable algorithm implementations for key order fulfillment subproblems provided through harmonized interfaces. 2. Semantic representation of warehouse context and algorithm requirements : A machine-readable description of warehouse system characteristics in the form of a data card, covering layout, articles, orders, resources, and storage. Machine-readable description of algorithm requirements in the form of an algorithm card. 3. Problem taxonomy and pipeline template : A taxonomy decomposing order fulfillment problems into subprob-lems and a corresponding pipeline template covering four problem classes. 4. Context-specific algorithm selection : Matching of warehouse features to algorithm requirements to identify the applicable algorithms for each subproblem. 5. Automated pipeline synthesis : Generation of all valid pipelines from the space of applicable algorithms through combinatory logic synthesis and runtime-e ffi cient execution of all pipelines to identify the best-performing configuration. Based on these features, CASOP supports a systematic evaluation of algorithmic design choices for a given warehouse context. Rather than relying on manually selected algorithm combinations, the framework identifies applicable components, composes valid pipelines, and evaluates their performance. We apply CASOP to 7 instance sets covering four problem classes, namely the single picker routing problem with and without scattered storage (SPRP, SPRP-SS), order batching and picker routing problem (OBRP), and the order batching, picker routing, and scheduling problem (OBRSP). To the best of our knowledge, these problems and the corresponding subproblems have not been studied jointly in the literature yet. Applicable Algorithms Data Cards Algorithm Cards Routing Batching Routing Batching Algorithm Repository Warehouse Context Pipeline Evaluation Routing Batching Instances Taxonomy  
+
+> Classical algorithm-selection components Added CASOP components
+> Context-Aware Pipeline Synthesis
+> Figure 2: Main contributions of the paper and delimitation from classical algorithm selection. Unlike classical algorithm selection, CASOP explicitly considers the warehouse context and provides automated pipeline synthesis.
+
+The remainder of this paper is organized as follows. Section 2 reviews related work on algorithm selection, semantic modeling, and pipeline generation. Section 3 defines the operational decision problems considered. Section 4 presents the CASOP framework. Section 5 reports on the experimental validation of the framework, followed by a conclusion in Section 6. 32. Related Work 
+
+In this section, we review work related to ours, namely, algorithm selection approaches in warehouse optimization and related fields, semantic and information modeling for representing systems and algorithms, and automated pipeline synthesis. These areas provide the foundation for the context-aware and performance-based selection of algorithms, yet there is currently no approach that achieves an integrated view to facilitate automated warehouse decision-making. 
+
+2.1. Algorithm Selection in Warehouse Order Fulfillment 
+
+Research on algorithm selection has shown that per-instance learning approaches can significantly outperform single solvers in domains such as SAT (Xu et al., 2008) and job-shop scheduling (Müller et al., 2022). By contrast, in warehouse optimization, approaches for algorithm selection remain underdeveloped, although researchers have observed that for problems like picker routing and order batching, the performance of heuristics can depend highly on warehouse characteristics, such as warehouse layout, number of picks or orders, and item distributions. Early works compared combinations of routing and storage policies (Petersen and Schmenner, 1999), while later studies expanded these comparisons to include simple constructive batching approaches, zoning, and routing strategies under di ff ering storage strategies, order sizes and batch capacities (van Gils et al., 2019; Bahçeci and Öncan, 2022). Henn et al. (2010) present a local search approach to the OBRP, which is configured with the routing policies, largest gap, and S-shape. The study confirms previous results on routing algorithm selection, i.e., selecting largest gap when the number of articles to be picked is small and S-shape when there are more articles to be picked. van Gils et al. (2019) evaluate the impact of varying combinations of storage, batching, zoning, and routing strategies. The authors provide an overview of prior work on combinations of di ff erent planning problems in warehouse operations. Lüke et al. (2024) present a novel, exact solution approach to the single picker routing problem with scattered storage, based on a dynamic programming formulation. Well-known routing heuristics, such as S-shape, return, or largest gap, are formulated with a similar approach. The authors compare di ff erent combinations of routing algorithms and storage policies with varying order sizes and find that increased scattering of C-articles has a larger e ff ect on tour lengths compared to only scattering A-articles. Beyond these studies, research is moving toward automated or learning-based algorithm selection for warehouse operations problems. For example, Cheng et al. (2024) introduce a deep reinforcement learning hyper-heuristic that adaptively selects an order batching strategy from a pool of heuristics. The learned selector significantly outperforms any single heuristic across a variety of test scenarios. Benavides-Robles et al. (2025) explore a hyper-heuristic approach to the pod relocation problem in a robotic mobile fulfillment system (RMFS), a form of automated goods-to-person system, e ff ectively treating it as an algorithm selection challenge. They develop a portfolio of six heuristics for pod allocation and design 20 di ff erent sequence-based hyper-heuristics, which are allocated varying time budgets. The two key contributions are a publicly available simulation framework for RMFS and the implementation of solution strategies. Neither is given for problems in manual warehouse operations. Instead, algorithm selection is typically driven by expert knowledge and scenario-specific assumptions, limiting reproducibility and generalization. While Heßler and Irnich (2024) propose a tabular mapping of routing algorithms against instance dimensions such as demand, number of blocks, and item scattering, this representation is limited to a single problem type and is not easily extendable to other decision stages. E ff orts to generalize routing models, for example, by extending the TSP formulation to unconventional layouts such as fishbone or flying-V (Wildt et al., 2025), demonstrate the growing diversity of applicable algorithms, but also highlight the increasing need for a structured applicability model. 
+
+Gap: No systematic mapping between problem features and solver applicability . Although several studies vary the warehouse characteristics, such as storage policies, order sizes, or item scattering to compare solution approaches (Bahçeci and Öncan, 2022; Heßler and Irnich, 2024; Lüke et al., 2024), no approach explicitly links the warehouse context to algorithm requirements. Current practice remains largely dependent on expert knowledge, which limits reproducibility, transferability, and automation of algorithm selection. We address this gap by introducing a mapping procedure based on warehouse features and algorithm requirements. 42.2. Information Modeling Data Models for Warehouse Operations. In the context of warehouse optimization, no unified modeling approach to represent warehouse data has been identified. Oxenstierna et al. (2021) were the first to mention the lack of standardized data formats in the context of order batching problems. To alleviate this, they publish an instance benchmark dataset based on the TSPLIB format for TSP. Each instance is represented as a JSON file containing information on the storage locations and obstacles of a digital warehouse model. Although this dataset is public, the lack of documentation makes it di ffi cult to reproduce or adopt the data model. In particular, Heßler and Irnich (2024) made a significant contribution to standardizing instance representations by converting instances from multiple previous works into a unified format. They include instances for single picker routing and the order batching and picker routing problem from Bahçeci and Öncan (2022); Žulj et al. (2018); Henn et al. (2010); Muter and Öncan (2015); Heßler and Irnich (2024). Although this serves as a starting point, the instance format of Heßler and Irnich (2024) encodes several fixed assumptions that constrain both its expressiveness and its adaptability to new problem settings. For example, a single depot location is assumed, and, besides a generic pick capacity, no information about picker resources is modeled, such as travel or picking speed. Further, the warehouse layout is given in a parameterized fashion, in terms of the number of aisles, number of pick locations, and fixed distances between them. This makes it di ffi cult to describe real-life or unconventional layouts. de Assis et al. (2025) introduce a real-world order picking dataset collected from a footwear manufacturer’s warehouse. The dataset includes the warehouse’s CAD layout, along with the coordinates of storage locations, aisles, and depots. Further, it contains detailed product and storage information, order lines, orders, and wave assignments. This information is additionally modeled as a UML class diagram. 
+
+Semantic modeling. Semantic information models for specific domains are essential to communicate information and standardize knowledge. A common approach to model semantic information is through ontologies. Formal ontologies have been proposed across various domains to standardize knowledge representation and aid complex decision processes. In the context of algorithm selection, Kostovska et al. (2021) propose the OPTION ontology, a semantically rich data model for benchmarking optimization algorithms. OPTION provides core objects such as algorithms, problem instances, and performance metrics, enabling annotation and automatic integration of benchmarking data from di ff erent platforms. In intralogistics, Negri et al. (2017) provide a comprehensive overview of existing ontology frameworks. They extend the Manufacturing Systems Ontology by the most important entities for internal logistics processes. These entities include, for example, transporters, operators, or such that perform storage functions. Knoll et al. (2019) extend this approach by relating the logistical process activity and information flow. Klein et al. (2021) propose an ontology for autonomous warehouses in the context of agile production systems. While such ontologies provide a powerful tool to unify existing datasets, the complexity of ontological frameworks may hinder their adoption. For example, OPTION consists of over 300 core classes (Kostovska et al., 2021). At the same time, there does not seem to be large adoption, as the published repository shows no activity. Knoll et al. (2019) also highlight that many ontologies in the warehousing area are using di ff erent names for the same process and have varying levels of detail, highlighting a lack of standardization. 
+
+Data and Model Cards. In the context of machine learning, Pushkarna et al. (2022) propose a structured way to document datasets in the form of data cards. This is motivated by the increasing complexity of multimodal datasets that are becoming popular and require a standardized representation of their use and intent. Mitchell et al. (2019) propose model cards to describe meta-information of trained machine learning models. For example, a model card for a computer vision model might describe the model’s architecture, the training data it was developed on, its accuracy on various benchmarks, and the contexts for which the model is suited. Yang et al. (2025) demonstrate the flexibility of model cards. They describe trained classification models using model cards. Based on these cards, models are selected according to the specified task. The model card approach is widely adopted in the machine learning community and is, for example, a key part of one of the most popular machine learning platforms, HuggingFace, where open-source models and data sets are shared. 
+
+Gap: Missing semantic and data models for warehouse optimization . While ontological frameworks in logistics (Negri et al., 2017; Knoll et al., 2019) and in algorithm benchmarking (Kostovska et al., 2021) demonstrate the potential of semantic modeling, they are either too complex for practical adoption or not tailored to warehouse decision problems. 5There is currently no lightweight semantic or data model that captures both the essential dimensions of warehouse instances (e.g., layout, order characteristics, resources) and the requirements of solution algorithms in a way that supports interoperability and reuse. 
+
+2.3. CLS and Data Pipeline Synthesis 
+
+Software product-line engineering studies how families of related software variants can be derived from shared reusable assets rather than implemented independently (Clements and Northrop, 2001; Pohl et al., 2005). Within this broader context, the Combinatory Logic Synthesizer (CLS) provides a type-based mechanism for automatically composing valid variants from repositories of typed components (Bessai et al., 2014). In CLS, each component is assigned a type that encodes both its programmatic interface and semantic properties describing its domain-specific role. Given a repository of components and a target specification, CLS solves the inhabitation problem by enumerating all valid component compositions that satisfy the specification, thereby generating all feasible solutions (potentially infinitely many) (Bessai et al., 2014). CLS has been applied across several domains to automate the composition of domain-specific components. Winkels et al. (2024) use CLS to synthesize structural variants of discrete-event simulation models for material flow systems. Starting from a valid initial model, they represent machines, conveyors, and structural nodes as typed combinators and automatically generate alternative factory layouts that satisfy specified input–output constraints. Mages et al. (2022) employ CLS to generate a product line of manufacturing simulation models from a master model, wrapping machine cells as components and using a graphical user interface to let non-experts configure shop floor layouts; their proof of concept synthesized and simulated 128 configurations in under seven minutes. Mäckel et al. (2021) build a CLS repository of constructive heuristics and dispatching rules for flow shop and job shop problems. CLS automatically selects and composes only those algorithms whose intersection types match the given problem class, demonstrating how the framework maps problem characteristics to applicable algorithms. However, their approach does not consider individual algorithm requirements beyond the machine environment, such as instance-specific feature conditions or data-dependent compatibility constraints. These applications share a common pattern: domain components are wrapped in semantic types encoding their applicability conditions, and CLS exhaustively enumerates all valid compositions. This pattern is directly transferable to the composition of decision pipelines for warehouse operations, where algorithms for e.g., order batching, picker routing, and scheduling must be combined. Selecting well-performing pipelines of algorithm combinations requires building and evaluating many di ff erent pipelines. Given a large design space, this process can quickly become tedious if done manually. Thus, a systematic automation of pipeline synthesis, evaluation, and selection can o ff er many e ffi ciency gains. Meyer et al. (2024) proposed CLS-Luigi, a framework for automating the generation and execution of analytics pipelines from an algorithm repository. It combines CLS with Luigi (Spotify, 2025), an open-source workflow management system originally developed at Spotify for defining, scheduling, and executing complex dependency-based data processing pipelines. Unlike existing approaches to automated pipeline synthesis, CLS-Luigi can combine algorithms from di ff erent domains, including data preprocessing, machine learning, and decision-making. The synthesized pipelines may be non-linear and vary in both length (number of nodes) and structure (flow of data). A built-in caching mechanism enables the reuse of intermediate results across pipeline executions. Newly added algorithm components can be integrated seamlessly and automatically benefit from the same caching infrastructure. 
+
+Gap: Lack of automated pipeline synthesis for warehouse optimization . While CLS has been successfully applied to synthesize simulation models (Winkels et al., 2024; Mages et al., 2022), scheduling heuristics (Mäckel et al., 2021), and analytics pipelines (Meyer et al., 2024), it has not yet been used for warehouse optimization based on a contextual description. Current studies still evaluate algorithm combinations manually or restrict to isolated decision problems, whereas the automated generation of valid, instance-specific decision pipelines that span multiple interdependent warehouse operations has not been explored yet. 
+
+3. Decision Problems in Order Fulfillment 
+
+Figure 3 illustrates how the subproblems of order fulfillment might be connected. Note that this is only one possible shape; depending on the warehouse context, the problem space may be smaller or larger, and subproblems such as 6order batching and picker routing could also be solved in an integrated fashion. In this section, we present a domain model that structures the data relevant for the order fulfillment subproblems, describe the subproblems in detail, and present an algorithm repository for each subproblem. Order Batching Orders Item Assignment Routing Scheduling 
+
+> t
+> Figure 3: Overview of decomposed decision problems in order fulfillment.
+
+3.1. Domain Model 
+
+The order fulfillment process takes place within a warehouse system composed of storage locations connected by travel aisles. To encapsulate the data relevant to solving decision problems in order fulfillment, we consider it along five domain objects: LayoutDomain , ArticlesDomain , OrdersDomain , ResourcesDomain , and StorageDomain .Each domain object serves as a container for related data models and is annotated by a typed variable t ∈ T to allow for meta-description of the domain object. Table 1 summarizes the domain objects and notation used. The domain objects and domain models are implemented as Python dataclass objects and are extendable based on the requirements of algorithms. 
+
+ArticlesDomain . Let A be the set containing all articles present in the warehouse. Each article a ∈ A is characterized by basic physical properties such as its weight w(a) ∈ R>0 and volume v(a) ∈ R>0, which define space and capacity requirements for batching. 
+
+OrdersDomain . Let O denote the set of customer orders. Each order o ∈ O consists of a set of order lines L(o). Each order line ℓ ∈ L (o) requests a specific article a(ℓ) ∈ A in a given quantity q(ℓ) ∈ N. Orders may also include temporal attributes such as an arrival time tarr (o) ∈ R≥0, a due date tdue (o) ∈ R≥0, which are relevant for scheduling decisions, or a completion time tcomplete (o) ∈ R≥0 which can be assigned when the order is fulfilled. The domain type indicates whether orders are splittable or non-splittable. 
+
+ResourcesDomain . Fulfillment operations are performed by a set of resources R, such as human pickers or au-tonomous mobile robots. The domain type categorizes the resource fleet accordingly. Each resource r ∈ R is specified by its travel speed s(r) ∈ R>0, and handling time per item τ(r) ∈ R>0. Resources have a load capacity through an associated pick cart, which is described by K capacity dimensions δ = (δ1, . . . , δ K ). For each resource r ∈ R and each capacity dimension k ∈ { 1, . . . , K}, ck(r) ∈ R>0 denotes the capacity of resource r in dimension k. The dimension types vary across warehouse settings: for example, Henn et al. (2010) measure capacity in number of items, while van Gils et al. (2019) constrain boxes per cart with each box limited by item count. The pick cart may further specify the number of available boxes nbox (r) and whether orders can be mixed across boxes. 
+
+StorageDomain . Articles are stored at physical locations S, governed by a storage policy, where each location s ∈ S 
+
+is characterized by coordinates ( x, y) in the warehouse layout and may hold a quantity of one or more articles. The inventory state at a given point in time is represented by the function I : A × S → Z≥0, where I(a, s) denotes the inventory level of article a at storage location s. The total inventory level of article a is given by Ps∈S I(a, s). The domain type distinguishes between dedicated storage, where each article is assigned to exactly one location, and scattered storage, where articles may be stored at multiple locations. 7LayoutDomain . The spatial structure of the warehouse can be described in two complementary forms: a parametric description and an explicit spatial representation. The parametric description captures the regular structure of conven-tional parallel-aisle warehouses through the number of aisles na, blocks nb, pick locations per aisle np, and distances between them ( dp, da), along with start and end positions ps and pe. The explicit spatial representation describes the warehouse as a layout graph G = (V, E), where V denotes pick nodes and depots, E ⊆ V × V the feasible connections, and d : V × V → R≥0 assigns shortest-path distances. A predecessor function pred : V × V → V supports path reconstruction to obtain the actual pick route. The domain type distinguishes conventional parallel-aisle layouts from unconventional designs such as fishbone or flying-V (Boysen et al., 2019). 
+
+Table 1: Summary of notation and domain objects. 
+
+Symbol Description 
+
+ArticlesDomain — type T ∈ { standard }A Set of all articles 
+
+a ∈ A An article 
+
+w(a) ∈ R>0 Weight of article av(a) ∈ R>0 Volume of article a
+
+OrdersDomain — type T ∈ { standard, splittable }O Set of customer orders 
+
+o ∈ O An order 
+
+L(o) Set of order lines in order o
+
+ℓ ∈ L (o) An order line 
+
+a(ℓ) ∈ A Article requested by order line ℓ
+
+q(ℓ) ∈ N Quantity requested in order line ℓ
+
+tarr (o), tdue (o), tcomplete (o) ∈ R≥0 Arrival time, due date, and completion time of order o
+
+ResourcesDomain — type T ∈ { human, robot, mixed }R Set of resources 
+
+r ∈ R A resource 
+
+s(r) ∈ R>0 Travel speed of resource r
+
+τ(r) ∈ R>0 Handling time per item for resource rck(r) ∈ R>0 Capacity of resource r in dimension kK ∈ N Number of capacity dimensions 
+
+k ∈ { 1, . . . , K} Index of a capacity dimension 
+
+δ = (δ1, . . . , δ K ) Capacity dimension types (e.g., items, weight, volume, order lines) 
+
+nbox (r) ∈ N Number of boxes on pick cart 
+
+StorageDomain — type T ∈ { dedicated, scattered }S Set of storage locations 
+
+s ∈ S A storage location with coordinates ( x, y)
+
+I : A × S → Z≥0 Inventory state function 
+
+I(a, s) Inventory level of article a at location s
+
+LayoutDomain — type T ∈ { conventional, unconventional }
+
+na, nb, np ∈ N Number of aisles, pick locations, blocks 
+
+dp, da ∈ R>0 Distance between pick locations, aisles 
+
+ps, pe ∈ V Start and end (depot) positions 
+
+G = (V, E) Warehouse layout graph 
+
+V Set of vertices (pick nodes and depots) 
+
+E ⊆ V × V Set of feasible connections 
+
+d : V × V → R≥0 Distance function 
+
+pred : V × V → V Predecessor function for path reconstruction 
+
+83.2. Subproblems of Order Fulfillment 
+
+We decompose order fulfillment into four subproblems: item assignment, order batching, picker routing, and picker scheduling. We describe each of these subproblems in detail below. 
+
+Item Assignment (IA). In warehouses with scattered storage policies, where articles may be stored at multiple locations simultaneously, the item assignment problem determines from which specific storage location(s) each requested article should be picked. This stage resolves each order line ℓ ∈ L (o) to one or more storage locations s ∈ S 
+
+based on the inventory function I(a(ℓ), s), such that the requested quantity q(ℓ) can be fulfilled. When a single location has insu ffi cient inventory, the quantity may be split across multiple locations. The output is a set of resolved pick positions P, where each p ∈ P specifies a pick node, the quantity to retrieve, and its associated order line. 
+
+Order Batching (B). To reduce travel time, multiple customer orders can be combined into batches that are retrieved in a single picker tour. The batching problem groups orders o ∈ O into batches b ∈ B , subject to capacity constraints imposed by the picker cart capacities ck(r), k ∈ { 1, . . . , K}. Each batch forms a pick list containing all order lines from its constituent orders. Every order o may have an arrival time tarr (o) that indicates when the order becomes known in the system, a due date tdue (o) that specifies the time at which the picking process of the order has to be finished, and a completion time tcomplete (o) that captures the time at which the picking process has actually finished. 
+
+Picker Routing (R). For each pick list, the routing problem determines the sequence in which pick locations are visited and the path through the warehouse. This is often modeled as a variant of the TSP with the objective of finding a tour σ that visits all required pick locations while minimizing total travel distance. The output specifies both the route through the warehouse layout graph G = (V, E) and the sequence in which items are picked. 
+
+Scheduling (S). Picker scheduling determines when each pick list or tour is executed and which resource handles it. In a multi-picker system, scheduling comprises both sequencing and resource assignment. Sequencing determines the sequence in which the tours are executed, while assignment allocates tours to available resources. In a single-picker system, scheduling reduces to sequencing. The output is a schedule consisting of an assignment function ρ : B → R ,which maps each batch b ∈ B to a resource r ∈ R , and a sequence π, which specifies the execution sequence of batches together with their start and completion times. 
+
+3.3. Optimization Objectives 
+
+The choice of the overall optimization objective in the order fulfillment context depends on operational priorities and available data. Common objectives in order fulfillment include: 
+
+• Distance: Total travel distance across all pick tours, Pb∈B d(σb), where σb denotes the tour for batch b and d(σb)denotes the total travel distance of this tour. 
+
+• Makespan: Time from the start of the first pick tour until completion of the last, max r∈R tend  
+
+> r
+
+, where tend  
+
+> r
+
+denotes the completion time of resource r, accounting for travel speed s(r) and handling time τ(r). 
+
+• Tardiness: Sum of delays beyond due dates, Po∈O max (0 , tcomplete (o) − tdue (o)), where orders completed before their due date contribute zero. 
+
+• On-Time rate: Percentage of orders completed by their due date, |{ o∈O| tcomplete (o)≤tdue (o)}| |O| × 100%. 
+
+3.4. Algorithms for Order Fulfillment 
+
+To the best of our knowledge, no open-source implementations of the algorithms reviewed in this paper exist. We therefore provide a dedicated repository of reusable, modular implementations covering the decision problems defined in Section 3, available at https://github.com/kit-dsm/ware_ops_algos .The repository currently contains 22 algorithm implementations: five item assignment approaches, seven batching approaches, eight routing approaches, one integrated batching-and-routing approach, and one scheduling approach. All algorithms implement a shared Algorithm base class parameterized by input and output types. Each algorithm operates on the domain objects introduced in Section 3.1 and returns a typed SolutionObject that downstream algorithms can consume. The repository is organized into dedicated modules for each decision problem, following a consistent pattern: an abstract base class defines the interface, and concrete implementations specialize it. In Tables 2–6, indented entries denote concrete implementations of the base class listed above. We use ’H’, ’MH’, and ’E’ to indicate whether an algorithm is heuristic, metaheuristic, or exact. Algorithms marked with * are used in the framework validation described in Section 5. 93.4.1. Item Assignment 
+
+The item_assignment module contains implementations of five item assignment approaches, summarized in Table 2. The module covers both dedicated and scattered storage settings. For dedicated storage, item assignment is fixed because each article is associated with a single storage position. As a simple baseline solution for such cases, we implemented GIA, which greedily selects the storage location with the highest inventory level first. For scattered storage, several storage positions may be feasible for the same requested article, and an assignment rule must select one or more of them. For the scattered case, we implement the heuristic assignment rules MinMaxIA, MinMinIA, and SPIA based on the priority-based approach presented in Weidinger (2018) and NNIA, which is adopted from Weidinger et al. (2019). GIA and NNIA are standalone constructive heuristics. MinMaxIA, MinMinIA, and SPIA are variants of 
+
+PriorityItemAssignment , a shared base class for penalty-based priority rules. SPIA is parameterized by a routing algorithm that serves as a distance evaluator. This yields twelve executable item-assignment configurations: four standalone configurations (GIA, NNIA, MinMaxIA, and MinMinIA) and eight SPIA configurations, one for each available routing algorithm. Each algorithm returns an ItemAssignmentSolution containing P.
+
+Table 2: Item assignment algorithms.                 
+
+> Algorithm Type Description
+> GreedyItemAssignment (GIA) HAssigns items from locations with the highest inventory level first until the requested quantity is satisfied.
+> NearestNeighborItemAssignment (NNIA) *HIteratively selects the nearest location until all demand is fulfilled (Wei-dinger et al., 2019).
+> PriorityItemAssignment HBase class for item assignment based on penalty-based priority rules (Wei-dinger, 2018).
+> MinMaxItemAssignment (MinMaxIA) *Computes penalties as the maximum distance to already-selected locations.
+> MinMinItemAssignment (MinMinIA) *Computes penalties as the minimum distance to already-selected locations.
+> SinglePosItemAssignment (SPIA) *Uses the distance from a fixed reference position.
+
+3.4.2. Batching 
+
+The batching module contains four batching implementations, summarized in Table 3. We include constructive, savings-based, seed-based, and local-search approaches. Constructive and metaheuristic approaches are discussed by Henn et al. (2010), Koch (2014), and Pinto et al. (2023). Learning-based batching methods have recently been explored by Beeks et al. (2022) and Cals et al. (2021). 
+
+PriorityBatching is a greedy constructive method parameterized by a sorting criterion. We implement four sorting rules: OrderNrFiFo, FiFo, DueDate, and Random. SavingsBatching requires a routing evaluator for computing savings and can be configured with any of the eight routing classes described in the next subsection. This generates eight di ff erent configurations of the SavingsBatching algorithm. SeedBatching is parameterized by three SeedCriteria and two SimilarityMeasure options as specified in Table 4, resulting in six configurations. 
+
+LocalSearchBatching requires both a constructive batching method for initialization and a routing evaluator. Combined with four constructive batching approaches (FiFo, OrdNrFiFo, DueDate, RAND) and eight routing classes, this yields 32 configurations. These implementations yield 50 executable batching configurations: four priority-based configurations, eight savings-based configurations, six seed-based configurations, and 32 local-search configurations. Each algorithm returns a BatchingSolution containing B and the derived pick lists. 10 Table 3: Batching algorithms.                  
+
+> Algorithm Type Description
+> PriorityBatching HGreedy constructive batching by sorting criterion.
+> OrderNrFiFo *By ascending order number.
+> FiFo *By arrival date tarr (o).
+> DueDate *By due date tdue (o).
+> Random *Random order with fixed seed.
+> SavingsBatching *HMerges batch pairs with largest routing distance saving (Clarke and Wright, 1964). Configurable routing evaluator (Table 5).
+> SeedBatching *HBuilds batches around seed orders. Configurable seed selection and similar-ity measure (Table 4).
+> LocalSearchBatching *MH Iterative improvement via SWAP /SHIFT operators (Henn et al., 2010). Configurable constructive initialization; see PriorityBatching , and routing evaluator (Table 5).
+
+Table 4: Configuration options for SeedBatching .           
+
+> Category Option Description
+> Seed selection RANDOM Random seed order.
+> MOST_POSITIONS Order with the most positions.
+> FEWEST_POSITIONS Order with the fewest positions.
+> CLOSEST_TO_DEPOT Order whose nearest pick node is closest to ps.Similarity measure SHARED_ARTICLES Orders with more shared articles are considered more simi-lar.
+> MIN_DISTANCE Minimum pairwise pick-node distance between orders.
+
+3.4.3. Routing 
+
+The routing module contains eight standalone routing implementations, summarized in Table 5. The layout-dependent heuristics follow established routing rules for parallel-aisle warehouses, as evaluated by Petersen (1997). We also implement nearest-neighbor routing, two exact TSP-based formulations, and the dynamic programming approach of Ratli ff and Rosenthal (1983) as extended by Heßler and Irnich (2024) for single-block parallel-aisle layouts with scattered storage. For a broader overview of TSP-based picker-routing models, we refer to Bock et al. (2025). In addition, we provide CBR, an integrated batching-and-routing approach. Joint order batching and picker routing has been studied as an integrated optimization problem by Valle et al. (2017); a more general column-generation-based approach is presented by Briant et al. (2020). Our implementation operates directly on O and jointly determines batching and routing via a capacity-constrained TSP formulation. Each routing algorithm returns a RoutingSolution containing σ and d(σ). This allows for the reconstruction and visualization of the picker tours. 
+
+3.4.4. Scheduling 
+
+Batches or pick tours are usually sequenced using dispatching rules from the scheduling literature. We implement list-scheduling, an approach introduced by Graham (1969) for multiprocessor scheduling, with four dispatching rules summarized in Table 6. The implementation operates on routing solutions σ, orders O with temporal attributes tarr (o) and tdue (o), and resources R with travel speed s(r) and handling time τ(r). It maintains a priority-ordered list of tours and repeatedly assigns the highest-priority tour to the earliest available picker. The dispatching rule defines the priority. This yields four executable scheduling configurations: shortest processing time (SPT), longest processing time (LPT), earliest due date (EDD), and earliest release date (ERD). Each algorithm returns a SchedulingSolution 
+
+containing the assignment ρ : B → R , the execution sequence π, and start and completion times for each tour. 11 Table 5: Routing algorithms.                            
+
+> Algorithm Type Description
+> HeuristicRouting HBase class for routing heuristics.
+> SShapeRouting (SShape) *Traverse aisles in an S-pattern.
+> ReturnRouting (RET) *Enter each aisle and return after the last pick.
+> MidpointRouting (MP) *Split the warehouse at a horizontal midpoint, processing the lower and upper parts separately.
+> LargestGapRouting (LG) *Enter each aisle only up to the largest empty gap.
+> NearestNeighborRouting (NN) *Greedily visit the nearest unvisited pick location.
+> ExactRouting EBase class for exact routing models.
+> ExactTSPRoutingDistance (TSP-D) TSP with subtour elimination.
+> ExactTSPRoutingTime (TSP-T) TSP including travel speed and handling time.
+> RatliffRosenthalRouting (RR) *EDP for single-block rectangular warehouses.
+> RoutingBatching EBase class for integrated batching-and-routing approaches.
+> CombinedBatchingRouting (CBR) *Capacity-constrained TSP for integrated batching-and-routing.
+
+Table 6: Scheduling algorithms.             
+
+> Algorithm Type Description
+> ListScheduling HBase class for priority-based list scheduling.
+> SPTScheduling (SPT) *Shortest processing time first.
+> LPTScheduling (LPT) *Longest processing time first.
+> EDDScheduling (EDD) *Earliest due date first.
+> ERDScheduling (ERD) Earliest release date first.
+
+3.5. Configuration Space of the Algorithm Repository 
+
+The algorithm repository described in Section 3.4 contains both fixed and parameterized implementations. We refer to each fully specified variant as an executable algorithm configuration, and write IA , B, R, BR , and S for the sets of item-assignment, batching, standalone routing, integrated batching-and-routing, and scheduling configurations. Across all subproblems, the repository contains 75 executable algorithm configurations: |IA | = 12, |B| = 50, |R| = 8, 
+
+|BR | = 1, and |S| = 4. This count describes the available algorithm configurations prior warehouse-specific filtering and composition into complete optimization pipelines. A purely sequential order batching and routing setting with item assignment already admits |IA | · | B| · | R| = 12 · 50 · 8 = 4,800 possible combinations. If scheduling is included, the corresponding sequential space grows to |IA | · | B| · | R| · | S| = 12 · 50 · 8 · 4 = 19 ,200 combinations. However, valid pipeline construction is not a cartesian product over all stages. Not every problem class requires every subproblem. A pure routing problem does not require batching or scheduling, while an integrated batching-and-routing configuration from BR bypasses the separate batching and routing stages, adding |IA | · | BR | combinations rather than entering the product above. The applicable algorithms also depend on the warehouse context and the available data. For example, item-assignment variants are only relevant when the storage model allows alternative pick locations, scheduling requires temporal order information and multiple resources, and some routing algorithms require a specific layout representation or layout class. Thus, the relevant configuration space is instance-dependent. Determining which algorithm configurations are applicable and composing them into valid executable pipelines is the key challenges addressed by the CASOP framework introduced in the following section. 
+
+4. CASOP 
+
+We present the framework coined Context-Aware Synthesis of Optimization Pipelines (CASOP) that enables the automated mapping of warehouse characteristics to compatible algorithmic approaches, the synthesis of valid algorithm pipelines, and their systematic evaluation. 12 4.1. CASOP Overview 
+
+The CASOP framework consists of the following five core building blocks, which are illustrated in Figure 4 and discussed in detail in the following subsections: OrdersDomain       
+
+> RBContext-aware Pipeline Synthesizer Pipeline Evaluator Algorithm Repository Batching Routing …Requirements Algorithm Cards Subproblem Objective
+> Features Data Card Problem Objective Domain-Algorithm Mapper Algorithm Card Algorithm Cards Algorithm Cards Algorithm Card Data Card Problem Taxonomy Subproblems Taxonomy BR13245Algorithm Card LayoutDomain Resources Domain
+> StorageDomain
+> ArticlesDomain
+> Objective
+
+Figure 4: Core building blocks of the CASOPframework. Warehouse data is semantically structured into domain models described in the form of a data card (1). Requirements of algorithms from a repository are described in the form of algorithm cards (2). A taxonomy describes the problem space and which subproblems a problem consists of (3). Algorithm card, data card, and taxonomy are used by the domain-algorithm mapping component to obtain applicable algorithms, which are then composed into context-aware pipelines (4). Finally, all resulting pipelines are evaluated to select the best-performing configuration (5). 
+
+(1) Data Cards and Domain Objects. Warehouse information is organized into domain objects, such as layout, articles, orders, resources, and storage. Each domain object contains contextual information, such as the layout type, and data features, such as the number of aisles or picker capacity. A data card provides a semantic description of these domain objects and declares the available features, the problem class to be solved, and the optimization objective. (2) Algorithm Cards and Algorithm Repository. The algorithm repository contains implementations of item assignment, batching, routing, and scheduling algorithms, i.e., the algorithms presented in Section 3.4. Each algorithm is described by an algorithm card that specifies the subproblem it addresses, its objective, and its requirements with respect to the warehouse data and context. (3) Taxonomy. The taxonomy defines the problem space considered by the framework. It maps each problem class to the corresponding subproblems. Depending on the warehouse setting and problem class, only a subset of subproblems may be relevant, and some subproblems may be solved sequentially or in an integrated fashion. (4) Pipeline Synthesizer. The pipeline synthesizer generates executable optimization pipelines subject to the context provided by the data card, algorithm cards, and taxonomy. It comprises two parts. First, the domain-algorithm mapper identifies all algorithms applicable to the given warehouse setting. It filters algorithms by problem type using the taxonomy and checks whether the required domain types, features, and feature constraints specified in the algorithm cards are satisfied by the context provided through the data card. Second, the applicable algorithms are synthesized into context-aware pipelines, represented as directed acyclic graphs in which nodes correspond to algorithms or data sources and edges capture data dependencies between decision stages. 13 (a) Data card 
+
+> name: example_data_card problem_class: OBRSP objective: distance LayoutDomain: type: conventional features: - start_node - end_node - n_blocks: 2 - graph - distance_matrix ArticlesDomain: type: standard features: - article_id - weight - volume OrdersDomain: type: standard features: - order_number - order_date - amount - article_id ResourcesDomain: type: human features: - speed - time_per_pick - capacities - dimensions_type: [items] StorageDomain: type: dedicated features: - amount - article_id
+
+(b) Algorithm card 
+
+> model_name: RatliffRosenthal problem_type: routing objective: distance requirements: LayoutDomain: type: - conventional features: - start_node - end_node - closest_node_to_start - min_aisle_position - max_aisle_position - n_pick_locations - n_aisles - dist_pick_locations - dist_bottom_to_pick_location - n_blocks constraints: n_blocks: equals: 1 ResourcesDomain: type: - any OrdersDomain: type: - standard StorageDomain: type: - any ArticlesDomain: type: - any
+
+Figure 5: Examples of a data card and an algorithm card. The data card describes an instance from the Kris dataset, whereas the algorithm card describes the requirements of the RatliffRosenthalRouting algorithm. 
+
+(5) Pipeline Evaluator. The pipeline evaluator evaluates the executed pipelines and assesses them according to the objective specified in the data card. The result is a ranked set of valid pipelines and the best-performing configuration for the given warehouse context. 
+
+4.2. Data Cards and Domain Objects 
+
+A data card I captures the semantic description of a warehouse setting. It is defined by: 
+
+I = ⟨P, Z, D1, . . . , D5⟩
+
+where P is the problem class, Z is the objective, and D1, . . . , D5 correspond to the five data domains introduced in Section 3.1. Each domain object Di = ⟨Ti, Fi⟩ expresses the categorical type Ti (e.g., conventional, scattered, human), and features Fi of the related domain models, as defined in Table 1. Data cards are structured hierarchically in YAML, mirroring the domain composition. Features are listed by name. When a feature carries a concrete value (e.g., n_blocks: 2), this value can be used for constraint evaluation in algorithm cards. Features listed without a value signal availability only; their presence indicates that the corresponding data exists in the warehouse setting. Figure 5(a) shows an example for the Kris instance set (Valle et al., 2017). 
+
+4.3. Algorithm Cards 
+
+Each algorithm in the repository introduced in Section 3.4 is accompanied by an algorithm card. An algorithm card 
+
+α ∈ A is defined by: 
+
+α = ⟨Rα, Pα, Zα⟩
+
+14 where Pα is the subproblem addressed, Zα is the optimization objective (empty for constructive methods without an explicit objective), and Rα = ⟨Tα, Fα, Cα⟩ specifies the algorithm requirements: the required domain types ( Tα), features ( Fα), and constraints ( Cα). Constraints can include comparison and set relations over features such as equals ,
+
+greater_than , or in , as well as logical combinations using and and or . This allows modeling requirements that go beyond feature presence. Algorithm requirements, subproblem, and objective are specified as YAML-formatted algorithm cards. Figure 5(b) shows an example for the RatliffRosenthalRouting algorithm (Ratli ff and Rosenthal, 1983; Heßler and Irnich, 2024). 
+
+4.4. Taxonomy 
+
+The problem taxonomy TP formalizes the mapping from each problem class P to its constituent subproblems. The taxonomy is given in Figure 6. It is based on the classification of order batching problems recently proposed by Pardo et al. (2024). To allow a broader range of problems to be covered, we extend it by the picker routing problem (PRP) and the IA subproblem, which are not covered in their work. In our taxonomy, the PRP requires only item assignment and routing; the order batching problem (OBP) adds batching, and the OBRP combines item assignment, order batching, and picker routing, with the option to solve batching and routing jointly through an integrated formulation (BR). The OBRSP additionally includes scheduling.    
+
+> P
+> PRP OBP OBRP OBRSP
+> IA
+> R
+> IA
+> B
+> IA
+> B
+> R
+> BR
+> IA
+> B
+> R
+> S
+> BR
+> S
+> Figure 6: Taxonomy implemented in CASOP. Problem (P); item assignment (IA); batching (B); routing (R); scheduling (S); picker routing problem (PRP); order batching problem (OBP); order batching and routing problem (OBRP); order batching, routing, and scheduling problem (OBRSP).
+
+4.5. Pipeline Synthesizer 
+
+The pipeline synthesizer generates executable optimization pipelines for a given warehouse setting. It uses the data card I, the algorithm cards A, and the taxonomy TP to first identify applicable algorithms, then compose them into valid context-aware pipelines, and execute them. 
+
+4.5.1. Domain-Algorithm Mapping 
+
+CASOPincludes a mapping mechanism that determines which algorithms from the repository A are applicable to a given data card I. The mapping produces the subset A∗ ⊆ A of applicable algorithms. The procedure is implemented by the DomainAlgoMapper class, which takes A, I, and TP as input and returns A∗. It proceeds in two stages. (1) Problem-type filtering. An algorithm described by algorithm card α = ⟨Rα, Pα, Zα⟩ passes the first stage if its declared subproblem Pα corresponds to the problem class P declared in I, or to one of its subproblems as defined by the taxonomy TP (see Section 4.4). For example, if I declares P = OBRP , then algorithms for the subproblems IA, B, R, and BR are admitted, while scheduling algorithms are filtered out. (2) Requirement matching. Each remaining algorithm is checked against the domain objects D1, . . . , D5 of I.Specifically, for each domain Di = ⟨Ti, Fi⟩ referenced by the algorithm requirements Rα = ⟨Tα, Fα, Cα⟩, the framework verifies: 15 (a) Type compatibility: The required domain type matches the data card’s type, i.e., Ti ∈ Tα, where any 
+
+indicates no restriction. (b) Feature availability: All required features are present, i.e., Fα ⊆ Fi.(c) Constraint satisfaction: All feature constraints Cα are satisfied by the concrete feature values in I.An algorithm α is applicable if and only if conditions (a)-(c) hold for every referenced domain. 
+
+4.5.2. Context-Aware Pipelines 
+
+The synthesizer builds valid algorithm pipelines for the active problem class, executes them, and ranks their results. It uses CLS-Luigi, which combines CLS with Luigi. CLS takes a repository of typed components and a target component, and searches for component combinations that can produce this target. Luigi executes the resulting combinations as directed acyclic task graphs and caches intermediate results. We implement the taxonomy from Figure 6 and the data flow between subproblems as a CLS-Luigi pipeline template, shown in Figure 7. InstanceLoader  AbstractItemAssignment  AbstractBatching  AbstractPickerRouting           
+
+> PickerRouting
+> AbstractScheduling AbstractResultAggregation
+> MultiOrderBatching
+> SingleOrderBatching CombinedBR
+> Distance
+> CBR
+> FiFo
+> RET
+> EDD
+> Component A
+> Abstract Component A
+> Concrete Component B
+> B depends on A
+> Data flow from A to B
+> Bspecializes A
+> BB
+> AA
+> AAB
+> DueDate
+> GIA NNIA
+> RR MP LG
+> DueDate LSFiFoNN
+> MinMax SPT LPT
+
+Figure 7: Visualization of the CASOPpipeline template. For readability, not all concrete implementations are shown. 
+
+First, the InstanceLoader provides the domain objects and instance data required by the decision components. Further, problem specific components model the data flow of the problems defined in the taxonomy: 
+
+• AbstractItemAssignment produces resolved pick positions. 
+
+• AbstractBatching has two alternatives: MultiOrderBatching , which applies a batching algorithm, and 
+
+SingleOrderBatching , which creates one batch per order. 
+
+• AbstractPickerRouting produces routing solutions. It can be instantiated by standalone routing algorithms that consume a BatchingSolution , or by an integrated batching-and-routing component that depends directly on item assignment. 
+
+• AbstractScheduling consumes routing solutions and instance data. It assigns tours to resources and determines their execution sequence. 
+
+ResultAggregation is the terminal component used as synthesis target. It collects objective values, runtimes, and the algorithm configurations used in each executed pipeline. The template distinguishes between abstract and concrete components. Abstract components represent the decision subproblems and define their typed inputs and outputs. Concrete components are the algorithm implementations that instantiate these abstract components. Algorithms from the repository described in Section 3.4 are added as concrete components. For example, batching algorithms instantiate MultiOrderBatching , routing algorithms instantiate the standalone routing alternative of 
+
+AbstractPickerRouting , and scheduling approaches instantiate AbstractScheduling .16 InstanceLoader  ResultAggregationDistance GIA  RR DueDate 
+
+IA->B->R 
+
+IA->BR   
+
+> InstanceLoader ResultAggregationDistance GIA CBR Figure 8: Example pipelines resulting from the defined template for the same problem (OBRP). The upper figure visualizes the OBRP in its decomposed, fully sequential form. The lower figure shows a partially integrated pipeline that combines batching and routing.
+
+Before synthesis, CASOP restricts the concrete components to the algorithms returned by the DomainAlgoMapper .Thus, only algorithms whose cards match the data card, problem class, objective, and feature constraints are available to CLS-Luigi. Starting from ResultAggregation , CLS searches for all valid component combinations that can produce the requested result object. In our implementation, ResultAggregation is specialized into objective-specific targets such as Distance and DueDate . Each valid inhabitant corresponds to one executable pipeline. The number of synthesized pipelines depends on the number of applicable algorithms per subproblem and on the structural alternatives encoded in the template. Figure 8 shows two pipelines synthesized from the template for the OBRP problem class. The first follows the sequential decomposition: item assignment, batching, routing, and result aggregation. The second uses the integrated batching-and-routing component and therefore bypasses separate batching and standalone routing. Both pipelines are valid because they can produce the requested aggregation target. After execution, AbstractResultAggregation collects the objective value, runtime, and concrete algorithm configuration of each executed pipeline. This is specialized into two variants for pipelines with and without time-related information. CASOP then ranks all successfully solved pipelines according to the objective specified in the data card I
+
+and returns the best-performing pipeline. 
+
+4.6. Pipeline Evaluator 
+
+Based on the aggregated results, we identify the best-performing pipeline with respect to the defined objective Z,which is derived from the data card I. To this end, we apply a straightforward ranking mechanism that evaluates the output of ResultAggregation across all successfully solved pipelines and ranks them by objective value, thereby determining the overall best-performing pipeline. 
+
+5. Framework Validation 
+
+We apply CASOP to seven benchmark data sets covering four problem types and warehouse settings that di ff er in layout, number of pickers, number of orders, storage policy, and available order information. The purpose of the experiments is to validate the implemented algorithms by comparing their solution quality to reported benchmark results, and answer the following three validation questions. (Q1) Framework Adaptability: Is the framework able to adapt to a wide range of warehouse and problem settings so that it can be adopted by practitioners? (Q2) Algorithm Selection Potential: Under what conditions does algorithm selection improve solution quality? (Q3) Benchmarking: How good is the performance of sequentially executed algorithms against the best known solutions? 17 Table 7: Overview of instance sets used in the experimental framework validation.                                                                                                         
+
+> Layout Capacity Storage Orders Resources Problem Instance Set Reference nbnanpδckStorage T# Policies |O| |L (o)||R|
+> SPRP SPRP Heßler and Irnich (2024) 15–50 30–180 ——Dedicated 113–30 1
+> SPRP-SS Heßler and Irnich (2024) 15–50 30–180 ——Scattered 113–30 1OBRP
+> BahceciOencan Bahçeci and Öncan (2022) 110 10 # Items 5–30 Dedicated 58–12 10–29 1
+> HennWaescher Henn et al. (2010) 110 45 # Items 30–75 Dedicated 220–100 125–442 1
+> MuterOencan Muter and Öncan (2015) 110 10 # Items 24–48 Dedicated 120–100 62–200 1
+> Foodmart van Gils et al. (2019) 28198 # Items 40 Dedicated 15–2000 59–8350 1OBRSP Kris Briant et al. (2023) 26–18 60–180 # Orderlines 4–45 Dedicated 16–300 1–45 2–6
+> Sources: ahttps://logistik.bwl.uni-mainz.de/forschung/benchmarks/ (SPRP, SPRP-SS, BahceciOencan, Henn, MuterOencan);
+> bhttps://pagesperso.g-scop.grenoble-inp.fr/~cambazah/batching/ (Foodmart); chttps://pagesperso.g-scop.grenoble-inp.fr/~cambazah/sequencing/ (Kris)
+
+The remainder of this section is structured around these questions. All experiments were conducted on a Manjaro Linux 25.0.10 workstation with an Intel Xeon W5-2445 CPU (10 cores, 20 threads) and 125 GB RAM. CASOP is implemented in Python 3.13.7, and we use Gurobi 12.0.3 with default solver settings for the CBR model. For the local search batching approach and the exact solution approaches, we set a time limit of 240 seconds, configurable through CLS-Luigi. All other heuristics were used without time limits. Each instance was processed by all applicable algorithm combinations. 
+
+5.1. Validation Setup 
+
+In the following, we briefly detail the validation setup. Our validation applies CASOP to seven benchmark instances across four problem classes: SPRP, SPRP-SS, OBRP, and OBRSP. To demonstrate the broad applicability of CASOP, we collected representative instance sets from the literature covering a wide range of warehouse settings. The instance sets are characterized by varying levels of, e.g., pickers, capacities, storage policies, number of orders and orderlines, layout characteristics, and order-level information (due dates). 
+
+Data Sources and Preprocessing. We evaluate CASOP on seven benchmark instance sets covering di ff erent problem classes, warehouse layouts, and operational settings. An overview of all instance sets and their key characteristics is provided in Table 7. We cover one SPRP instance set presented in Heßler and Irnich (2024). In the SPRP-SS set, scattered storage is considered, where items may be stored in multiple storage locations. Both instance sets have a single picker and a single-block, parallel-aisle layout, with varying numbers of aisles and storage locations per aisle. For OBRP, we evaluate four instance sets. MuterOencan , BahceciOencan , and Henn cover varying settings of single-block parallel-aisle layouts with varying picker capacities, number of orders, and number of articles per order. Each of these instance sets measures picker capacity in terms of the number of items. For BahceciOencan and Henn , five and two storage policies are varied, respectively. Foodmart features a parallel-aisle layout with two blocks connected by a cross-aisle. For Foodmart , picker capacity is constrained by the number of boxes on a picking cart. As boxes cannot contain mixed orders, each order o ∈ O requires a dedicated number of boxes calculated as bo = ⌈items o/B⌉, where B
+
+denotes the box capacity. A batch is feasible if Po∈b bo ≤ K, where K is the number of boxes per cart as defined in the Resources domain R. This constraint reflects the order indivisibility requirement from the original problem formulation by Valle et al. (2017), where orders from di ff erent customers cannot share baskets. The Kris instance set covers the OBRSP and was first proposed in Valle et al. (2017) and further improved and published online by Briant et al. (2023), who also publish solutions for a subset of 243 instances. Kris includes multiple pickers, a two-block layout, and order due dates, with all orders being released at the beginning of the planning horizon. The Kris instance set is provided with large and small instances that di ff er in the number of orders per instance, which we treat together. All instance sets originate from heterogeneous sources and formats. We therefore implement dedicated parsers and 
+
+DomainLoader to transform each instance into the unified CASOPdomain model. The preprocessing code and parsers are publicly available in our open-source repository to ensure reproducibility. 
+
+Employed Algorithms and Configurations. We use a broad set of algorithms covering all subproblems defined in Section 3. The employed methods and their abbreviations are summarized in Section 3.4. 18 Our focus is on the combination of heuristic approaches, and thus, exact routing approaches are excluded from our evaluation. The only exceptions are the runtime e ffi cient RR approach and CBR, which is included as an exact benchmark for routing and batching and to highlight the non-linear template structure. To keep experiment runtimes manageable, we evaluate CBR only on BahceciOencan , the smallest OBRP instance set. Batching methods that require configuration, e.g., with methods for initial solution construction, are evaluated using a restricted set of representative configurations. LocalSearchBatching is combined with three routing algorithms (RR, NN, SShape) for solution evaluation and two initialization strategies (FiFo, RAND), yielding six LS configurations. SeedBatching is evaluated with the seed criterion CLOSEST_TO_DEPOT and two similarity measures (SHARED_ARTICLES , MIN_DISTANCE ). For SavingsBatching , routing-based distance evaluation is performed using RR, NN, and SShape. 
+
+Performance Metrics and Objectives. Following common practice in algorithm selection literature (Bischl et al., 2016), we compare the following: 
+
+• Single Best Solver (SBS): The algorithm combination that achieves the best average performance across all instances in a instance sets. 
+
+• Virtual Best Solver (VBS): An oracle that always selects the best-performing algorithm for each instance. The VBS provides an upper bound on achievable performance through perfect algorithm selection. Because multiple strategies may yield the same result, we will use total runtime as a tiebreaker and always report the fastest strategy. The relative gap between SBS and VBS quantifies the potential benefit of algorithm selection: Relative Gap = SBS Mean − VBS Mean SBS Mean × 100% .
+
+We further report the gap between the best known solution (BKS) reported in literature and the VBS result per instance, i.e., Optimality Gap = VBS − BKS BKS × 100% .
+
+The runtime of the resulting pipelines is evaluated in seconds. In terms of objectives, we compare distance, makespan, tardiness, and on-time rate, based on the problem setting and instance features. 
+
+5.2. Q1: Framework Adaptability Across Problem Classes 
+
+We first analyze the pipeline generation process in general. We therefore evaluate the number of resulting pipelines per instance set and compare the runtimes of the three stages: instance generation, pipeline building, and execution. 
+
+Pipeline Overview. Table 8 summarizes the execution of CASOP, reporting the number of synthesized pipelines per instance set alongside the number of applicable algorithm components for item assignment, batching, routing, and scheduling. The results demonstrate how the filtering mechanism identifies applicable algorithms based on problem type and instance characteristics, e ff ectively pruning the combinatorial space of possible pipelines. We denote the filtered algorithm configurations per subproblem by IA ∗ ⊆ IA , B∗ ⊆ B, R∗ ⊆ R, BR ∗ ⊆ BR , and S∗ ⊆ S.For the SPRP and SPRP-SS instance sets, which consist of single-order instances without batching capacity, no genuine order-batching decision is present. For consistency with the pipeline template, the table reports one single-order batching alternative, which acts as an identity component. The resulting number of pipelines per instance is therefore 
+
+|IA | × | B| × | R|, with |B| = 1. For OBRP instance sets, batching algorithms are applicable as well. For BahceciOencan , the BR subproblem is applicable. Therefore, the resulting number of pipelines for this instance set is not only the Cartesian product 
+
+|IA ∗| × | B∗| × | R∗|, but also includes the pipelines generated by the combined batching-and-routing approach, |IA ∗| × | BR ∗|.For this instance set, the framework synthesizes both distance-based pipelines without scheduling and time-based pipelines with scheduling. The resulting number of pipelines per instance is therefore 
+
+|IA ∗| × | B∗| × | R∗| + |IA ∗| × | B∗| × | R∗| × | S∗|.
+
+19 Table 8: Number of resulting pipelines per instance set. 
+
+# Algorithms # Instances # Pipelines Instance Set IA B R BR SSPRP 1 1 6 0 0 2400 14400 
+
+SPRP-SS 5 1 6 0 0 14300 429000 
+
+BahceciOencan 1 11 6 1 0 1350 90450 
+
+HennWaescher 1 11 6 0 0 5759 380094 
+
+MuterOencan 1 11 6 0 0 270 17820 
+
+FoodmartData 1 9 5 0 0 144 6480 
+
+Kris 1 13 5 0 3 480 124800 
+
+P 24,704 1,063,044 These results demonstrate that CASOP is able to capture the domain features and algorithm requirements and successfully synthesizes valid algorithm pipelines for four di ff erent problem classes based on this information with a single CLS-Luigi template. 
+
+Runtimes. Table 9 reports the computational overhead of the pipeline synthesis process. The runtimes are given for    
+
+> Table 9: Detailed pipeline generation runtimes (mean ±std, in seconds)
+
+Instance Set Load Domain Build Pipelines Run Pipelines Total 
+
+SPRP 1.1717 ± 2.7287 0.221 ± 0.189 0.388 ± 0.722 1.781 ± 3.464 
+
+SPRP-SS 1.4288 ± 3.3660 0.569 ± 0.332 0.465 ± 0.835 2.463 ± 4.202 
+
+BahceciOencan 0.0088 ± 0.0083 0.878 ± 0.125 154 .078 ± 109 .904 154 .965 ± 109 .906 
+
+HennWaescher 0.0224 ± 0.0276 0.354 ± 0.167 25 .956 ± 30 .621 26 .333 ± 30 .590 
+
+MuterOencan 0.0025 ± 0.0004 0.235 ± 0.011 27 .489 ± 24 .348 27 .728 ± 24 .347 
+
+Foodmart 0.0851 ± 0.0431 0.190 ± 0.100 19 .728 ± 53 .565 20 .003 ± 53 .576 
+
+Kris 0.4311 ± 0.5602 23 .146 ± 22 .500 184 .554 ± 297 .259 208 .132 ± 284 .392 the initial domain generation (load domain), the pipeline build process (build pipelines), the sequential execution of the resulting pipelines (run pipelines), and the total time (total). Notably, the load domain and build pipelines phases remain negligible across all instance sets, except for Kris , confirming that the framework’s overhead for algorithm filtering and pipeline construction is minimal compared to actual algorithm execution. For SPRP-SS , the entire process completes in under 3 seconds per instance on average. Across all instances, the total runtime is dominated by the run pipelines phase, which executes all synthesized algorithm pipelines using Luigi. The long pipeline runtimes of Kris instances indicate that the time limits for the LS batching configurations are exhausted, and the relative complexity of the batching phase compared to other instance sets, where solutions can be found faster. This can also be seen in BahceciOencan , where the longer runtimes are attributable to the combined batching-and-routing approach. Also, for the other instance sets, high standard deviation indicates instance-dependent variability, likely driven by varying instance sizes and greater computational e ff ort, e.g., in generating the distance matrix and graph. At the same time, this serves as a good example of the caching mechanism of CLS-Luigi. When running new algorithms for the same instances, these time-consuming preprocessing steps do not have to be repeated. To summarize Q1, the experiments demonstrate that CASOP successfully processes instances across multiple problem classes, varying layout representations, storage policies, and resource configurations. The mapping approach implemented in CASOP automatically identifies applicable algorithms based on warehouse characteristics and algorithm requirements. Through direct comparison with the best reported results from the literature, we could also verify the correctness of the instance modeling and algorithm implementations. 
+
+5.3. Q2: Algorithm Selection Potential 
+
+Table 10 shows the comparison of VBS vs. SBS for all instance sets aggregated by the applicable objectives. We 20 Table 10: VBS overview.                                                                   
+
+> Problem Instance Set SBS Strategy SBS Mean VBS Mean Relative Gap % Objective SPRP SPRP GIA +RawInput +RR 589.83 589.83 0.00 distance SPRP SPRP-SS MinMinIA +RawInput +RR 395.28 385.78 2.40 distance OBRP BahceciOencan GIA +CBR 168.28 168.10 0.11 distance OBRP HennWaescher GIA +SavingsRR +RR 8114.34 8083.95 0.37 distance OBRP MuterOencan GIA +SavingsRR +RR 1293.23 1279.49 1.06 distance OBRP Foodmart GIA +SavingsNN +NN 2299.58 2095.33 8.88 distance OBRSP Kris GIA +SavingsNN +NN +EDD 144076.33 143695.60 0.26 distance OBRSP Kris GIA +SavingsNN +NN +LPT 71368.43 70044.13 1.86 makespan OBRSP Kris GIA +DueDate +NN +EDD 2153.53 2037.06 5.41 max_tardiness OBRSP Kris GIA +DueDate +NN +EDD 96.49 97.94 1.50 on_time_rate
+
+report the name of the SBS as a concatenation of the pipeline’s algorithmic components in the order of item assignment, pick list generation, picker routing, and scheduling. We further report the mean distance of the SBS (SBS mean), the mean distance of the VBS (VBS mean), and the gain achieved by the VBS as relative gap between SBS and VBS (Relative Gap %). For most instance sets, the potential gain expected from the VBS is marginal and largely depends on the applicable solution approaches. The largest gains can be observed for the Foodmart and SPRP-SS instance sets, with a gain of 8.88 % and 2.40 %, respectively. For other instance sets such as SPRP , Kris , and BahceciOencan , we find a gain of around 0 % for the distance objective. This indicates that there is a single strategy that performs best on every instance of the respective instance set. The reason in the case of SPRP , and BahceciOencan is the use of approaches that provide exact results. For HennWaescher and MuterOencan , CBR was not used, but we can still see that the combination of SavingsRR and RR wins on almost every instance, which again is not surprising, as both approaches use the exact RR routing approach. The LS configurations were not able to outperform the savings approach within the specified time limit. 
+
+Foodmart has the largest relative gap between SBS and VBS. To investigate this, we analyze the per-instance gap between each strategy and the VBS as a function of the number of orders. Figure 9 shows the gap to the VBS (top) and the mean CPU time (bottom) for all strategies that achieve the best result on at least one instance. For small and medium instances (up to 100 orders), the local search configurations GIA +LSOrdNrNN +NN and GIA +LSRANDNN +NN consistently achieve the lowest gaps. However, for instances with 500 or more orders, their CPU time approaches the 240-second time limit, and the gap increases to over 80%. The savings- and seed-based strategies maintain stable gaps across all instance sizes at low computational cost. The local search configurations dominate on small instances but exhaust the 240-second time limit on large instances, degrading their mean performance. As the SBS is determined by the overall mean, it falls on GIA +SavingsNN +NN. Figure 9 indicates that this strategy actually performs worse than the LS based strategy for all instances below 200 orders. This also highlights the drawback of the pure mean-based determination of the SBS. Since the Kris instances allow us to solve the scheduling subproblem, we can analyze time-related objectives. The comparison of the SBS reveals that for di ff erent objectives, di ff erent strategies may perform better, and rankings across di ff erent objectives are not consistent, as illustrated in Figure 10. For the distance and makespan objectives, the pipeline GIA +SavingsNN +NN +LPT performs best. However his pipeline is not in the top ten for the due-date-related objectives, where GIA +DueDate +NN +EDD consistently performs best. This is because the pipelines for distance and makespan ignore the due-date constraints and can therefore find solutions that are better than those that sort by due date. To summarize Q2, algorithm selection improves solution quality when the best-performing pipeline depends on instance characteristics or on the objective function. For most distance-based objectives, the relative gap between SBS and VBS is small, indicating that a single robust strategy often dominates across the entire instance set. This is especially visible for SPRP , BahceciOencan , HennWaescher , MuterOencan , and Kris under the distance objective. However, the Foodmart results clearly show the potential of algorithm selection: local-search configurations perform best on small and medium instances, whereas savings- and seed-based strategies are more stable on larger instances where local search runs out of time. The Kris results further indicate that the best pipeline depends on the objective, since distance, makespan, tardiness, and on-time rate favor di ff erent strategy rankings. Algorithm selection is therefore 21 Figure 9: Per-strategy gap to the VBS (top) and mean CPU time (bottom) on the Foodmart instance set, grouped by number of orders. total_distance 
+
+> makespan
+> on_time_rate
+> max_tardiness
+> max_lateness
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10 
+
+> Rank
+
+Distance Time Due Date 
+
+Pipeline 
+
+> GIA+DueDate+LG+EDD
+> GIA+DueDate+MP+EDD
+> GIA+DueDate+NN+EDD
+> GIA+LSDueDateNN+NN+EDD
+> GIA+LSDueDateNN+NN+LPT
+> GIA+LSDueDateNN+NN+SPT
+> GIA+LSFiFoNN+NN+EDD
+> GIA+LSFiFoNN+NN+LPT
+> GIA+LSOrdNrNN+NN+EDD
+> GIA+LSOrdNrNN+NN+LPT
+> GIA+LSRANDNN+NN+EDD
+> GIA+LSRANDNN+NN+LPT
+> GIA+LSRANDNN+NN+SPT
+> GIA+SEEDCDMinDist+NN+EDD
+> GIA+SavingsNN+NN+EDD
+> GIA+SavingsNN+NN+LPT
+> GIA+SavingsNN+NN+SPT
+> GIA+SavingsSShape+NN+EDD
+
+Figure 10: Varying ranks of strategies for di ff erent objectives on the Kris instance set. Results are grouped by objective and objective categories. We show the ten best performing strategies for the respective objective, ranked from best to worst. 
+
+22 most useful in heterogeneous settings where instance size, time limits, or objective functions change the relative performance of the available pipelines. 
+
+5.4. Q3: Benchmarking Against Best Known Solutions 
+
+We compare the VBS results to the BKS values from the corresponding benchmark studies, where possible. These results contain both heuristic and optimal solutions. For Kris , the objective values are calculated from the reported solution schedules. Table 11 reports the number of benchmark instances (# Instances), the evaluated objective (Objective), the mean relative gap of the VBS to the BKS (Mean Gap to BKS [%]), the ex-post runtime of the selected VBS pipeline (VBS Runtime [s]), and the corresponding mean objective values of the VBS and the BKS (VBS Mean and BKS Mean). 
+
+Table 11: Validation results across instance sets. 
+
+Instance Set # Instances Objective Mean Gap to BKS [%] VBS Runtime [s] VBS Mean BKS Mean 
+
+SPRP 2400 distance 0.000 0.006 589.834 589.834 
+
+SPRP-SS 14300 distance 9.574 0.004 385.784 345.356 
+
+BahceciOencan 1350 distance 0.015 36.333 168.102 168.074 
+
+HennWaescher 1440 distance 3.206 4.085 8090.171 7840.128 
+
+MuterOencan 270 distance 2.458 7.144 1308.775 1278.174 
+
+Foodmart 42 distance 6.296 0.307 850.801 799.302 
+
+Kris 294 distance 6.655 0.067 69828.082 64261.571 
+
+Kris 294 on-time rate 0.945 0.072 99.050 99.993 
+
+Kris 294 on-time_distance 13.945 0.062 81898.231 64261.571 
+
+Figure 11 visualizes the gap between the VBS and the optimal results as boxplots.  
+
+> Figure 11: Comparison of gap between VBS and BKS on di ff erent instance sets. Results are grouped by instance set and problem class and sorted in ascending order by average gap of the VBS. While the instance sets for the problem classes SPRP and OBRP show the distance objective, for Kris ,three objectives are evaluated, which are specified in parentheses.
+
+As expected, the framework achieves the best results for instance sets with parallel-aisle single-block layouts (SPRP , BahceciOencan , MuterOencan ), where exact approaches for the subproblems are applicable. For SPRP , we can validate the correctness of our RR implementation and our instance representation, as it matches the reported results in Heßler and Irnich (2024). The VBS reaches a Mean Gap to BKS of 0.000%, with identical VBS Mean and BKS Mean values of 589.834. For SPRP-SS , the remaining gap is mainly caused by the fact that the item assignment is solved with a heuristic component, as opposed to the integrated approach presented in Heßler and Irnich (2024). On the BahceciOencan 
+
+23 instance set, the average gap to the best reported results is close to zero, indicating that the integrated CBR model is able to reproduce the optimal results reported in Heßler and Irnich (2022). The results of MuterOnecan and HennWaescher ,for which CBR was not used, show that heuristic batching approaches combined with RR routing are strong baselines, achieving Mean Gap to BKS values of 2.458% and 3.206%, respectively. For Foodmart , we observe a Mean Gap to BKS of 6.296%. This instance set uses a two-block layout, making RR routing inapplicable to the evaluated implementation. For the Kris instance set, we evaluate three objectives: on-time rate, distance objective, and the hierarchical objective of on-time rate and distance. For the hierarchical objective, the VBS selects the pipeline with the highest on-time rate per instance, using distance only as a tiebreaker. This is the fairest comparison, as using the VBS solely for the distance objective would not respect the due-date constraints the literature model is subject to. Although the VBS achieves a Mean Gap to BKS below 1% for the on-time rate objective, this does not translate to the hierarchical objective where the Mean Gap to BKS is 13.945%. When simply selecting the pipeline with the shortest distance, we can achieve a Mean Gap to BKS of 6.655%. To summarize Q3, the benchmark comparison shows that the VBS can reproduce or closely approach best reported solution values when the evaluated component portfolio matches the benchmark setting. For SPRP , the RR implementation exactly matches the reported results, validating both the routing implementation and the instance representation. For BahceciOencan , the integrated CBR model yields a Mean Gap to BKS close to zero. For settings without CBR, the results quantify the performance of sequential batching-and-routing pipelines. The VBS achieves an average gap of 3.206% for HennWaescher and 2.458% for MuterOencan . Larger gaps occur, for instance, in sets where the evaluated portfolio relies on heuristic components or where specific exact components are not applicable or not yet implemented in the algorithm repository, as in SPRP-SS , Foodmart , and the hierarchical objective on Kris .
+
+6. Conclusion and Future Research 
+
+This paper introduced the CASOP framework for context-aware synthesis of optimization pipelines in warehouse optimization. Building on the need to study decomposed planning models in warehouse operations, the framework ad-dresses how order fulfillment problems can be decomposed into subproblems, how applicable algorithm configurations can be identified from warehouse context and algorithm requirements, and how these configurations can be composed into executable pipelines. CASOP combines four main components. First, warehouse systems are described using structured, machine-readable data cards that capture the problem class, objective, and available warehouse data across the five domain objects: layout, articles, orders, resources, and storage. Second, optimization algorithms are represented as algorithm cards that specify the addressed subproblem, optimization objective, and requirements regarding domain types, features, and feature constraints. Third, a context-aware mapping procedure matches algorithm requirements against the data card and the problem taxonomy to identify algorithms applicable to a given warehouse setting. Fourth, the resulting algorithms are composed into executable pipelines using CLS-Luigi. The taxonomy is translated into a pipeline template that covers both sequential decompositions and partially integrated solution paths, such as integrated batching and routing, and is instantiated using algorithms from the open-source repository provided with the framework, which includes implementations for item assignment, order batching, picker routing, integrated batching and routing, and picker scheduling. The experimental evaluation shows that CASOP can be applied across heterogeneous warehouse optimization settings. Across seven benchmark instance sets covering four problem classes, the framework generated and evaluated 1,063,044 valid pipelines on 24,704 instances. The comparison with reported benchmark results further shows the performance range of the evaluated component portfolio. For BahceciOencan , the integrated CBR model yields an average gap close to zero, while sequential heuristic pipelines achieve average gaps of 3.43% and 4.85% for 
+
+HennWaescher and MuterOencan , respectively. Larger gaps occur in settings where the evaluated portfolio relies on heuristic components because exact-algorithm components are not applicable, for example, in scattered-storage instances or two-block layouts. Overall, the paper demonstrates that context-aware pipeline synthesis is a feasible approach for structuring and evaluating decomposed decision-making approaches in warehouse optimization. Instead of studying isolated algorithms or manually selected combinations, the proposed framework makes the relation between warehouse context, algorithm applicability, pipeline structure, and resulting performance explicit. 24 Based on this, several directions for future work emerge. First, while this paper focuses on order fulfillment, the methodology can be transferred to other warehouse optimization problems and potentially to broader supply chain planning settings. Second, the algorithm repository should be extended to integrate additional subproblems and algorithm variants for existing ones. Third, future work should study dynamic and online warehouse settings, where the applicable pipeline may change as orders, resources, and system states evolve. Finally, recent developments in large language models and agentic systems may support selected parts of the framework, such as generating algorithm cards, refining pipeline templates, or integrating new algorithm components. 
+
+Acknowledgements 
+
+This publication was produced as part of the research project “Data- and target-driven sequential decision-making for time-dynamic logistics systems”, which was funded by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) – 502552827. 
+
+References 
+
+Amazon.com, Inc., 2024. Fulfillment and delivery. URL: https://press.aboutamazon.com/fulfillment-and -delivery . image reproduced with permission. Accessed: 2026-05-13. de Assis, R.F., de Paula Ferreira, W., Ouhimmou, M., 2025. Order picking dataset from a warehouse of a footwear manufacturing company. Data in Brief 61, 111837. doi: 10.1016/j.dib.2025.111837 .Bahçeci, U., Öncan, T., 2022. An evaluation of several combinations of routing and storage location assignment policies for the order batching problem. International Journal of Production Research 60, 5892–5911. doi: 10.1080/ 00207543.2021.1973684 .Beeks, M., Afshar, R.R., Zhang, Y., Dijkman, R., Van Dorst, C., De Looijer, S., 2022. Deep reinforcement learning for a multi-objective online order batching problem, in: Proceedings of the International Conference on Automated Planning and Scheduling, pp. 435–443. Benavides-Robles, M.T., Cruz-Duarte, J.M., Ortiz-Bayliss, J.C., Amaya, I., 2025. Algorithm selection for allocating pods within robotic mobile fulfillment systems: A hyper-heuristic approach. IEEE Access 13, 14010–14028. doi: 10.1109/ACCESS.2025.3530842 .Bessai, J., Dudenhefner, A., Düdder, B., Martens, M., Rehof, J., 2014. Combinatory logic synthesizer, in: International Symposium On Leveraging Applications of Formal Methods, Verification and Validation, pp. 26–40. doi: 10.1007/ 978-3-662-45234-9_3 .Bischl, B., Kerschke, P., Kottho ff , L., Lindauer, M., Malitsky, Y., Fréchette, A., Hoos, H., Hutter, F., Leyton-Brown, K., Tierney, K., Vanschoren, J., 2016. ASlib: A benchmark library for algorithm selection. Artificial Intelligence 237, 41–58. doi: 10.1016/j.artint.2016.04.003 .Bock, S., Bomsdorf, S., Boysen, N., Schneider, M., 2025. A survey on the Traveling Salesman Problem and its variants in a warehousing context. European Journal of Operational Research 322, 1–14. doi: 10.1016/j.ejor.2024.04 .014 .Boysen, N., de Koster, R., 2025. 50 years of warehousing research: An operations research perspective. European Journal of Operational Research 320, 449–464. doi: 10.1016/j.ejor.2024.03.026 .Boysen, N., de Koster, R., Weidinger, F., 2019. Warehousing in the e-commerce era: A survey. European Journal of Operational Research 277, 396–411. doi: 10.1016/j.ejor.2018.08.023 .Briant, O., Cambazard, H., Cattaruzza, D., Catusse, N., Ladier, A.L., Ogier, M., 2020. An e ffi cient and general approach for the joint order batching and picker routing problem. European Journal of Operational Research 285, 497–512. doi: 10.1016/j.ejor.2020.01.059 .25 Briant, O., Cambazard, H., Cattaruzza, D., Catusse, N., Ladier, A.L., Ogier, M., 2023. Lower and upper bounds for the joint batching, routing and sequencing problem. URL: https://arxiv.org/abs/2303.17834 ,
+
+arXiv:2303.17834 . arXiv preprint arXiv:2303.17834. Cals, B., Zhang, Y., Dijkman, R., Van Dorst, C., 2021. Solving the online batching problem using deep reinforcement learning. Computers & Industrial Engineering 156, 107221. Cheng, B., Xie, T., Wang, L., Tan, Q., Cao, X., 2024. Deep reinforcement learning driven cost minimization for batch order scheduling in robotic mobile fulfillment systems. Expert Systems with Applications 255, 124589. doi: 10.1016/j.eswa.2024.124589 .Clarke, G., Wright, J.W., 1964. Scheduling of vehicles from a central depot to a number of delivery points. Operations Research 12, 568–581. Clements, P.C., Northrop, L.M., 2001. Software Product Lines: Practices and Patterns. Addison-Wesley, Boston, MA. de Koster, R., Le-Duc, T., Roodbergen, K.J., 2007. Design and control of warehouse order picking: A literature review. European Journal of Operational Research 182, 481–501. doi: 10.1016/j.ejor.2006.07.009 .Graham, R.L., 1969. Bounds on multiprocessing timing anomalies. SIAM Journal on Applied Mathematics 17, 416–429. doi: 10.1137/0117039 .Gu, J., Goetschalckx, M., McGinnis, L.F., 2007. Research on warehouse operation: A comprehensive review. European Journal of Operational Research 177, 1–21. doi: 10.1016/j.ejor.2006.02.025 .Henn, S., Koch, S., Doerner, K.F., Strauss, C., Wäscher, G., 2010. Metaheuristics for the Order Batching Problem in Manual Order Picking Systems. Business Research 3, 82–105. doi: 10.1007/BF03342717 .Heßler, K., Irnich, S., 2022. Modeling and Exact Solution of Picker Routing and Order Batching Problems. Technical Report LM-2022-03. Chair of Logistics Management, Gutenberg School of Management and Economics, Johannes Gutenberg University Mainz. Mainz, Germany. Heßler, K., Irnich, S., 2024. Exact solution of the single-picker routing problem with scattered storage. INFORMS Journal on Computing 36, 1417–1435. doi: 10.1287/ijoc.2023.0075 .Klein, J.F., Wurster, M., Stricker, N., Lanza, G., Furmans, K., 2021. Towards ontology-based autonomous intralo-gistics for agile remanufacturing production systems, in: 2021 26th IEEE International Conference on Emerging Technologies and Factory Automation (ETFA ), pp. 01–07. doi: 10.1109/ETFA45728.2021.9613486 .Knoll, D., Waldmann, J., Reinhart, G., 2019. Developing an internal logistics ontology for process mining. Procedia CIRP 79, 427–432. Koch, S., 2014. Genetische Algorithmen für das Order Batching-Problem, in: Genetische Algorithmen für das Order Batching-Problem in manuellen Kommissioniersystemen. Springer, pp. 94–118. Kostovska, A., Vermetten, D., Doerr, C., Džeroski, S., Panov, P., Eftimov, T., 2021. Option: optimization algorithm benchmarking ontology, in: Proceedings of the Genetic and Evolutionary Computation Conference Companion, pp. 239–240. Lüke, L., Heßler, K., Irnich, S., 2024. The single picker routing problem with scattered storage: modeling and evaluation of routing and storage policies. OR Spectrum 46, 909–951. doi: 10.1007/s00291-024-00760-4 .Mäckel, D., Winkels, J., Schumacher, C., 2021. Synthesis of scheduling heuristics by composition and recombination, in: Optimization and Learning, Springer International Publishing. pp. 283–293. doi: 10.1007/978-3-030-85672 -4_21 .26 Mages, A., Mieth, C., Hetzler, J., Kallat, F., Rehof, J., Riest, C., Schäfer, T., 2022. Automatic component-based synthesis of user-configured manufacturing simulation models, in: 2022 Winter Simulation Conference (WSC), pp. 1841–1852. doi: 10.1109/WSC57314.2022.10015425 .Meyer, A., Kutabi, H., Bessai, J., Scholtyssek, D., 2024. CLS-Luigi: Analytics pipeline synthesis, in: Learning and Intelligent Optimization, Springer. pp. 269–284. doi: 10.1007/978-3-031-75623-8_21 .Mitchell, M., Wu, S., Zaldivar, A., Barnes, P., Vasserman, L., Hutchinson, B., Spitzer, E., Raji, I.D., Gebru, T., 2019. Model Cards for Model Reporting, in: Proceedings of the Conference on Fairness, Accountability, and Transparency, pp. 220–229. doi: 10.1145/3287560.3287596 .Muter, I., Öncan, T., 2015. An exact solution approach for the order batching problem. IIE Transactions 47, 728–738. doi: 10.1080/0740817X.2014.991478 .Müller, D., Müller, M.G., Kress, D., Pesch, E., 2022. An algorithm selection approach for the flexible job shop scheduling problem: Choosing constraint programming solvers through machine learning. European Journal of Operational Research 302, 874–891. doi: 10.1016/j.ejor.2022.01.034 .Negri, E., Perotti, S., Fumagalli, L., Marchet, G., Garetti, M., 2017. Modelling internal logistics systems through ontologies. Computers in Industry 88, 19–34. doi: 10.1016/j.compind.2017.03.004 .Oxenstierna, J., Malec, J., Krueger, V., 2021. Layout-agnostic order-batching optimization, in: International Conference on Computational Logistics, pp. 115–129. doi: 10.1007/978-3-030-87672-2_8 .Pardo, E.G., Gil-Borrás, S., Alonso-Ayuso, A., Duarte, A., 2024. Order batching problems: Taxonomy and literature review. European Journal of Operational Research 313, 1–24. doi: 10.1016/j.ejor.2023.02.019 .Petersen, C.G., 1997. An evaluation of order picking routeing policies. International Journal of Operations & Production Management 17, 1098–1111. doi: 10.1108/01443579710177860 .Petersen, C.G., Schmenner, R.W., 1999. An evaluation of routing and volume-based storage policies in an order picking operation. Decision Sciences 30, 481–501. Pinto, A.R.F., Nagano, M.S., Boz, E., 2023. A classification approach to order picking systems and policies: Integrating automation and optimization for future research. Results in Control and Optimization 12, 100281. doi: 10.1016/j.rico.2023.100281 .Pohl, K., Böckle, G., van der Linden, F.J., 2005. Software Product Line Engineering: Foundations, Principles and Techniques. Springer, Berlin, Heidelberg. Pushkarna, M., Zaldivar, A., Kjartansson, O., 2022. Data cards: Purposeful and transparent dataset documentation for responsible AI, in: Proceedings of the 2022 ACM Conference on Fairness, Accountability, and Transparency, pp. 1776–1826. Ratli ff , H.D., Rosenthal, A.S., 1983. Order-Picking in a Rectangular Warehouse: A Solvable Case of the Traveling Salesman Problem. Operations Research 31, 507–521. doi: 10.1287/opre.31.3.507 .Spotify, 2025. Luigi documentation. URL: https://luigi.readthedocs.io/en/stable/ . accessed: 2025-09-11. Valle, C.A., Beasley, J.E., da Cunha, A.S., 2017. Optimally solving the joint order batching and picker routing problem. European Journal of Operational Research 262, 817–834. doi: 10.1016/j.ejor.2017.03.069 .van Gils, T., Caris, A., Ramaekers, K., Braekers, K., 2019. Formulating and solving the integrated batching, routing, and picker scheduling problem in a real-life spare parts warehouse. European Journal of Operational Research 277, 814–830. doi: 10.1016/j.ejor.2019.03.012 .Weidinger, F., 2018. Picker routing in rectangular mixed shelves warehouses. Computers & Operations Research 95, 139–150. doi: 10.1016/j.cor.2018.03.012 .27 Weidinger, F., Boysen, N., Schneider, M., 2019. Picker routing in the mixed-shelves warehouses of e-commerce retailers. European Journal of Operational Research 274, 501–515. doi: 10.1016/j.ejor.2018.10.021 .Wildt, C., Weidinger, F., Boysen, N., 2025. Picker routing in scattered storage warehouses: an evaluation of solution methods based on TSP transformations. OR Spectrum 47, 35–66. doi: 10.1007/s00291-024-00780-0 .Winkels, J., Özkul, F., Sutherland, R., Löhn, J., Wenzel, S., Rehof, J., 2024. Component-based synthesis of structural variants of simulation models for changeable material flow systems, in: 2024 Winter Simulation Conference (WSC), pp. 1657–1668. doi: 10.1109/WSC63780.2024.10838927 .Xu, L., Hutter, F., Hoos, H.H., Leyton-Brown, K., 2008. SATzilla: Portfolio-based algorithm selection for SAT. Journal of Artificial Intelligence Research 32, 565–606. Yang, Z., Zeng, W., Jin, S., Qian, C., Luo, P., Liu, W., 2025. AutoMMLab: Automatically generating deployable models from language instructions for computer vision tasks, in: Proceedings of the AAAI Conference on Artificial Intelligence, pp. 22056–22064. doi: 10.1609/aaai.v39i21.34358 .Žulj, I., Kramer, S., Schneider, M., 2018. A hybrid of adaptive large neighborhood search and tabu search for the order-batching problem. European Journal of Operational Research 264, 653–664. doi: 10.1016/j.ejor.2017.06.056 .28

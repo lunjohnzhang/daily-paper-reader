@@ -1,0 +1,12088 @@
+Title: DUET: Decentralized Bilevel Optimization without Lower-Level Strong Convexity
+
+URL Source: https://arxiv.org/pdf/2606.21153v1
+
+Published Time: Tue, 23 Jun 2026 00:36:43 GMT
+
+Number of Pages: 47
+
+Markdown Content:
+Published as a conference paper at ICLR 2025 
+
+# DUET : DECENTRALIZED BILEVEL OPTIMIZATION WITHOUT LOWER -L EVEL STRONG CONVEXITY 
+
+Zhen Qin †, Zhuqing Liu ‡, Songtao Lu ◦∗ 
+
+, Yingbin Liang †, Jia Liu ††Department of Electrical and Computer Engineering, The Ohio State University 
+
+> ‡
+
+Department of Computer Science and Engineering, University of North Texas 
+
+> ◦
+
+Department of Computer Science and Engineering, The Chinese University of Hong Kong 
+
+ABSTRACT 
+
+Decentralized bilevel optimization (DBO) provides a powerful framework for multi-agent systems to solve local bilevel tasks in a decentralized fashion without the need for a central server. However, most existing DBO methods rely on lower-level strong convexity (LLSC) to guarantee unique solutions and a well-defined hypergradient for stationarity measure, hindering their applicability in many practical scenarios not satisfying LLSC. To overcome this limitation, we introduce a new single-loop DBO algorithm called diminishing quadratically-regularized bilevel decentralized optimization ( DUET ), which eliminates the need for LLSC by introducing a diminishing quadratic regularization to the lower-level (LL) objective. We show that DUET achieves an iteration complexity of O(1 /T 1−5p− 11 4 τ ) for approximate KKT-stationary point convergence under relaxed assumptions, where 
+
+p and τ are control parameters for LL learning rate and averaging, respectively. In addition, our DUET algorithm incorporates gradient tracking to address data heterogeneity, a key challenge in DBO settings. To the best of our knowledge, this is the first work to tackle DBO without LLSC under decentralized settings with data heterogeneity. Numerical experiments validate the theoretical findings and demonstrate the practical effectiveness of our proposed algorithms. 
+
+1 INTRODUCTION 
+
+In recent years, Decentralized Bilevel Optimization (DBO) over networks has gained significant attention. Consider a DBO problem, where the agents form a peer-to-peer network represented by an undirected connected graph G = ( N , L). Here N and L are the sets of agents (nodes) and edges, respectively, with |N | = m.Each agent i can share information with neighboring agents Ni ≜ {i′ ∈ N : ( i, i ′) ∈ L} and has access to a local dataset of size n. The goal is for all agents to collaboratively solve the following decentralized bilevel optimization problem: 
+
+min  
+
+> xi∈Rp1,yi∈S (xi)
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+fi (xi, yi) (1) s.t. S(xi) := arg min 
+
+> yi∈Rp2
+
+gi(xi, yi), ∀i; xi = xi′ , if (i, i ′) ∈ L , (2) where xi ∈ Rp1 and yi ∈ Rp2 are parameters to be trained for the UL and LL subproblems at agent 
+
+i, respectively. In this paper, we assume that the UL objective 1
+
+> m
+
+Pmi=1 fi (xi, yi) is non-convex and the LL objectives gi(xi, yi), ∀i, are convex but not strongly convex (i.e., not LLSC), respectively. In the absence of LLSC, the LL solution could be a set-valued map S(xi) (i.e., non-unique optimal solutions to the LL problem). The consensus constraints xi = xi′ in (2) ensure that the local copies at neighboring agents i and i′ are equal to each other, hence a “consensus” among the agents. The LL variable yi is influenced by the UL variable xi chosen from the feasible set X (i.e., xi ∈ X). DBO provides an effective framework for solving multi-agent, nested optimization problems, where each agent solves a local bilevel task while coordinating with others in a network without relying 
+
+> ∗
+
+This work was completed while S. Lu was a senior research scientist at IBM Research in the U.S. 
+
+1
+
+> arXiv:2606.21153v1 [math.OC] 19 Jun 2026
+
+Published as a conference paper at ICLR 2025 on a central server. This approach proves particularly beneficial in scenarios such as multi-agent pretraining-finetuning (Rajeswaran et al., 2019; Poon & Peyré, 2021; Liu & Liu, 2021; Hashemi et al., 2024) for Large Language Models (LLMs), which faces significant challenges in private finetuning data environments, thereby making collaboration critical for successful fine-tuning. This framework is also useful in multi-agent meta learning (Rajeswaran et al., 2019; Liu & Liu, 2021), and reinforcement learning (Zhang et al., 2020; Lu et al., 2022), where decentralization reduces communication costs and enhances privacy. DBO problems share the same structure as their centralized counterpart and involve an upper-level (UL) objective function dependent on the optimal parameter values of a lower-level (LL) objective. Even in the centralized case, bilevel optimization is inherently challenging without lower-level strong convexity (LLSC). Several algorithmic approaches have been proposed for centralized bilevel optimization without LLSC. These include using the sequential averaging method (SAM) (Sabach & Shtern, 2017; Liu et al., 2023a; Li et al., 2020), penalty methods (Lu & Mei, 2023), and employing the value function approach (Yao et al., 2024). Despite the progress in LLSC-less centralized bilevel optimization, designing efficient algorithms for LLSC-less DBO turns out to be far from a simple extension of the centralized counterpart. Instead, LLSC-less DBO is a new area with a collection of new challenging and important problems, which warrant drastically different algorithmic designs. To date, LLSC-less DBO remains under-explored and this gap in the literature is largely due to the fact that most of the algorithmic ideas for centralized bilevel optimization cannot be directly applied to DBO. The first key reason is that, instead of solving a single LL problem, DBO involves multiple LL tasks across different agents, making centralized techniques inapplicable. Another major challenge is the data heterogeneity across agents, where each agent works with its own distinct dataset. This further complicates coordination among agents, making it difficult for centralized bilevel optimization approaches to be effective in DBO. To solve DBO problems without LLSC, a natural starting point is to leverage the decentralized network-consensus approach (Nedic & Ozdaglar, 2009), where agents collaboratively solve a global learning task to reach a consensus. However, two fundamental challenges arise when applying network-consensus methods to DBO: (1) Most existing DBO methods (see, e.g., (Chen et al., 2022; 2023; Lu et al., 2022; Niu et al., 2023; Liu et al., 2022b; Qiu et al., 2023; Liu et al., 2023b),) heavily rely on the assumption of LLSC to guarantee a well-defined Hessian inverse in the upper-level (UL) hypergradient evaluation and the uniqueness of the LL solution, both of which may break down in the absence of LLSC. Excerbating the situation is the fact that the norm of the UL hypergradient is the most widely used stationarity measure for bilevel optimization. Without a well-defined UL hypergradient in the absence of LLSC, it is not even clear what should be used as a stationarity measure in DBO; (2) Without LLSC, the lack of uniqueness in LL solutions complicates coordination in decentralized network-consensus approaches, where agents must exchange their updates without a central server. Aggregating information from agents becomes more difficult, as the LL solution may shift randomly, resulting in oscillations and poor convergence in DBO. These challenges motivate us to design new efficient network-consensus-based algorithms for DBO without LLSC. Toward this end, we propose a novel approach called diminishing quadratically-regularized bilevel decentralized optimization ( DUET ). To our knowledge, none of the existing works has considered solving LLSC-less DBO problems, particularly in decentralized environments with data heterogeneity. Our major contributions are summarized as follows: • New Single-Loop Algorithm for LLSC-less DBO: We propose DUET , a single-loop algorithm that integrates gradient tracking and consensus updates to avoid the computational complexity of conventional double-loop structure in bilevel optimization, while ensuring convergence in decentralized settings with data heterogeneity. To our knowledge, this is the first algorithm with provable convergence for DBO without LLSC. • New Stationarity Measure for LLSC-less DBO Convergence: We propose to use the approxi-mate KKT stationarity as the convergence measure of DBO solution quality in our algorithm and provide a detailed convergence rate analysis based on this new measure. We establish state-of-the-art finite-time convergence rates of O(1 /T 1−3p− 11 4 τ ) and O(1 /T 1−5p− 11 4 τ ) corresponding to the dual variables being bounded and unbounded, respectively. Here, τ and p control the LL learn-ing rate and averaging, respectively. Moreover, we note that this new approximate KKT-based stationarity measure is general for all DBO problems, which could be of independent theoretical interests. Most notably, the convergence of our DUET algorithms is proved by establishing a new descent lemma for the Lyapunov function (cf. Lemma 1), which resolves the difficulty resulting from the inapplicability of using the standard descent lemma in the absence of LLSC. 2Published as a conference paper at ICLR 2025 • New Augmented LL Objective: We propose a new augmented LL objective function that allows us to relax several restrictive assumptions made in existing works on LLSC-less bilevel optimization. Notably, our approach does not require strong convexity for the UL objective at each agent, Lipschitz continuity of second-order derivatives, or a bounded dataset. • Handling Decentralization with Data Heterogeneity: Without gradient heterogeneity assump-tions, our algorithm overcomes the challenges of consensus errors in DBO with data heterogeneity, ensuring agents can synchronize their updates effectively without relying on LLSC. 
+
+2 RELATED WORK 
+
+In this section, we provide an overview of two closely related lines of works: 1) DBO and 2) centralized bilevel optimization without LLSC, thus putting our work into comparative perspectives. 
+
+1) Decentralized Bilevel Optimization (DBO): Numerous studies have focused on solving decen-tralized bilevel optimization problems on graphs with LLSC. One line of work focuses on achieving consensus only for the UL variables, where algorithms are often designed with the hypergradient norm as a stationarity measure. Liu et al. (2022b) introduced a local full-gradient-based algorithm with variance reduction and gradient tracking to achieve O(n/ϵ )
+
+sample complexity and O(1 /ϵ ) communication complexity, where n is the size of the dataset at each agent. Furthermore, momentum information is leveraged (Gao et al., 2023; Qiu et al., 2023) to enable single-loop algorithmic architecture by slightly trading off convergence rate performance. To address data heterogeneity, Niu et al. (2023) introduced a single-loop algorithm for nonconvex-strongly-convex bilevel optimization that handles heterogeneity without requiring bounded hypergradients. In collaborative learning, Zhang et al. (2023) proposed COBO, an SGD-based algorithm that scales with clients and outperforms federated learning baselines in heterogeneous settings. Another line of works enforce consensus on the LL variables refer to Appendix B. Despite these advancements, all aforementioned DBO methods assume LLSC. In contrast, our work departs from this assumption, addressing decentralized bilevel optimization without LLSC under non-i.i.d. data, thus filling a critical gap in the literature. 
+
+2) Centralized Bilevel Optimization without LLSC: In recent years, centralized bilevel optimization without LLSC has also received increasing attention. For example, Chen et al. (2024a) employed an ϵ-stationary point for the hyper-objective as a convergence metric to quantify algorithmic and proposed a first-order bilevel algorithm with a convergence rate of O(ℓκ 3/ϵ 2), where ℓ is a Lipschitz constant and κ is the condition number, though it required PL conditions for LL objectives. Liu et al. (2022a) presents a first-order algorithm for non-convex bilevel optimization that avoids Hessian computations, ensures practical efficiency with non-asymptotic convergence guarantees, and introduces a modified KKT condition with a stationarity measure to address bilevel problem challenges. Lu & Mei (2023) reformulated the LL convex bilevel problem as a constrained min-max problem and used the classic penalty method, achieving a convergence rate of O(1 /ϵ 4) to find ϵ-KKT points. Jiang et al. (2023) tackled a “simple bilevel” problem and proposed a double-loop algorithm utilizing the condition gradient method to approximate nonlinear LL convex functions with linear inequality constraints, achieving a convergence rate of O(1 /ϵ 2). The stochastic variant in Cao et al. (2023) extends this method to both stochastic and finite-sum settings, with rates matching the standard conditional gradient method. More recently, Yao et al. (2024) introduced a value-function-based proximal Lagrangian approach for constrained LL convex bilevel problems, achieving a convergence rate of O(1 /T (1 −2p)/2), where p controls the penalty parameter decay. Additional related works are discussed in Appendix B. The most related work on centralized LLSC-less bilevel optimization is in Liu et al. (2023a), which reformulated the LL convex bilevel problem as a constrained problem using first-order stationarity condition. By employing the KKT condition as the stationarity measure, they proposed a single-loop method that averages the UL and LL objectives, achieving a convergence rate of O  1/T 1−3p−3τ , where p and τ control the decreasing LL learning rate and the averaging parameter. While both our work and Liu et al. (2023a) reformulate the bilevel problem as constrained optimization and use aggregation function for solving LL problem, our work differs from Liu et al. (2023a) in the following key aspects: 1) Liu et al. (2023a) required strong convexity of the UL objectives, which limits their approach’s applicability in real-world scenarios where UL objectives are often nonconvex. In contrast, our method can be applied to non-convex UL objective by employing a different aggregation function that sequentially averages the LL objective with a diminishing 3Published as a conference paper at ICLR 2025                                                      
+
+> Algorithm Setting Lower Level Upper Level Het. Data
+> FOPM (Lu & Mei, 2023) Centralized Convex Nonconvex NA CG-BiO (Jiang et al., 2023) Centralized Convex Nonconvex NA F2BA (Chen et al., 2024a) Centralized Nonconvex, PL Nonconvex NA SBCGF (Cao et al., 2023) Centralized Convex Nonconvex NA LV-HBA (Yao et al., 2024) Centralized Convex Nonconvex NA sl-BAMM (Liu et al., 2023a) Centralized Convex Strongly Convex NA INTERACT (Liu et al., 2022b) Decentralized Strongly Convex Nonconvex i.i.d DIAMOND (Qiu et al., 2023) Decentralized Strongly Convex Nonconvex i.i.d Prometheus(Liu et al., 2023b) Decentralized Strongly Convex Nonconvex i.i.d SLDBO (Dong et al., 2024) Decentralized Strongly Convex Nonconvex non-i.i.d LoPA (Niu et al., 2023) Decentralized Strongly Convex Nonconvex non-i.i.d
+> DUET (Ours) Decentralized Convex Nonconvex non-i.i.d
+
+Table 1: Summary of bilevel optimization algorithms. quadratic regularizer. 2) Although both approaches employ the KKT condition as the stationarity measure, our measure applies to the decentralized setting by accounting for consensus errors and aggregating the stationarity measure across subproblems from agents with non-i.i.d. data distributions. In contrast, the KKT-based stationarity measure in Liu et al. (2023a) cannot handle data hetergeneity. In summary, while the aforementioned existing works addressed centralized bilevel optimization without LLSC, they cannot be generalized to address the decentralized setting with heterogeneous data challenges in a straightforward fashion. In contrast, our work tackles LLSC-less DBO and relaxes several assumptions typically made in the bilevel optimization literature. For easy reference, we summarize the most relevant bilevel optimization algorithms in Table 1. 
+
+3 THE DIMINISHING QUADRATICALLY -REGULARIZED BILEVEL 
+
+OPTIMIZATION ALGORITHM (DUET )
+
+1) Problem Reformulation for a New Stationarity Convergence Metric: In the LLSC DBO literature, the uniqueness of the LL solution y∗ 
+
+> i
+
+(xi) ensures that the hypergradient norm of each agent’s UL objective Φi(xi) = fi(xi, y∗ 
+
+> i
+
+(xi)) is well-defined. Consequently, the hypergradient norm of the overall UL objective Φ ( xi) = 1
+
+> m
+
+Pmi=1 Φi (xi) is also well-defined. This norm has been widely used as a measure for stationarity in previous works (e.g., Ghadimi & Wang (2018); Liu et al. (2022b; 2023b); Dong et al. (2024); Lu & Mei (2023)). However, in the absence of LLSC, the Hessian matrix of the LL problem is not full-rank and thus not invertible. In decentralized settings, this problem is further exacerbated by the inconsistent updates across agents, which leads to the conventional hypergradient-norm-based stationarity measure being ill-defined. This motivates us to develop a new stationarity measure that handles both the absence of LLSC and the consensus errors among agents at the same time. Toward this end, inspired by Wolfe-duality, we first reformulate the LLSC-less DBO problem into an equivalent constrained optimization problem. Instead of directly solving for y∗ 
+
+> i
+
+(xi), we replace the LL problem by introducing the LL-stationary condition (i.e., ∇yg(x, y) = 0 ) as constraints: 
+
+min  
+
+> xi∈Rp1,yi∈Rp2
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+fi (xi, yi) s.t. ∇ygi(xi, yi) = 0 , ∀i; xi = xi′ , if (i, i ′) ∈ L . (3) The reformulation in Problem (3) is equivalent to the original Problem (1) because the LL-stationarity is both necessary and sufficient for the LL-optimality when the LL problem gi(xi, yi) is convex in 
+
+yi for any fixed xi, which is satisfied in our problem setting. Our key rationale behind converting the original bilevel optimization problem in (1) into an equivalent conventional constrained optimization problem in (3) is to facilitate the use of the KKT conditions, for which the KKT stationary condition can naturally serve as a new stationarity measure, hence resolving the conundrum of lacking a well-defined hypergradient norm as the stationarity measure in the absence of LLSC. We now state the KKT conditions for Problem (3) , for which the Lagrangian function can be written as L(x, y, v) := 1
+
+> m
+
+Pmi=1 fi(xi, yi) − Pmi=1 v⊤ 
+
+> i
+
+∇ygi(xi, yi), where vi, ∀i, are dual variables 4Published as a conference paper at ICLR 2025 associated with the constraints. Then, a KKT solution (x∗ 
+
+> i
+
+, y∗ 
+
+> i
+
+, v∗ 
+
+> i
+
+), if exists, satisfies the following: 
+
+ 
+
+> 1
+> m
+
+∇xfi (x∗ 
+
+> i
+
+, y∗ 
+
+> i
+
+) − ∇ 2
+
+> xy
+
+gi (x∗ 
+
+> i
+
+, y∗ 
+
+> i
+
+) v∗ 
+
+> i
+
+= 0 , ∀i, (Stationarity of Problem (3))  
+
+> 1
+> m
+
+∇yfi (x∗ 
+
+> i
+
+, y∗ 
+
+> i
+
+) − ∇ 2
+
+> yy
+
+gi (x∗ 
+
+> i
+
+, y∗ 
+
+> i
+
+) v∗ 
+
+> i
+
+= 0 , ∀i, (Stationarity of Problem (3)) 
+
+−∇ ygi (x∗ 
+
+> i
+
+, y∗ 
+
+> i
+
+) = 0 , ∀i, (Primal Feasibility of Problem (3)) 
+
+x∗ 
+
+> i
+
+− x∗ 
+
+> i′
+
+= 0 , ∀(i, i ′) ∈ L . (Primal Feasibility of Problem (3)) Note that the dual feasibility and complementary slackness conditions in this KKT system are implied by the primal feasibility condition and hence can be omitted. For convenience, we define the KKT stationarity residual for a primal-dual pair (xi, yi, vi) as KKT (xi, yi, vi) := ∥∇L (xi, yi, vi)∥2,which will be used as a part of our stationarity convergence metric defined later. Note that when LLSC holds, it is not difficult to show that the ∇Φ(¯ x) = 0 if and only if KKT (xi, yi, vi) = 0 for some y, v ∈ Rp2 . This fact will serve as a “bridge” to connect the above KKT staionarity and the hypgradients induced by the diminishing μt-quadratic regularization described next. 
+
+2) The Diminishing μt-Quadratic Regularization: To address the challenge of lacking LLSC in our algorithm design, our basic idea is to augment the LL objective function by introducing a quadratic regularizer that is controlled by a sequence of diminishing regularization parameters, thereby reviving the LLSC in each iteration. These regularization parameters are carefully selected to ensure that the augmented problems converge to the original problem, thereby leading to a solution to Problem (3). Specifically, at iteration t we define the augmented LL objective function as follows: 
+
+ψiμt (xi,t , yi,t ) := μthi(xi,t , yi,t ) + (1 − μt)gi(xi,t , yi,t ), (4) where hi(xi,t , yi,t ) = 12 ∥xi,t ∥2 + 12 ∥yi,t ∥2. Here, the norm ∥ · ∥ represents the ℓ2 norm. xi,t 
+
+and yi,t are the variables corresponding to agent i at iteration t. Here {μt}∞
+
+> t=0
+
+, where μt > 0, ∀t,is the diminishing sequence of regularization parameters, which ensures that ψiμt (x, ·) is strongly convex for any x. This augmentation also leverages the connection between the KKT condition and the norm of the μt-induced hypergradient, allowing us to replace the LL objective gi(xi,t , yi,t )
+
+by ψiμt (xi,t , yi,t ), facilitating the solution to Problem (3) . Thanks to the strong convexity of the quadratic regularizor, ψiμt (xi,t , ·) has a unique minimizer for any given x-variable, which is denoted as y∗ 
+
+> i,μ t
+
+(xi).Next, we define the approximate UL objective as Φμt (xt) = 1
+
+> m
+
+Pmi=1 Φiμt (xi,t ), where Φiμt (xi,t ) ≜
+
+fi(xi,t , y∗ 
+
+> i,μ t
+
+(xi,t )) . Similar to conventional bilevel optimizaiton with LLSC, for differentiable 
+
+Φiμt (xi,t ), the hypergradient ∇Φiμt (xi,t ) can be derived by the chain rule, the implicit func-tion theorem, and the augmented LL function as: ∇Φiμt (xi,t ) = ∇xfi
+
+ xi,t , y∗ 
+
+> i,μ t
+
+(xi,t ) −∇2
+
+> xy
+
+ψiμt
+
+ xi,t , y∗ 
+
+> i,μ t
+
+(xi,t ) v∗ 
+
+> i,μ t
+
+(xi,t ), where v∗ 
+
+> i,μ t
+
+(xi,t ) ∈ Rp2 is the solution of the linear system: 
+
+v∗ 
+
+> i,μ t
+
+(xi,t ) := [ ∇2
+
+> yy
+
+ψiμt (xi,t , y∗ 
+
+> i,μ t
+
+(xi,t ))] −1∇yfi(xi,t , y∗ 
+
+> i,μ t
+
+(xi,t )) .
+
+After introducing the regularization in (4) , we can now adopt the approximate KKT condi-tion by replacing the LL objective with ψiμt (xi,t , yi,t ), and thus consider KKT (xt, yt, vt) := 
+
+∥∇L (xt, yt, vt)∥2 ≤ ϵ at time t. Here xt := [ x⊤
+
+> 1,t
+
+, . . . , x⊤
+
+> m,t
+
+]⊤, and similarly for yt and vt.
+
+3) Consensus Mechanism: To address the consensus constraint xi = xi′ , (i, i ′) ∈ L in Problem (3) ,we adopt the network consensus approach (Nedic & Ozdaglar, 2009), where a consensus weight matrix M ∈ Rm×m is used to mix and aggregate information at each iteration. The element [M]ij 
+
+represents the weight assigned for the information from the j-th agent at the i-th agent. Each agent uses the weights in its corresponding row in the M ∈ Rm×m to aggregate the information from its neighbors. For consensus to be reached asymptotically, the matrix M should satisfy certain properties: (1) Doubly Stochastic: Pmi=1 [M]ij = Pmj=1 [M]ij = 1 ; (2) Symmetric: [M]ij = [ M]ji 
+
+for all i, j ∈ N ; and (3) Sparsity Pattern Adhering to the Network Topology: [M]ij > 0 if (i, j ) ∈ N 
+
+and [M]ij = 0 otherwise for all i, j ∈ L . These properties ensure that the eigenvalues of M are real and fall within the interval (−1, 1] , thus being sortable. Then, we order the eigenvalues of M as: 
+
+−1 < λ m(M) ≤ · · · ≤ λ2(M) < λ 1(M) = 1 . The second-largest eigenvalue in magnitude of M,5Published as a conference paper at ICLR 2025 denoted as λ ≜ max {| λ2(M)|, |λm(M)|} , will play an important role in our step size selection and thus convergence rate in our proposed DUET algorithm. 
+
+Algorithm 1 The DUET Algorithm at Each Agent i.Set parameter pair (xi, 0, yi, 0, vi, 0) = ( x0, y0, v0).
+
+for t = 1 , · · · , T do 
+
+Update local models (xi,t +1 , yi,t +1 , vi,t +1 ) as in Eqs. (5); Compute the (di,t  
+
+> x
+
+, di,t  
+
+> y
+
+, di,t  
+
+> v
+
+) local estimator as in Eq. (6); Track global gradients (hi,t  
+
+> x
+
+, hi,t  
+
+> y
+
+, hi,t  
+
+> v
+
+) as in Eq. (7); 
+
+end for 4) The Proposed Algorithm: 
+
+With the preliminaries in 1)–3), we are now ready to present our diminishing quadratically-regularized bilevel decentralized optimization (DUET ) method. This method is specifically de-signed to address the challenges of bilevel optimization without LLSC in decentralized environ-ments with data heterogeneity. Our DUET method draws inspiration from the centralized SOBA approach (Dagréou et al., 2022), which features a single-loop structure that is easier to implement and reduces the computational complexity compared to traditional double-loop methods. However, fundamentally different from SOBA, DUET builds on the augmented LL objective function in (4) ,enabling us to address DBO problems without LLSC. The procedure of our algorithm DUET can be organized into three key steps: • Step 1 (Update Local Models): In each iteration t, each agent i updates its local variables as: 
+
+xi,t +1 = X
+
+> i′∈N i
+
+[M]ii ′ xi′,t −αthi,t  
+
+> x
+
+; yi,t +1 = Prty [yi,t −βthi,t  
+
+> y
+
+]; vi,t +1 = Prtv [vi,t +ηthi,t  
+
+> v
+
+], (5) where αt, βt and ηt are step-sizes for updating xi, yi and vi variables, respectively, and Pr [·]
+
+denotes a projection operator defined as Pr [q] := arg min ∥q′∥≤ r ∥q′ − q∥ = min {q, r q 
+
+> ∥q∥
+
+}, where 
+
+r > 0 is the radius. rtv and rty are projection parameters of yi and vi variables, respectively (to be defined in the next subsection). First, the UL variable xi,t +1 is updated by aggregating the UL information from its neighbors and adjusting based on the local gradient hi,t  
+
+> x
+
+, which induces consensus among the agents in the network. The LL variable yi,t +1 is updated through a projected local gradient descent step, reflecting the agent’s progress in solving its local optimization problem. Finally, the dual variable vi,t +1 is updated using a projected gradient ascent step to ensure that the necessary optimality conditions of the LL problem are maintained. We also employ the projection steps of yi,t and vi,t is to ensure that the sequences {yi,t } and {vi,t } are bounded with radii rtv
+
+and rty respectively. Later we will show that, based on increasing rtv and rty with respect to t, the boundedness of yi,t - and vi,t -variables results in the boundedness of xi,t -variables, hence ensuring convergence. • Step 2 (Local Gradient Estimate): In the local gradient estimator step, each agent i computes its local gradients to update its variables: 
+
+
+
+di,t  
+
+> y
+
+= ∇yψiμt (xi,t , yi,t ) ,
+
+di,t  
+
+> v
+
+= ∇yfi (xi,t , yi,t ) − ∇ 2
+
+> yy
+
+ψiμt (xi,t , yi,t ) vi,t ,
+
+di,t  
+
+> x
+
+= ∇xfi (xi,t , yi,t ) − ∇ 2
+
+> xy
+
+ψiμt (xi,t , yi,t )vi,t .
+
+(6) We update yi,t using the gradient of the augmented LL objective ψiμt (xi,t , yi,t ), while the gradients for vi,t and xi,t are derived using the KKT conditions. This ensures that the LL solution meets optimality constraints and that the UL problem is solved efficiently. • Step 3 (Gradient Tracking in Upper-Level Parameters): In this step, each agent i updates its tracked gradient hi,t  
+
+> x
+
+by averaging the gradients from neighboring agents and correcting the local estimates: 
+
+hi,t  
+
+> x
+
+= X
+
+> i′∈N i
+
+[M]ii ′ hi′,t −1 
+
+> x
+
++ di,t  
+
+> x
+
+− di,t −1 
+
+> x
+
+; hi,t  
+
+> y
+
+= di,t  
+
+> y
+
+; hi,t  
+
+> v
+
+= di,t  
+
+> v
+
+. (7) The purpose of gradient tracking for the UL variables is to further reduce consensus error and accelerate convergence even under non-i.i.d data distributions. On the other hand, since the LL variables yi,t and vi,t are updated locally without consensus requirements, gradient tracking is not needed for the LL variables. To conclude the discussion of the DUET ’s algorithmic design, we summarize the per-agent algorithm of DUET in Algorithm 1. 6Published as a conference paper at ICLR 2025 
+
+4 THEORETICAL CONVERGENCE RATE ANALYSIS 
+
+In this section, we will establish the theoretical convergence rate for the proposed DUET algorithm. Before we state our main convergence result, we first present several needed assumptions as follows. 
+
+Assumption 1 (Boundedness and Smoothness of the UL Objectives) . The UL objectives fi satisfies: (a) For any i ∈ [m], the UL objective fi(xi, ·) has a uniform lower bound denoted by fi0; and (b) For any i ∈ [m], the UL objective fi is twice differentiable and Lipschitz continuous with a Lipschitz constant of Lfi0 . The first-order derivatives ∇xfi(·, yi), ∇xfi(xi, ·), ∇yfi(·, yi), ∇yfi(xi, ·) are Lipschitz continuous with respective Lipschitz constants Lfix1 ,Lfix2 , Lfiy1 , Lfiy2 .
+
+Assumption 2 (Convexity and Smoothness of the LL Objectives) . The LL objective gi satisfies: (a) for any i ∈ [m] and any xi, the LL objective gi(x, ·) is convex; and (b) for any i ∈ [m], the LL objective 
+
+gi is twice differentiable and the derivatives ∇ygi and ∇2
+
+> xy
+
+gi,∇2
+
+> yy
+
+gi are Lipschitz continuous in 
+
+(xi, yi) with respective Lipschitz constants Lgiy1 ,Lgiy2 and Lgixy 1 ,Lgixy 2 , Lgiyy 1 ,Lgiyy 2 .
+
+The smoothness and boundedness assumptions in Assumptions 1 and 2 are standard in the literature of bilevel optimization (Ghadimi & Wang, 2018; Ji et al., 2021; ji & Liang, 2023; Dagréou et al., 2022; Ji et al., 2024; Kong et al., 2024; He et al., 2024). Unlike many works, however, we do not assume LLSC, which significantly complicates the theoretical analysis. Under the above assumptions, the augmented LL objective ψiμt (xi, ·) is σψμt - strongly convex with σψμt = μtσhi = μt, where 
+
+σhi = 1 by the definition of function hi. Hence, ψiμt (xi, ·) has a unique minimizer, denoted by 
+
+y∗ 
+
+> i,μ t
+
+(xi). To this end, we introduce the following convergence metric to help us approach the KKT condition as the μt-regularized problem converges to the original problem as μt shrinks to zero. Specifically, for each {xt, yt, vt} at time t, we define 
+
+Π( xt, yt, vt) := E∥∇ Φμt (¯ xt)∥2
+
+| {z }
+
+> Stationarity Error
+
++ E∥xt − 1 ⊗ ¯xt∥2
+
+| {z }
+
+> Consensus Error
+
++ E∥y∗ 
+
+> t
+
+−yt∥2
+
+| {z }
+
+> Lower −Level Error
+
++ E∥v∗ 
+
+> t
+
+−vt∥2
+
+| {z }
+
+> Dual Multiplier Error
+
+, (8) where ¯xt ≜ 1
+
+> m
+
+Pmi=1 xi,t , yt ≜ [y⊤
+
+> 1,t
+
+, . . . , y⊤
+
+> m,t
+
+]⊤, y∗ 
+
+> μt
+
+≜ [y∗⊤  
+
+> 1,μ t
+
+, . . . , y∗⊤  
+
+> m,μ t
+
+]⊤, vt ≜
+
+[v⊤
+
+> 1,t
+
+, . . . , v⊤
+
+> m,t
+
+]⊤, and v∗ 
+
+> μt
+
+≜ [v∗⊤  
+
+> 1,μ t
+
+, . . . , v∗⊤  
+
+> m,μ t
+
+]⊤. ⊗ is the Kronecker product. Note that the first term in (8) quantifies the convergence of ¯xt to a stationary point of the global objective. The second term measures the consensus error among local copies of the UL variables. The third and fourth terms quantify the optimality gap in the LL problem’s primal variable yt and dual variable vt,respectively, across all agents. Thus, Π( xt, yt, vt) ≤ ϵ for a small ϵ-value implies that the algorithm achieves three goals simultaneously: i) approximate KKT stationarity convergence of Problem (3) , ii) consensus of UL xt-variables, and iii) optimal solutions to the LL yt-variables and dual vt-variables. With Assumptions 1 and 2, we also define the following parameters that will be used in our algorithm: 
+
+rtv := Lfi0
+
+> σψμ t
+
+, B1 := Lfi0 + ( Lψiy1 rtv ), λ1 := 1−λ2 
+
+> λ
+
++ 41−λ + 16 (1 −λ)3 ,rtx := 
+
+q
+
+2λ1B21 m ¯β ¯μ + 2 Pmi=1 ∥xi, 0∥2, rty := Lψy1
+
+> σψμ t
+
+rtx + 1
+
+> σψμ t
+
+∥∇ yψμt (0 , 0) ∥, (9) where xi, 0, i ∈ [m], are the initial points, constants Lfi0 , Lψiy1 , and parameter σψμt are as defined in Assumptions 1 and 2, and λ is the second largest eigenvalue in magnitude of the network graph. ¯β
+
+and ¯μ are the initial LL learning rate and averaging control parameter, respectively. Both ¯β and ¯μ are constants. With the above notations, we are now ready to state the main convergence rate result of 
+
+DUET as follows: 
+
+Theorem 1 (Convergence Analysis for DUET ). Under Assumptions 1 and 2, choose μt = ¯ μ(t+1) −p.Choose the step-sizes as βt ∈ [ ¯β(t + 1) −τ / 4, 1/L fiy 2 + Lgy2 ] with 0 < p < 1/6, 0 < τ < 2/33 and 
+
+ηt = ( t + 1) −τ / 2βtμt, and αt = ( t + 1) −3τ / 2βtμt5. It then holds that 
+
+min 0≤t≤T Π( xt, yt, vt) = O
+
+
+
+1/T 1−5p− 11 4 τ
+
+
+
+.
+
+Further, if vi,t is bounded, it holds that min 0≤t≤T KKT( xt, yt, vt) = O(1 /T 1−5p− 11 4 τ + 1 /T 2p).
+
+The following result immediately follows from Theorem 1: 7Published as a conference paper at ICLR 2025 
+
+Corollary 2. Let p = 17 and τ → 0. Then, DUET converges to a KKT point of Problem (3) at rate of 
+
+O(1 /T 27 ), which implies that the number of communication rounds required to reach ϵ-accuracy for our DUET method is O(1 /ϵ 72 ).
+
+Moreover, if the problem instance satisfies the stronger condition that ∥v∗ 
+
+> μt
+
+(xi,t ) ∥ is bounded, we can further improve the convergence result of DUET in Theorem 1 as follows: 
+
+Theorem 3 (Convergence Analysis for DUET with Boundedness Assumption) . Under Assumptions 1 and 2, choose μt = ¯ μ(t + 1) −p. Choose step-sizes as βt ∈ [ ¯β(t + 1) −τ / 4, 1/L fiy 2 + Lgy2 ] with 
+
+0 < p < 1/4, 0 < τ < 1/11 and ηt = ( t + 1) −τ / 2βt, and αt = ( t + 1) −3τ / 2βtμt3. If v∗ 
+
+> μt
+
+(xi,t )
+
+is bounded, it then holds that: 
+
+min 0≤t≤T Π( xt, yt, vt) = O
+
+
+
+1/T 1−3p− 11 4 τ
+
+
+
+.
+
+Further, if vi,t is bounded, it holds that min 0≤t≤T KKT( xt, yt, vt) = O(1 /T 1−3p− 11 4 τ + 1 /T 2p).
+
+Similar to Theorem 1, the following result immediately follows from Theorem 3: 
+
+Corollary 4. Let p = 15 and τ → 0. Then, DUET converges to a KKT point at a rate of O(1 /T 25 ),which implies that the number of communication rounds required to reach ϵ-accuracy for our 
+
+DUET method is O(1 /ϵ 52 ).
+
+Due to space limitation, we relegate the proofs of Theorems 1 and 3 to the Appendix. In here, several important remarks for the proofs of Theorems 1 and 3 are in order: • It is worth noting that, compared to existing works on decentralized bilevel optimization, the major challenge in proving the convergence results in Theorems 1 and 3 stems from the absence of LLSC, which breaks the standard descent lemma for the LL variable yi in convergence analysis. To address this challenge, leveraging our augmented LL objective, we establish a new descent lemma for the implied UL objective function at time t, expressed in terms of ¯xt, as follows: 
+
+Lemma 1 (A New Descent Lemma of the Implied UL Objective) . Under Assumptions 1 and 2 and letting μt+1 ≤ μt ≤ 12 for all t, the sequence {xi,t , yi,t , vi,t } generated by DUET satisfy: 
+
+Φμt+1 (¯ xt+1 ) − Φμt (¯ xt)
+
+≤ − αt
+
+2 ∥∇ Φμt (¯ xt)∥2 −
+
+ αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+
+
+∥¯ht
+
+> x
+
+∥2 + αtLΦμt
+
+rσ 2
+
+> ψμt
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∥¯xt − xi,t ∥2
+
++ 2αtrm
+
+> m
+
+X
+
+> i=1
+
+ Lψxy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfix2
+
+2 yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2
+
++ αtrL 2
+
+> ψy1
+
+m
+
+> m
+
+X
+
+> i=1
+
+vi,t − v∗ 
+
+> μt
+
+(xi,t ) 2 + 2 αtr 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+di,t  
+
+> x
+
+− ¯ht
+
+> x
+> 2
+
++ 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+ 2 ∇yfi
+
+
+
+¯xt+1 , y∗ 
+
+> μt+1
+
+(¯ xt+1 )
+
+
+
+y∗ 
+
+> μt+1
+
+(¯ xt+1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+  
+
++ 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+2Lfiy2 ∥y∗ 
+
+> μt+1
+
+(¯ xt+1 )∥2
+
+σ2
+
+> hi
+
+ μt − μt+1 
+
+μt
+
+2
+
+,
+
+where CΦ1 and CΦ2 are problem-dependent constants provided in Lemma 12 in the Appendix. 
+
+Lemma 1 characterizes the expected per-iterate descent of the implied UL objective value, which depends on i) the consensus error of the UL parameters ∥¯xt − xi,t ∥2, ii) the approximation error of the LL optimal parameter ∥yi,t − y∗ 
+
+> μt
+
+(xi,t ) ∥2, iii) the approximation error of the dual parameter ∥vi,t − v∗ 
+
+> μt
+
+(xi,t ) ∥2, and iv) the diminishing speed of the augmented LL objective regularization parameter μt.• The second challenge comes from the fact that DUET employs a decentralized consensus update mechanism for the UL model parameters as shown in (5) , which inherently leads to consensus errors. Thanks to our algorithmic design in DUET , the graph topology of the underlying network 8Published as a conference paper at ICLR 2025 does not theoretically affect the convergence rate order of DUET (i.e., the T -dependence in the Big-O convergence rate result in Theorem 1). Also, we achieve the μt-convergence rate, which depends on the decay rate τ of the step-size for LL yi-variables and the decay rate p of regularization parameter μt. This is a new result compared to those obtained from LLSC. • We note that the augmented LL objective (4) for each agent also allows us to relax many restrictive assumptions made in traditional bilevel optimization methods (e.g., Liu et al. (2023a), etc.): i) we do not require strong convexity for the UL objective at every agent; ii) we relax the requirement of the derivatives ∇2
+
+> xy
+
+fi, ∇2
+
+> yy
+
+fi being Lipschitz continuous with respect to xi and yi, respectively; and (iii) we also relax the requirement of a bounded dataset of (xi, yi). These relaxations make our approach more flexible and practical in decentralized settings with data heterogeneity. 
+
+Discussions: As mentioned earlier, in this paper, we have tried to avoid imposing any extra restrictive assumptions in the absence of LLSC. However, it is interesting and insightful to compare the performance of our DUET algorithm with those who do make extra assumptions. For example, it turns out that the sl-BAMM method (Liu et al., 2023a), which assumes a UL strongly convex (ULSC) objective, can be generalized to the decentralized setting as a baseline for comparisons in our experiments. We name this extension as decentralized sl-BAMM with gradient tracking (DSGT ). DSGT adopts the same single-loop framework as DUET but utilizes a different augmented LL objective function, which follows Liu et al. (2023a) to aggregate the UL and LL objectives for every agent as follows: ψiμt (xi,t , yi,t ) := μtfi(xi,t , yi,t ) + (1 − μt)gi(xi,t , yi,t ). For DSGT , we make the following extra ULSC assumption for every agent: 
+
+Assumption 3 (ULSC Assumption for DSGT ). (a) For any i ∈ [m] and fixed xi, UL objective 
+
+fi(xi, ·) is σfi -strongly convex. (b) For any i ∈ [m], the derivatives ∇2
+
+> xy
+
+fi, ∇2
+
+> yy
+
+fi are Lipschitz continuous in (xi, yi) with respective Lipschitz constants Lfixy 1 ,Lfixy 2 , Lfiyy 1 ,Lfiyy 2 .
+
+With Assumption 3, we can show the following convergence result for sl-BAMM (the proof of Theorem 5 is similar to the proofs of Theorem 1 and 3 and hence omitted for brevity.) 
+
+Theorem 5 (Convergence Analysis for DSGT ). Under Assumptions 1 and 3, choose μt =¯μ(t + 1) −p. Choose the step-sizes as βt ∈ [ ¯β(t + 1) −τ / 4, 1/L fiy 2 + Lgy2 ] with p ∈ (0 , 1/6) ,
+
+τ ∈ (0 , 2/33) and ηt = (t + 1) −τ / 2βtμt, and αt = (t + 1) −3τ / 2βtμt5. It then holds that min 0≤t≤T Π( xt, yt, vt) = O(1 /T 1−5p− 11 4 τ ). Further, if vi,t is bounded, it holds that 
+
+min 0≤t≤T KKT( xt, yt, vt) = O(1 /T 1−5p− 11 4 τ + 1 /T 2p).
+
+We also notice a recent work called LV-HBA (Yao et al., 2024), which considers a more generic case where the lower-level problem includes equality or inequality constraints g(x, y), and pro-poses a value function-based proximal Lagrangian method to enforce the constraints with a provable rate of O(1 /K (1 −2p)/2). However, this convergence rate and our convergence rate are not comparable due to different stationary measure. Our stationary measure is define in Eq (8) . In contrast, the stationary measure Rk of LV-HBA is defined as following: Rk := 
+
+dist (0 , (∇F (x, y), 0) + ck (( ∇f (x, y), 0) − ∇ vγ,r (x, y, z)) + NC×Z (x, y, z)) , where F (x, y) is the UL objective, f (x, y) is the LL objective and vγ,r (x, y, z) is truncated proximal Lagrangian value function. ck is penalty parameter. NΩ(s) denotes the normal cone to Ω at s.
+
+5 NUMERICAL EXPERIMENTS 
+
+In this section, we conduct numerical experiments to verify our theoretical results for DUET . Due to the lack of existing algorithms for solving decentralized bilevel optimization problems without LLSC assumption, we compare the convergence performance of DUET and DSGT .
+
+1) A Pedagogical Example: We first verify the convergence results under the ULSC and non-LLSC cases using five-agent communication networks, with the network edge connection probability 
+
+pc = 0 .5. The decentralized bilevel optimization problem is defined as the following: min x∈Rn 12 ∥x−
+
+y∗ 
+
+> 2
+
+∥2 + 12 ∥y∗ 
+
+> 1
+
+− e∥2 s.t y∗ = ( y∗ 
+
+> 1
+
+, y∗ 
+
+> 2
+
+) ∈ arg min (y1,y2)∈R2n 12 ∥y1∥2 + x⊤y2, where e denotes the all-one vector with dimensionality being clear from the context. As shown in Figs. 1(a) and 1(b), the gradients of x, y, reach zero when using our DUET algorithm, suggesting they can converge to the global optimal solution without the LLSC assumption. Note that we use “GT=1” and “GT=0” to denote the adoption of gradient tracking in the algorithm or otherwise, respectively. As shown in 9Published as a conference paper at ICLR 2025 0 2 4 6   
+
+> Time(s)
+> 020 40 60 80 100 120 140 160
+> || dx||
+> DUET, GT=1 DUET, GT=0 DSGT, GT=1 DSGT, GT=0 456701
+
+(a) The gradient of x.0 2 4 6    
+
+> Time(s)
+> 02468
+> || dy||
+> DUET, GT=1 DUET, GT=0 DSGT, GT=1 DSGT, GT=0 45670.0 0.2 0.4
+
+(b) The gradient of y.0 2 4 6   
+
+> Time(s)
+> 010 20 30 40
+> LL objective function value  DUET, GT=1 DUET, GT=0 DSGT, GT=1 DSGT, GT=0 5670.0 0.1
+
+(c) LL objective value. 0 2 4 6   
+
+> Time(s)
+> 10 20 30 40 50 60
+> UL objective function value
+> DUET, GT=1 DUET, GT=0 DSGT, GT=1 DSGT, GT=0 5673456
+
+(d) UL objective value. 
+
+Figure 1: The gradients of the variables x and y, and the objective values of the UL and LL problems. 0 200 400 600 800 1000    
+
+> Epochs
+> 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9
+> Test Accuracy
+> DUET, GT = 1 DSGT, GT = 1 DSGD 850 900 950 0.80 0.85 0.90
+
+(a) i.i.d. 0 250 500 750 1000 1250 1500 1750 2000   
+
+> Epochs
+> 0.1 0.2 0.3 0.4 0.5 0.6
+> Test Accuracy
+> DUET, GT = 1 DUET, GT = 0 DSGT, GT = 1 DSGT, GT = 0 1850 1900 1950 0.525 0.550 0.575
+
+(b) non-i.i.d. 
+
+Figure 2: Test accuracy on the meta-learning problem with a 5-agent network on MNIST. 0 250 500 750 1000 1250 1500 1750 2000    
+
+> Epochs
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> Test Accuracy
+> DUET, p=0.3
+> DUET, p=0.5
+> DUET, p=0.7
+> DSGT, p=0.3
+> DSGT, p=0.5
+> DSGT, p=0.7 1850 1900 1950
+> 0.80
+> 0.85
+> 0.90
+
+(a) i.i.d. 0 250 500 750 1000 1250 1500 1750 2000     
+
+> Epochs
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> Test Accuracy
+> DUET, p=0.3
+> DUET, p=0.5
+> DUET, p=0.7
+> DSGT, p=0.3
+> DSGT, p=0.5
+> DSGT, p=0.7 1850 1900 1950
+> 0.550
+> 0.575
+
+(b) non.i.i.d. 
+
+Figure 3: Test accuracy on random graphs and the meta-learning problem on MNIST. Figs. 1(a) and 1(b), the gradients of x, y converge more rapidly when gradient tracking is adopted. However, as observed in Fig. 1(d), DSGT tends to select an LL solution y ∈ S (x) that also yields a good value for the UL objective function (i.e., fi(x, ·)), which is due to the ULSC assumption. In contrast, as shown in Fig. 1(c), DUET tends to choose an LL solution y ∈ S (x) that has a good LL objective value, which is more relevant in DBO problems. 
+
+2) Decentralized Meta-learning Problems with Real-World Data: Next, we evaluate our 
+
+DUET algorithm on decentralized meta-learning problems with heterogeneous datasets. Following the experimental settings in Qiu et al. (2023), we use the MNIST dataset to train m personalized classifiers. In this setup, x represents the common parameters shared across all agents, while θ
+
+corresponds to task-specific parameters for each agent. The cross-entropy loss is employed as the main objective function for fi. To prevent overfitting on local samples, we incorporate a quadratic regularization term in the UL objective function fi, affecting the parameters θ. We set m = 5 and allo-cate 12,000 samples to each node in a communication network generated by the random Erd˝ os–Rényi graphs. In the scenario with i.i.d. data, all agents have access to the same global dataset. We compare our proposed algorithms with the baseline DSGD. In Fig. 2(a), the DUET algorithm demonstrates superior performance by achieving the highest testing accuracy, along with fast convergence. Notably, its testing accuracy is 6% higher than that of the standard baseline based on decentralized stochastic gradient descent. This performance highlights the advantages of DUET in collaborative training across multiple learners and in tailored adaptation at each node. In contrast, in the non-i.i.d. data scenario, we adopt a data partitioning strategy, where each agent accesses data consisting of 95% from two specific labels and 5% randomly selected from other labels. This strategy ensures significantly diverse label distributions and high data heterogeneity across nodes. In the non-i.i.d. data scenario, we compare DUET and DSGT by focusing on their configurations with gradient tracking (GT=1) and without gradient tracking (GT=0). This ablation study examines the benefits of incorporating gradient tracking. As shown in Fig. 2(b), both testing accuracy is higher for all algorithms that include gradient tracking. Specifically, the DUET and DSGT algorithms with gradient tracking significantly outper-form their counterparts without gradient tracking, illustrating the effectiveness of gradient tracking in enhancing model performance in environments with heterogeneous data. We further evaluate the impact of edge connection probability pc on the performance of DUET and DSGT in both i.i.d. and non-i.i.d. settings with a five-agent network. Using pc ∈ { 0.3, 0.5, 0.7} and the same learning rates as before (Fig. 3), we observe only a slight improvement in convergence with higher pc , indicating that our DUET algorithm is robust to different edge connection probabilities and adaptable to various network configurations. To further validate our algorithm, additional experiments on decentralized hyperparameter optimization and decentralized meta learning are presented in Appendix E.3 and E.2. 10 Published as a conference paper at ICLR 2025 
+
+6 CONCLUSION 
+
+In this paper, we explored decentralized bilevel optimization (DBO) problems that do not require lower-level strong convexity (LLSC). To address this challenge, we proposed a single-loop DBO algorithm called quadratically regularized bilevel optimization ( DUET ) and established its theoretical convergence rate performance. Additionally, we adopted a single-loop structure in DUET to more effectively manage the challenges posed by nested structures, and we incorporated gradient tracking to tackle data heterogeneity. We also conducted numerical experiments to validate the effectiveness and efficiency of our proposed 
+
+DUET algorithm. ACKNOWLEDGMENTS 
+
+The work has been supported in part by NSF grants CAREER CNS-2110259, CNS-2112471, ExpandAI-2324052 RINGS-2148253, ECCS-2413528, DARPA Young Faculty Award D24AP00265, ONR grant N00014-24-1-2729, and AFRL grant PGSC-SC-111374-19s. 
+
+REFERENCES 
+
+Jincheng Cao, Ruichen Jiang, Nazanin Abolfazli, Erfan Yazdandoost Hamedani, and Aryan Mokhtari. Projection-free methods for stochastic simple bilevel optimization with convex lower-level problem. 
+
+arXiv preprint arXiv:2308.07536 , 2023. Jincheng Cao, Ruichen Jiang, Erfan Yazdandoost Hamedani, and Aryan Mokhtari. An accelerated gradient method for convex smooth simple bilevel optimization. In The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. URL https://openreview. net/forum?id=aFOdln7jBV .Lesi Chen, Jing Xu, and Jingzhao Zhang. On finding small hyper-gradients in bilevel optimization: Hardness results and improved analysis. In Shipra Agrawal and Aaron Roth (eds.), Proceedings of Thirty Seventh Conference on Learning Theory , volume 247 of Proceedings of Machine Learning Research , pp. 947–980. PMLR, 30 Jun–03 Jul 2024a. URL https://proceedings.mlr. press/v247/chen24a.html .Pengyu Chen, Xu Shi, Rujun Jiang, and Jiulin Wang. Penalty-based methods for simple bilevel optimization under hölderian error bounds. In The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024b. URL https://openreview.net/forum?id= oQ1Zj9iH88 .X. Chen, M. Huang, S. Ma, and K. Balasubramanian. Decentralized stochastic bilevel optimization with improved per-iteration complexity. In Proceedings of the 40th International Conference on Machine Learning , volume 202, pp. 4641–4671. PMLR, 2023. Xuxing Chen, Minhui Huang, and Shiqian Ma. Decentralized bilevel optimization. Optimization Letters , 2022. URL https://api.semanticscholar.org/CorpusID:249626492 .M. Dagréou, P. Ablin, S. Vaiter, and T. Moreau. A framework for bilevel optimization that enables stochastic and global variance reduction algorithms. In Advances in Neural Information Processing Systems , volume 35, pp. 26698–26710. Curran Associates, Inc., 2022. Youran Dong, Shiqian Ma, Junfeng Yang, and Chao Yin. A single-loop algorithm for decentralized bilevel optimization, 2024. URL https://arxiv.org/abs/2311.08945 .Hongchang Gao, Bin Gu, and My T Thai. On the convergence of distributed stochastic bilevel optimization algorithms over a network. In International Conference on Artificial Intelligence and Statistics , pp. 9238–9281. PMLR, 2023. Saeed Ghadimi and Mengdi Wang. Approximation methods for bilevel programming. arXiv preprint arXiv:1802.02246 , 2018. 11 Published as a conference paper at ICLR 2025 Diba Hashemi, Lie He, and Martin Jaggi. Cobo: Collaborative learning via bilevel optimization. In The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. URL 
+
+https://openreview.net/forum?id=SjQ1iIqpfU .Yutong He, Jie Hu, Xinmeng Huang, Songtao Lu, Bin Wang, and Kun Yuan. Distributed bilevel optimization with communication compression. In Ruslan Salakhutdinov, Zico Kolter, Katherine Heller, Adrian Weller, Nuria Oliver, Jonathan Scarlett, and Felix Berkenkamp (eds.), Proceedings of the 41st International Conference on Machine Learning , volume 235 of Proceedings of Machine Learning Research , pp. 17877–17920. PMLR, 21–27 Jul 2024. URL https://proceedings. mlr.press/v235/he24d.html .Kaiyi ji and Yingbin Liang. Lower bounds and accelerated algorithms for bilevel optimization. Jour-nal of Machine Learning Research , 24(22):1–56, 2023. URL http://jmlr.org/papers/ v24/21-0949.html .Kaiyi Ji, Junjie Yang, and Yingbin Liang. Bilevel optimization: Convergence analysis and enhanced design. In Marina Meila and Tong Zhang (eds.), Proceedings of the 38th International Conference on Machine Learning , volume 139 of Proceedings of Machine Learning Research , pp. 4882– 4892. PMLR, 18–24 Jul 2021. URL https://proceedings.mlr.press/v139/ji21c. html .Kaiyi Ji, Mingrui Liu, Yingbin Liang, and Lei Ying. Will bilevel optimizers benefit from loops. In Proceedings of the 36th International Conference on Neural Information Processing Systems ,NIPS ’22, Red Hook, NY, USA, 2024. Curran Associates Inc. ISBN 9781713871088. Ruichen Jiang, Nazanin Abolfazli, Aryan Mokhtari, and Erfan Yazdandoost Hamedani. A conditional gradient-based method for simple bilevel optimization with convex lower-level problem. In 
+
+Proceedings of International Conference on Artificial Intelligence and Statistics , pp. 10305–10323, 2023. Boao Kong, Shuchen Zhu, Songtao Lu, Xinmeng Huang, and Kun Yuan. Decentralized bilevel optimization over graphs: Loopless algorithmic update and transient iteration complexity. arXiv preprint arXiv:2402.03167 , 2024. Junyi Li, Bin Gu, and Heng Huang. Improved bilevel model: Fast and optimal algorithm with theoretical guarantee, 2020. URL https://arxiv.org/abs/2009.00690 .Bo Liu, Mao Ye, Stephen Wright, Peter Stone, and Qiang Liu. Bome! bilevel optimization made easy: A simple first-order approach. Advances in neural information processing systems , 35: 17248–17262, 2022a. Risheng Liu, Yaohua Liu, Wei Yao, Shangzhi Zeng, and Jin Zhang. Averaged method of multipliers for bi-level optimization without lower-level strong convexity. In Proceedings of International Conference on Machine Learning , pp. 21839–21866, 2023a. Y. Liu and R. Liu. Boml: A modularized bilevel optimization library in python for meta-learning. In 
+
+2021 IEEE International Conference on Multimedia & Expo Workshops (ICMEW) , pp. 1–2. IEEE, 2021. Zhuqing Liu, Xin Zhang, Prashant Khanduri, Songtao Lu, and Jia Liu. Interact: Achieving low sample and communication complexities in decentralized bilevel learning over networks. In Proceedings of the Twenty-Third International Symposium on Theory, Algorithmic Foundations, and Protocol Design for Mobile Networks and Mobile Computing , pp. 61–70, 2022b. Zhuqing Liu, Xin Zhang, Prashant Khanduri, Songtao Lu, and Jia Liu. Prometheus: Taming sample and communication complexities in constrained decentralized stochastic bilevel learning. In 
+
+Proceedings of the 40th International Conference on Machine Learning , pp. 22420–22453, 2023b. Songtao Lu, Siliang Zeng, Xiaodong Cui, Mark Squillante, Lior Horesh, Brian Kingsbury, Jia Liu, and Mingyi Hong. A stochastic linearized augmented lagrangian method for decentralized bilevel optimization. Advances in Neural Information Processing Systems , 2022. Zhaosong Lu and Sanyou Mei. First-order penalty methods for bilevel optimization. arXiv preprint arXiv:2301.01716 , 2023. 12 Published as a conference paper at ICLR 2025 Roey Merchav and Shoham Sabach. Convex bi-level optimization problems with nonsmooth outer objective function. SIAM Journal on Optimization , 33(4):3114–3142, 2023. doi: 10.1137/ 22M1533608. URL https://doi.org/10.1137/22M1533608 .Angelia Nedic and Asuman Ozdaglar. Distributed subgradient methods for multi-agent optimization. 
+
+IEEE Transactions on Automatic Control , 54(1):48–61, 2009. doi: 10.1109/TAC.2008.2009515. Yurii Nesterov. Lectures on Convex Optimization , volume 137. Springer, 2018. Youcheng Niu, Jinming Xu, Ying Sun, Yan Huang, and Li Chai. Distributed stochastic bilevel optimization: Improved complexity and heterogeneity analysis, 2023. Clarice Poon and Gabriel Peyré. Smooth bilevel programming for sparse regularization. Advances in Neural Information Processing Systems , 34:1543–1555, 2021. Peiwen Qiu, Yining Li, Zhuqing Liu, Prashant Khanduri, Jia Liu, Ness B Shroff, Elizabeth Ser-ena Bentley, and Kurt Turck. Diamond: Taming sample and communication complexities in decentralized bilevel optimization. In IEEE INFOCOM 2023-IEEE Conference on Computer Communications , pp. 1–10. IEEE, 2023. Aravind Rajeswaran, Chelsea Finn, Sham M Kakade, and Sergey Levine. Meta-learning with implicit gradients. Advances in neural information processing systems , 32, 2019. Shoham Sabach and Shimrit Shtern. A first order method for solving convex bilevel optimization problems. SIAM Journal on Optimization , 27(2):640–660, 2017. Sepideh Samadi, Daniel Burbano, and Farzad Yousefian. Achieving optimal complexity guaran-tees for a class of bilevel convex optimization problems. 2024 American Control Conference (ACC) , pp. 2206–2211, 2023. URL https://api.semanticscholar.org/CorpusID: 264305773 .Shuoguang Yang, Xuezhou Zhang, and Mengdi Wang. Decentralized gossip-based stochastic bilevel optimization over communication networks. Advances in neural information processing systems ,35:238–252, 2022. Wei Yao, Chengming Yu, Shangzhi Zeng, and Jin Zhang. Constrained bi-level optimization: Proximal lagrangian value function approach and hessian-free algorithm. arXiv preprint arXiv:2401.16164 ,2024. Haifeng Zhang, Weizhe Chen, Zeren Huang, Minne Li, Yaodong Yang, Weinan Zhang, and Jun Wang. Bi-level actor-critic for multi-agent coordination. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 34, pp. 7325–7332, 2020. Yihan Zhang, My T Thai, Jie Wu, and Hongchang Gao. On the communication complexity of decentralized bilevel optimization. arXiv preprint arXiv:2311.11342 , 2023. 13 Published as a conference paper at ICLR 2025 
+
+A NOTATION 
+
+We summarize our notation in the following table. 
+
+Notation Definition 
+
+N Set of nodes. 
+
+L Set of edges. 
+
+m Number of agents. 
+
+i i-th agent. 
+
+T Total iteration numbers. 
+
+t t-th iteration. 
+
+α Step size for updating x.
+
+β Step size for updating y.
+
+η Step size for updating v.
+
+p Averaging control parameter. 
+
+τ Learning rate control parameter for updating y.
+
+μ Regularization parameter for the LL objective. 
+
+Lfi0 Lipschitz constant of the UL objective fi, see Assumption 1. 
+
+Lfix1 , L fix2 Lipschitz constants for ∇xfi(·, yi) and ∇xfi(xi, ·), see Assumption 1. 
+
+Lfiy1 , L fiy2 Lipschitz constants for ∇yfi(·, yi) and ∇yfi(xi, ·), see Assumption 1. 
+
+fi0 Uniform lower bound of the UL objective fi, see Assumption 1. 
+
+Lgiy1 , L giy2 Lipschitz constants for ∇ygi, see Assumption 2. 
+
+Lgixy 1 , L gixy 2 Lipschitz constants for ∇2
+
+> xy
+
+gi, see Assumption 2. 
+
+Lgiyy 1 , L giyy 2 Lipschitz constants for ∇2
+
+> yy
+
+gi, see Assumption 2. 
+
+σψμt Strongly convex constant of the augmented LL objective ψiμt (xi, ·).
+
+gi LL objective, convex and smooth, see Assumption 2. 
+
+fi UL objective, bounded and smooth, see Assumption 1. 
+
+M Consensus weight matrix M ∈ RN ×N for the decentralized network. 
+
+λ Second largest eigenvalue of the consensus matrix M .
+
+xi,t UL variable for agent i at iteration t.
+
+yi,t LL variable for agent i at iteration t.
+
+vi,t Dual variable for agent i at iteration t.
+
+∇L Gradient of the Lagrangian function. 
+
+∇Φ Gradient of the total UL objective. Table 2: Notation Table Also, we formally define the communication complexity of a decentralized algorithm as follows: 
+
+Definition 1. (Communication Complexity) : The communication complexity is defined as the total number of communication rounds needed to converge to an ϵ-stationary point. In each round, every node can send and receive vector-valued information to and from its neighboring nodes. 
+
+B EXPANDED RELATED WORK 
+
+1) Decentralized Bilevel Optimization (DBO): One line of works enforce consensus on the LL variables. For example, Chen et al. (2022) employed hypergradient estimation with gradient track-ing for both deterministic and stochastic algorithms, achieving convergence rates of O(1 /K ) and 
+
+O(1 /√K) for nonconvex UL and strongly-convex LL problems. However, enforcing LL consensus adds a costly inner subroutine for decentralized Hessian inverse operation, significantly increasing the communication costs. Lu et al. (2022) explored stochastic bilevel optimization algorithms with primal-dual updates and demonstrated linear convergence speedup with respect to the number of nodes in homogeneous data settings. However, this method does not extend to non-i.i.d. environments, which are common in decentralized systems. For non-i.i.d. data, Yang et al. (2022) introduced a gossip protocol-based decentralized bilevel algorithm that achieves linear speedup while accounting for the communication graph’s spectral gap. Additionally, Dong et al. (2024) proposed a single-loop algorithm that does not require gradient heterogeneity assumptions. Similarly, Zhang et al. (2023) 14 Published as a conference paper at ICLR 2025 introduced decentralized stochastic bilevel gradient descent algorithms for heterogeneous settings, illustrating how communication for hypergradient estimation affects convergence. 
+
+2) Centralized Bilevel Optimization without LLSC: Merchav & Sabach (2023) addressed convex bilevel optimization problems with nonsmooth outer objectives, introducing a generalized sub-gradient method to the bilevel setting and achieves sub-linear convergence rates for outer and inner objectives under mild assumptions. They additionally improves to a linear rate for strongly convex outer objectives while allowing for nonsmoothness. In contrast, our work specifically deals with smooth UL objectives. Chen et al. (2024b) proposed a penalty-based algorithm that leverages Hölderian error bounds to achieve convergence rates of O(1 /ϵ 2), assuming a convex UL objective. Cao et al. (2024) introduced an accelerated gradient method specifically designed for bilevel problems with a convex lower-level problem, achieving convergence rates of O(1 /√ϵ) for smooth convex objectives. Samadi et al. (2023) achieved optimal complexity guarantees for a class of convex bilevel problems using advanced regularization techniques and strong convexity assumptions. While their works (Merchav & Sabach, 2023; Chen et al., 2024b; Cao et al., 2024; Samadi et al., 2023) assume UL convexity, our work focuses on non-convex UL objectives, broadening the applicability to more general problem settings. 
+
+C PROOF OF MAIN RESULTS 
+
+Before diving into our theoretical analysis, we first introduce the following notations. Let {at, b t, c t, d t}∞ 
+
+> t=1
+
+be a sequence of decreasing positive constants. The general form of potential function is given by 
+
+Vt := at
+
+f (¯ xt, y∗ 
+
+> μt
+
+(¯ xt)) − f0
+
+ + dt∥xt − 1 ⊗ ¯xt∥2 + dtαt∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2
+
++ bt∥yt − y∗ 
+
+> μt
+
+(xt)∥2 + ct∥vt − v∗ 
+
+> μt
+
+(xt)∥2.
+
+We also introduce the following notations: 
+
+¯xt = 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+xi,t , xt = [ x⊤
+
+> 1,t
+
+, . . . , x⊤
+
+> m,t
+
+]⊤,
+
+yt = [ y⊤
+
+> 1,t
+
+, . . . , y⊤
+
+> m,t
+
+]⊤, vt = [ v⊤
+
+> 1,t
+
+, . . . , v⊤
+
+> m,t
+
+]⊤.
+
+The proofs of the theorem involve four major steps, which include: (1) upper-bounding the descent of the total UL objective; (2) controlling both LL solution and multiplier errors in the descent of the total UL objective; (3) controlling both the consensus steps and the gradient tracking steps; and (4) combining all results from the previous steps and choosing suitable coefficients {at, b t, c t, d t}∞ 
+
+> t=1
+
+for the Lyapunov function to prove the convergence guarantee. 
+
+Step 1: Upper-bounding the descent of the total UL objective. We begin by analyzing the descent of the total upper-level objective Φμt (¯ xt), which is the average of the individual UL objectives 
+
+Φiμt (¯ xt). Our goal is to establish an upper bound on the change in this objective between iterations 
+
+t and t + 1 . The descent of the approximate overall UL objective is Φμt (¯ xt) = 1
+
+> m
+
+Pmi=1 Φiμt (¯ xt),where Φiμt (¯ xt) = fi
+
+ ¯xt, y∗ 
+
+> μt
+
+(¯ xt).
+
+Lemma 2. Suppose Assumptions holds. Let μt+1 ≤ μt ≤ 12 for all k. Then the sequence of 
+
+xi,t , yi,t , vi,t generated by our algorithm satisfy 
+
+Φμt+1 (¯ xt+1 ) − Φμt (¯ xt)
+
+≤ − αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
+∥¯ht
+
+> x
+
+∥2 + αtLΦμt
+
+rσ 2
+
+> ψμt
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∥¯xt − xi,t ∥2
+
++ 2αtrm
+
+> m
+
+X
+
+> i=1
+
+ Lψxy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfix2
+
+2 yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2
+
++ αtrL 2
+
+> ψy1
+
+m
+
+> m
+
+X
+
+> i=1
+
+vi,t − v∗ 
+
+> μt
+
+(xi,t ) 2
+
+15 Published as a conference paper at ICLR 2025 
+
++ 2 αtr 1
+
+m
+
+mX
+
+i=1 
+
+di,t 
+
+x − ¯ht
+
+x
+
+2
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+ 2 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (¯ xt+1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
+,
+
+where both CΦ1 and CΦ2 are constants given by 
+
+CΦ1 := L2
+
+ψy1 Lψyy 2 + Lψy1
+
+ Lψyy 1 + Lψxy 2
+
+ σψμ + Lψxy 1 σ2
+
+ψμ
+
+CΦ2 := L2
+
+ψy1 Lfiy2 + Lψy1
+
+
+
+Lfiy1 + Lfix2
+
+
+
+σψμ + Lfix1 σ2
+
+ψμ .
+
+Proof. We decompose the difference Φiμt+1 (¯ xt+1 ) − Φiμt (¯ xt) into two terms: 
+
+Φiμt+1 (¯ xt+1 ) − Φiμt (¯ xt)=fi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+− fi
+
+ ¯xt, y∗
+
+μt (¯ xt)
+
+=fi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+− fi
+
+ ¯xt+1 , y∗
+
+μt (¯ xt+1 ) + fi
+
+ ¯xt+1 , y∗
+
+μt (¯ xt+1 ) − fi
+
+ ¯xt, y∗
+
+μt (¯ xt) .
+
+By the smoothness of fi(x, ·) and Cauchy-Schwarz inequality, we have 
+
+1
+
+m
+
+mX
+
+i=1 
+
+h
+
+fi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+− fi
+
+ ¯xt+1 , y∗
+
+μt (¯ xt+1 )i
+
+≤ 1
+
+m
+
+mX
+
+i=1 
+
+hD 
+
+∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+, y∗
+
+μt+1 (¯ xt+1 ) − y∗
+
+μt (¯ xt+1 )
+
+Ei 
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+Lfiy2
+
+2 ∥y∗
+
+μt+1 (¯ xt+1 ) − y∗
+
+μt (¯ xt+1 )∥2
+
+≤ 1
+
+m
+
+mX
+
+i=1 
+
+h
+
+∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+· y∗
+
+μt+1 (¯ xt+1 ) − y∗
+
+μt (¯ xt+1 )
+
+i
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+Lfiy2
+
+2 ∥y∗
+
+μt+1 (¯ xt+1 ) − y∗
+
+μt (¯ xt+1 )∥2
+
+≤ 1
+
+m
+
+mX
+
+i=1 
+
+ 2 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (¯ xt+1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
+, (10) where the last inequality follows from y∗
+
+μ(x) − y∗
+
+μ′ (x) ≤ 2∥y∗
+
+> μ
+
+(x)∥
+
+σhi
+
+· |μ−μ′|
+
+μ′ with μ′ = μt and 
+
+μ = μt+1 .Next, let LΦμt := CΦ1 v∗
+
+μt (¯ xt) + CΦ2 , we have 
+
+Φμt (¯ xt+1 ) − Φμt (¯ xt) = 1
+
+m
+
+mX
+
+i=1 
+
+Φiμt (¯ xt+1 ) − 1
+
+m
+
+mX
+
+i=1 
+
+Φiμt (¯ xt)= 1
+
+m
+
+mX
+
+i=1 
+
+fi
+
+ ¯xt+1 , y∗
+
+μt (¯ xt+1 ) − fi
+
+ ¯xt, y∗
+
+μt (¯ xt) 
+
+16 Published as a conference paper at ICLR 2025 
+
+≤ 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (¯ xt) , ¯xt+1 − ¯xt + 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+∥¯xt+1 − ¯xt∥2 . (11) We apply the gradient descent update step 
+
+¯xt+1 − ¯xt = −αt ¯ht
+
+> x
+
+. (12) Incorporating (12) into (11), we get 
+
+Φμt (¯ xt+1 ) − Φμt (¯ xt)
+
+≤ − αt
+
+*
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (¯ xt) , ¯ht
+
+> x
+
++
+
++ α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+¯ht
+
+> x
+> 2
+
+= − αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
+∥¯ht
+
+> x
+
+∥2 + αt
+
+2 ∥∇ Φμt (¯ xt) − ¯ht
+
+> x
+
+∥2.
+
+We could further get 
+
+Φμt (¯ xt+1 ) − Φμt (¯ xt)
+
+≤ − αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
+∥¯ht
+
+> x
+
+∥2
+
++ αt
+
+2 ∇Φμt (¯ xt) − 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t ) + 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t ) − ¯ht
+
+> x
+> 2
+
+≤ − αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
+∥¯ht
+
+> x
+
+∥2
+
++ αt
+
+r ∇Φμt (¯ xt) − 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t )
+
+> 2
+
++ αtr 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t ) − ¯ht
+
+> x
+> 2
+
+≤ − αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
+¯ht 
+
+> x
+> 2
+
++ αtLΦμt
+
+rσ 2
+
+> ψμt
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∥¯xt − xi,t ∥2
+
++ αtr 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t ) − ¯ht
+
+> x
+> 2
+
+.
+
+Now, we consider the last term of this equation, 
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t ) − ¯ht
+
+> x
+> 2
+
+= 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t ) − 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+di,t  
+
+> x
+
++ 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+di,t  
+
+> x
+
+− ¯ht
+
+> x
+> 2
+
+≤2 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t ) − 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+di,t 
+
+> x
+> 2
+
++ 2 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+di,t  
+
+> x
+
+− ¯ht
+
+> x
+> 2
+
+≤ 2
+
+m
+
+> m
+
+X
+
+> i=1
+
+∇Φiμt (xi,t ) − di,t  
+
+> x
+> 2
+
++ 2 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+di,t  
+
+> x
+
+− ¯ht
+
+> x
+> 2
+
+.
+
+The desired result follows from the inequality (Pri=1 ai)2 ≤ r Pri=1 a2 
+
+> i
+
+. By the definition of Φiμt (xi),we get ∇Φiμt (xi,t ) = ∇xfi
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) − ∇ 2
+
+> xy
+
+ψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) v∗ 
+
+> μt
+
+(xi,t ) , which implies that 
+
+∥∇ Φiμt (xi,t ) − di,t  
+
+> x
+
+∥2
+
+= ∇Φiμt (xi,t ) − ∇ xfi (xi,t , yi,t ) + ∇2
+
+> xy
+
+ψμt (xi,t , yi,t ) vi,t 
+
+≤ ∇xfi
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) − ∇ xfi (xi,t , yi,t )
+
++ ∇2
+
+> xy
+
+ψμt (xi,t , yi,t ) − ∇ 2
+
+> xy
+
+ψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) v∗ 
+
+> μt
+
+(xi,t )
+
+17 Published as a conference paper at ICLR 2025 
+
++ ∇2
+
+> xy
+
+ψμt (xi,t , yi,t ) vi,t − v∗ 
+
+> μt
+
+(xi,t )
+
+≤  Lfix2 + Lψxy 2 v∗ 
+
+> μt
+
+(xi,t )  yi,t − y∗ 
+
+> μt
+
+(xi,t ) + Lψy1 vi,t − v∗ 
+
+> μt
+
+(xi,t ) .
+
+We now combine all terms and upper-bound the total descent of the UL objective: 
+
+Φμt+1 (¯ xt+1 ) − Φμt (¯ xt)
+
+≤ − αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
+∥¯ht
+
+> x
+
+∥2 + αtLΦμt
+
+rσ 2
+
+> ψμt
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+∥¯xt − xi,t ∥2
+
++ 2αtrm
+
+> m
+
+X
+
+> i=1
+
+ Lψxy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfix2
+
+2 yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2
+
++ αtrL 2
+
+> ψy1
+
+m
+
+> m
+
+X
+
+> i=1
+
+vi,t − v∗ 
+
+> μt
+
+(xi,t ) 2
+
++ 2 αtr 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+di,t  
+
+> x
+
+− ¯ht
+
+> x
+> 2
+
++ 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+ 2 ∇yfi
+
+
+
+¯xt+1 , y∗ 
+
+> μt+1
+
+(¯ xt+1 )
+
+
+
+y∗ 
+
+> μt+1
+
+(¯ xt+1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+2Lfiy2 ∥y∗ 
+
+> μt+1
+
+(¯ xt+1 )∥2
+
+σ2
+
+> hi
+
+ μt − μt+1 
+
+μt
+
+2
+
+.
+
+Step 2: Controlling both LL solution and multiplier errors. 
+
+In this step, we analyze the errors arising from the LL variables yμt (xi,t ) and the multiplier vμt (xi,t ).These errors contribute to the overall descent of the upper-level (UL) objective function, as discussed in Lemma 2. The boundedness of y∗ 
+
+> μt
+
+(xi,t ) and v∗ 
+
+> μt
+
+(xi,t ) will be key to understanding the impact of these errors. 
+
+Lemma 3. For y∗ 
+
+> μt
+
+(xi,t ) and v∗ 
+
+> μt
+
+(xi,t ), we have (recall that rv and ry are defined in (9) ): (a) ∥v∗ 
+
+> μt
+
+(xi,t )∥ ≤ rtv = Lfi0
+
+> σψμ t
+
+= O( 1
+
+> σψμ t
+
+),(b) ∥y∗ 
+
+> μt
+
+(xi,t )∥ ≤ rty = O( 1
+
+> σ2
+> ψμ t
+
+), for any xi,t satisfying ∥xi,t ∥ ≤ rtx = O( 1
+
+> σψμ t
+
+).
+
+The assumption that ∥xi,t ∥ ≤ rtx = O
+
+ 1
+
+> σψμ t
+
+
+
+will be proven later, but for now, it ensures that xi,t is bounded relative to σψμt , further supporting the use of the bounds for y∗ 
+
+> μt
+
+(xi,t ) and v∗ 
+
+> μt
+
+(xi,t ).
+
+Proof. (a) By the Lfi0 -Lipschitz continuity of fi and σψμ -strong convexity of ψiμt in Assumption 1, we can deduce that 
+
+∇yfi(xi,t , y∗ 
+
+> μt
+
+(xi,t )) ≤ Lfi0 and ∇2
+
+> yy
+
+ψiμt (xi,t , y∗ 
+
+> μt
+
+(xi,t )) −1 ≤ 1
+
+σψμt
+
+.
+
+For v∗ 
+
+> μt
+
+(xi,t ) = ∇2
+
+> yy
+
+ψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) −1 ∇yfi
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ), we have 
+
+v∗ 
+
+> μt
+
+(xi,t ) ≤ ∇2
+
+> yy
+
+ψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) −1 ∇yfi
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) ≤ Lfi0
+
+σψμt
+
+.
+
+(b) Assume ∥xi,t ∥ ≤ rtx. By the optimality of y∗ 
+
+> μt
+
+(xi,t ) and Lemme 11 (a), we take x′ 
+
+> i
+
+= 0 and have 
+
+∥y∗ 
+
+> μt
+
+(xi,t )∥ ≤ Lψy1
+
+σψμ
+
+∥xi,t − 0∥ + ∥y∗ 
+
+> μt
+
+(0) ∥
+
+18 Published as a conference paper at ICLR 2025 
+
+= Lψy1
+
+σψμ
+
+∥xi,t ∥ + ∥y∗ 
+
+> μt
+
+(0) − 0∥≤ Lψy1
+
+σψμ
+
+∥xi,t ∥ + 1
+
+σψμ
+
+∥∇ yψμ(0 , y∗ 
+
+> μt
+
+(0)) − ∇ yψμ(0 , 0) ∥≤ Lψy1
+
+σψμ
+
+rtx + 1
+
+σψμt
+
+∥∇ yψμt (0 , 0) ∥,
+
+where the second inequality follows from the strong convexity of ψμt (xi,t , ·), the last inequality follows from the optimality of y∗ 
+
+> μt
+
+(0) .
+
+Lemma 4. For any i ∈ [m], the sequence of xi,t , yi,t , vi,t generated by our algorithm satisfy 
+
+yi,t +1 − y∗ 
+
+> μt
+
+(xi,t ) 2
+
+≤  1 − σψμt βt
+
+ yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2 −
+
+
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+> t
+
+
+
+hi,t  
+
+> y
+> 2
+
+,
+
+and 
+
+vi,t +1 − v∗ 
+
+> μt
+
+(xi,t ) 2 ≤  1 − ηtσψμt
+
+ vi,t − v∗ 
+
+> μt
+
+(xi,t ) 2
+
++ 2ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfiy2
+
+2
+
+yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2 ,
+
+if we choose βt ≤ 2 
+
+> σψμ t+Lψμ t
+
+and ηt ≤ 1
+
+> Lψμ t
+
+.
+
+Proof. We begin by analyzing the update for the LL solution, yi,t +1 . Recall that the update is performed via a projected gradient step: 
+
+yi,t +1 = Prty [yi,t − βt∇yψμt (xi,t , yi,t )] ,
+
+where Prty [·] denotes the projection onto the feasible set with radius rty . This projection ensures that yi,t +1 = yi,t +1 (xi,t +1 ) remains bounded, preventing it from diverging. To analyze the error 
+
+∥yi,t +1 − y∗ 
+
+> μt
+
+(xi,t )∥, we decompose the update step: 
+
+∥yi,t +1 − y∗ 
+
+> μt
+
+(xi,t )∥2 = ∥Prty [yi,t − βt∇yψμt (xi,t , yi,t )] − y∗ 
+
+> μt
+
+(xi,t )∥2.
+
+Since the projection is non-expansive, i.e., it does not increase distances, and y∗ 
+
+> μt
+
+(xi,t ) 2 ≤ rty by Lemma 3, we have: 
+
+∥yi,t +1 − y∗ 
+
+> μt
+
+(xi,t )∥2 ≤ ∥ yi,t − βt∇yψμt (xi,t , yi,t ) − y∗ 
+
+> μt
+
+(xi,t )∥2.
+
+Next, we expand the right-hand side: 
+
+yi,t +1 − y∗ 
+
+> μt
+
+(xi,t ) 2
+
+≤ yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2 − 2βt yi,t − y∗ 
+
+> μt
+
+(xi,t ) , ∇yψμt (xi,t , yi,t ) + β2 
+
+> t
+
+∥∇ yψμt (xi,t , yi,t )∥2 ,
+
+To bound the inner product term, by the σψμt -strong convexity and Lψμt -smoothness of ψμt (x, ·),since ∇yψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) = 0 , Theorem 2.1.12 in (Nesterov, 2018) implies that 
+
+yi,t − y∗ 
+
+> μt
+
+(xi,t ) , ∇yψμt (xi,t , yi,t )
+
+= yi,t − y∗ 
+
+> μt
+
+(xi,t ) , ∇yψμt (xi,t , yi,t ) − ∇ yψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t )
+
+≥ σψμt Lψμt
+
+σψμt + Lψμt
+
+yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2 + 1
+
+σψμt + Lψμt
+
+∥∇ yψμt (xi,t , yi,t )∥2 .
+
+Hence, when 0 < β t ≤ 2 
+
+> σψμ t+Lψμ t
+
+, we have 
+
+yi,t +1 − y∗ 
+
+> μt
+
+(xi,t ) 2
+
+19 Published as a conference paper at ICLR 2025 
+
+≤
+
+
+
+1 − 2σψμt Lψμt
+
+σψμt + Lψμt
+
+βt
+
+
+
+yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2 −
+
+
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+> t
+
+
+
+∥∇ yψμt (xi,t , yi,t )∥2
+
+=
+
+
+
+1 − 2σψμt Lψμt
+
+σψμt + Lψμt
+
+βt
+
+
+
+yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2 −
+
+
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+> t
+
+
+
+hi,t  
+
+> y
+> 2
+
+,
+
+which implies the desired result since 12 ≤ Lψμ t 
+
+> σψμ t+Lψμ t
+
+≤ 1. This inequality shows that the error in yi,t contracts as long as the step size βt is chosen appropriately, ensuring the progress of the algorithm toward the optimal solution y∗ 
+
+> μt
+
+(xi,t ).Now, we proceed to bound the error in the multiplier vi,t +1 = vi,t +1 (xi,t +1 ) by using ∇2
+
+> yy
+
+ψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) v∗ 
+
+> μt
+
+(xi,t ) = ∇yfi
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ). As with the previous projection for yi,t +1 , the non-expansiveness property of the projection operator Prtv [·] gives us: 
+
+vi,t +1 − v∗ 
+
+> μt
+
+(xi,t ) 2
+
+= Prtv [vi,t − ηt
+
+  ∇2
+
+> yy
+
+ψμt (xi,t , yi,t ) vi,t − ∇ yfi (xi,t , yi,t )] − v∗ 
+
+> μt
+
+(xi,t ) 2
+
+≤ vi,t − v∗ 
+
+> μt
+
+(xi,t ) − ηt
+
+  ∇2
+
+> yy
+
+ψμt (xi,t , yi,t ) vi,t − ∇ yfi (xi,t , yi,t ) 2 , (13) where the inequality holds because v∗ 
+
+> μt
+
+(xi,t ) 2 ≤ rtv by Lemma 3. Next, we expand the right-hand side, which gives: 
+
+vi,t − v∗ 
+
+> μt
+
+(xi,t ) − ηt
+
+  ∇2
+
+> yy
+
+ψμt (xi,t , yi,t ) vi,t − ∇ yfi (xi,t , yi,t )
+
+=vi,t − v∗ 
+
+> μt
+
+(xi,t ) − ηt
+
+∇2
+
+> yy
+
+ψμt (xi,t , yi,t )  vi,t − v∗ 
+
+> μt
+
+(xi,t )
+
+− ηt
+
+∇2
+
+> yy
+
+ψμt (xi,t , yi,t ) − ∇ 2
+
+> yy
+
+ψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) v∗ 
+
+> μt
+
+(xi,t )
+
+− ηt
+
+∇yfi
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) − ∇ yfi
+
+ xi,t , y∗
+
+> i,t
+
+ . (14) Hence, by Cauchy-Schwarz inequality, for all ϵ ≥ 0, we incorporate (14) into (13) and have 
+
+vi,t +1 − v∗ 
+
+> μt
+
+(xi,t ) 2
+
+≤(1 + ϵ) I − ηt∇2
+
+> yy
+
+ψμt (xi,t , yi,t )  vi,t − v∗ 
+
+> μt
+
+(xi,t ) 2
+
++
+
+
+
+1 + 1
+
+ϵ
+
+
+
+η2 
+
+> t
+
+× ∥ ∇2
+
+> yy
+
+ψμt (xi,t , yi,t ) − ∇ 2
+
+> yy
+
+ψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) v∗ 
+
+> μt
+
+(xi,t )+  ∇yfi
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) − ∇ yfi
+
+ xi,t , y∗
+
+> i,t
+
+ 2 .
+
+When ηt ≤ 1/L ψμt , by the σψμ - strongly convexity of ψμt (xi, ·), since the spectral norm is monotone, we have 
+
+I − ηt∇2
+
+> yy
+
+ψμt (xi,t , yi,t +1 )  vi,t − v∗ 
+
+> μt
+
+(xi,t ) ≤  1 − ηtσψμt
+
+ ∥vi,t − v∗ 
+
+> μt
+
+(xi,t )∥.
+
+Next, by Lipschitz continuity of ∇2
+
+> yy
+
+ψμt (x, ·) and ∇yfi(x, ·), we get 
+
+∥ ∇2
+
+> yy
+
+ψμt (xi,t , yi,t ) − ∇ 2
+
+> yy
+
+ψμt
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t ) v∗ 
+
+> μt
+
+(xi,t ) + ∇yfi
+
+ xi,t , y∗ 
+
+> μt
+
+(xi,t )
+
+−∇ yfi (xi,t , yi,t )∥≤
+
+
+
+Lψyy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfiy2
+
+
+
+yi,t − y∗ 
+
+> μt
+
+(xi,t ) .
+
+Taking ε = ηtσψμt , we have 
+
+vi,t +1 − v∗ 
+
+> μt
+
+(xi,t ) 2
+
+≤  1 + ηtσψμt
+
+   1 − ηtσψμt
+
+2 vi,t − v∗ 
+
+> μt
+
+(xi,t ) 2
+
++
+
+
+
+1 + 1
+
+ηtσψμt
+
+
+
+η2
+
+> t
+
+
+
+Lψyy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfiy2
+
+2
+
+yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2 ,
+
+which implies the desired result since η2 
+
+> t
+
+≤ ηt/L ψμt ≤ ηt/σ ψμt .20 Published as a conference paper at ICLR 2025 This shows that the error in the multiplier vi,t also contracts over iterations, provided that the step size ηt is chosen appropriately. By the above lemmas, we can now proceed to analyze the error of LL and multiplier variables. 
+
+Lemma 5. Suppose Assumptions hold. For any i ∈ [m], the the sequence of xi,t , yi,t , vi,t generated by our algorithm satisfy 
+
+y∗ 
+
+> μt
+
+(xi,t ) − y∗ 
+
+> μt+1
+
+(xi,t +1 ) 2
+
+≤ 2L2
+
+> ψy1
+
+σ2
+
+> ψμt
+
+∥xi,t − xi,t +1 ∥2 +8 y∗ 
+
+> μt+1
+
+(xi,t +1 ) 2
+
+σ2
+
+> hi
+
+ μt − μt+1 
+
+μt
+
+2
+
+,
+
+and 
+
+v∗ 
+
+> μt
+
+(xi,t ) − v∗ 
+
+> μt+1
+
+(xi,t +1 ) 2
+
+≤ 2  Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+σ4
+
+> ψμt
+
+∥xi,t − xi,t +1 ∥2
+
++ 2 ( 
+
+
+
+Cv1 v∗ 
+
+> μt+1
+
+(xi,t +1 ) + Lfiy2
+
+
+
+y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+  2  μt − μt+1 
+
+μ2
+
+> t
+
+2
+
+,
+
+where both Cv1 and Cv2 are constants given by 
+
+Cv1 := 2 
+
+
+
+Lhiyy 2 + Lgiyy 2
+
+
+
+/σ 2 
+
+> hi
+
+, Cv2 := 2 
+
+
+
+Lfiy2 + Lgiy2
+
+
+
+/σ 2 
+
+> hi
+
+.
+
+Proof. By the triangle inequality, and Lemma 11(a) and 13(a) with μ′ = μt and μ = μt+1 ,
+
+y∗ 
+
+> μt
+
+(xi,t ) − y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+≤ y∗ 
+
+> μt
+
+(xi,t ) − y∗ 
+
+> μt
+
+(xi,t +1 ) + y∗ 
+
+> μt
+
+(xi,t +1 ) − y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+≤ Lψy1
+
+σψμt
+
+∥xi,t − xi,t +1 ∥ +2 y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
+.
+
+Then with μ′ = μt and μ = μt+1 , we have 
+
+v∗ 
+
+> μt
+
+(xi,t ) − v∗ 
+
+> μt+1
+
+(xi,t +1 ) ≤ v∗ 
+
+> μt
+
+(xi,t ) − v∗ 
+
+> μt
+
+(xi,t +1 ) + v∗ 
+
+> μt
+
+(xi,t +1 ) − v∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+≤
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+
+
+σ2
+
+> ψμt
+
+∥xi,t − xi,t +1 ∥
+
++
+
+ 
+
+Cv1 v∗ 
+
+> μt+1
+
+(xi,t +1 ) + Lfiy2
+
+
+
+y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+   μt − μt+1 
+
+μ2
+
+> t
+
+
+
+.
+
+Building upon the aforementioned lemmas, we can now proceed to analyze the iteration-wise differences in the errors of LL and multiplier variables. 
+
+Lemma 6. Then for any i ∈ [m], the sequence of xi,t , yi,t , vi,t generated by our algorithm satisfy 
+
+yi,t +1 − y∗ 
+
+> μt+1
+
+(xi,t +1 ) 2
+
+− yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2
+
+≤ − 12 βtσψμt yi,t − y∗ 
+
+> μt
+
+(xi,t ) 2 −
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+> t
+
+
+
+∥hi,t  
+
+> y
+
+∥2
+
++ 6L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
+∥xi,t − xi,t +1 ∥2 +24 y∗ 
+
+> μt+1
+
+(xi,t +1 ) 2
+
+σ2 
+
+> hi
+
+βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
+,
+
+21 Published as a conference paper at ICLR 2025 
+
+and 
+
+vi,t +1 − v∗
+
+μt+1 (xi,t +1 ) 2
+
+− vi,t − v∗
+
+μt (xi,t ) 2
+
+≤ − 12 ηtσψμt vi,t − v∗
+
+μt (xi,t ) 2 + 6  Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+∥xi,t − xi,t +1 ∥2
+
++ 3ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
+yi,t − y∗
+
+μt (xi,t ) 2
+
++
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2 6
+
+ηtσψμt
+
+ 
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
+.
+
+Proof. By Cauchy-Schwarz inequality, it is easy to check that for any ϵ > 0, we have 
+
+∥yi,t +1 − y∗
+
+μt+1 (xi,t +1 )∥2
+
+=∥yi,t +1 − y∗
+
+μt (xi,t ) + y∗
+
+μt (xi,t ) − y∗
+
+μt+1 (xi,t +1 )∥2
+
+≤(1 + ϵ)∥yi,t +1 − y∗
+
+μt (xi,t )∥2 + (1 + 1
+
+ϵ )∥y∗
+
+μt (xi,t ) − y∗
+
+μt+1 (xi,t +1 )∥2.
+
+Taking ϵ = 12 βtσψμt , by Lemma 4 and Lemma 5, we have 
+
+∥yi,t +1 − y∗
+
+μt+1 (xi,t +1 )∥2
+
+≤
+
+
+
+1 − 12 βtσψμt
+
+
+
+yi,t − y∗
+
+μt (xi,t ) 2 −
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+
+
+∥hi,t 
+
+y ∥2
+
++ 2L2
+
+ψy1
+
+σ2
+
+ψμt
+
+
+
+1 + 2
+
+βtσψμt
+
+
+
+∥xi,t − xi,t +1 ∥2
+
++8 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi
+
+
+
+1 + 2
+
+βtσψμt
+
+  μt − μt+1 
+
+μt
+
+2
+
+,
+
+which implies the desired result since βtσψμt ≤ 1 when βt ≤ 2/(σψμt + Lψμt ).
+
+Similarly, for any δ > 0, by Cauchy-Schware inequality, 
+
+∥vi,t +1 − v∗
+
+μt+1 (xi,t +1 )∥2
+
+=∥vi,t +1 − v∗
+
+μt (xi,t ) + v∗
+
+μt (xi,t ) − v∗
+
+μt+1 (xi,t +1 )∥2
+
+≤(1 + δ)∥vi,t +1 − v∗
+
+μt (xi,t )∥2 + (1 + 1
+
+δ )∥v∗
+
+μt (xi,t ) − v∗
+
+μt+1 (xi,t +1 )∥2.
+
+Taking δ = 12 ηtσψμt , by Lemma 4 and Lemma 5, we have 
+
+vi,t +1 − v∗
+
+μt+1 (xi,t +1 ) 2
+
+≤
+
+
+
+1 − 12 ηtσψμt
+
+
+
+vi,t − v∗
+
+μt (xi,t ) 2
+
++ 2  Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+σ4
+
+ψμt
+
+
+
+1 + 2
+
+ηtσψμt
+
+
+
+∥xi,t − xi,t +1 ∥2
+
++ 2ηt
+
+σψμt
+
+
+
+1 + 12 ηtσψμt
+
+ 
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
+yi,t − y∗
+
+μt (xi,t ) 2
+
++ 2 
+
+ 
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
+22 Published as a conference paper at ICLR 2025 
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+  2
+
+×
+
+
+
+1 + 2
+
+ηtσψμt
+
+  μt − μt+1 
+
+μ2
+
+> t
+
+2
+
+.
+
+This desired result follows since ηtσψμt ≤ 1 when ηt ≤ 1/L ψμt .
+
+Step 3: Controlling both the consensus steps and the gradient tracking steps. 
+
+In this step, we are focusing on controlling both the consensus steps and the gradient tracking steps within our decentralized algorithm. The goal is to show that the iterates contract over time, which means that both the decision variables xt and the gradient tracking variables ht 
+
+> x
+
+converge as the algorithm progresses. This lemma proves that the discrepancy between these variables across agents reduces over iterations, thus guaranteeing convergence. 
+
+Lemma 7 (Iterates Contraction) . The following contraction properties of the iterates hold: 
+
+∥xt+1 − 1 ⊗ ¯xt+1 ∥2 ≤ (1 + l1)λ2∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2 
+
+> t
+
+∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2,
+
+and 
+
+∥ht+1  
+
+> x
+
+− 1 ⊗ ¯ht+1  
+
+> x
+
+∥2 ≤ (1 + l2)λ2∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 + (1 + 1
+
+l2
+
+)∥dt+1  
+
+> x
+
+− dt
+
+> x
+
+∥2,
+
+where l1 and l2 are arbitrary positive constants. Additionally, we have 
+
+∥xt+1 − xt∥2 ≤ 8∥(xt − 1 ⊗ ¯xt)∥2 + 4 α2 
+
+> t
+
+∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 + 4 α2 
+
+> t
+
+m∥¯ht
+
+> x
+
+∥2.
+
+And also, 
+
+∥yt+1 − yt∥2 ≤ β2 
+
+> t
+
+∥ht
+
+> y
+
+∥2.
+
+The first inequality states that the deviation of the iterates xt+1 from their consensus value 1 ⊗ ¯xt+1 
+
+(where 1⊗ represents the averaging operator) is bounded by a factor that depends on the previous deviation, scaled by the contraction factor λ, and the gradient tracking error. The second inequality bounds the change in the gradient tracking variables ht 
+
+> x
+
+between iterations t and t + 1 , showing that it contracts over time, depending on the contraction factor λ and the difference in the gradient correction steps dt+1  
+
+> x
+
+− dt
+
+> x
+
+. These two contraction results help ensure that the iterates (both the decision variables and the gradient tracking variables) converge towards their consensus values over time. 
+
+Proof. We begin by analyzing the iterates of xt+1 . The idea is to show that the deviation of xt+1 
+
+from its average consensus value 1 ⊗ ¯xt+1 contracts over iterations. Define fM = M ⊗ Im. First for the iterates xt, we have the following contraction: 
+
+∥fMx t − 1 ⊗ ¯xt∥2 = ∥fM(xt − 1 ⊗ ¯xt)∥2 ≤ λ2∥xt − 1 ⊗ ¯xt∥2. (15) This is because xt − 1 ⊗ xt is orthogonal 1, which is the eigenvector corresponding to the largest eigenvalue of fM, and λ = max {| λ2|, |λm|} . Recall that ¯xt = ¯ xt−1 − αt−1 ¯ht−1 
+
+> x
+
+, hence, 
+
+∥xt − 1 ⊗ ¯xt∥2 = ∥fMx t−1 − αt−1ht−1 
+
+> x
+
+− 1 ⊗ (¯ xt−1 − αt−1 ¯ht−1 
+
+> x
+
+)∥2(a)
+
+≤ (1 + l1)∥fMx t−1 − 1 ⊗ ¯xt−1∥2 + (1 + 1
+
+l1
+
+)α2
+
+> t−1
+
+∥ht−1 
+
+> x
+
+− 1 ⊗ ¯ht−1 
+
+> x
+
+∥2(b)
+
+≤ (1 + l1)λ2∥xt−1 − 1 ⊗ ¯xt−1∥2 + (1 + 1
+
+l1
+
+)α2
+
+> t−1
+
+∥ht−1 
+
+> x
+
+− 1 ⊗ ¯ht−1 
+
+> x
+
+∥2,
+
+where (a) is because of triangle inequality and (b) is from (15) . Next, we analyze the gradient tracking steps. The goal here is to show that the deviation of the gradient tracking variables from their consensus value also contracts over time. Using the update rule for ht
+
+> x
+
+, we have 
+
+∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2
+
+23 Published as a conference paper at ICLR 2025 
+
+=∥fMh t−1 
+
+> x
+
++ dt 
+
+> x
+
+− dt−1 
+
+> x
+
+− 1 ⊗  ¯ht−1 
+
+> x
+
++ ¯dt 
+
+> x
+
+− ¯dt−1
+
+> x
+
+∥2
+
+≤(1 + l2)λ2∥ht−1 
+
+> x
+
+− 1 ⊗ ¯ht−1 
+
+> x
+
+∥2 + (1 + 1
+
+l2
+
+)∥dt 
+
+> x
+
+− dt−1 
+
+> x
+
+− 1 ⊗  ¯dt 
+
+> x
+
+− ¯dt−1
+
+> x
+
+ ∥2
+
+≤(1 + l2)λ2∥ht−1 
+
+> x
+
+− 1 ⊗ ¯ht−1 
+
+> x
+
+∥2 + (1 + 1
+
+l2
+
+)∥ I − 1
+
+n (11 ⊤) ⊗ I  dt 
+
+> x
+
+− dt−1
+
+> x
+
+∥2(a)
+
+≤ (1 + l2)λ2∥ht−1 
+
+> x
+
+− 1 ⊗ ¯ht−1 
+
+> x
+
+∥2 + (1 + 1
+
+l2
+
+)∥dt 
+
+> x
+
+− dt−1 
+
+> x
+
+∥2, (16) where (a) is due to ∥I − 1 
+
+> m
+
+(11 ⊤) ⊗ I∥ ≤ 1.
+
+From (16), letting l2 = 1−λλ , we can further have 
+
+(1 + l2)λ2∥ht−1 
+
+> x
+
+− 1 ⊗ ¯ht−1 
+
+> x
+
+∥2 + (1 + 1
+
+l2
+
+)∥dt 
+
+> x
+
+− dt−1 
+
+> x
+
+∥2
+
+≤λ∥ht−1 
+
+> x
+
+− 1 ⊗ ¯ht−1 
+
+> x
+
+∥2 + 11 − λ ∥dt 
+
+> x
+
+− dt−1 
+
+> x
+
+∥2.
+
+Then we have 
+
+∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 ≤ 11 − λ
+
+> t+1
+
+X
+
+> s=0
+
+ λt+1 −s∥ds 
+
+> x
+
+− ds−1 
+
+> x
+
+∥2 . (17) By using ∥ht
+
+> x
+
+∥2 = ∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 + n∥¯ht
+
+> x
+
+∥2 and (17), we can immediately deduce that 
+
+∥ht
+
+> x
+
+∥2 ≤ 11 − λ
+
+> t+1
+
+X
+
+> s=0
+
+ λt+1 −s∥ds 
+
+> x
+
+− ds−1 
+
+> x
+
+∥2 + n∥¯dt
+
+> x
+
+∥2.
+
+According to the updating mechanism detailed in (5), we have 
+
+∥xt − xt−1∥2
+
+=∥fMx t−1 − αt−1ht−1 
+
+> x
+
+− xt−1∥2
+
+=∥(fM − I)xt−1 − αt−1ht−1 
+
+> x
+
+∥2
+
+≤2∥(fM − I)xt−1∥2 + 2 α2
+
+> t−1
+
+∥ht−1 
+
+> x
+
+∥2
+
+=2 ∥(fM − I)( xt−1 − 1 ⊗ ¯xt−1)∥2 + 2 α2
+
+> t−1
+
+∥ht−1 
+
+> x
+
+∥2
+
+≤8∥(xt−1 − 1 ⊗ ¯xt−1)∥2 + 4 α2
+
+> t−1
+
+∥ht−1 
+
+> x
+
+− 1 ⊗ ¯ht−1 
+
+> x
+
+∥2 + 4 α2
+
+> t−1
+
+m∥¯ht−1 
+
+> x
+
+∥2.
+
+Also, 
+
+∥yt − yt−1∥2 = ∥P r ty [yt−1 − β2 
+
+> t
+
+ht−1] − yt−1∥2 ≤ ∥ yt−1 − β2 
+
+> t
+
+ht−1 − yt−1∥2 ≤ β2 
+
+> t
+
+∥ht−1 
+
+> y
+
+∥2,
+
+where the first inequality holds because ∥yt−1∥2 ≤ rt−1 
+
+> y
+
+≤ rty by the algorithm setting, implying the non-expensive property. 
+
+Lemma 8. Let rx be defined as in (9) . Then, the following inequality holds: 
+
+∥xi,t ∥2 ≤ r2 
+
+> x
+
+= O 1
+
+σ2
+
+> ψμt
+
+!
+
+.
+
+This lemma states that the squared norm of the vector xi,t is bounded by r2 
+
+> x
+
+, which is of the order 
+
+O
+
+
+
+> 1
+> σ2
+> ψμ t
+
+
+
+.
+
+Proof. By Assumption 2, we have 
+
+di,t  
+
+> x
+
+= ∥∇ xfi(xi,t , yi,t ) − ∇ xy ψi(xi,t , yi,t )vi,t ∥≤ ∥∇ xfi(xi,t , yi,t )∥ + ∥∇ xy ψi(xi,t , yi,t )∥ ∥ vi,t ∥
+
+24 Published as a conference paper at ICLR 2025 
+
+≤ Lfi0 + ( Lψiy1 rv ) = B1 = O( 1
+
+σψμt
+
+),
+
+and 
+
+¯di,t 
+
+x ≤ 1
+
+m
+
+mX
+
+i=1 
+
+di,t 
+
+x ≤ B1 = O( 1
+
+σψμt
+
+).
+
+Here we also prove that 
+
+∥di,t 
+
+y ∥ = ∥∇ yψi(xi,t , yi,t )∥ ≤ ∥∇ yψi(xi,t , yi,t ) − ∇ yψi(0 , 0) ∥ + ∥∇ yψi(0 , 0) ∥≤ Lψy (∥xi,t ∥ + ∥yi,t ∥) ≤ Lψy (rtx + rty ) + ∥∇ yψi(0 , 0) ∥ ≤ B2 = ˜O( 1
+
+σ2
+
+ψμt
+
+),
+
+and 
+
+di,t 
+
+v = ∥∇ yfi(xi,t , yi,t ) − ∇ yy ψi(xi,t , yi,t )vi,t ∥ ≤ Lfi0 + ( Lψiy2 rv ) = B3 = O( 1
+
+σψμt
+
+).
+
+We can deduce that 
+
+mX
+
+i=1 
+
+hi,t +1 
+
+x
+
+2 ≤ 4mB 21
+
+1 − λ
+
+t+1 X
+
+s=0 
+
+λt+1 −s
+
+!
+
++ mB 21 ≤
+
+
+
+1 + 4(1 − λ)2
+
+
+
+B21 m. 
+
+From xi,t +1 = P
+
+i′∈N i [M]ii ′ xi′,t − αthi,t 
+
+x , we have 
+
+mX
+
+i=1 
+
+∥xi,t +1 − xi,t ∥2
+
+≤
+
+mX
+
+i=1 
+
+X
+
+i′∈N i
+
+[M]ii ′ xi′,t − αthi,t 
+
+x − X
+
+i′∈N i
+
+[M]ii ′ xi′,t −1 − αt−1hi,t −1
+
+x
+
+2
+
+≤ 1
+
+λ
+
+mX
+
+i=1 
+
+X
+
+i′∈N i
+
+[M]ii ′ xi′,t − X
+
+i′∈N i
+
+[M]ii ′ xi′,t −1
+
+2
+
++ 11 − λ
+
+mX
+
+i=1 
+
+αthi,t 
+
+x − αt−1hi,t −1
+
+x
+
+2
+
+≤ 1
+
+λ
+
+mX
+
+i=1 
+
+X
+
+i′∈N i
+
+[M]ii ′ (xi′,t − xi′,t −1)
+
+2
+
++ 11 − λ α2
+
+t−1
+
+mX
+
+i=1 
+
+hi,t 
+
+x − hi,t −1
+
+x
+
+2 ,
+
+where the second inequality is due to the Cauchy-Schwarz inequality. Now we have 
+
+mX
+
+i=1 
+
+X
+
+i′∈N i
+
+[M]ii ′ xi′,t − X
+
+i′∈N i
+
+[M]ii ′ xi′,t −1 − (¯ xt − ¯xt−1)
+
+2
+
+≤λ2
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1 − (¯ xt − ¯xt−1)∥2 .
+
+Moreover, we have 
+
+mX
+
+i=1 
+
+X
+
+i′∈N i
+
+[M]ii ′ xi′,t − X
+
+i′∈N i
+
+[M]ii ′ xi′,t −1 − (¯ xt − ¯xt−1)
+
+2
+
+=
+
+mX
+
+i=1 
+
+X
+
+i′∈N i
+
+[M]ii ′ xi′,t − X
+
+i′∈N i
+
+[M]ii ′ xi′,t −1
+
+2
+
++ m ∥¯xt − ¯xt−1∥2
+
+− 2
+
+mX
+
+i=1 
+
+* X
+
+i′∈N i
+
+[M]ii ′ xi′,t − X
+
+i′∈N i
+
+[M]ii ′ xi′,t −1, ¯xt − ¯xt−1
+
++
+
+=
+
+mX
+
+i=1 
+
+X
+
+i′∈N i
+
+[M]ii ′ xi′,t − X
+
+i′∈N i
+
+[M]ii ′ xi′,t −1
+
+2
+
+− m ∥¯xt − ¯xt−1∥2 ,
+
+25 Published as a conference paper at ICLR 2025 and 
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1 − (¯ xt − ¯xt−1)∥2
+
+=
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1∥2 + m ∥¯xt − ¯xt−1∥2 − 2
+
+mX
+
+i=1 
+
+⟨xi,t − xi,t −1, ¯xt − ¯xt−1⟩
+
+=
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1∥2 − m ∥¯xt − ¯xt−1∥2 .
+
+Then we obtain 
+
+mX
+
+i=1 
+
+X
+
+i′∈N i
+
+[M]ii ′ xi′,t − X
+
+i′∈N i
+
+[M]ii ′ xi′,t −1
+
+2
+
+≤λ2
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1∥2 + (1 − λ2)m ∥¯xt − ¯xt−1∥2
+
+=λ2
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1∥2 + (1 − λ2)mα 2
+
+t−1 ¯dt−1
+
+x
+
+2 .
+
+Now we have that 
+
+mX
+
+i=1 
+
+∥xi,t +1 − xi,t ∥2
+
+≤λ
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1∥2 + 1 − λ2
+
+λ mα 2
+
+t−1 ¯dt−1
+
+x
+
+2 + 11 − λ α2
+
+t−1
+
+mX
+
+i=1 
+
+hi,t 
+
+x − hi,t −1
+
+x
+
+2
+
+≤λ
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1∥2 + 1 − λ2
+
+λ mα 2
+
+t−1 ¯dt−1
+
+x
+
+2
+
++ 21 − λ α2
+
+t−1
+
+mX
+
+i=1 
+
+hi,t 
+
+x
+
+2 +
+
+mX
+
+i=1 
+
+hi,t −1
+
+x
+
+2
+
+!
+
+.
+
+We set λ1 = 1−λ2
+
+λ + 41−λ + 16 (1 −λ)3 and have 
+
+mX
+
+i=1 
+
+∥xi,t +1 − xi,t ∥2 ≤ λ
+
+mX
+
+i=1 
+
+∥xi,t − xi,t −1∥2 + λ1B21 mα 2
+
+t−1
+
+≤ λtmX
+
+i=1 
+
+∥xi, 0 − xi, −1∥2 + λ1B21 m
+
+tX
+
+s=1 
+
+α2
+
+s−1
+
+≤ λ1B21 m
+
+tX
+
+s=1 
+
+α2
+
+s−1
+
+≤ λ1B21 m ¯β ¯μ 1(t + 1) 2(1+ 74 τ +p) ,
+
+where αt = ( t + 1) −3τ / 2βtμt3, and Pts=1 α2
+
+s−1 ≤ ¯β ¯μ 1(t+1) 2(1+ 74 τ +p) log( t + 1) . Then we have 
+
+mX
+
+i=1 
+
+∥xi,t ∥2 ≤ 2
+
+mX
+
+i=1 
+
+∥xi,t − xi, 0∥2 + 2 
+
+mX
+
+i=1 
+
+∥xi, 0∥2
+
+≤ 2t
+
+t−1X
+
+s=0 
+
+mX
+
+i=1 
+
+∥xi,s +1 − xi,s ∥2 + 2 
+
+mX
+
+i=1 
+
+∥xi, 0∥2
+
+26 Published as a conference paper at ICLR 2025 
+
+≤ 2λ1B21 m ¯β ¯μ t2
+
+(t + 1) 2(1+ 74 τ +p) + 2 
+
+> m
+
+X
+
+> i=1
+
+∥x0 
+
+> i
+
+∥2
+
+≤ 2λ1B21 m ¯β ¯μ + 2 
+
+> m
+
+X
+
+> i=1
+
+∥x0 
+
+> i
+
+∥2
+
+which implies ∥xi,t ∥2 ≤ Pmi=1 ∥xi,t ∥2 ≤ r2 
+
+> x
+
+= O( 1
+
+> σ2
+> ψμ t
+
+), where rx is defined in (9). We now analyze the contraction properties of the iterates xt+1 and ht+1  
+
+> x
+
+,respectively, as generated by the algorithm. Specifically, we aim to track how the differences between successive iterations decrease over time. 
+
+Lemma 9. 
+
+∥xt+1 − 1 ⊗ ¯xt+1 ∥2 − ∥ xt − 1 ⊗ ¯xt∥2
+
+≤ ((1 + l1)λ2 − 1) ∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2 
+
+> t
+
+∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2,
+
+where l1 is an arbitrary positive constant. 
+
+∥ht+1  
+
+> x
+
+− 1 ⊗ ¯ht+1  
+
+> x
+
+∥2 − ∥ ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2
+
+≤ ((1 + l2)λ2 − 1) ∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 + (1 + 1
+
+l2
+
+)( L2 
+
+> fi1
+
+∥xt+1 − xt∥2 + L2 
+
+> fi2
+
+β2 
+
+> t
+
+∥ht
+
+> y
+
+∥2),
+
+where l2 is also an arbitrary positive constant. Proof. We start by examining the difference in the updates between iterations for both xt and ht
+
+> x
+
+.Using the smoothness assumptions (Assumption 2), we first bound the difference between successive updates of dx, which are defined as the gradient of the objective function: 
+
+∥dt+1  
+
+> x
+
+− dt
+
+> x
+
+∥2 ≤ L2 
+
+> fi1
+
+∥xt+1 − xt∥2 + L2 
+
+> fi2
+
+∥yt+1 − yt∥2 ≤ L2 
+
+> fi1
+
+∥xt+1 − xt∥2 + L2 
+
+> fi2
+
+β2 
+
+> t
+
+∥ht
+
+> y
+
+∥2.
+
+Applying the results from Lemma 7, we have: 
+
+∥xt+1 − 1 ⊗ ¯xt+1 ∥2
+
+≤(1 + l1)λ2∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2 
+
+> t
+
+∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2,
+
+which reflects the contraction behavior of the consensus steps for the decision variable xt. Similarly, the contraction property for ht
+
+> x
+
+, the gradient tracking variable, follows: 
+
+∥ht+1  
+
+> x
+
+− 1 ⊗ ¯ht+1  
+
+> x
+
+∥2
+
+≤(1 + l2)λ2∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 + (1 + 1
+
+l2
+
+)( L2 
+
+> fi1
+
+∥xi − x′
+
+> i
+
+∥2 + L2 
+
+> fi2
+
+β2 
+
+> t
+
+∥ht
+
+> y
+
+∥2).
+
+Finally, we combine the two bounds to obtain the iterative contraction properties for both xt+1 and 
+
+ht+1  
+
+> x
+
+:
+
+∥xt+1 − 1 ⊗ ¯xt+1 ∥2 − ∥ xt − 1 ⊗ ¯xt∥2
+
+≤ ((1 + l1)λ2 − 1) ∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2 
+
+> t
+
+∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2
+
+∥ht+1  
+
+> x
+
+− 1 ⊗ ¯ht+1  
+
+> x
+
+∥2 − ∥ ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2
+
+≤ ((1 + l2)λ2 − 1) ∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 + (1 + 1
+
+l2
+
+)( L2 
+
+> fi1
+
+∥xt+1 − xt∥2 + L2 
+
+> fi2
+
+β2 
+
+> t
+
+∥ht
+
+> y
+
+∥2).
+
+Step 4: Choosing suitable coefficients such that the descent of Lyapunov function is well controlled. 
+
+27 Published as a conference paper at ICLR 2025 The purpose of Step 4 is to identify suitable decreasing coefficients {at, b t, c t, d t}∞ 
+
+> t=1
+
+and a well-chosen averaging parameter μt such that the descent of the Lyapunov function is well-controlled and can be bounded by a summable series. This ensures the algorithm converges under the framework provided by the potential function. In this lemma, we define a potential function Vt that tracks the overall progress of the algorithm and analyze its behavior over iterations. We then establish an upper bound on the difference between 
+
+Vt+1 and Vt, showing that the Lyapunov function Vt decreases at each step, guided by well-chosen coefficients that control the descent rate. 
+
+Lemma 10 (Potential function) . We assume that {at, b t, c t, d t}∞ 
+
+> t=1
+
+be a sequence of decreasing positive constants, where Vt := at
+
+f (¯ xt, y∗ 
+
+> μt
+
+(¯ xt)) − f0
+
+ + dt∥xt − 1 ⊗ ¯xt∥2 + dtαt∥ht 
+
+> x
+
+− 1 ⊗
+
+¯ht
+
+> x
+
+∥2 + bt∥yt − y∗ 
+
+> μt
+
+(xt)∥2 + ct∥vt − v∗ 
+
+> μt
+
+(xt)∥2.Vt+1 − Vt
+
+≤ − at+1 αt
+
+2 ∥∇ Φμt (¯ xt)∥2 + C1∥¯ht
+
+> x
+
+∥2 + C2∥xt − 1 ⊗ ¯xt∥2 + C3 yt − y∗ 
+
+> μt
+
+(xt) 2
+
++ C4 vt − v∗ 
+
+> μt
+
+(xt) 2 + C5∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 + C6∥ht
+
+> y
+
+∥2
+
++ 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+2at+1 ∇yfi
+
+
+
+¯xt+1 , y∗ 
+
+> μt+1
+
+(¯ xt+1 )
+
+
+
+y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+2at+1 Lfiy2 ∥y∗ 
+
+> μt+1
+
+(¯ xt+1 )∥2
+
+σ2
+
+> hi
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+> m
+
+X
+
+> i=1
+
+24 bt+1 y∗ 
+
+> μt+1
+
+(xi,t +1 ) 2
+
+σ2 
+
+> hi
+
+βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+> m
+
+X
+
+> i=1
+
+6ct+1 
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+> t
+
+2  
+
+Cv1 v∗ 
+
+> μt+1
+
+(xi,t +1 ) + Lfiy2
+
+
+
+y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗ 
+
+> μt+1
+
+(xi,t +1 )
+
+  2
+
+,
+
+where 
+
+C1 = −at+1 
+
+αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
++ 4 α2 
+
+> t
+
+m 6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 4 α2 
+
+> t
+
+m 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
++ 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+4α2 
+
+> t
+
+m, C2 = at+1 
+
+αtLΦμt
+
+rσ 2
+
+> ψμt
+
+m + 8 6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
+!
+
++ dt+1 (λ − 1) + 8 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+,C3 = at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfix2
+
+2
+
+−
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfiy2
+
+2
+
+,C4 = at+1 
+
+αtrm L2 
+
+> ψy1
+
+− ct+1 
+
+2 ηtσψμt ,C5 = 4 α2
+
+> t
+
+6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
+!
+
++ 11 − λ dt+1 α2 
+
+> t
+
++ dt+1 αt+1 (λ − 1) + 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+4α2 
+
+> t
+
+,C6 = dt+1 αt+1 
+
+11 − λ L2 
+
+> fi2
+
+β2 
+
+> t
+
+− bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+> t
+
+
+
+.
+
+28 Published as a conference paper at ICLR 2025 
+
+Proof. 
+
+Vt+1 − Vt
+
+=at+1 
+
+h
+
+f (¯ xt+1 , y∗
+
+μt+1 (¯ xt+1 )) − f (¯ xt, y∗
+
+μt (¯ xt)) 
+
+i
+
++ ( at+1 − at)f (¯ xt, y∗
+
+μt (¯ xt)) + dt+1 
+
+∥xt+1 − 1 ⊗ ¯xt+1 ∥2 − ∥ xt − 1 ⊗ ¯xt∥2 + ( dt+1 − dt)∥xt − 1 ⊗ ¯xt∥2
+
++ dt+1 αt+1 
+
+∥ht+1 
+
+x − 1 ⊗ ¯ht+1 
+
+x ∥2 − ∥ ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ ( dt+1 αt+1 − dtαt)∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ bt+1 
+
+
+
+yt+1 − y∗
+
+μt+1 (xt+1 ) 2
+
+− yt − y∗
+
+μt (xt) 2
+
+
+
++ ( bt+1 − bt) yt − y∗
+
+μt (xt) 2
+
++ ct+1 
+
+
+
+vt+1 − v∗
+
+μt+1 (xt+1 ) 2
+
+− vt − v∗
+
+μt (xt) 2
+
+
+
++ ( ct+1 − ct) vt − v∗
+
+μt (xt) 2
+
+≤at+1 
+
+h
+
+f (¯ xt+1 , y∗
+
+μt+1 (¯ xt+1 )) − f (¯ xt, y∗
+
+μt (¯ xt)) 
+
+i
+
++ dt+1 
+
+∥xt+1 − 1 ⊗ ¯xt+1 ∥2 − ∥ xt − 1 ⊗ ¯xt∥2
+
++ dt+1 αt+1 
+
+∥ht+1 
+
+x − 1 ⊗ ¯ht+1 
+
+x ∥2 − ∥ ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ bt+1 
+
+" mX
+
+i=1 
+
+yi,t +1 − y∗
+
+μt+1 (xi,t +1 ) 2
+
+−
+
+mX
+
+i=1 
+
+yi,t − y∗
+
+μt (xi,t ) 2
+
+#
+
++ ct+1 
+
+" mX
+
+i=1 
+
+vi,t +1 − v∗
+
+μt+1 (xi,t +1 ) 2
+
+−
+
+mX
+
+i=1 
+
+vi,t − v∗
+
+μt (xi,t ) 2
+
+#
+
+By combining the estimates from the above lemmas, we have 
+
+Vt+1 − Vt
+
+≤at+1 
+
+"
+
+− αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − αt
+
+2 − α2
+
+t LΦμt
+
+2σ2
+
+ψμt
+
+!
+
+¯ht
+
+x
+
+2 + αtLΦμt
+
+rσ 2
+
+ψμt
+
+1
+
+m
+
+mX
+
+i=1 
+
+∥¯xt − xi,t ∥2
+
++ αtrm
+
+mX
+
+i=1 
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2 yi,t − y∗
+
+μt (xi,t ) 2
+
++ αtrL 2
+
+ψy1
+
+m
+
+mX
+
+i=1 
+
+vi,t − v∗
+
+μt (xi,t ) 2 + 2 αtr 1
+
+m
+
+mX
+
+i=1 
+
+di,t 
+
+x − ¯ht
+
+x
+
+2
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+ 2 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (¯ xt+1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2#
+
++ bt+1 
+
+mX
+
+i=1 
+
+"
+
+− 12 βtσψμt yi,t − y∗
+
+μt (xi,t ) 2 + 6L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
+∥xi,t − xi,t +1 ∥2
+
+−
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+
+
+∥hi,t 
+
+y ∥2
+
++24 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
+
+
++ ct+1 
+
+mX
+
+i=1 
+
+
+
+− 12 ηtσψμt vi,t − v∗
+
+μt (xi,t ) 2
+
+29 Published as a conference paper at ICLR 2025 
+
++ 6  Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+∥xi,t − xi,t +1 ∥2
+
++ 3ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
+yi,t − y∗
+
+μt (xi,t ) 2
+
++ 6
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2  
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
++ dt+1 
+
+
+
+((1 + l1)λ2 − 1) ∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2
+
+t ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
+
+
++ dt+1 αt+1 ((1 + l2)λ2 − 1) ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ dt+1 αt+1 (1 + 1
+
+l2
+
+)( L2
+
+fi1 ∥xt+1 − xt∥2 + L2
+
+fi2 β2
+
+t ∥ht
+
+y∥2)
+
+Rearranging it, we have 
+
+Vt+1 − Vt
+
+≤ − at+1 αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − at+1 
+
+αt
+
+2 − α2
+
+t LΦμt
+
+2σ2
+
+ψμt
+
+!
+
+∥¯ht
+
+x∥2
+
++ at+1 
+
+αtLΦμt
+
+rσ 2
+
+ψμt
+
+m ∥xt − 1 ⊗ ¯xt∥2
+
++ at+1 
+
+αtrm
+
+mX
+
+i=1 
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2 yi,t − y∗
+
+μt (xi,t ) 2
+
++ at+1 
+
+αtrL 2
+
+ψy1
+
+m
+
+mX
+
+i=1 
+
+vi,t − v∗
+
+μt (xi,t ) 2 + 2 at+1 αtr 1
+
+m
+
+mX
+
+i=1 
+
+di,t 
+
+x − ¯ht
+
+x
+
+2
+
++ at+1 
+
+1
+
+m
+
+mX
+
+i=1 
+
+ 2 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (¯ xt+1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ at+1 
+
+1
+
+m
+
+mX
+
+i=1 
+
+2Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
+− bt+1 
+
+2 βtσψμt
+
+mX
+
+i=1 
+
+yi,t − y∗
+
+μt (xi,t ) 2 + 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
+mX
+
+i=1 
+
+∥xi,t − xi,t +1 ∥2
+
+− bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+ mX
+
+i=1 
+
+∥hi,t 
+
+y ∥2
+
++
+
+mX
+
+i=1 
+
+24 bt+1 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
+− ct+1 
+
+2 ηtσψμt
+
+mX
+
+i=1 
+
+vi,t − v∗
+
+μt (xi,t ) 2
+
++
+
+mX
+
+i=1 
+
+6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+∥xi,t − xi,t +1 ∥2
+
++
+
+mX
+
+i=1 
+
+3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
+yi,t − y∗
+
+μt (xi,t ) 2
+
+30 Published as a conference paper at ICLR 2025 
+
++
+
+mX
+
+i=1 
+
+6ct+1 
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2  
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
++ dt+1 
+
+
+
+((1 + l1)λ2 − 1) ∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2
+
+t ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
+
+
++ dt+1 αt+1 ((1 + l2)λ2 − 1) ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ dt+1 αt+1 (1 + 1
+
+l2
+
+)( L2
+
+fi1 ∥xt+1 − xt∥2 + L2
+
+fi2 β2
+
+t ∥ht
+
+y∥2)
+
+Rearranging it, we have 
+
+Vt+1 − Vt
+
+≤ − at+1 αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − at+1 
+
+αt
+
+2 − α2
+
+t LΦμt
+
+2σ2
+
+ψμt
+
+!
+
+∥¯ht
+
+x∥2
+
++ at+1 
+
+αtLΦμt
+
+rσ 2
+
+ψμt
+
+m ∥xt − 1 ⊗ ¯xt∥2
+
++ 2 at+1 αtr 1
+
+m
+
+mX
+
+i=1 
+
+di,t 
+
+x − ¯ht
+
+x
+
+2
+
++ at+1 
+
+αtrL 2
+
+ψy1
+
+m
+
+mX
+
+i=1 
+
+vi,t − v∗
+
+μt (xi,t ) 2
+
++ at+1 
+
+αtrm
+
+mX
+
+i=1 
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2 yi,t − y∗
+
+μt (xi,t ) 2
+
++
+
+mX
+
+i=1 
+
+6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
+∥xi,t − xi,t +1 ∥2
+
+−
+
+mX
+
+i=1 
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
+yi,t − y∗
+
+μt (xi,t ) 2
+
+− bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+ mX
+
+i=1 
+
+∥hi,t 
+
+y ∥2
+
+− ct+1 
+
+2 ηtσψμt
+
+mX
+
+i=1 
+
+vi,t − v∗
+
+μt (xi,t ) 2
+
++ at+1 
+
+1
+
+m
+
+mX
+
+i=1 
+
+ 2 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (¯ xt+1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ at+1 
+
+1
+
+m
+
+mX
+
+i=1 
+
+2Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+24 bt+1 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+6ct+1 
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2  
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
++ dt+1 
+
+
+
+((1 + l1)λ2 − 1) ∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2
+
+t ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
+
+
++ dt+1 αt+1 ((1 + l2)λ2 − 1) ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
+31 Published as a conference paper at ICLR 2025 
+
++ dt+1 αt+1 (1 + 1
+
+l2
+
+)( L2
+
+fi1 ∥xt+1 − xt∥2 + L2
+
+fi2 β2
+
+t ∥ht
+
+y∥2).
+
+Since v∗
+
+μt (xi,t ) is of order O( 1
+
+σψμ t
+
+), to simplify the proof, we take v∗
+
+μt (xi,t ) as its maximal value over all m agents at iteration t. By further calculating the terms from the previous result, we have 
+
+Vt+1 − Vt
+
+≤ − at+1 αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − at+1 
+
+αt
+
+2 − α2
+
+t LΦμt
+
+2σ2
+
+ψμt
+
+!
+
+∥¯ht
+
+x∥2
+
++ at+1 
+
+αtLΦμt
+
+rσ 2
+
+ψμt
+
+m ∥xt − 1 ⊗ ¯xt∥2 + 2 at+1 αtr 1
+
+m
+
+mX
+
+i=1 
+
+di,t 
+
+x − ¯ht
+
+x
+
+2
+
++ at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2 yt − y∗
+
+μt (xt) 2
+
+−
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
+yt − y∗
+
+μt (xt) 2
+
++ at+1 
+
+αtrm L2
+
+ψy1 vt − v∗
+
+μt (xt) 2 − ct+1 
+
+2 ηtσψμt vt − v∗
+
+μt (xt) 2
+
+− bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+ mX
+
+i=1 
+
+∥hi,t 
+
+y ∥2
+
++ 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
+∥xt − xt+1 ∥2
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+24 bt+1 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+6ct+1 
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2  
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
++ dt+1 
+
+
+
+((1 + l1)λ2 − 1) ∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2
+
+t ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
+
+
++ dt+1 αt+1 ((1 + l2)λ2 − 1) ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ dt+1 αt+1 (1 + 1
+
+l2
+
+)( L2
+
+fi1 ∥xt+1 − xt∥2 + L2
+
+fi2 β2
+
+t ∥ht
+
+y∥2).
+
+Then, we obtain the following expression: 
+
+Vt+1 − Vt
+
+≤ − at+1 αt
+
+2 ∥∇ Φμt (¯ xt)∥2 − at+1 
+
+αt
+
+2 − α2
+
+t LΦμt
+
+2σ2
+
+ψμt
+
+!
+
+∥¯ht
+
+x∥2
+
++ at+1 
+
+αtLΦμt
+
+rσ 2
+
+ψμt
+
+m ∥xt − 1 ⊗ ¯xt∥2 + 2 at+1 αtr 1
+
+m
+
+mX
+
+i=1 
+
+di,t 
+
+x − ¯ht
+
+x
+
+2
+
++ at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2 yt − y∗
+
+μt (xt) 2
+
+32 Published as a conference paper at ICLR 2025 
+
+−
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
+yt − y∗
+
+μt (xt) 2
+
+− bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+ mX
+
+i=1 
+
+∥hi,t 
+
+y ∥2
+
++ at+1 
+
+αtrm L2
+
+ψy1 vt − v∗
+
+μt (xt) 2 − ct+1 
+
+2 ηtσψμt vt − v∗
+
+μt (xt) 2
+
++ 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
+×
+
+ 8∥(xt − 1 ⊗ ¯xt)∥2 + 4 α2
+
+t ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2 + 4 α2
+
+t m∥¯ht
+
+x∥2
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+24 bt+1 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+6ct+1 
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2  
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
++ dt+1 
+
+
+
+((1 + l1)λ2 − 1) ∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2
+
+t ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
+
+
++ dt+1 αt+1 ((1 + l2)λ2 − 1) ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ dt+1 αt+1 (1 + 1
+
+l2
+
+)( L2
+
+fi1 ∥xt+1 − xt∥2 + L2
+
+fi2 β2
+
+t ∥ht
+
+y∥2).
+
+Then, we obtain the following expression: 
+
+Vt+1 − Vt
+
+≤ − at+1 αt
+
+2 ∥∇ Φμt (¯ xt)∥2
+
+− at+1 
+
+αt
+
+2 − α2
+
+t LΦμt
+
+2σ2
+
+ψμt
+
+!
+
+− 4α2
+
+t m 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
+−4α2
+
+t m 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
+∥¯ht
+
+x∥2
+
++ at+1 
+
+αtLΦμt
+
+rσ 2
+
+ψμt
+
+m + 8 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!! 
+
+× ∥ xt − 1 ⊗ ¯xt∥2
+
++
+
+
+
+at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2
+
+−
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2 
+
+×
+
+yt − y∗
+
+μt (xt) 2 − bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+
+
+∥ht
+
+y∥2
+
+33 Published as a conference paper at ICLR 2025 
+
++
+
+
+
+at+1 
+
+αtrm L2
+
+ψy1 − ct+1 
+
+2 ηtσψμt
+
+
+
+vt − v∗
+
+μt (xt) 2 + 2 at+1 αtr 1
+
+m
+
+mX
+
+i=1 
+
+di,t 
+
+x − ¯ht
+
+x
+
+2
+
++ 4 α2
+
+t
+
+6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
+∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+24 bt+1 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+6ct+1 
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2  
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
++ dt+1 
+
+
+
+((1 + l1)λ2 − 1) ∥xt − 1 ⊗ ¯xt∥2 + (1 + 1
+
+l1
+
+)α2
+
+t ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
+
+
++ dt+1 αt+1 ((1 + l2)λ2 − 1) ∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++ dt+1 αt+1 (1 + 1
+
+l2
+
+)( L2
+
+fi1 ∥xt+1 − xt∥2 + L2
+
+fi2 β2
+
+t ∥ht
+
+y∥2).
+
+For algorithm 1, with PTt=0 1
+
+m
+
+Pmi=1 di,t 
+
+x − ¯ht
+
+x
+
+2 = 0 , we have 
+
+Vt+1 − Vt
+
+≤ − at+1 αt
+
+2 ∥∇ Φμt (¯ xt)∥2
+
+− at+1 
+
+αt
+
+2 − α2
+
+t LΦμt
+
+2σ2
+
+ψμt
+
+!
+
+− 4α2
+
+t m 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
+− 4α2
+
+t m 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
++dt+1 αt+1 
+
+
+
+1 + 1
+
+l2
+
+
+
+L2
+
+fi1 4α2
+
+t m
+
+
+
+∥¯ht
+
+x∥2
+
++ at+1 
+
+αtLΦμt
+
+rσ 2
+
+ψμt
+
+m + 8 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
++dt+1 
+
+ (1 + l1)λ2 − 1 + 8 dt+1 αt+1 
+
+
+
+1 + 1
+
+l2
+
+
+
+L2
+
+fi1
+
+
+
+∥xt − 1 ⊗ ¯xt∥2
+
++
+
+
+
+at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2
+
+−
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2 
+
+yt − y∗
+
+μt (xt) 2
+
++
+
+
+
+at+1 
+
+αtrm L2
+
+ψy1 − ct+1 
+
+2 ηtσψμt
+
+
+
+vt − v∗
+
+μt (xt) 2
+
++ 4α2
+
+t
+
+6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
++ dt+1 
+
+
+
+1 + 1
+
+l1
+
+
+
+α2
+
+t + dt+1 αt+1 ((1 + l2) λ2 − 1) 
+
+34 Published as a conference paper at ICLR 2025 
+
++dt+1 αt+1 
+
+
+
+1 + 1
+
+l2
+
+
+
+L2
+
+fi1 4α2
+
+t
+
+
+
+∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2
+
++
+
+
+
+dt+1 αt+1 
+
+
+
+1 + 1
+
+l2
+
+
+
+L2
+
+fi2 β2
+
+t − bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+ 
+
+∥ht
+
+y∥2
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+24 bt+1 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+6ct+1 
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2  
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
+.
+
+Then, it holds that 
+
+Vt+1 − Vt
+
+≤ − at+1 αt
+
+2 ∥∇ Φμt (¯ xt)∥2 + C1∥¯ht
+
+x∥2 + C2∥xt − 1 ⊗ ¯xt∥2 + C3 yt − y∗
+
+μt (xt) 2
+
++ C4 vt − v∗
+
+μt (xt) 2 + C5∥ht
+
+x − 1 ⊗ ¯ht
+
+x∥2 + C6∥ht−1
+
+y ∥2
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 ∇yfi
+
+
+
+¯xt+1 , y∗
+
+μt+1 (¯ xt+1 )
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
+σhi
+
+ μt − μt+1 
+
+μt
+
+
+
++ 1
+
+m
+
+mX
+
+i=1 
+
+2at+1 Lfiy2 ∥y∗
+
+μt+1 (¯ xt+1 )∥2
+
+σ2
+
+hi
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+24 bt+1 y∗
+
+μt+1 (xi,t +1 ) 2
+
+σ2
+
+hi βtσψμt
+
+ μt − μt+1 
+
+μt
+
+2
+
++
+
+mX
+
+i=1 
+
+6ct+1 
+
+ηtσψμt
+
+ μt − μt+1 
+
+μ2
+
+t
+
+2  
+
+Cv1 v∗
+
+μt+1 (xi,t +1 ) + Lfiy2
+
+
+
+y∗
+
+μt+1 (xi,t +1 )
+
++Cv2 ∇yfi
+
+
+
+xi,t +1 , y∗
+
+μt+1 (xi,t +1 )
+
+  2
+
+,
+
+where 
+
+C1 = −at+1 
+
+αt
+
+2 − α2
+
+t LΦμt
+
+2σ2
+
+ψμt
+
+!
+
++ 4 α2
+
+t m 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 4 α2
+
+t m 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
++ dt+1 αt+1 
+
+
+
+1 + 1
+
+l2
+
+
+
+L2
+
+fi1 4α2
+
+t m, C2 = at+1 
+
+αtLΦμt
+
+rσ 2
+
+ψμt
+
+m + 8 6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
++ dt+1 
+
+ (1 + l1)λ2 − 1 + 8 dt+1 αt+1 
+
+
+
+1 + 1
+
+l2
+
+
+
+L2
+
+fi1 ,C3 = at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2
+
+−
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
+,
+
+35 Published as a conference paper at ICLR 2025 
+
+C4 = at+1 
+
+αtrm L2 
+
+> ψy1
+
+− ct+1 
+
+2 ηtσψμt ,C5 = 4 α2
+
+> t
+
+6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
+!
+
++ dt+1 
+
+
+
+1 + 1
+
+l1
+
+
+
+α2 
+
+> t
+
++ dt+1 αt+1 ((1 + l2) λ2 − 1) + dt+1 αt+1 
+
+
+
+1 + 1
+
+l2
+
+
+
+L2 
+
+> fi1
+
+4α2 
+
+> t
+
+,C6 = dt+1 αt+1 
+
+
+
+1 + 1
+
+l2
+
+
+
+L2 
+
+> fi2
+
+β2 
+
+> t
+
+− bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+> t
+
+
+
+.
+
+Step 5: Step-size calculations. 
+
+To ensure convergence, we choose step-sizes carefully by setting l1 = l2 = 1 
+
+> λ
+
+− 1, which simplifies several terms. Under this setting, we have 1 + 1 
+
+> l1
+
+= 1 + 1 
+
+> l2
+
+= 11−λ and (1 + l1)λ2 − 1 = λ − 1.
+
+Using these values, we proceed to calculate each of the constants C1 through C6 , which represent various components that contribute to the change in the Lyapunov function. 
+
+C1 = −at+1 
+
+αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
++ 4 α2 
+
+> t
+
+m 6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 4 α2 
+
+> t
+
+m 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
++ 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+4α2 
+
+> t
+
+m, C2 = at+1 
+
+αtLΦμt
+
+rσ 2
+
+> ψμt
+
+m + 8 6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
+!
+
++ dt+1 (λ − 1) + 8 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+,C3 = at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfix2
+
+2
+
+−
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfiy2
+
+2
+
+,C4 = at+1 
+
+αtrm L2 
+
+> ψy1
+
+− ct+1 
+
+2 ηtσψμt ,C5 = 4 α2
+
+> t
+
+6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
+!
+
++ 11 − λ dt+1 α2 
+
+> t
+
++ dt+1 αt+1 (λ − 1) + 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+4α2 
+
+> t
+
+,C6 = dt+1 αt+1 
+
+11 − λ L2 
+
+> fi2
+
+β2 
+
+> t
+
+− bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+> t
+
+
+
+.
+
+Next, we set the unified form as follow: 
+
+βt ∈
+
+"
+
+¯β(t + 1) −τ / 4, 1
+
+Lfiy 2 + Lgy2
+
+#
+
+, η t = cη
+
+bt+1 
+
+ct+1 
+
+βtσ2 
+
+> ψμt
+
+, α t = cα
+
+at+1 
+
+ct+1 
+
+ηtσ5 
+
+> ψμt
+
+,
+
+where 
+
+cη =
+
+ ct+1 
+
+bt+1 
+
+  ηt
+
+βt
+
+
+
+σ−2
+
+> ψμt
+
+, cα =
+
+ ct+1 
+
+at+1 
+
+  αt
+
+ηt
+
+
+
+σ−5
+
+> ψμt
+
+.
+
+Also, we set 
+
+ηt = ( t + 1) −τ / 2βt, αt = ( t + 1) −3τ / 2βtμt3,at+1 = ( t + 1) −τ , bt+1 = ( t + 1) −τ / 2σ3 
+
+> ψμt
+
+,ct+1 = ( t + 1) −τ σ5 
+
+> ψμt
+
+, dt+1 = ( t + 1) −τ / 8,
+
+36 Published as a conference paper at ICLR 2025 
+
+cη = ( t + 1) −τ , cα = ( t + 1) −τ σ3 
+
+> ψμt
+
+.
+
+For C1, we have 
+
+C1 = −at+1 
+
+αt
+
+2 − α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
+!
+
++ 4 α2 
+
+> t
+
+m 6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 4 α2 
+
+> t
+
+m 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
++ 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+4α2 
+
+> t
+
+m
+
+= − at+1 αt
+
+2 + at+1 α2 
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
++ 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+4α2 
+
+> t
+
+m
+
+− 4α2 
+
+> t
+
+m at+1 
+
+αt
+
+cα
+
+" 6bt+1 αtL2
+
+> ψy1
+
+cαat+1 βtσ3
+
+> ψμt
+
++ 6 ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+#
+
+.
+
+By further simplification and applying our chosen step-size settings, we derive: 
+
+C1 = − 12 (t + 1) −5τ / 2βtμ3 
+
+> t
+
++ 24 m(t + 1) −7/2τ βtμ6
+
+> t
+
+
+
+Lψy1 +  Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
++ ( t + 1) −4τ β2 
+
+> t
+
+μ6
+
+> t
+
+LΦμt
+
+2σ2
+
+> ψμt
+
++ 4 m L2
+
+> fi1
+
+1 − λ (t + 1) −37 τ / 8β3 
+
+> t
+
+μ9 
+
+> t
+
+.
+
+As we can see, the dominant term for C1 is −(t + 1) −5τ / 2βtμ3 
+
+> t
+
+, which is smaller than 0. This indicates that C1 contributes to the overall decrease in the Lyapunov function. Next, for C2, we have 
+
+C2 = at+1 
+
+αtLΦμt
+
+rσ 2
+
+> ψμt
+
+m + 8 6bt+1 L2
+
+> ψy1
+
+βtσ3
+
+> ψμt
+
++ 6ct+1 
+
+ Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+> ψμt
+
+!
+
++ dt+1 (λ − 1) + 8 11 − λ dt+1 αt+1 L2
+
+> fi1
+
+= at+1 
+
+αtLΦμt
+
+rσ 2
+
+> ψμt
+
+m + 8 at+1 
+
+αt
+
+cα
+
+" 6bt+1 αtL2
+
+> ψy1
+
+cαat+1 βtσ3
+
+> ψμt
+
++ 6  Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+#
+
++ dt+1 (λ − 1) + 8 11 − λ dt+1 αt+1 L2 
+
+> fi1
+
+.
+
+Simplifying further, we obtain: 
+
+C2 = ( t + 1) −τ / 8 (λ − 1) + Lψy1
+
+rmσ 2
+
+> ψμt
+
+(t + 1) −5τ / 2μ3 
+
+> t
+
++ 8L2
+
+> fi1
+
+1 − λ (t + 1) −13 τ / 8βtμ3
+
+> t
+
++ 1
+
+βt
+
+(t + 1) −τ / 2 
+
+48 + 48  Lv1 v∗ 
+
+> μt
+
+(xi,t ) + Lv2
+
+2
+
+.
+
+The leading term is −(t + 1) −τ / 8, ensuring that C2 is negative. For C3, we have 
+
+C3 = at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfix2
+
+2
+
+−
+
+ bt+1 
+
+2 βtσψμt − 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfiy2
+
+2
+
+= − bt+1 
+
+2 βtσψμt + 3ct+1 ηt
+
+σψμt
+
+
+
+Lψyy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfiy2
+
+2
+
++ at+1 αtr 1
+
+m
+
+ Lψxy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfix2
+
+2
+
+= − 1 − 6ct+1 ηt
+
+bt+1 βtσ2
+
+> ψμt
+
+
+
+Lψyy 2 v∗ 
+
+> μt
+
+(xi,t ) + Lfiy2
+
+2
+
+37 Published as a conference paper at ICLR 2025 
+
+− 2at+1 αtrbt+1 βtσψμt m
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2
+
+
+
+× bt+1 
+
+2 βtσψμt
+
+= − 1 − cη
+
+6ct+1 ηt
+
+cη bt+1 βtσ2
+
+ψμt
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
++ 2at+1 αtrcη bt+1 βtσψμt m
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2
+
+ 
+
+× bt+1 
+
+2 βtσψμt .
+
+After simplification, we have: 
+
+C3 = 12 (t + 1) −τ / 2βtσ4
+
+ψμt
+
+×
+
+
+
+−1 + ( t + 1) −τ
+
+
+
+6
+
+
+
+Lψyy 2 v∗
+
+μt (xi,t ) + Lfiy2
+
+2
+
++ 2rσψ4
+
+> μt
+
+m (t + 1) −τ μ3
+
+t
+
+ Lψxy 2 v∗
+
+μt (xi,t ) + Lfix2
+
+2
+
+!! 
+
+,
+
+which is negative as well, with the dominant term −(t + 1) −τ / 2βt.For C4, the calculation proceeds similarly: 
+
+C4 = at+1 
+
+αtrm L2
+
+ψy1 − ct+1 
+
+2 ηtσψμt = − 1 − 2at+1 αtL2
+
+ψy1 rct+1 ηtσψμt m
+
+!
+
+ct+1 
+
+2 ηtσψμt .
+
+Then 
+
+C4 = − σ5
+
+ψμt
+
+2
+
+ 1 − (t + 1) −τ μ−3
+
+t
+
+ (t + 1) −3τ / 2βt,
+
+ensuring C4 is negative with its dominant term being −(t + 1) −3τ / 2βt.For C5, we have 
+
+C5 = 4 α2
+
+t
+
+6bt+1 L2
+
+ψy1
+
+βtσ3
+
+ψμt
+
++ 6ct+1 
+
+ Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+ηtσ5
+
+ψμt
+
+!
+
++ 11 − λ dt+1 α2
+
+t + dt+1 αt+1 (λ − 1) + 11 − λ dt+1 αt+1 L2
+
+fi1 4α2
+
+t
+
+= 4 α2
+
+t
+
+at+1 
+
+αt
+
+cα
+
+" 6bt+1 αtL2
+
+ψy1
+
+cαat+1 βtσ3
+
+ψμt
+
++ 6  Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2
+
+#
+
++ 11 − λ dt+1 α2
+
+t + dt+1 αt+1 (λ − 1) + 11 − λ dt+1 αt+1 L2
+
+fi1 4α2
+
+t .
+
+Then we have 
+
+C5 = 24( t + 1) −7τ / 2βtμ6
+
+t
+
+h
+
+L2
+
+ψy1 +  Lv1 v∗
+
+μt (xi,t ) + Lv2
+
+2i
+
++ 11 − λ (t + 1) −25 τ / 8β2
+
+t μ6
+
+t + ( λ − 1) ( t + 1) −13 τ / 8βtμ3
+
+t + 41 − λ L2
+
+fi1 (t + 1) −37 τ / 8β3
+
+t μ9
+
+t .
+
+As we can see, C5 should be the same order as the order of −(t + 1) −13 τ / 8βtμ3
+
+t , which is smaller than 0. Finally, for C6, we have 
+
+C6 = 11 − λ dt+1 αt+1 L2
+
+fi2 β2
+
+t − bt+1 
+
+
+
+1 + 12 βtσψμt
+
+  
+
+2βt
+
+1
+
+σψμt + Lψμt
+
+− β2
+
+t
+
+
+
+= 11 − λ L2
+
+fi2 dt+1 αt+1 β2
+
+t − 2βt
+
+bt+1 
+
+σψμt + Lψμt
+
++ bt+1 β2
+
+t
+
+σψμt
+
+σψμt + Lψμt
+
++ 12 bt+1 β3
+
+t σψμt .
+
+38 Published as a conference paper at ICLR 2025 Then we can get 
+
+C6 = −2βt
+
+(t + 1) −τ / 2σ3
+
+> ψμt
+
+σψμt + Lψμt
+
++ 11 − λ L2 
+
+> fi2
+
+(t + 1) −25 τ / 8β3 
+
+> t
+
+μ3 
+
+> t
+
++ ( t + 1) −τ / 2 σ4
+
+> ψμt
+
+σψμt + Lψμt
+
+β2
+
+> t
+
++ 12 (t + 1) −τ / 2β3 
+
+> t
+
+σ4 
+
+> ψμt
+
+.
+
+As we can see, C6 should be the same order as the order of −(t + 1) −τ / 2βt, which is smaller than 0. 
+
+Step 6: Proof of Theorem. 
+
+It is helpful to find suitable coeffcients at+1 , b t+1 , c t+1 , d t+1 such that C1 to C6 < 0 and all of the sequences involving μt − μt+1 (denoted by Atμ, B tμ, C tμ respectively) are summable. Achieving this would allow us to conclude convergence using Lemma 10. First, we establish the following inequality for the change in the potential function Vt:
+
+Vt+1 − Vt ≤ Atμ + Btμ + Ctμ.
+
+By the definition of potential function, we get Vt ≥ 0 for all t. This implies that the potential function is bounded from below, and we can write: 
+
+VT ≤ V0 +
+
+> ∞
+
+X
+
+> t=1
+
+ Atμ + Btμ + Ctμ
+
+ .
+
+Since the sequences Atμ, Btμ, and Ctμ are summable, we can conclude that: 
+
+VT = O(1) as T → ∞ .
+
+Next, applying Lemma 10, we have the following summation over the interval t = T to t = 2 T + 1 : 
+
+> 2T+1
+
+X
+
+> t=T
+
+ at+1 αt 
+
+> 2
+
+∥∇ Φμt (¯ xt)∥2 − C1∥¯ht
+
+> x
+
+∥2 − C2∥xt − 1 ⊗ ¯xt∥2 − C3 yt − y∗ 
+
+> μt
+
+(xt) 2
+
+−C4 vt − v∗ 
+
+> μt
+
+(xt) 2 − C5∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 − C6∥ht
+
+> y
+
+∥2
+
+
+
+= O(1) .
+
+Since the constants C1 through C6 are all strictly negative, the terms on the left-hand side are non-negative, and thus, the overall sum remains bounded. Note that P2T +1  
+
+> t=T
+
+(t + 1) −s ≥ R 2T +2   
+
+> T+1
+
+k−sdk = 
+
+> 21−s−11−s
+
+(T + 1) 1−s.
+
+Now, by lower-bounding the coefficients, according to different step size strategies and the coefficients of Lyapunov function, we can get the estimates on 
+
+min 
+
+> 0≤t≤T
+
+
+
+∥∇ Φμt (¯ xt)∥2 + ∥¯ht
+
+> x
+
+∥2 + ∥xt − 1 ⊗ ¯xt∥2 + yt − y∗ 
+
+> μt
+
+(xt) 2
+
++ vt − v∗ 
+
+> μt
+
+(xt) 2 + ∥ht 
+
+> x
+
+− 1 ⊗ ¯ht
+
+> x
+
+∥2 + ∥ht
+
+> y
+
+∥2
+
+.
+
+By choosing suitable upper bounds for the parameters p and τ , we conclude that the desired con-vergence holds, completing the proof. To further lead to the convergence rates as measured by the KKT residual, due to the optimality of y∗ 
+
+> μt
+
+(xt) and the definition of v∗ 
+
+> μt
+
+(xt) , there exists a positive constant C , independent of t, such that: KKT (xt, yt, vt)
+
+≤C
+
+
+
+∥∇ Φμt (¯ xt)∥2 + ∥xt − 1 ⊗ ¯xt∥2 + yt − y∗ 
+
+> μt
+
+(xt) 2 + vt − v∗ 
+
+> μt
+
+(xt) 2 + μ2
+
+> t
+
+
+
+.
+
+D SUPPORTING LEMMAS 
+
+Now, we present the technical lemmas that would be useful throughout our main result. To establish the convergence result of DUET , we first characterize the Lipschitz continuity of y∗ 
+
+> μ
+
+(xi)
+
+in xi and v∗
+
+> μ
+
+(xi) in xi, without any boundedness assumption of ∇yfi(xi, yi).39 Published as a conference paper at ICLR 2025 
+
+Lemma 11. Suppose assumptions holds, the follow statement holds. (a) For any i ∈ [m], the function y∗ 
+
+> μ
+
+(xi) is Lipschitz continuous in xi, i.e , for all xi, x′
+
+> i
+
+,
+
+∥y∗
+
+> μ
+
+(xi) − y∗
+
+> μ
+
+(x′
+
+> i
+
+)∥ ≤ Lψy1
+
+σψμ
+
+∥xi − x′
+
+> i
+
+∥,
+
+where both Lψy1 = μL hiy1 + (1 − μ)Lgiy1 and σψμ = μσ hi + (1 − μ)σgi are constants. (b) For any i ∈ [m], the function v∗
+
+> μ
+
+(xi) satisfies 
+
+∥v∗
+
+> μ
+
+(xi)∥ = ∇2
+
+> yy
+
+ψμ
+
+ xi, y∗
+
+> μ
+
+(xi) −1 ∇yfi
+
+ xi, y∗
+
+> μ
+
+(xi) ≤ ∇yfi
+
+ xi, y∗
+
+> μ
+
+(xi)
+
+σψμ
+
+,
+
+and for all xi, x′
+
+> i
+
+,
+
+v∗
+
+> μ
+
+(xi) − v∗
+
+> μ
+
+(x′
+
+> i
+
+) ≤
+
+ Lv1∥v∗
+
+> μ
+
+(xi)∥ + Lv2
+
+
+
+σ2
+
+> ψμ
+
+∥xi − x′
+
+> i
+
+∥,
+
+where both Lv1 := Lψyy 2 Lψy1 + Lψyy 1 σψμ and Lv2 := Lfiy2 Lψy1 + Lfiy1 σψμ are constants. Proof. (a) By the optimality of y∗ 
+
+> i,μ
+
+to LL problem, we have ∇yψμ(xi, y∗
+
+> μ
+
+(xi)) = 0 . Thus 
+
+ ∇yψμ(xi, y∗
+
+> μ
+
+(xi)) − ∇ yψμ(xi, y∗
+
+> μ
+
+(x′
+
+> i
+
+)) 
+
++  ∇yψμ(xi, y∗
+
+> μ
+
+(x′
+
+> i
+
+)) − ∇ yψμ(x′
+
+> i
+
+, y∗
+
+> μ
+
+(x′
+
+> i
+
+))  = 0 .
+
+Multiplying the above equation by y∗
+
+> μ
+
+(xi) − y∗
+
+> μ
+
+(x′
+
+> i
+
+), by the σψμ - strongly convexity of ψμ(x, ·) and 
+
+Lψy1 -smoothness of ψμ(·, y), we have 
+
+σψμ ∥y∗
+
+> μ
+
+(xi) − y∗
+
+> μ
+
+(x′
+
+> i
+
+)∥2
+
+≤ ∥∇ yψμ(xi, y∗
+
+> μ
+
+(x′
+
+> i
+
+)) − ∇ yψμ(x′
+
+> i
+
+, y∗
+
+> μ
+
+(x′
+
+> i
+
+)) ∥ · ∥ y∗
+
+> μ
+
+(xi) − y∗
+
+> μ
+
+(x′
+
+> i
+
+)∥≤ Lψy1 ∥xi − x′
+
+> i
+
+∥ · ∥ y∗
+
+> μ
+
+(xi) − y∗
+
+> μ
+
+(x′
+
+> i
+
+)∥.
+
+Then the conclusion follows immediately from the above inequality. (b) First, by the σψμ - strongly convexity of ψμ(x, ·) and Cauchy-Schwarz inequality, we have 
+
+σψμ ∥v∗
+
+> μ
+
+(xi)∥2 ≤ ⟨ v∗
+
+> μ
+
+(xi), ∇2
+
+> yy
+
+ψμ
+
+ xi, y∗
+
+> μ
+
+(xi) v∗
+
+> μ
+
+(xi)⟩
+
+= ⟨v∗
+
+> μ
+
+(xi), ∇yfi
+
+ xi, y∗
+
+> μ
+
+(xi)⟩ ≤ ∥ v∗
+
+> μ
+
+(xi)∥∥∇ yfi
+
+ xi, y∗
+
+> μ
+
+(xi)∥,
+
+which implies the conclusion. Second, the definition of v∗
+
+> μ
+
+(xi) implies that ∇2
+
+> yy
+
+ψμ(xi, y∗
+
+> μ
+
+(x′
+
+> i
+
+))  v∗
+
+> μ
+
+(xi) = ∇yfi
+
+ xi, y∗
+
+> μ
+
+(xi).Thus ∇2
+
+> yy
+
+ψμ(x′
+
+> i
+
+, y∗
+
+> μ
+
+(x′
+
+> i
+
+))   v∗
+
+> μ
+
+(x′
+
+> i
+
+) − v∗
+
+> μ
+
+(xi)
+
+= ∇yfi
+
+ x′
+
+> i
+
+, y∗
+
+> μ
+
+(x′
+
+> i
+
+) − ∇ yfi
+
+ xi, y∗
+
+> μ
+
+(xi) 
+
++ ∇2
+
+> yy
+
+ψμ(xi, y∗
+
+> μ
+
+(xi)) − ∇ 2
+
+> yy
+
+ψμ(x′
+
+> i
+
+, y∗
+
+> μ
+
+(x′
+
+> i
+
+))  v∗
+
+> μ
+
+(xi).
+
+By (a), the σψμ - strongly convexity of ψμ(xi, ·) and Lipschitz continuity of ∇yψμ and ∇yfi, we have 
+
+σψμ ∥v∗
+
+> μ
+
+(xi) − v∗
+
+> μ
+
+(x′
+
+> i
+
+)∥≤
+
+
+
+Lfiy1 ∥xi − x′
+
+> i
+
+∥ + Lfiy2 ∥y∗
+
+> μ
+
+(xi) − y∗
+
+> μ
+
+(x′
+
+> i
+
+)∥
+
+
+
++ ∥v∗
+
+> μ
+
+(xi)∥  Lψyy 1 ∥xi − x′
+
+> i
+
+∥ + Lψyy 2 ∥y∗
+
+> μ
+
+(xi) − y∗
+
+> μ
+
+(x′
+
+> i
+
+)∥
+
+≤ ∥xi − x′
+
+> i
+
+∥
+
+σψμ
+
+
+
+∥v∗
+
+> μ
+
+(xi)∥  Lψyy 2 Lψy1 + σψμ Lψyy 1
+
+ + Lfiy2 Lψy1 + σψμ Lfiy1
+
+
+
+,
+
+which implies the desired result. 40 Published as a conference paper at ICLR 2025 Next, we have a lemma that characterizes the smoothness of Φiμ(xi) = fi
+
+ xi, y∗
+
+> μ
+
+(xi) in xi,without any boundedness assumption of ∇yfi(xi, yi), where ∇Φiμ(xi) = ∇xfi
+
+ xi, y∗
+
+> μ
+
+(xi) −∇2
+
+> xy
+
+ψiμ
+
+ xi, y∗
+
+> μ
+
+(xi) v∗
+
+> μ
+
+(xi).
+
+Lemma 12. Suppose all assumptions holds, for any i ∈ [m] and xi ∈ Rp1 , we have 
+
+∇Φiμ(xi) − ∇ Φiμ (x′
+
+> i
+
+) ≤
+
+ CΦ1 v∗
+
+> μ
+
+(xi) + CΦ2 
+
+
+
+σ2
+
+> ψμ
+
+∥xi − x′
+
+> i
+
+∥ ,
+
+where both CΦ1 := L2 
+
+> ψy1
+
+Lψyy 2 +Lψy1
+
+ Lψyy 1 + Lψxy 2
+
+ σψμ +Lψxy 1 σ2 
+
+> ψμ
+
+and CΦ2 := L2 
+
+> ψy1
+
+Lfiy2 +
+
+Lψy1
+
+
+
+Lfiy1 + Lfix2
+
+
+
+σψμ + Lfix1 σ2 
+
+> ψμ
+
+are constants. Proof. Recall that v∗
+
+> μ
+
+(xi) = ∇2
+
+> yy
+
+ψμ
+
+ xi, y∗
+
+> μ
+
+(xi) −1 ∇yfi
+
+ xi, y∗
+
+> μ
+
+(xi) and ∇Φμ(xi) =
+
+∇xfi
+
+ xi, y∗
+
+> μ
+
+(xi) − ∇2
+
+> xy
+
+ψμ
+
+ xi, y∗
+
+> μ
+
+(xi) v∗
+
+> μ
+
+(xi). Thus 
+
+∇Φiμ(xi) − ∇ Φiμ (x′
+
+> i
+
+) = ∇xfi
+
+ xi, y∗
+
+> μ
+
+(xi) − ∇ xfi
+
+ x′
+
+> i
+
+, y∗ 
+
+> μ
+
+(x′
+
+> i
+
+)
+
++ ∇2
+
+> xy
+
+ψμ
+
+ x′
+
+> i
+
+, y∗ 
+
+> μ
+
+(x′
+
+> i
+
+) v∗ 
+
+> μ
+
+(x′
+
+> i
+
+) − ∇2
+
+> xy
+
+ψμ
+
+ xi, y∗
+
+> μ
+
+(xi) v∗
+
+> μ
+
+(xi).
+
+First, by Lipschitz continuity of ∇xfi, we have 
+
+∇xfi
+
+ xi, y∗
+
+> μ
+
+(xi) − ∇ xfi
+
+ x′
+
+> i
+
+, y∗ 
+
+> μ
+
+(x′
+
+> i
+
+) ≤ Lfix1 ∥xi − x′
+
+> i
+
+∥ + Lfix2 y∗
+
+> μ
+
+(xi) − y∗ 
+
+> μ
+
+(x′
+
+> i
+
+) .
+
+Second, note that 
+
+∇2
+
+> xy
+
+ψμ
+
+ x′
+
+> i
+
+, y∗ 
+
+> μ
+
+(x′
+
+> i
+
+) v∗ 
+
+> μ
+
+(x′
+
+> i
+
+) − ∇2
+
+> xy
+
+ψμ
+
+ xi, y∗
+
+> μ
+
+(xi) v∗
+
+> μ
+
+(xi)= ∇2
+
+> xy
+
+ψμ
+
+ x′
+
+> i
+
+, y∗ 
+
+> μ
+
+(x′
+
+> i
+
+)  v∗ 
+
+> μ
+
+(x′
+
+> i
+
+) − v∗
+
+> μ
+
+(xi)
+
++ ∇2
+
+> xy
+
+ψμ
+
+ x′
+
+> i
+
+, y∗ 
+
+> μ
+
+(x′
+
+> i
+
+) − ∇ 2
+
+> xy
+
+ψμ
+
+ xi, y∗
+
+> μ
+
+(xi) v∗
+
+> μ
+
+(xi).
+
+Thus, by Lipschitz continuity of ∇2
+
+> yy
+
+ψμ and Lemma 11, we have 
+
+∇2
+
+> xy
+
+ψμ
+
+ x′
+
+> i
+
+, y∗ 
+
+> μ
+
+(x′
+
+> i
+
+) v∗ 
+
+> μ
+
+(x′
+
+> i
+
+) − ∇2
+
+> xy
+
+ψμ
+
+ xi, y∗
+
+> μ
+
+(xi) v∗
+
+> μ
+
+(xi)
+
+≤Lψy1 v∗ 
+
+> μ
+
+(x′
+
+> i
+
+) − v∗
+
+> μ
+
+(xi) + v∗
+
+> μ
+
+(xi)  Lψxy 1 ∥x′ 
+
+> i
+
+− xi∥ + Lψxy 2 y∗
+
+> μ
+
+(xi) − y∗ 
+
+> μ
+
+(x′
+
+> i
+
+) 
+
+≤ Lψy1
+
+ Lv1 v∗
+
+> μ
+
+(xi) + Lv2
+
+
+
+σ2
+
+> ψμ
+
+∥xi − x′
+
+> i
+
+∥
+
++ v∗
+
+> μ
+
+(xi)  Lψxy 1 ∥x′ 
+
+> i
+
+− xi∥ + Lψxy y∗
+
+> μ
+
+(xi) − y∗ 
+
+> μ
+
+(x′
+
+> i
+
+)  .
+
+where Lψy1 is constant given by Lψy1 = μL hiy1 + (1 − μ)Lgiy1 .
+
+It implies the desired result since 
+
+Lψy1 Lv1 + Lψxy 2 Lψy1 σψμ + Lψxy 1 σ2 
+
+> ψμ
+
+= L2 
+
+> ψy1
+
+Lψyy 2 + Lψy1
+
+ Lψyy 1 + Lψxy 2
+
+ σψμ + Lψxy 1 σ2
+
+> ψμ
+
+and 
+
+Lψy1 Lv2 + Lfix2 Lψy1 σψμ + Lfix1 σ2 
+
+> ψμ
+
+= L2 
+
+> ψy1
+
+Lfiy2 + Lψy1
+
+
+
+Lfiy1 + Lfix2
+
+
+
+σψμ + Lfix1 σ2 
+
+> ψμ
+
+.
+
+Next lemma characterize the smoothness of y∗
+
+> μ
+
+(xi) and v∗
+
+> μ
+
+(xi) in μ when the LL problem has multiple minimizers. 
+
+Lemma 13. Suppose assumptions holds, let 0 ≤ μ ≤ 1/2 and μ′ ≤ 2μ, the follow statements hold. (a) For any i ∈ [m],
+
+y∗
+
+> μ
+
+(xi) − y∗ 
+
+> μ′
+
+(xi) ≤ 2 ∇yhi
+
+ xi, y∗
+
+> μ
+
+(xi)
+
+σhi
+
+· |μ − μ′|
+
+μ′ = 2 y∗
+
+> μ
+
+(xi)
+
+σhi
+
+· |μ − μ′|
+
+μ′ .
+
+41 Published as a conference paper at ICLR 2025 
+
+(b) For any i ∈ [m],
+
+v∗
+
+> μ
+
+(xi) − v∗ 
+
+> μ′
+
+(xi) ≤
+
+
+
+Cv1∥v∗
+
+> μ
+
+(xi)∥ + Lfiy2
+
+
+
+∥y∗
+
+> μ
+
+(xi)∥ · |μ − μ′|
+
+(μ′)2
+
++ Cv2∥∇ yfi
+
+ xi, y∗
+
+> μ
+
+(xi)∥ · |μ − μ′|
+
+(μ′)2 ,
+
+where both Cv1 := 2 
+
+
+
+Lhiyy 2 + Lgiyy 2
+
+
+
+/σ 2 
+
+> hi
+
+and Cv2 := 2 
+
+
+
+Lfiy2 + Lgiy2
+
+
+
+/σ 2 
+
+> hi
+
+are constants. Proof. (a) Recall that y∗ 
+
+> i,μ
+
+= y∗
+
+> μ
+
+(xi) satisfies μ∇yhi
+
+ xi, y∗
+
+> i,μ
+
+ + (1 − μ)∇ygi
+
+ xi, y∗
+
+> i,μ
+
+ = 0 . Thus 
+
+(μ − μ′)∇yhi
+
+ xi, y∗
+
+> i,μ
+
+ + μ′ ∇yhi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ yhi
+
+ xi, y∗
+
+> i,μ ′
+
+ 
+
++ ( μ′ − μ)∇ygi
+
+ xi, y∗
+
+> i,μ
+
+ + (1 − μ′) ∇ygi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ ygi
+
+ xi, y∗
+
+> i,μ ′
+
+ = 0 ,
+
+which imply that 
+
+μ′ ∇yhi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ yhi
+
+ xi, y∗
+
+> i,μ ′
+
+ + (1 − μ′) ∇ygi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ ygi
+
+ xi, y∗
+
+> i,μ ′
+
+ 
+
+= ( μ′ − μ)∇yhi
+
+ xi, y∗
+
+> i,μ
+
+ + ( μ′ − μ) μ
+
+1 − μ ∇yhi
+
+ xi, y∗
+
+> i,μ
+
+ = ( μ′ − μ) ∇yhi
+
+ xi, y∗
+
+> i,μ
+
+
+
+1 − μ .
+
+Since hi(xi, ·) is σhi - strongly convex, we have 
+
+⟨∇ yhi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ yhi
+
+ xi, y∗
+
+> i,μ ′
+
+ , y∗ 
+
+> i,μ
+
+− y∗ 
+
+> i,μ ′
+
+⟩ ≥ σhi ∥y∗ 
+
+> i,μ
+
+− y∗ 
+
+> i,μ ′
+
+∥2.
+
+Similarly, since gi(xi, ·) is convex, we get 
+
+⟨∇ ygi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ ygi
+
+ xi, y∗
+
+> i,μ ′
+
+ , y∗ 
+
+> i,μ
+
+− y∗ 
+
+> i,μ ′
+
+⟩ ≥ 0.
+
+Combining the above inequalities, we have 
+
+0 ≤ μ′σhi ∥y∗ 
+
+> i,μ
+
+− y∗ 
+
+> i,μ ′
+
+∥2 ≤
+
+ μ′ − μ
+
+1 − μ
+
+
+
+⟨∇ yhi
+
+ xi, y∗
+
+> i,μ
+
+ , y∗ 
+
+> i,μ
+
+− y∗ 
+
+> i,μ ′
+
+⟩.
+
+Since 0 ≤ μ ≤ 1/2, we get 1/(1 − μ) ≤ 2 and then 
+
+μ′σhi ∥y∗ 
+
+> i,μ
+
+− y∗ 
+
+> i,μ ′
+
+∥2 ≤ 2∥∇ yhi
+
+ xi, y∗
+
+> i,μ
+
+∥ · ∥ μ − μ′∥ · ∥ y∗ 
+
+> i,μ
+
+− y∗ 
+
+> i,μ ′
+
+∥
+
+= 2 ∥y∗
+
+> i,μ
+
+∥ · ∥ μ − μ′∥ · ∥ y∗ 
+
+> i,μ
+
+− y∗ 
+
+> i,μ ′
+
+∥
+
+which implies the desired result. (b)The definition of v∗ 
+
+> i,μ
+
+= v∗
+
+> μ
+
+(xi) says that ∇yy ψμ(xi, y∗
+
+> μ
+
+(x′
+
+> i
+
+))  v∗
+
+> μ
+
+(xi) = ∇yfi
+
+ xi, y∗
+
+> μ
+
+(xi).Thus we have 
+
+∇2
+
+> yy
+
+ψμ′ (xi, y∗ 
+
+> μ′
+
+)   v∗ 
+
+> i,μ
+
+− v∗
+
+> i,μ ′
+
+ + ∇2
+
+> yy
+
+ψμ(xi, y∗
+
+> μ
+
+) − ∇ 2
+
+> yy
+
+ψμ′ (xi, y∗ 
+
+> μ′
+
+) v∗
+
+> i,μ
+
+=∇yfi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ yfi
+
+ xi, y∗
+
+> i,μ ′
+
+ .
+
+Multiplying the above equation by v∗ 
+
+> i,μ
+
+− v∗ 
+
+> i,μ ′
+
+, by the σψμ - strongly convexity of ψμt (xi, ·), we get 
+
+σψμ′ ∥v∗ 
+
+> i,μ
+
+− v∗ 
+
+> i,μ ′
+
+∥2 ≤ ∥∇ 2
+
+> yy
+
+ψμ(xi, y∗
+
+> μ
+
+) − ∇ 2
+
+> yy
+
+ψμ′ (xi, y∗ 
+
+> μ′
+
+)∥ · ∥ v∗
+
+> i,μ
+
+∥ · ∥ v∗ 
+
+> i,μ
+
+− v∗ 
+
+> i,μ ′
+
+∥
+
++ ∥∇ yfi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ yfi
+
+ xi, y∗
+
+> i,μ ′
+
+∥ · ∥ v∗ 
+
+> i,μ
+
+− v∗ 
+
+> i,μ ′
+
+∥.
+
+Note that by the definition of ψμ we have 
+
+∇2
+
+> yy
+
+ψμ(xi, y∗
+
+> i,μ
+
+) − ∇ 2
+
+> yy
+
+ψμ′ (xi, y∗ 
+
+> i,μ ′
+
+)=( μ − μ′)∇2
+
+> yy
+
+hi
+
+ xi, y∗
+
+> i,μ
+
+ + μ′ ∇2
+
+> yy
+
+hi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ 2
+
+> yy
+
+hi
+
+ xi, y∗
+
+> i,μ ′
+
+ 
+
++ ( μ′ − μ)∇2
+
+> yy
+
+gi
+
+ xi, y∗
+
+> i,μ
+
+ + (1 − μ′) ∇2
+
+> yy
+
+gi
+
+ xi, y∗
+
+> i,μ
+
+ − ∇ 2
+
+> yy
+
+gi
+
+ xi, y∗
+
+> i,μ ′
+
+ .
+
+Since μ′ ≤ 2μ ≤ 1, we get 
+
+σψμ′ ∥v∗ 
+
+> i,μ
+
+− v∗ 
+
+> i,μ ′
+
+∥
+
+42 Published as a conference paper at ICLR 2025 
+
+≤
+
+h 
+
+Lhiy2 + Lgiy2
+
+
+
+∥μ − μ′∥ +
+
+
+
+Lhiyy 2 + Lgiyy 2
+
+
+
+∥y∗
+
+i,μ − y∗
+
+i,μ ′ ∥
+
+i
+
+∥v∗
+
+i,μ ∥ + Lfiy2 ∥y∗
+
+i,μ − y∗
+
+i,μ ′ ∥≤
+
+h 
+
+Lhiyy 2 + Lgiyy 2
+
+
+
+∥v∗
+
+i,μ ∥ + Lfiy2
+
+i
+
+∥y∗
+
+i,μ − y∗
+
+i,μ ′ ∥ +
+
+
+
+Lhiy2 + Lgiy2
+
+
+
+∥v∗
+
+i,μ ∥ · ∥ μ − μ′∥.
+
+By (a), since σψμ′ = μ′σhi when σgi = 0 , we have 
+
+∥v∗
+
+i,μ − v∗
+
+i,μ ′ ∥ ≤ 
+
+h 
+
+Lhiyy 2 + Lgiyy 2
+
+
+
+∥v∗
+
+i,μ ∥ + Lfiy2
+
+i 2 y∗
+
+μ(xi)
+
+σ2
+
+hi
+
+· |μ − μ′|
+
+(μ′)2
+
++
+
+
+
+Lhiy2 + Lgiy2
+
+
+
+σhi
+
+∥v∗
+
+i,μ ∥ · |μ − μ′|
+
+μ′ .
+
+Since μ′ ≤ 2μ, Lemma 11 implies that 
+
+μ′∥v∗
+
+i,μ ∥ ≤ μ′ ∇yfi
+
+ xi, y∗
+
+μ(xi)
+
+μσ hi
+
+≤ 2 ∇yfi
+
+ xi, y∗
+
+μ(xi)
+
+σhi
+
+.
+
+Hence we get the desired result. Finally, we present the lemma that characterizes the Lipschitz properties of the approximate gradient by using ∥∇ yfi(xi, yi)∥ ≤ Lfi0 from Assumption 1. 
+
+Lemma 14. For any i ∈ [m],
+
+∥∇ fi(xi, yi) − ∇ fi(x′
+
+i, y′
+
+i)∥2 ≤ L2
+
+fi1 ∥xi − x′
+
+i∥2 + L2
+
+fi2 ∥yi − y′
+
+i∥2 ,
+
+where L2
+
+fi1 = 4 L2
+
+fix1 + 4 L2
+
+ψy1
+
+1
+
+σ2
+
+> ψμ
+
+L2
+
+fiy1 + 4 1
+
+σ2
+
+> ψμ
+
+L2
+
+fi0 L2
+
+ψxy 1 + 4 L2
+
+ψy1 L2
+
+fi0
+
+1
+
+σ4
+
+> ψμ
+
+L2
+
+ψyy 1 , and L2
+
+fi2 =4L2
+
+fix2 + 4 L2
+
+ψy1
+
+1
+
+σ2
+
+> ψμ
+
+L2
+
+fiy2 + 4 1
+
+σ2
+
+> ψμ
+
+L2
+
+fi0 L2
+
+ψxy 2 + 4 L2
+
+ψy1 L2
+
+fi0
+
+1
+
+σ4
+
+> ψμ
+
+L2
+
+ψyy 2 .
+
+Proof. Recall that 
+
+∇fi(xi, yi) = ∇xfi (xi, yi) − ∇ 2
+
+xy ψiμ (xi, yi) vi,
+
+where vi ∈ Rp2 is define as: 
+
+vi := [ ∇2
+
+yy ψiμ(xi, yi)] −1∇yfi(xi, yi).
+
+Then, we have 
+
+∥∇ fi(xi, yi) − ∇ fi(x′
+
+i, y′
+
+i)∥2
+
+≤ 2∥∇ xfi(xi, yi) − ∇ xfi(x′
+
+i, y′
+
+i)∥2
+
++ 2 ∥∇ 2
+
+xy ψiμ (xi, yi) [ ∇2
+
+yy ψiμ(xi, yi)] −1∇yfi(xi, yi)
+
+− ∇ 2
+
+xy ψiμ (x′
+
+i, y′
+
+i) [ ∇2
+
+yy ψiμ(x′
+
+i, y′
+
+i)] −1∇yfi(x′
+
+i, y′
+
+i)∥2
+
+≤ 2∥∇ xfi(xi, yi) − ∇ xfi(x′
+
+i, y′
+
+i)∥2
+
++ 2 ∥∇ 2
+
+xy ψiμ (xi, yi) [ ∇2
+
+yy ψiμ(xi, yi)] −1(∇yfi(xi, yi) − ∇ yfi(x′
+
+i, y′
+
+i)) ∥2
+
++ 2 ∥(∇2
+
+xy ψiμ (xi, yi) − ∇ 2
+
+xy ψiμ (x′
+
+i, y′
+
+i))[ ∇2
+
+yy ψiμ(xi, yi)] −1∇yfi(xi, yi)∥2
+
++ 2 ∥∇ 2
+
+xy ψiμ (x′
+
+i, y′
+
+i) ([ ∇2
+
+yy ψiμ(xi, yi)] −1([ ∇2
+
+yy ψiμ(xi, yi)] 
+
+− [∇2
+
+yy ψiμ(x′
+
+i, y′
+
+i)])[ ∇2
+
+yy ψiμ(x′
+
+i, y′
+
+i)] −1)∇yfi(x′
+
+i, y′
+
+i)∥2.
+
+Then we have the following: 
+
+∥∇ xfi(xi, yi) − ∇ xfi(x′
+
+i, y′
+
+i)∥ ≤ Lfix1 ∥xi − x′
+
+i∥2 + Lfix2 ∥yi − y′
+
+i∥ .
+
+∥∇ yfi(xi, yi) − ∇ yfi(x′
+
+i, y′
+
+i)∥ ≤ Lfiy1 ∥xi − x′
+
+i∥ + Lfiy2 ∥yi − y′
+
+i∥ .
+
+Furthermore, we have 
+
+∥∇ 2
+
+xy ψiμ (xi, yi) − ∇ 2
+
+xy ψiμ (x′
+
+i, y′
+
+i)∥ ≤ Lψxy 1 ∥xi − x′
+
+i∥ + Lψxy 2 ∥yi − y′
+
+i∥ .
+
+43 Published as a conference paper at ICLR 2025 
+
+∥∇ 2
+
+> yy
+
+ψiμ(xi, yi) − ∇ 2
+
+> yy
+
+ψiμ(x′
+
+> i
+
+, y′
+
+> i
+
+)∥ ≤ Lψyy 1 ∥xi − x′
+
+> i
+
+∥ + Lψyy 2 ∥yi − y′
+
+> i
+
+∥ .
+
+Assuming that ∥∇ 2
+
+> xy
+
+ψiμ (xi, yi)∥ ≤ Lψy1 and ∥∇ yfi(xi, yi)∥ ≤ Lfi0 , then we have 
+
+∥∇ fi(xi, yi) − ∇ fi(x′
+
+> i
+
+, y′
+
+> i
+
+)∥2
+
+≤ 4L2 
+
+> fix1
+
+∥xi − x′
+
+> i
+
+∥2 + 4 L2 
+
+> fix2
+
+∥yi − y′
+
+> i
+
+∥2
+
++ 4 L2
+
+> ψy1
+
+1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fiy1
+
+∥xi − x′
+
+> i
+
+∥2 + 4 L2
+
+> ψy1
+
+1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fiy2
+
+∥yi − y′
+
+> i
+
+∥2
+
++ 4 1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fi0
+
+L2 
+
+> ψxy 1
+
+∥xi − x′
+
+> i
+
+∥2 + 4 1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fi0
+
+L2 
+
+> ψxy 2
+
+∥yi − y′
+
+> i
+
+∥
+
++ 4 L2 
+
+> ψy1
+
+L2
+
+> fi0
+
+1
+
+σ4
+
+> ψμ
+
+L2 
+
+> ψyy 1
+
+∥xi − x′
+
+> i
+
+∥ + 4 L2 
+
+> ψy1
+
+L2
+
+> fi0
+
+1
+
+σ4
+
+> ψμ
+
+L2 
+
+> ψyy 2
+
+∥yi − y′
+
+> i
+
+∥ .
+
+Thus we have 
+
+∥∇ fi(xi, yi) − ∇ fi(x′
+
+> i
+
+, y′
+
+> i
+
+)∥2
+
+≤ (4 L2 
+
+> fix1
+
++ 4 L2
+
+> ψy1
+
+1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fiy1
+
++ 4 1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fi0
+
+L2 
+
+> ψxy 1
+
++ 4 L2 
+
+> ψy1
+
+L2
+
+> fi0
+
+1
+
+σ4
+
+> ψμ
+
+L2 
+
+> ψyy 1
+
+) ∥xi − x′
+
+> i
+
+∥2
+
++ (4 L2 
+
+> fix2
+
++ 4 L2
+
+> ψy1
+
+1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fiy2
+
++ 4 1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fi0
+
+L2 
+
+> ψxy 2
+
++ 4 L2 
+
+> ψy1
+
+L2
+
+> fi0
+
+1
+
+σ4
+
+> ψμ
+
+L2 
+
+> ψyy 2
+
+) ∥yi − y′
+
+> i
+
+∥2
+
+≤ L2 
+
+> fi1
+
+∥xi − x′
+
+> i
+
+∥2 + L2 
+
+> fi2
+
+∥yi − y′
+
+> i
+
+∥2 ,
+
+where 
+
+L2 
+
+> fi1
+
+= 4 L2 
+
+> fix1
+
++ 4 L2
+
+> ψy1
+
+1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fiy1
+
++ 4 1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fi0
+
+L2 
+
+> ψxy 1
+
++ 4 L2 
+
+> ψy1
+
+L2
+
+> fi0
+
+1
+
+σ4
+
+> ψμ
+
+L2 
+
+> ψyy 1
+
+,L2 
+
+> fi2
+
+= 4 L2 
+
+> fix2
+
++ 4 L2
+
+> ψy1
+
+1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fiy2
+
++ 4 1
+
+σ2
+
+> ψμ
+
+L2 
+
+> fi0
+
+L2 
+
+> ψxy 2
+
++ 4 L2 
+
+> ψy1
+
+L2
+
+> fi0
+
+1
+
+σ4
+
+> ψμ
+
+L2 
+
+> ψyy 2
+
+.
+
+E ADDITIONAL EXPERIMENTAL DETAILS AND RESULTS 
+
+All numerical experiments were conducted on a MacBook Pro equipped with an Apple M3 Pro chip, featuring a 12-core CPU with 6 performance cores and 6 efficiency cores, and 36GB of memory. E.1 A P EDAGOGICAL EXAMPLE 
+
+In this section, we present the results of a pedagogical example using the DUET and DSGT algorithms. For the DUET algorithm, we set the LL learning rate to 0.005, with p = 110 and τ = 140 . For the 
+
+DSGT algorithm, the LL learning rate is set to 0.001, with p = 115 and τ = 140 .The following figures illustrate the norm of the variables x and y during the optimization process. E.2 DECENTRALIZED META -LEARNING PROBLEMS WITH REAL -W ORLD DATA :In this section, we present more details for decentralized meta-learning problems with Real-World Data. At each node, we construct a neural network classifier comprising an input layer, a single hidden layer with 32 neurons using a sigmoid activation function, and a linear layer as final output layer param-eterized by θ. The hidden layer parameters x are shared across all nodes to ensure global consensus, while the output layer parameters θ are fine-tuned locally to adapt to the specific data available at each node. The objective functions fi and gi are: fi(x, θ ) = P   
+
+> (sij ,b ij )∈Di
+
+bij ln( yj (x, θ ; sij )) + γ 
+
+> 2
+
+∥θ∥2,
+
+and gi(x, θ ) = P   
+
+> (sij ,b ij )∈Di
+
+bij ln( yj (x, θ ; sij )) , where (sij , b ij ) represents the j-th sample at node 
+
+i, with sij as the feature vector and bij as the corresponding label. Here, γ = 0 .1 denotes the regularization coefficient, and yj (x, θ ; sij ) denotes the output of the neural network. 44 Published as a conference paper at ICLR 2025 0 2 4 6
+
+Time(s)   
+
+> 0123456
+> || X||
+> DUET, GT=1 DUET, GT=0 DSGT, GT=1 DSGT, GT=0 5670.2
+> 0.0 0.2
+
+(a) The norm of x.0 2 4 6
+
+Time(s)    
+
+> 02468
+> || Y||
+> DUET, GT=1 DUET, GT=0 DSGT, GT=1 DSGT, GT=0 5670.0 0.5 1.0
+
+(b) The norm of y.
+
+Figure 4: The norms of x and y.The decentralized stochastic gradient descent (DSGD) approach is used as baseline for i.i.d. case that updates θ first by gradient descent and then uses the updated θ to calculate the gradient of x,subsequently updating x via SGD. We compare the performance of DUET and DSGT in both i.i.d. and non-i.i.d. settings. Figures 5 and 6 illustrate the train loss and accuracy results for both settings. 0 200 400 600 800 1000   
+
+> Epochs
+> 0.50 0.75 1.00 1.25 1.50 1.75 2.00 2.25
+> Train Loss
+> DUET, GT = 1 DSGT, GT = 1 DSGD
+> 850 900 950 0.4 0.6 0.8
+
+(a) Train loss. 0 200 400 600 800 1000     
+
+> Epochs
+> 0.2 0.4 0.6 0.8
+> Train Accuracy
+> DUET, GT = 1 DSGT, GT = 1 DSGD 850 900 950 0.8 0.9
+
+(b) Train accuracy. 
+
+Figure 5: Comparisons between DUET and DSGT in the i.i.d. data scenario on the meta-learning problem with a 5-agent network on MNIST. 0 250 500 750 1000 1250 1500 1750 2000 
+
+> Epochs
+> 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3
+> Train Loss
+> DUET, GT = 1 DUET, GT = 0 DSGT, GT = 1 DSGT, GT = 0
+> 1850 1900 1950 1.6 1.8
+
+(a) Train loss. 0 250 500 750 1000 1250 1500 1750 2000   
+
+> Epochs
+> 0.1 0.2 0.3 0.4 0.5 0.6
+> Train Accuracy
+> DUET, GT = 1 DUET, GT = 0 DSGT, GT = 1 DSGT, GT = 0 1850 1900 1950 0.5 0.6
+
+(b) Train accuracy. 
+
+Figure 6: Comparisons between DUET and DSGT in the non-i.i.d. data scenario on the meta-learning problem with a 5-agent network on MNIST. In Figure 5, the DUET algorithm demonstrates superior performance by achieving the highest training accuracy, along with fast convergence. For the non-i.i.d. case (Figure 6), the algorithms with gradient tracking handle the heterogeneity of the data well, with better performance. Figure 7 shows the label distributions of data heterogeneity across different nodes, highlighting the strong non-i.i.d. nature of the data used in our experiments. This visual representation of non-i.i.d. data distribution provides a clear understanding of the varying degrees of heterogeneity. For a 10-agent network (Figure 8) and a 50-agent network (Figure 9) in the i.i.d case, DUET continues to perform effectively and demonstrates the best performance among the tested methods DSGT and 45 Published as a conference paper at ICLR 2025 0 1 2 3 4 5 6 7 8 9 
+
+Labels 
+
+05000 
+
+> Count
+
+Agent 1 
+
+0 1 2 3 4 5 6 7 8 9 
+
+Labels 
+
+Agent 2 
+
+0 1 2 3 4 5 6 7 8 9 
+
+Labels 
+
+Agent 3 
+
+0 1 2 3 4 5 6 7 8 9 
+
+Labels 
+
+Agent 4 
+
+0 1 2 3 4 5 6 7 8 9 
+
+Labels 
+
+Agent 5 
+
+Figure 7: Label distributions of data heterogeneity across nodes for non-iid case on the meta-learning problem with a 5-agent network on MNIST. baseline DSGD, maintaining robust convergence and accuracy even in larger, more complex network settings. 0 250 500 750 1000 1250 1500 1750 2000 
+
+> Epochs
+> 0.50 0.75 1.00 1.25 1.50 1.75 2.00 2.25
+> Train Loss
+> DUET, GT = 1 DSGT, GT = 1 DSGD
+> 1850 1900 1950 0.5 0.6
+
+(a) Train loss. 0 250 500 750 1000 1250 1500 1750 2000   
+
+> Epochs
+> 0.2 0.4 0.6 0.8
+> Train Accuracy
+> DUET, GT = 1 DSGT, GT = 1 DSGD 1850 1900 1950 0.875 0.900 0.925
+
+(b) Train accuracy. 0 250 500 750 1000 1250 1500 1750 2000   
+
+> Epochs
+> 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9
+> Test Accuracy
+> DUET, GT = 1 DSGT, GT = 1 DSGD 1850 1900 1950 0.85 0.90
+
+(c) Test accuracy. 
+
+Figure 8: Comparisons between DUET and DSGT in the i.i.d. data scenario on the meta-learning problem with a 10-agent network on MNIST. 0 250 500 750 1000 1250 1500 1750 2000 
+
+> Epochs
+> 0.25 0.50 0.75 1.00 1.25 1.50 1.75 2.00 2.25
+> Train Loss
+> DUET, GT = 1 DSGT, GT = 1 DSGD
+> 1850 1900 1950 0.4 0.6
+
+(a) Train loss. 0 250 500 750 1000 1250 1500 1750 2000   
+
+> Epochs
+> 0.2 0.4 0.6 0.8
+> Train Accuracy
+> DUET, GT = 1 DSGT, GT = 1 DSGD 1850 1900 1950 0.80 0.85 0.90
+
+(b) Train accuracy. 0 250 500 750 1000 1250 1500 1750 2000   
+
+> Epochs
+> 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9
+> Test Accuracy
+> DUET, GT = 1 DSGT, GT = 1 DSGD 1850 1900 1950 0.6 0.8
+
+(c) Test accuracy. 
+
+Figure 9: Comparisons between DUET and DSGT in the i.i.d. data scenario on the meta-learning problem with a 50-agent network on MNIST. The following table summarizes the parameter settings for the DUET , DSGT , and DSGD algorithms under both i.i.d. and non-i.i.d. cases, illustrating the diverse configurations tested in our experiments. E.3 DECENTRALIZED HYPERPARAMETER OPTIMIZATION WITH REAL -W ORLD DATA :In this section, we explore the hyperparameter optimization problem, which is formulated as a bilevel optimization task. Specifically, we employ softmax regression (with parameters yi) as the classifier and introduce hyperparameters xi to weight samples for training. Let Dtr,i and Dval,i as the training and validation sets for agent i. We define ℓ(yi; ui, vi) as the cross-entropy loss function, where yi denotes the classification parameters and (ui, vi) are the data pairs. The LL problem minimizes the softmax regression loss over the training dataset, and the LL objective function is formulated as follows: gi(xi, yi) = P
+
+(ui,vi)∈Dtr,i [σ(xi)] ℓ(yi; ui, vi), where 
+
+xi is the hyperparameter that penalizes the objective for different training sample. Simultaneously, the UL problem aims to improve the performance of the regression model on the validation dataset by fine-tuning the hyperparameters. The UL objective is defined as: 46 Published as a conference paper at ICLR 2025 
+
+Setting Algorithm UL Learning Rate LL Learning Rate Parameters (μ, p)IID DUET 10 0.01 (0.1, 15 )DSGT 0.5 0.00001 (0.5, 15 )DSGD 1 0.01 -non-IID DUET 0.1 0.0001 (0.1, 15 )DSGT 0.001 0.001 (0.5, 15 )
+
+Table 3: Parameter settings for DUET, DSGT, and DSGD under iid and non-iid conditions on the meta-learning problem on MNIST. 
+
+fi(xi, yi) = P 
+
+> (ui,vi)∈Dval,i
+
+ℓ(y(xi); ui, vi) + 1
+
+> d
+
+Pds=1  
+
+> ρ(ys(xi)) 2
+> 1+ ρ(ys(xi)) 2
+
+, where ρ = 10 −4 is the reg-ularization parameter. This regularizer is non-convex and is applied in a distributed manner. To evaluate the proposed method, we use the FashionMNIST dataset, which consists of images of clothing categories and serves as an alternative to the classic MNIST dataset. For each agent, the dataset is split into training, validation, and testing sets, each containing 5000 samples. We compare the performance of DUET and DSGT algorithms in terms of test accuracy and F1 score, utilizing a 10-agent communication network with a connection probability pc = 0 .5.As show in Figure 10, the analysis of F1 score and test accuracy reveals similar trends across the three algorithms, indicating consistency between the metrics in evaluating performance. DUET achieves the best results in both F1 score and test accuracy, with the fastest convergence and highest stability across epochs. DSGT follows closely, showing competitive performance but slightly behind DUET .In contrast, DSGD, which lacks gradient tracking, exhibits slower convergence, lower overall performance in both metrics. These results highlight the effectiveness of gradient tracking in 
+
+DUET and DSGT , with DUET emerging as the most robust and generalizable approach. The similar trends in F1 score and test accuracy further validate the reliability of these algorithms’ performance in decentralized optimization. 0 25 50 75 100 125 150 175 200 
+
+> Epochs
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> 0.7
+> Test Accuracy
+> DUET, GT = 1
+> DSGT, GT = 1
+> DSGD
+
+(a) Test accuracy. 0 25 50 75 100 125 150 175 200  
+
+> Epochs
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> 0.7
+> F1 Score
+> DUET, GT = 1
+> DSGT, GT = 1
+> DSGD
+
+(b) F1 Score. 
+
+Figure 10: Comparisons between DUET and DSGT on the hyperparameter optimization problem with 10-agent network on FashinMNIST. The following table summarizes the parameter settings for the DUET , DSGT , and DSGD algorithms on the hyperparameter optimization problem with 10-agent network on FashinMNIST. 
+
+Algorithm UL Learning Rate LL Learning Rate Parameters (μ, p)
+
+DUET 0.001 0.1 (0.1, 15 )
+
+DSGT 0.1 0.01 (0.9, 15 )DSGD 0.01 0.01 -
+
+Table 4: Parameter settings for DUET, DSGT, and DSGD on the hyperparameter optimization problem with 10-agent network on FashinMNIST. 47

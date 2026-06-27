@@ -6,35 +6,47 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-26
-- 运行时间：2026-06-26 21:53:15 UTC
+- 最新运行日期：2026-06-27
+- 运行时间：2026-06-27 20:54:06 UTC
 - 运行状态：成功
-- 本次总论文数：5
-- 精读区：3
-- 速读区：2
+- 本次总论文数：9
+- 精读区：2
+- 速读区：7
 
 ### 今日简报（AI）
-今日共处理5篇推荐论文，精读3篇、速读2篇。最值得关注的是《IDEA》（9.0分）在多智能体控制迁移中解决动态失配，以及《KRVF》（8.0分）为边缘移动操作提供语义体素表示。建议优先精读《IDEA》探索其效果对齐方法。
-- 详情：[/202606/26/README](/202606/26/README)
+今日精选9篇论文，精读2篇、速读7篇，聚焦仓库优化与机器人推理。最值得关注《Context-Aware Synthesis of Optimization Pipelines》和《RoBoSR: Structured Scene Representations》，分别针对优化管道自动化与具身机器人结构化场景理解。建议优先精读这两篇论文，把握前沿方向。
+- 详情：[/202606/27/README](/202606/27/README)
 
 ### 精读区论文标签
-1. [IDEA: Insensitive to Dynamics Mismatch via Effect Alignment for Sim-to-Real Transfer in Multi-Agent Control](/202606/26/2606.26575v1-idea-insensitive-to-dynamics-mismatch-via-effect-alignment-for-sim-to-real-transfer-in-multi-agent-control)  
+1. [Context-Aware Synthesis of Optimization Pipelines for Warehouse Optimization](/202606/27/2606.26852v1-context-aware-synthesis-of-optimization-pipelines-for-warehouse-optimization)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：多智能体控制与仿真到真实迁移
-2. [KRVF: A Source-Aware Semantic Voxel World Representation for Edge Mobile Manipulation](/202606/26/2606.26321v1-krvf-a-source-aware-semantic-voxel-world-representation-for-edge-mobile-manipulation)  
+   evidence：仓库优化管道，直接涉及仓储机器人自动化和路径规划
+2. [RoBoSR: Structured Scene Representations for Embodied Robotic Reasoning](/202606/27/2606.24338v1-robosr-structured-scene-representations-for-embodied-robotic-reasoning)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：面向移动操作臂的语义体素世界表示
-3. [A Closed-Form 4-DoF Inter-Robot Pose Estimator using Bearing-only Measurements](/202606/26/2606.26616v1-a-closed-form-4-dof-inter-robot-pose-estimator-using-bearing-only-measurements)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：机器人间位姿估计支持协作定位
+   evidence：结构化场景表示可作为多机器人世界模型的基础
 
 ### 速读区论文标签
-1. [Offline Reinforcement Learning for Warehouse SLAM Throughput Control](/202606/26/2606.23978v1-offline-reinforcement-learning-for-warehouse-slam-throughput-control)  
+1. [DUET: Decentralized Bilevel Optimization without Lower-Level Strong Convexity](/202606/27/2606.21153v1-duet-decentralized-bilevel-optimization-without-lower-level-strong-convexity)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：仓储SLAM吞吐控制的离线强化学习
-2. [GCT-MARL: Graph-Based Contrastive Transfer for Sample-Efficient Cooperative Multi-Agent Reinforcement Learning](/202606/26/2606.25073v1-gct-marl-graph-based-contrastive-transfer-for-sample-efficient-cooperative-multi-agent-reinforcement-learning)  
+   evidence：分布式双层优化用于多智能体系统，可应用于多机器人协调
+2. [World Value Models for Robotic Manipulation](/202606/27/2606.24742v1-world-value-models-for-robotic-manipulation)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：基于图对比迁移的合作多智能体强化学习
+   evidence：世界模型用于价值估计，与多机器人世界模型的环境表示相关
+3. [Scaling Nonlinear Optimization: Many Problems One GPU](/202606/27/2606.26341v1-scaling-nonlinear-optimization-many-problems-one-gpu)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：GPU批处理非线性优化用于轨迹优化和运动规划
+4. [MANGO: Automated Multi-Agent Test Oracle Generation for Vision-Language-Action Models](/202606/27/2606.24815v1-mango-automated-multi-agent-test-oracle-generation-for-vision-language-action-models)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：多智能体测试Oracle生成，辅助多机器人协调验证
+5. [ARTOO-DARTU: Studying AR-HRC With AR Obstruction Mitigation During a Warehouse Task](/202606/27/2606.25202v1-artoo-dartu-studying-ar-hrc-with-ar-obstruction-mitigation-during-a-warehouse-task)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：仓库人机协作中的增强现实
+6. [Multi-Agent Goal Recognition with Team- and Goal-Conditioned Reinforcement Learning and Factorized Branch-and-Bound](/202606/27/2606.25978v1-multi-agent-goal-recognition-with-team--and-goal-conditioned-reinforcement-learning-and-factorized-branch-and-bound)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：多智能体目标识别结合团队条件强化学习，支持多机器人协调推断
+7. [In-Context World Modeling for Robotic Control](/202606/27/2606.26025v1-in-context-world-modeling-for-robotic-control)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：机器人控制的世界模型，可应用于多机器人环境表示
 
 
 <div class="dpr-home-promo-card">
