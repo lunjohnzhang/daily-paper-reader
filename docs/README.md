@@ -6,32 +6,50 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-29
-- 运行时间：2026-06-29 21:24:05 UTC
+- 最新运行日期：2026-06-30
+- 运行时间：2026-06-30 22:17:02 UTC
 - 运行状态：成功
-- 本次总论文数：4
-- 精读区：3
-- 速读区：1
+- 本次总论文数：10
+- 精读区：6
+- 速读区：4
 
 ### 今日简报（AI）
-今天精读两篇多机器人运动规划论文，速读一篇多机器人系统与智能体AI结合综述。最值得关注：AO-ARC实现几乎必然渐近最优规划，P-ARC通过子问题独立加速并行计算。建议普通读者重点关注多机器人系统与AI融合趋势，以及并行算法在实际部署中的效率优势。
-- 详情：[/202606/29/README](/202606/29/README)
+今日精读6篇，重头戏在《RoboGaze》9.0分（机器人世界模型评估）和《LAMP》9.0分（多机器人长时域协作规划）。建议优先精读这两篇，掌握视觉语言分析与自适应操作的新思路。
+- 详情：[/202606/30/README](/202606/30/README)
 
 ### 精读区论文标签
-1. [AO-ARC: Almost-Surely Asymptotically Optimal Multi-Robot Motion Planning with ARC](/202606/29/2606.27495v1-ao-arc-almost-surely-asymptotically-optimal-multi-robot-motion-planning-with-arc)  
-   标签：评分：10.0/10、query:multi-robot
-   evidence：多机器人运动规划，具有渐近最优性
-2. [P-ARC: Exploiting Subproblem Independence for Parallel Multi-Robot Motion Planning](/202606/29/2606.27625v1-p-arc-exploiting-subproblem-independence-for-parallel-multi-robot-motion-planning)  
-   标签：评分：10.0/10、query:multi-robot
-   evidence：并行多机器人运动规划算法
-3. [LLawCo: Learning Laws of Cooperation for Modeling Embodied Multi-Agent Behavior](/202606/29/2606.28182v1-llawco-learning-laws-of-cooperation-for-modeling-embodied-multi-agent-behavior)  
+1. [RoboGaze: Evaluating Robot World Models via Structured Vision-Language Analysis](/202606/30/2606.28385v1-robogaze-evaluating-robot-world-models-via-structured-vision-language-analysis)  
+   标签：评分：9.0/10、query:multi-robot
+   evidence：提出使用结构化视觉语言分析评估机器人世界模型的框架
+2. [LAMP: Long-Horizon Adaptive Manipulation Planning for Multi-Robot Collaboration in Cluttered Space](/202606/30/2606.29358v1-lamp-long-horizon-adaptive-manipulation-planning-for-multi-robot-collaboration-in-cluttered-space)  
+   标签：评分：9.0/10、query:multi-robot
+   evidence：多机器人协同规划在杂乱空间中
+3. [A Linear Matching Bandit Approach to Online Multi-Human Multi-Robot Teaming](/202606/30/2606.29221v1-a-linear-matching-bandit-approach-to-online-multi-human-multi-robot-teaming)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：基于大语言模型的多智能体合作，学习合作法则
+   evidence：在线多人类多机器人团队协作的线性匹配赌博机方法
+4. [SPACE: Swarm Pheromone Fields for Adaptive Collision-Aware Exploration](/202606/30/2606.29372v1-space-swarm-pheromone-fields-for-adaptive-collision-aware-exploration)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：通过信息素场进行去中心化群体协调以实现碰撞感知探索
+5. [Learned Coordination Conventions in Cooperative MARL: Measuring the Translation Gap Between Theory-Informed Roles and Learned Routing](/202606/30/2606.29541v1-learned-coordination-conventions-in-cooperative-marl-measuring-the-translation-gap-between-theory-informed-roles-and-learned-routing)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：研究协作多智能体强化学习中的学习协调惯例
+6. [Normalizing Flow-Enhanced Message Passing for Multirobot Collaborative Localization](/202606/30/2606.29868v1-normalizing-flow-enhanced-message-passing-for-multirobot-collaborative-localization)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：基于归一化流增强消息传递的多机器人协同定位
 
 ### 速读区论文标签
-1. [When Multi-Robot Systems Meet Agentic AI:Towards Embodied Collective Intelligence](/202606/29/2606.27929v1-when-multi-robot-systems-meet-agentic-aitowards-embodied-collective-intelligence)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：关于多机器人系统和具身集体智能的展望论文
+1. [Towards World Model-Empowered Integrated Sensing, Communication, and Decision for Complex Unmanned Systems](/202606/30/2606.30568v1-towards-world-model-empowered-integrated-sensing-communication-and-decision-for-complex-unmanned-systems)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：多机器人无人系统的世界模型
+2. [GBC: Gradient-Based Connections for Optimizing Multi-Agent Systems](/202606/30/2606.28187v1-gbc-gradient-based-connections-for-optimizing-multi-agent-systems)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：基于梯度的多智能体系统优化
+3. [Privacy-Preserving Decentralized Cooperative Localization with Range-Only Measurements: A Convex Optimization Based Approach](/202606/30/2606.29673v1-privacy-preserving-decentralized-cooperative-localization-with-range-only-measurements-a-convex-optimization-based-approach)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：多机器人系统中的隐私保护去中心化协作定位
+4. [ACPO: Agent-Chained Policy Optimization for Multi-Agent Reinforcement Learning](/202606/30/2606.30072v1-acpo-agent-chained-policy-optimization-for-multi-agent-reinforcement-learning)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：多智能体强化学习用于机器人协调
 
 
 <div class="dpr-home-promo-card">
