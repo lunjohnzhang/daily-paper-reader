@@ -6,50 +6,43 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-30
-- 运行时间：2026-06-30 22:17:02 UTC
+- 最新运行日期：2026-07-01
+- 运行时间：2026-07-01 20:54:19 UTC
 - 运行状态：成功
-- 本次总论文数：10
-- 精读区：6
-- 速读区：4
+- 本次总论文数：7
+- 精读区：4
+- 速读区：3
 
 ### 今日简报（AI）
-今日精读6篇，重头戏在《RoboGaze》9.0分（机器人世界模型评估）和《LAMP》9.0分（多机器人长时域协作规划）。建议优先精读这两篇，掌握视觉语言分析与自适应操作的新思路。
-- 详情：[/202606/30/README](/202606/30/README)
+今天聚焦7篇论文，精读4篇、速读3篇，核心围绕多机器人协调与柔性制造调度。  
+最值得看的是两篇9.0分精读论文：采样协调的多目标多机器人强化学习，以及验证门控的智能工业多机器人系统治理。  
+建议普通读者优先精读这两篇高分论文，再速读柔性制造调度与语义导航以扩展应用视角。
+- 详情：[/202607/01/README](/202607/01/README)
 
 ### 精读区论文标签
-1. [RoboGaze: Evaluating Robot World Models via Structured Vision-Language Analysis](/202606/30/2606.28385v1-robogaze-evaluating-robot-world-models-via-structured-vision-language-analysis)  
+1. [Sampling-Based Coordination-Informed Multi-Objective Multi-Robot Reinforcement Learning](/202607/01/2606.30893v1-sampling-based-coordination-informed-multi-objective-multi-robot-reinforcement-learning)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：提出使用结构化视觉语言分析评估机器人世界模型的框架
-2. [LAMP: Long-Horizon Adaptive Manipulation Planning for Multi-Robot Collaboration in Cluttered Space](/202606/30/2606.29358v1-lamp-long-horizon-adaptive-manipulation-planning-for-multi-robot-collaboration-in-cluttered-space)  
+   evidence：多机器人协调的多目标强化学习
+2. [Verification-Gated Agentic Mission-State Governance for Intelligent Industrial Multi-Robot Systems](/202607/01/2606.31339v1-verification-gated-agentic-mission-state-governance-for-intelligent-industrial-multi-robot-systems)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：多机器人协同规划在杂乱空间中
-3. [A Linear Matching Bandit Approach to Online Multi-Human Multi-Robot Teaming](/202606/30/2606.29221v1-a-linear-matching-bandit-approach-to-online-multi-human-multi-robot-teaming)  
+   evidence：多机器人系统治理框架，保障协调执行
+3. [Vision-Language Model Reasoning for Contextual Semantic Mapping in Intralogistics](/202607/01/2606.24814v2-vision-language-model-reasoning-for-contextual-semantic-mapping-in-intralogistics)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：在线多人类多机器人团队协作的线性匹配赌博机方法
-4. [SPACE: Swarm Pheromone Fields for Adaptive Collision-Aware Exploration](/202606/30/2606.29372v1-space-swarm-pheromone-fields-for-adaptive-collision-aware-exploration)  
+   evidence：为多机器人构建语义地图的世界模型
+4. [MultiUAV-Plat: An LLM-Oriented Platform, Benchmark and Framework for Multi-UAV Collaborative Task Planning](/202607/01/2606.31073v1-multiuav-plat-an-llm-oriented-platform-benchmark-and-framework-for-multi-uav-collaborative-task-planning)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：通过信息素场进行去中心化群体协调以实现碰撞感知探索
-5. [Learned Coordination Conventions in Cooperative MARL: Measuring the Translation Gap Between Theory-Informed Roles and Learned Routing](/202606/30/2606.29541v1-learned-coordination-conventions-in-cooperative-marl-measuring-the-translation-gap-between-theory-informed-roles-and-learned-routing)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：研究协作多智能体强化学习中的学习协调惯例
-6. [Normalizing Flow-Enhanced Message Passing for Multirobot Collaborative Localization](/202606/30/2606.29868v1-normalizing-flow-enhanced-message-passing-for-multirobot-collaborative-localization)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：基于归一化流增强消息传递的多机器人协同定位
+   evidence：面向LLM的多无人机协作任务规划平台
 
 ### 速读区论文标签
-1. [Towards World Model-Empowered Integrated Sensing, Communication, and Decision for Complex Unmanned Systems](/202606/30/2606.30568v1-towards-world-model-empowered-integrated-sensing-communication-and-decision-for-complex-unmanned-systems)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：多机器人无人系统的世界模型
-2. [GBC: Gradient-Based Connections for Optimizing Multi-Agent Systems](/202606/30/2606.28187v1-gbc-gradient-based-connections-for-optimizing-multi-agent-systems)  
+1. [Dynamic Scheduling for Flexible Manufacturing Systems Based on Multi-Agent Deep Reinforcement Learning and Petri Nets](/202607/01/2606.31737v1-dynamic-scheduling-for-flexible-manufacturing-systems-based-on-multi-agent-deep-reinforcement-learning-and-petri-nets)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：多智能体深度强化学习用于制造动态调度，关联多机器人协调
+2. [Evolution Fine-Tuning: Learning to Discover Across 371 Optimization Tasks](/202607/01/2606.29082v1-evolution-fine-tuning-learning-to-discover-across-371-optimization-tasks)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：基于梯度的多智能体系统优化
-3. [Privacy-Preserving Decentralized Cooperative Localization with Range-Only Measurements: A Convex Optimization Based Approach](/202606/30/2606.29673v1-privacy-preserving-decentralized-cooperative-localization-with-range-only-measurements-a-convex-optimization-based-approach)  
+   evidence：进化优化方法可应用于多机器人系统
+3. [Hierarchical 3D Scene Graph Construction and Belief-based Planning for Semantic Navigation](/202607/01/2606.31071v1-hierarchical-3d-scene-graph-construction-and-belief-based-planning-for-semantic-navigation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：多机器人系统中的隐私保护去中心化协作定位
-4. [ACPO: Agent-Chained Policy Optimization for Multi-Agent Reinforcement Learning](/202606/30/2606.30072v1-acpo-agent-chained-policy-optimization-for-multi-agent-reinforcement-learning)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：多智能体强化学习用于机器人协调
+   evidence：分层3D场景图作为世界模型
 
 
 <div class="dpr-home-promo-card">
