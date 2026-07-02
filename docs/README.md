@@ -6,43 +6,61 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-01
-- 运行时间：2026-07-01 20:54:19 UTC
+- 最新运行日期：2026-07-02
+- 运行时间：2026-07-02 21:32:22 UTC
 - 运行状态：成功
-- 本次总论文数：7
-- 精读区：4
-- 速读区：3
+- 本次总论文数：13
+- 精读区：6
+- 速读区：7
 
 ### 今日简报（AI）
-今天聚焦7篇论文，精读4篇、速读3篇，核心围绕多机器人协调与柔性制造调度。  
-最值得看的是两篇9.0分精读论文：采样协调的多目标多机器人强化学习，以及验证门控的智能工业多机器人系统治理。  
-建议普通读者优先精读这两篇高分论文，再速读柔性制造调度与语义导航以扩展应用视角。
-- 详情：[/202607/01/README](/202607/01/README)
+今日重点研究多机器人运动规划与分布式协同，精选两篇9分论文深入解读。
+最值得关注的是“分散式安全多臂运动规划”和“基于时空凸集图的搜索式多机器人运动规划”两大方向。
+建议普通读者优先了解分散式安全机制与自适应协作感知，这些对实际部署更具参考价值。
+- 详情：[/202607/02/README](/202607/02/README)
 
 ### 精读区论文标签
-1. [Sampling-Based Coordination-Informed Multi-Objective Multi-Robot Reinforcement Learning](/202607/01/2606.30893v1-sampling-based-coordination-informed-multi-objective-multi-robot-reinforcement-learning)  
+1. [NeHMO: Neural Hamilton-Jacobi Reachability Learning for Decentralized Safe Multi-Arm Motion Planning](/202607/02/2607.00326v1-nehmo-neural-hamilton-jacobi-reachability-learning-for-decentralized-safe-multi-arm-motion-planning)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：多机器人协调的多目标强化学习
-2. [Verification-Gated Agentic Mission-State Governance for Intelligent Industrial Multi-Robot Systems](/202607/01/2606.31339v1-verification-gated-agentic-mission-state-governance-for-intelligent-industrial-multi-robot-systems)  
+   evidence：使用神经HJR的分散安全多臂运动规划
+2. [Search-Based Spatiotemporal and Multi-Robot Motion Planning on Graphs of Space-Time Convex Sets](/202607/02/2607.00444v1-search-based-spatiotemporal-and-multi-robot-motion-planning-on-graphs-of-space-time-convex-sets)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：多机器人系统治理框架，保障协调执行
-3. [Vision-Language Model Reasoning for Contextual Semantic Mapping in Intralogistics](/202607/01/2606.24814v2-vision-language-model-reasoning-for-contextual-semantic-mapping-in-intralogistics)  
+   evidence：基于时空凸集图的搜索式多机器人运动规划
+3. [From Real-Time Planning to Reliable Execution:Scalable Coordination for Heterogeneous Multi-Robot Fleets in Industrial Environments](/202607/02/2607.00591v1-from-real-time-planning-to-reliable-executionscalable-coordination-for-heterogeneous-multi-robot-fleets-in-industrial-environments)  
+   标签：评分：9.0/10、query:multi-robot
+   evidence：异构多机器人车队在工业环境中的协调
+4. [From Consistency to Collaborative Discovery: MFEA-CoD for Multitask Novelty Search](/202607/02/2607.00761v1-from-consistency-to-collaborative-discovery-mfea-cod-for-multitask-novelty-search)  
+   标签：评分：9.0/10、query:multi-robot
+   evidence：基于多因子进化算法的多任务新颖性搜索实现协作发现
+5. [Distributed Multi Robot Lunar Cargo Transportation via Phase Decomposed Reinforcement Learning](/202607/02/2607.00160v1-distributed-multi-robot-lunar-cargo-transportation-via-phase-decomposed-reinforcement-learning)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：为多机器人构建语义地图的世界模型
-4. [MultiUAV-Plat: An LLM-Oriented Platform, Benchmark and Framework for Multi-UAV Collaborative Task Planning](/202607/01/2606.31073v1-multiuav-plat-an-llm-oriented-platform-benchmark-and-framework-for-multi-uav-collaborative-task-planning)  
+   evidence：基于强化学习的分布式多机器人货物运输协调
+6. [Path Planning in Physically Viable World Models](/202607/02/2607.00673v1-path-planning-in-physically-viable-world-models)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：面向LLM的多无人机协作任务规划平台
+   evidence：用于机器人路径规划的物理可行世界模型
 
 ### 速读区论文标签
-1. [Dynamic Scheduling for Flexible Manufacturing Systems Based on Multi-Agent Deep Reinforcement Learning and Petri Nets](/202607/01/2606.31737v1-dynamic-scheduling-for-flexible-manufacturing-systems-based-on-multi-agent-deep-reinforcement-learning-and-petri-nets)  
+1. [Technical Report: Asynchronous Distributed Trajectory Estimation of Multi-Robot Systems](/202607/02/2607.01106v1-technical-report-asynchronous-distributed-trajectory-estimation-of-multi-robot-systems)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：异步分布式轨迹估计用于多机器人系统
+2. [Learning Transferable Dynamics Priors from Action to World Modeling](/202607/02/2606.29501v1-learning-transferable-dynamics-priors-from-action-to-world-modeling)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：多智能体深度强化学习用于制造动态调度，关联多机器人协调
-2. [Evolution Fine-Tuning: Learning to Discover Across 371 Optimization Tasks](/202607/01/2606.29082v1-evolution-fine-tuning-learning-to-discover-across-371-optimization-tasks)  
+   evidence：预训练动作条件世界模型用于机器人学习的可迁移动力学先验
+3. [HydraCollab: Adaptive Collaborative-Perception for Distributed Autonomous Systems](/202607/02/2607.00191v1-hydracollab-adaptive-collaborative-perception-for-distributed-autonomous-systems)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：多机器人系统自适应协作感知
+4. [Distributed Online Bandit Submodular Maximization with Bounded Sampling Violations](/202607/02/2607.00680v1-distributed-online-bandit-submodular-maximization-with-bounded-sampling-violations)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：分布式在线子模最大化用于多智能体协调
+5. [Multi-Agent Routing as Set-Valued Prediction: A WildChat Benchmark and Cost-Aware Evaluation](/202607/02/2606.28925v1-multi-agent-routing-as-set-valued-prediction-a-wildchat-benchmark-and-cost-aware-evaluation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：进化优化方法可应用于多机器人系统
-3. [Hierarchical 3D Scene Graph Construction and Belief-based Planning for Semantic Navigation](/202607/01/2606.31071v1-hierarchical-3d-scene-graph-construction-and-belief-based-planning-for-semantic-navigation)  
+   evidence：多智能体路由作为集值预测
+6. [Managed Autonomy at Runtime: Gear-Based Safety and Governance for Single- and Multi-Agent Cyber-Physical Systems](/202607/02/2607.00334v1-managed-autonomy-at-runtime-gear-based-safety-and-governance-for-single--and-multi-agent-cyber-physical-systems)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：分层3D场景图作为世界模型
+   evidence：多智能体安全治理与协调框架
+7. [From World Models to World Action Models: A Concise Tutorial for Robotics](/202607/02/2607.00836v1-from-world-models-to-world-action-models-a-concise-tutorial-for-robotics)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：面向机器人的世界模型与世界动作模型教程
 
 
 <div class="dpr-home-promo-card">
