@@ -6,48 +6,35 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-04
-- 运行时间：2026-07-04 21:17:13 UTC
+- 最新运行日期：2026-07-05
+- 运行时间：2026-07-05 21:22:13 UTC
 - 运行状态：成功
-- 本次总论文数：8
+- 本次总论文数：5
 - 精读区：2
-- 速读区：6
+- 速读区：3
 
 ### 今日简报（AI）
-今日聚焦动态环境单目高斯建图与机器人世界行动模型，精选2篇高分精读及3篇速读论文。
-
-最值得精读《MoPe: Motion Permanence for Robust Monocular Gaussian Mapping in Dynamic Environments》和《从世界模型到世界行动模型：机器人简明教程》，均获8分，分别攻克动态场景建图稳定性和机器人决策框架。
-
-建议普通读者优先关注动态环境下的视觉建图技术，或机器人行动模型的应用趋势，它们直接关联自动驾驶与具身智能落地。
-- 详情：[/202607/04/README](/202607/04/README)
+今日精读2篇、速读3篇，聚焦3D点云世界模型与多任务新奇搜索。最值得关注的是3D点补全提升动力学学习精度（8.0），以及多任务协同搜索框架（8.0）。建议优先研读这两篇精读论文，并关注其开源代码与实验复现。
+- 详情：[/202607/05/README](/202607/05/README)
 
 ### 精读区论文标签
-1. [MoPe: Motion Permanence for Robust Monocular Gaussian Mapping in Dynamic Environments](/202607/04/2606.29237v1-mope-motion-permanence-for-robust-monocular-gaussian-mapping-in-dynamic-environments)  
+1. [3D Point World Models: Point Completion Enables More Accurate Dynamics Learning](/202607/05/2607.00148v1-3d-point-world-models-point-completion-enables-more-accurate-dynamics-learning)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：动态环境中的机器人世界模型
-2. [From World Models to World Action Models: A Concise Tutorial for Robotics](/202607/04/2607.00836v2-from-world-models-to-world-action-models-a-concise-tutorial-for-robotics)  
+   evidence：用于动力学学习的3D点云世界模型
+2. [From Consistency to Collaborative Discovery: MFEA-CoD for Multitask Novelty Search](/202607/05/2607.00761v2-from-consistency-to-collaborative-discovery-mfea-cod-for-multitask-novelty-search)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：机器人世界模型教程，直接涉及多机器人世界模型
+   evidence：多因子进化算法用于协作新颖性搜索
 
 ### 速读区论文标签
-1. [Preventing Error Propagation in Multi-Agent AI through Runtime Monitoring](/202607/04/2606.29026v1-preventing-error-propagation-in-multi-agent-ai-through-runtime-monitoring)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：多智能体通信的运行时监控
-2. [Motion Planning in Compressed Representation Spaces](/202607/04/2606.30940v1-motion-planning-in-compressed-representation-spaces)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：基于压缩潜在空间的生成式运动规划框架，可用于多机器人路径规划
-3. [Holonic Active Distillation for Scalable Multi-Agent Learning in Multi-Sensor Systems](/202607/04/2606.31578v1-holonic-active-distillation-for-scalable-multi-agent-learning-in-multi-sensor-systems)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：可扩展的多智能体学习框架，适用于多机器人协调系统
-4. [Minimal MMAO: A Resource-Closed-Loop Framework for Adaptive Metaheuristic Search](/202607/04/2606.30450v1-minimal-mmao-a-resource-closed-loop-framework-for-adaptive-metaheuristic-search)  
+1. [Robots Ask the Way: Communication-Enabled Social Navigation](/202607/05/2607.01044v1-robots-ask-the-way-communication-enabled-social-navigation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：作为自适应元启发式的代谢多智能体优化器
-5. [ELMP: Efficient Learning for Motion Planning via Analytical Policy Gradients](/202607/04/2607.00215v1-elmp-efficient-learning-for-motion-planning-via-analytical-policy-gradients)  
+   evidence：面向多人类环境的机器人通信增强社会导航
+2. [PhysMani: Physics-principled 3D World Model for Dynamic Object Manipulation](/202607/05/2607.01938v1-physmani-physics-principled-3d-world-model-for-dynamic-object-manipulation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：基于解析策略梯度的数据高效运动规划，可应用于多智能体路径规划
-6. [ABot-M0.5: Unified Mobility-and-Manipulation World Action Model](/202607/04/2607.00678v1-abot-m05-unified-mobility-and-manipulation-world-action-model)  
+   evidence：物理原理3D高斯世界模型，可用于动态环境表示
+3. [Bridge-WA: Predicting Where and How the World Changes for Robotic Action](/202607/05/2607.02195v1-bridge-wa-predicting-where-and-how-the-world-changes-for-robotic-action)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：世界动作模型，可用于多机器人环境表征
+   evidence：预测场景变化的世界-动作模型用于机器人操作
 
 
 <div class="dpr-home-promo-card">
