@@ -6,35 +6,29 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-05
-- 运行时间：2026-07-05 21:22:13 UTC
+- 最新运行日期：2026-07-06
+- 运行时间：2026-07-06 21:42:25 UTC
 - 运行状态：成功
-- 本次总论文数：5
+- 本次总论文数：2
 - 精读区：2
-- 速读区：3
+- 速读区：0
 
 ### 今日简报（AI）
-今日精读2篇、速读3篇，聚焦3D点云世界模型与多任务新奇搜索。最值得关注的是3D点补全提升动力学学习精度（8.0），以及多任务协同搜索框架（8.0）。建议优先研读这两篇精读论文，并关注其开源代码与实验复现。
-- 详情：[/202607/05/README](/202607/05/README)
+1) 今日精读2篇高分论文，聚焦多目标规划与多智能体安全协同。  
+2) 值得关注的方向：冲突搜索中的多目标节点选择优化，以及分布式梯度流在智能体安全一致性的应用。  
+3) 建议持续关注这两篇论文的具体方法，可尝试将其结合到实际机器人或无人系统协同控制中。
+- 详情：[/202607/06/README](/202607/06/README)
 
 ### 精读区论文标签
-1. [3D Point World Models: Point Completion Enables More Accurate Dynamics Learning](/202607/05/2607.00148v1-3d-point-world-models-point-completion-enables-more-accurate-dynamics-learning)  
+1. [Dual-Informed Vertical Expansion for Multi-Objective Node Selection in Anytime Conflict-Based Search](/202607/06/2607.00156v1-dual-informed-vertical-expansion-for-multi-objective-node-selection-in-anytime-conflict-based-search)  
+   标签：评分：10.0/10、query:multi-robot
+   evidence：直接针对多智能体路径规划问题，提出冲突基搜索中的新节点选择策略
+2. [Reference-Governed Distributed Safe Gradient Flow for Safe Optimal Output Agreement of Multi-Agent Systems](/202607/06/2607.02192v1-reference-governed-distributed-safe-gradient-flow-for-safe-optimal-output-agreement-of-multi-agent-systems)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：用于动力学学习的3D点云世界模型
-2. [From Consistency to Collaborative Discovery: MFEA-CoD for Multitask Novelty Search](/202607/05/2607.00761v2-from-consistency-to-collaborative-discovery-mfea-cod-for-multitask-novelty-search)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：多因子进化算法用于协作新颖性搜索
+   evidence：分布式安全协调实现多智能体输出一致
 
 ### 速读区论文标签
-1. [Robots Ask the Way: Communication-Enabled Social Navigation](/202607/05/2607.01044v1-robots-ask-the-way-communication-enabled-social-navigation)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：面向多人类环境的机器人通信增强社会导航
-2. [PhysMani: Physics-principled 3D World Model for Dynamic Object Manipulation](/202607/05/2607.01938v1-physmani-physics-principled-3d-world-model-for-dynamic-object-manipulation)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：物理原理3D高斯世界模型，可用于动态环境表示
-3. [Bridge-WA: Predicting Where and How the World Changes for Robotic Action](/202607/05/2607.02195v1-bridge-wa-predicting-where-and-how-the-world-changes-for-robotic-action)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：预测场景变化的世界-动作模型用于机器人操作
+- 本次无速读推荐。
 
 
 <div class="dpr-home-promo-card">
