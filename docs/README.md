@@ -6,44 +6,40 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-11
-- 运行时间：2026-07-11 21:10:56 UTC
+- 最新运行日期：2026-07-12
+- 运行时间：2026-07-12 20:35:15 UTC
 - 运行状态：成功
-- 本次总论文数：8
-- 精读区：2
-- 速读区：6
+- 本次总论文数：5
+- 精读区：0
+- 速读区：5
 
 ### 今日简报（AI）
-今天精读2篇、速读6篇，涵盖伊辛机辅助搜索、动态多车辆路由、机器人场景生成、GPU碰撞避免及世界模型学习。最值得关注的是子问题规模可调的大邻域搜索（8分）与奖励密度启发式的动态路由（8分），在组合优化和运筹学中表现突出。建议普通读者优先研读这两篇精读论文，并结合速读中机器人场景生成与实时碰撞避免技术，了解实际调度和机器人应用方向。
-- 详情：[/202607/11/README](/202607/11/README)
+今日速读5篇论文，聚焦多智能体轨迹预测、具身世界模型与点云增量更新。
+
+最值得关注的是《IMR》的多智能体迭代回归方法和《RynnWorld-4D》的4D具身世界模型，两者评分并列7.0/10。
+
+建议优先精读这两篇论文，了解多智能体交互预测与机器人操作的结合趋势，后续可关注相关代码开源或基准测试。
+- 详情：[/202607/12/README](/202607/12/README)
 
 ### 精读区论文标签
-1. [Ising-Machine-Assisted Large Neighborhood Search with Flexibly Tunable Subproblem Size](/202607/11/2607.05169v1-ising-machine-assisted-large-neighborhood-search-with-flexibly-tunable-subproblem-size)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：针对车辆路径问题的大邻域搜索可应用于多机器人路径规划
-2. [Reward-Density Heuristic for Dynamic Multi-Vehicle Routing: Performance and Computational Efficiency](/202607/11/2607.06066v1-reward-density-heuristic-for-dynamic-multi-vehicle-routing-performance-and-computational-efficiency)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：基于奖励密度启发式的动态多车辆路径规划，用于物流和无人机调度
+- 本次无精读推荐。
 
 ### 速读区论文标签
-1. [RoboSnap: One-Shot Real-to-Sim Scene Generation for Generalizable Robot Learning and Evaluation](/202607/11/2607.06699v1-robosnap-one-shot-real-to-sim-scene-generation-for-generalizable-robot-learning-and-evaluation)  
+1. [IMR: Iterative Mode-World Weighted Regression for Multi-Agent Trajectory Prediction](/202607/12/2607.05705v1-imr-iterative-mode-world-weighted-regression-for-multi-agent-trajectory-prediction)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：单次真实到仿真场景生成用于机器人世界模型
-2. [GPU-Accelerated Polygonal Signed Distance Functions for Real-Time Collision Avoidance](/202607/11/2607.04310v1-gpu-accelerated-polygonal-signed-distance-functions-for-real-time-collision-avoidance)  
+   evidence：多智能体轨迹预测，与多智能体路径规划算法相关
+2. [RynnWorld-4D: 4D Embodied World Models for Robotic Manipulation](/202607/12/2607.06559v1-rynnworld-4d-4d-embodied-world-models-for-robotic-manipulation)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：4D世界模型用于机器人操作
+3. [ECO: Incremental Ego-Centric Octree Update for Point Streams](/202607/12/2607.05092v1-eco-incremental-ego-centric-octree-update-for-point-streams)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：利用多边形符号距离函数实现碰撞避免约束，可支持高效的多机器人路径规划
-3. [Learning Task-Sufficient World Models by Synergizing Agentic Exploration and Structured Modeling](/202607/11/2607.04409v1-learning-task-sufficient-world-models-by-synergizing-agentic-exploration-and-structured-modeling)  
+   evidence：以自我为中心的八叉树移动机器人环境表示
+4. [EvoAgentBench: Benchmarking Agent Self-Evolution via Ability Transfer](/202607/12/2607.05202v1-evoagentbench-benchmarking-agent-self-evolution-via-ability-transfer)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：任务充分的世界模型学习，通过智能体探索和结构化建模
-4. [KAM-WM: Kinematic Affordance Maps from Latent World Models for Robot Manipulation](/202607/11/2607.04652v1-kam-wm-kinematic-affordance-maps-from-latent-world-models-for-robot-manipulation)  
+   evidence：智能体自我进化基准，涉及能力迁移，与进化优化相关
+5. [EmbodiedGen V2: An Agentic, Simulation-Ready 3D World Engine for Embodied AI](/202607/12/2607.07459v1-embodiedgen-v2-an-agentic-simulation-ready-3d-world-engine-for-embodied-ai)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：潜在世界模型用于运动学可操作图提取，与世界模型相关
-5. [Clustering-Embedded Model Predictive Path Integral Control: Avoiding Averaging-Induced Failure and Enabling Efficient Cluster Selection for Dynamic Obstacles](/202607/11/2607.06499v1-clustering-embedded-model-predictive-path-integral-control-avoiding-averaging-induced-failure-and-enabling-efficient-cluster-selection-for-dynamic-obstacles)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：面向动态障碍物密集环境的运动规划方法
-6. [CILC: Cryptographically-secure Inter-agent Loop Closure Candidate Detection for Multi-Agent Collaborative SLAM](/202607/11/2607.06700v1-cilc-cryptographically-secure-inter-agent-loop-closure-candidate-detection-for-multi-agent-collaborative-slam)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：多智能体协同SLAM中的安全闭环检测，支持环境建模
+   evidence：生成式3D世界引擎，为具身AI构建可执行仿真环境
 
 
 <div class="dpr-home-promo-card">
