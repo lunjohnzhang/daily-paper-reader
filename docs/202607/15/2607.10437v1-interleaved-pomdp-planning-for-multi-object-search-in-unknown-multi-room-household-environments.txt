@@ -1,0 +1,358 @@
+Title: Interleaved POMDP Planning for Multi-Object Search in Unknown Multi-Room Household Environments
+
+URL Source: https://arxiv.org/pdf/2607.10437v1
+
+Published Time: Tue, 14 Jul 2026 01:20:02 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Interleaved POMDP Planning for Multi-Object Search in Unknown Multi-Room Household Environments 
+
+Ruochu Yang 1, Ziyi Xia 2, Huibo Zhang 2, Yatong Han 3, Yiming Zhao 3,Yingke Li 4, Fumin Zhang 2, Yorai Wardi 1, Mengxue Hou 5
+
+Abstract — Multi-object search in unknown household environments requires planning under extensive uncertainty — from unknown object locations to cluttered spaces with unobserved obstacles. POMDPs offer a principled framework for such problems but remain intractable in large domains. We propose Inter-POMDP, a novel interleaved POMDP planning algorithm that decomposes this challenge into two interacting levels: a high-level POUCT planner reasons over object distributions us-ing LLM-informed histogram beliefs, while a low-level motion planner models navigation uncertainty with obstacle-aware particle beliefs as domain knowledge to guide high-level POUCT. This interleaved design balances planning quality and efficiency despite the large search space across unknown multi-room environments. Both simulation and real-world experiments show that our Inter-POMDP algorithm reduces collision counts by up to 63%, navigation steps by up to 35%, and detection counts by up to 32% compared with baseline methods. Full videos are https://sites.google.com/view/inter-pomdp 
+
+I. I NTRODUCTION 
+
+Household robots are a long-standing topic in robotics, with object search being a classical problem. While many works address object search in deterministic settings, real-world deployments demand reasoning under partial observability: environments are large-scale, objects’ locations vary over time, and obstacles are unknown. Planning under such uncertainty is critical for developing fully autonomous household robots. Two key challenges arise: 1) the large state-action space and long planning horizon demand efficiency, as the search tree is deep with many branching factors; 2) the extensive activity range in cluttered, uncertain environments makes obstacle encounters highly likely, demanding planning qual-ity and robustness. Partially observable Markov decision processes (POMDPs) provide a principled framework for sequential decision-making under uncertainty [1]. However, POMDPs are computation-ally intractable in large domains [2], as belief space dimensionality grows with the number of possible states—exponentially so with the number of objects in search tasks [3]. When the environment is only partially observed, the full state-action space is unknown and vast, making long-horizon planning especially difficult. We focus on cluttered multi-room household environments such as research laboratories or shared office workspaces, characterized by large open floors with similar furniture (e.g., tables, shelves) and miscellaneous objects (e.g., equipment, monitors, personal items). In such settings, digging more informative object-level and object-furniture relations is significant for efficient search [4]. Target objects may rest on the ground, serving simultaneously as obstacles and search targets, necessitating the integration of high-level seman-tic information into low-level navigation costs—beyond approaches that only consider distance-based reachability [5]. Moreover, large household environments emphasize an inevitable challenge: clut-tered navigational space. Arbitrary arrangements of tables, chairs, and objects make it insufficient to simply partition rooms and expect 
+
+> 1
+
+Georgia Institute of Technology, USA. 2The Hong Kong University of Science and Technology, China. 3Ising AI, China. 4MIT, USA. 5Notre Dame University, USA. 
+
+obstacle-free navigation between them. We aim to systematically incorporate grounded navigation information into the belief update process to make planning under uncertainty more robust. To achieve this, we treat uncertainty as physical rather than purely semantic. Many existing works [6]–[8] rely on high-level task planners to re-select exploratory directions upon failure, seldom accounting for physical-world uncertainties. Even works that acknowledge such uncertainties often resort to simple replanning [9], [10] or LLM-based action re-selection strategies [11], [12]. Several works have applied POMDP planning to object search and related tasks [13]. Online POMDP solvers such as POMCP [14] and DESPOT [15] use sparse belief sampling with particles and Monte Carlo Tree Search (MCTS) to grow belief trees within limited planning time. POMCP has scaled to large POMDPs by sampling states from current beliefs and histories via a black-box simulator. However, its UCT-based exploration can be overly greedy with poor worst-case performance, and its black-box policies lack transparency, reducing safety and trustworthiness. Multi-scale approaches [13] have shown that hierarchical methods maintain comparable solution quality on modest problems while demonstrat-ing superior performance on larger ones. Our work is motivated by the interleaved planning workflow of [16], which addresses MDP settings with known dynamics in pre-partitioned environments. We make a significant extension to POMDP planning, where transition models are unknown due to unobserved obstacles, and incorporate abstract semantic reasoning for efficient object search in multi-room environments, which is absent in prior MDP-based formulations. Our contributions are summarized as follows:  
+
+> •
+
+We propose a novel interleaved POMDP planning framework for multi-object search in unknown multi-room environments. Our two-level planners handle semantic object distributions and geometric navigation, respectively, interacting iteratively so that low-level domain knowledge guides high-level action selection, balancing planning quality and efficiency against uncertainties from numerous unknown objects and obstacles.  
+
+> •
+
+Comprehensive evaluations demonstrate that our framework converges to near-optimal plans under realistic uncertainties such as furniture occlusions and unknown obstacles, leveraging search heuristics from past experience and natural language priors at both planning levels for safe and efficient operation. II. R ELATED WORKS 
+
+a) Object Search in Unknown Environments: In this general domain, there are a number of works solving this problem from dif-ferent perspectives. Learning-based methods train robots to explore and find objects through repeated environment interactions [17], [18]. However, they suffer from inefficient exploration—optimizing solely from sensory inputs without directly modeling semantic and geometric scene information [19] - and poor generalizability due to extensive training data requirements that hinder sim-to-real transfer [20]. Large foundation model (LFM) methods leverage arXiv:2607.10437v1 [cs.RO] 11 Jul 2026 natural language and visual inputs for navigation in unknown environments. [11] uses LLM semantic priors to guide online POMDP planning in scene graphs but ignores geometric constraints and past planning experience. [12] enhances interactive planning via 3D-visual-language models. [8] combines LLMs with scene graphs for target localization but assumes off-the-shelf navigation and relies heavily on room-level hierarchy, limiting adaptability to multi-room environments. Generally, LFM methods depend on coarse embeddings capturing only scene-level information, miss-ing fine-grained object correlations and physical constraints [21]. 
+
+Probabilistic planning methods systematically account for uncer-tainty using frameworks like POMDPs, typically assuming no prior environment knowledge [6], [7], [14]. While principled, POMDP methods face computational challenges in scaling to large environ-ments due to maintaining belief states for multiple objects over extended horizons [9], [10]. In this work, we focus on the POMDP domain, deliberately addressing the challenges and limitations of existing methods for object search. 
+
+b) POMDP Planners: We focus on POMDP planning for object search. [10] introduces belief reinvigoration for dynamically growing state spaces in online map generation. [6] builds a gener-alized 3D multi-object search system but uses naive POMCP as a plug-in without adapting it to the problem structure. [22] proposes GPOMCP for finding occluded objects but ignores navigation un-certainty and semantic guidance. [7] formulates multi-object search as an OO-POMDP with OO-POMCP, but only utilizes semantics at task initialization; we continuously exploit semantic information throughout the mission. [9] extends to 3D with multi-resolution planning but assumes object independence, ignores geometric con-straints in observations, and lacks rollout heuristics. [23] incremen-tally constructs scene graphs but focuses on representation rather than planning, relying on off-the-shelf POMDP solvers. [24] scales constrained-POMDP planning via hierarchical MCTS but does not leverage semantic information for household object search. Most related to our work, [5] builds a hierarchical framework with two POUCT planners. However, it follows a purely sequential decision paradigm without feeding low-level navigation costs back to the high-level planner, its factored distribution reverts to an intractable joint distribution as targets increase, and its learned correlation model lacks generalizability. To the best of our knowledge, we propose the first interleaved POMDP planning algorithm for multi-object search in unknown multi-room environments, designing a principled interaction between two planners to jointly capture semantic and geometric information under uncertainty. III. P ROBLEM FORMULATION 
+
+We consider a large-scale household environment with K
+
+known furniture items F ur = {f ur 1, . . . , f ur K }. A mobile robot equipped with an onboard camera is tasked with finding 
+
+N unknown target objects Otar = {tar 1, . . . , tar N } . The environment additionally contains M unknown landmark objects 
+
+Oobj = {obj 1, . . . , obj M } that may provide contextual cues, and 
+
+J unknown obstacles Oobs = {obs 1, . . . , obs J } on the floor that may impede navigation. The robot has access to a 2D occupancy grid map M o encoding walls and furniture, but has no prior knowledge of target objects, landmark objects, or obstacles. Cells outside the robot’s field of view are initialized as unknown and updated incrementally during exploration. Importantly, we explicitly model object-object and object-furniture relations, departing from the independence assumption in OO-POMDP [7]. At each time step t, the joint state is: st =
+
+{srt , S Otar , S Oobj , S Oobs } ∈ S, where the robot state 
+
+srt = ( xrt , y rt , θ rt ) specifies its position and orientation on M o and is fully known. Each target object state star i 
+
+> t
+
+= ( xtar i 
+
+> t
+
+, y tar i 
+
+> t
+
+, A tar i )
+
+and landmark object state sobj j 
+
+> t
+
+= ( xobj j 
+
+> t
+
+, y obj j 
+
+> t
+
+, A obj j ) include grid coordinates and semantic attributes. Each obstacle state 
+
+sobs k 
+
+> t
+
+= ( xobs k 
+
+> t
+
+, y obs k 
+
+> t
+
+) specifies only its position. All non-robot states are unknown. Since st is partially observable, the robot maintains a belief bt(st) = Pr( st | ht) over the joint state, updated via Bayes’ Rule after each action and observation. The high dimensionality of this belief - growing with the number of unknown objects and obstacles - motivates a hierarchical decomposition. 
+
+a) Hierarchical POMDP Decomposition: The joint POMDP is intractable for any single planner due to the large number of unknown entities. We decompose it into two levels: a high-level planner for semantic reasoning over object search order, and a low-level planner for geometric reasoning over navigation. 
+
+High-Level Action Space Ah: Four abstract actions: Navigate 
+
+moves the robot between regions; Search moves the robot in a lo-cal region; Sense performs object detection within the robot’s field of view (FOV); and Declare terminates the mission, succeeding if all targets are found. 
+
+Low-Level Action Space Al: To execute Navigate or 
+
+Search , the robot takes primitive actions move ahead, turn left, turn right , and to execute Sense with camera taking pictures. 
+
+Transition Model T : Navigate action moves the robot be-tween grid cells on M o. Crucially, unknown obstacles Oobs may lie along the path, introducing trajectory-level uncertainty. We account for this by reasoning over Navigate at a higher-resolution trajec-tory space - going beyond prior works [11], [22] that consider only high-level search while ignoring grounded navigation constraints. 
+
+Observation Space Z and Model H: Upon executing Sense ,the robot receives observation zt = ( ztar i 
+
+> t
+
+, z obj j 
+
+> t
+
+, z obs k 
+
+> t
+
+), where each component is either the detected state within the FOV or null 
+
+if undetected. The observation model H(zt, s rt ) = Pr( zt | srt ) is defined by a fan-shaped camera of depth D with perfect accuracy, as object detection is outside the scope of this work. 
+
+Reward Model R: A successful Declare (all targets detected within FOV and within a distance threshold) yields R = +100 ;failure yields R = −100 . Each Navigate action incurs R = −1,and each collision with an obstacle incurs R = −10 .
+
+b) Object Relations and Enhanced Maps: To exploit the rich structure of household environments, we introduce two additional elements beyond the standard POMDP formulation. 
+
+Object-Furniture Relations: We define object-object relations 
+
+Coo (star i , s obj j ) = Pr( star i | sobj j ) (e.g., coffee cup next to milk ) and object-furniture relations Cof (star i , s f ur p ) = Pr( star i |
+
+sf ur p ) (e.g., coffee cup on kitchen table ). These relations encode semantic priors that guide the high-level planner toward promising search locations. 
+
+Enhanced Maps: Beyond the occupancy grid M o, we maintain two complementary representations: (1) a semantic map M s that abstracts grid cells to furnitures f ur p, incrementally built online using relations Coo and Cof to inform high-level search decisions; and (2) a topological map M p = ⟨N , E, W⟩ , a sparse graph over reachable positions where edge weights W encode navigation costs arising from unknown obstacles Oobs , incrementally updated as the robot explores to inform low-level planning. 
+
+c) Problem Statement: Given the above formulations, our goal is to find an optimal policy π∗ that guides the robot to find all target objects Otar while minimizing cumulative cost. This problem is NP-hard: it requires jointly optimizing the high-level search order over objects and the low-level navigation under obstacle uncertainty, across a large environment with an expansive solution space. The central challenge is: how can we design a POMDP planning algorithm that achieves a principled balance between planning quality and efficiency under such complexity? 
+
+IV. M ETHODOLOGY 
+
+As shown above, our problem formulation introduces many challenges which traditional POMDP planners can’t directly solve. To this end, we propose a novel interleaved POMDP planning algorithm to systematically imbue high-level semantic information and low-level geometric information with two specific designs:  
+
+> •
+
+Structural planning hierarchy to mitigate the curse of di-mensionality where the high-level planner deals with global object localization and the low-level planner deals with motion primitives.  
+
+> •
+
+Interleaved communication between the two planners where the high-level planner narrows the search space for the motion layer, while the low-level planner provides grounded naviga-tion feedback to prune redundant search branches. During a long process of searching multiple objects, our in-terleaved planning algorithm will incrementally model the large unknown environment, starting from an empty map with only furniture to a detailed map with all the objects/obstacles included. Our algorithm considers both quick target localization and robust navigation with unknown obstacles. In this way, we can enjoy a balance of efficiency and accuracy, which is the best we can expect to plan on multi-object search in a large unknown environment with obstacles. In this section, we first introduce our hierarchical archi-tecture of two POMDP planners. Then we present our interleaved design of connecting the two planners in a principled way. Details are described in Algorithm 1. 
+
+A. High-Level POUCT for Generalized Object Localization 
+
+The high-level planner operates on the semantic map M s to identify promising search locations for target objects. Its core task is to select which furniture or region to visit next, based on inferred object-object relations Coo and object-furniture relations Cof .
+
+LLM Relation Inference: Modeling object relations in advance is infeasible in large environments with many unknown objects, and training relation models requires extensive data to generalize across diverse scenes. We instead leverage LLMs, which possess commonsense knowledge that naturally serves as semantic priors for search. To fully exploit LLM reasoning, we encode semantic attributes Aobj = location, category, usage for each object. For example, location : a cup is typically near food and drinks on a table; usage : a cup is used for holding drinks during leisure activities. The relation models are computed via structured prompts: 
+
+Coo , C of ← LLM (F ur, O obj , O tar ). (1) To capture environment-specific preferences (e.g., a user who always places their coffee cup on the study table), we additionally maintain a memory map Mm that allows the LLM to accumulate domain-specific knowledge online. LLM prompt design is shown in Figure 2. 
+
+Histogram Belief Representation: We represent the high-level belief as a histogram over discretized furniture-level locations, enabling exact Bayesian inference. The planner maintains two complementary beliefs: a primary belief b, updated from POMDP observations, and a refined belief b′, obtained by conditioning b
+
+Algorithm 1 Interleaved POMDP Planning 
+
+Require: initial state s0, target object tar , initial observation z0,action set A, occupancy grid map M ot , semantic map M st ,topological map M pt = ⟨N , E, W⟩ .
+
+Ensure: high-level subtask ahigh , low-level action alow , updated maps M ot+1 , M st+1 , M pt+1 . 
+
+> 1:
+
+while tar not reached do  
+
+> 2:
+
+// High-Level POUCT Planning  
+
+> 3:
+
+Update semantic map M st using object-furniture spatial relations.  
+
+> 4:
+
+ahigh ← Select semantic subtask via POUCT based on M st
+
+and belief.  
+
+> 5:
+
+// Low-Level Motion Planning  
+
+> 6:
+
+Sample obstacle states sobs t into particle belief representa-tions.  
+
+> 7:
+
+Update topological nodes N and edges E based on sobs t and 
+
+M ot . 
+
+> 8:
+
+Compute navigation costs c via A* path planning on M ot 
+
+> 9:
+
+Update edge weights W in M pt using computed costs c. 
+
+> 10:
+
+// Interleaved Planning  
+
+> 11:
+
+Propagate low-level navigation costs c back to High-level POUCT as domain knowledge.  
+
+> 12:
+
+alow ← Execute motion primitive to satisfy ahigh given updated costs.  
+
+> 13:
+
+// Bi-level Belief Update  
+
+> 14:
+
+Update bt+1 ← bt based on robot state srt and environmental observation zt. 
+
+> 15:
+
+High-level POUCT updates M st+1 ← M st and Low-level planner updates M ot+1 ← M ot and M pt+1 ← M pt , 
+
+> 16:
+
+end while 
+
+on the semantic relations Coo and Cof . As the robot explores and discovers landmark objects, these relations help narrow the search region - if a landmark frequently co-occurs with a target, finding it significantly constrains the target’s likely location. Given the current semantic map M st , beliefs, and relation models, the high-level POUCT selects a subtask: 
+
+subtask ← POUCT (M st , b ′, C oo , C of ). (2) 
+
+B. Low-Level Motion Planner for Uncertainty-aware Navigation 
+
+While the high-level planner determines where to search, the low-level planner determines how to get there safely. It reasons over fine-grained geometric uncertainties arising from unknown obstacles using particle-based beliefs. 
+
+Particle Belief Representation: Given a high-level subtask (Navigate or Sense ), the low-level POMCP planner maintains a particle belief over obstacle states sobs k , updated via the transition model st+1 = T l(st, a t) and observation model p(zt | st+1 ).Each particle represents a hypothesis about the local obstacle configuration, enabling the planner to reason about collision risks along candidate trajectories. 
+
+Topological Map Construction: The planner maintains a topo-logical map M pt = ⟨N , E, W⟩ for grounded navigation. Nodes 
+
+N are reachable positions sampled from current beliefs over targets bt(star i 
+
+> t
+
+) and obstacles bt(sobs k 
+
+> t
+
+). Edges E ensure graph connectivity, and weights W encode navigation costs influenced by discovered and hypothesized obstacles. As the robot explores, new observations update the particle belief and consequently refine M pt ,yielding increasingly accurate navigation cost estimates. Fig. 1: Interleaved POMDP planning for large unknown environments. The high-level POUCT planner issues LLM-guided semantic subtasks to the low-level motion planner, which resolves local obstacles and feeds navigation costs back as domain knowledge. Both planners continuously update their semantic and topological maps from online observations. 
+
+Fig. 2: LLM prompt design of generalized object localization for the high-level POUCT planner based on the explored objects and the pre-known furniture. 
+
+Navigation Cost as Domain Knowledge: Since the local geome-try is initially unknown and the trajectory space is vast, the low-level planner cannot guarantee optimal paths from the outset. However, as it accumulates planning experience—successful traversals, observed obstacles, and collision events—it produces increasingly reliable navigation cost estimates. These costs constitute valuable domain knowledge that, if communicated to the high-level planner, can significantly improve global planning quality. This observation motivates the interleaved design described next. 
+
+C. Interleaved POMDP Planning with Domain Knowledge 
+
+Given the above hierarchy, a key question remains: how should the two planners interact so that the overall policy optimally hedges against both semantic uncertainty in object locations and geometric uncertainty in navigation? Most hierarchical POMDP approaches operate sequentially [10] or without interaction [5], [13] - the high-level planner issues subtasks without knowledge of their execution cost, and the low-level planner executes them without influencing future high-level decisions. This separation can lead to suboptimal plans: the high-level planner may repeatedly select subtasks that are semantically promising but geometrically costly (e.g., navigating through heavily obstructed areas), without any mechanism to learn from these experiences. Our key innovation is an interleaved mechanism where low-level navigation costs are propagated upward as domain knowledge to bias high-level action selection, enabling the two planners to iteratively co-refine the global plan. 
+
+Domain Knowledge Augmented UCT: POUCT planners treat action selection at each tree node as a multi-armed bandit problem, using UCT [25] to balance exploration and exploitation: 
+
+Q⊕(s, a ) = Q(s, a ) + c
+
+s
+
+log N (s)
+
+N (s, a ) , (3) where Q(s, a ) is the estimated action value, N (s, a ) the visit count, and c the exploration constant. In standard MCTS, Q(s, a )
+
+is initialized to zero, providing no guidance early in the search. We instead initialize it using domain knowledge from the low-level planner: 
+
+Q(s, a ) ← Qinit (s, a ), (4) where Qinit (s, a ) encodes accumulated navigation costs from low-level geometric reasoning. This initialization biases the tree search toward states that are both semantically promising and geometri-cally feasible, without altering the asymptotic convergence guar-antees of MCTS. Similarly, the rollout policy incorporates this domain knowledge to select informed actions rather than sampling uniformly at random, further accelerating convergence to high-quality plans. V. E XPERIMENTS 
+
+We evaluate our Inter-POMDP and compare with two baselines CSG-TL [8] and COSPOMDP [5] on multi-object search in un-known multi-room environments with narrow paths and unknown obstacles. 
+
+A. Experimental Setup 
+
+Simulation: We use ProcTHOR [26] of 8-12 rooms with numer-ous objects/furnitures and a mobile robot with an onboard camera. 
+
+Real-World: We deploy on a RealMan RMC-DA 7DOF dual-arm mobile robot with STM32 chassis and Nvidia Jetson AGX Orin compute platform in an 8.71 m × 7.22 m room and YOLO11 [27] for object detection. 
+
+Baselines: We compare against methods CSG-TL [8] and COSPOMDP [5]. We aim to demonstrate that our interleaved design can enable bi-directional information flow between planning levels for globally informed plans. 
+
+Metrics: We evaluate three grounded metrics: collision counts ,
+
+navigation steps , and detection counts . Results are reported as mean 
+
+± standard deviation across 5 trials per mission. 
+
+Configurations: We use GPT-4o [28] for LLM relation inference. We use GATv2Conv [29] backbone for relation model training with hyperparameters as 300 epochs, 16 batch size, 1 × 10 −4 learning rate, Adam optimizer, and binary cross-entropy loss function and with training dataset as 1500 ProcTHOR object/furniture relations. 
+
+B. Simulation Experiments 
+
+We evaluate all methods across 15 trials in three large ProcTHOR scenes train 1, train 8, and train 13, where each trial requires the robot to find 3 target objects across 8-12 rooms. Quantitative results are shown in Table I, aggregated performance is shown in Figure 3, and qualitative comparisons with aligned timestamps are shown in Figure 4. An obvious trend is that Inter-POMDP’s performance achieves progressively the strongest results across all scenes: zero collisions, fewest navigation steps and camera detection. This validates our interleaved design - propagating low-level domain knowledge back to the high-level for near-optimal planning by the end. 
+
+C. Analysis 
+
+We perform detailed analysis between our Inter-POMDP and CSG-TL [8] and COSPOMDP [5] based on quantitative metrics. 
+
+Navigation Efficiency: For the first object, all methods require comparable steps as the environment is largely unexplored. The gap widens significantly for later objects: in train 1, Inter-POMDP finds the third object in 12 ± 1 steps versus 34 ± 3 (CSG-TL) and 
+
+26 ± 2 (COSPOMDP); in train 13, the contrast is more obvious at 
+
+14 ± 1 versus 80 ± 2 and 166 ± 5, a reduction of over 90% and 80%, respectively. As shown in Figure 3, Inter-POMDP achieves the lowest aggregated navigation steps across all scenes. The baselines’ inefficiency stems from distinct limitations: CSG-TL assumes off-the-shelf navigation and relies on room-level abstraction, missing fine-grained spatial nuances in geometrically complex scenes such as narrow aisles; COSPOMDP’s naive correlation model lacks gen-eralizability - occasionally degrading search efficiency as evidenced by its high step count in train 13 - and its histogram beliefs at both levels without low-level feedback lack fidelity for fine-grained trajectory planning. In contrast, Inter-POMDP’s interleaved mechanism effectively translates accumulated low-level navigation knowledge into more informed high-level subtask selection, yield-ing robust and efficient planning across diverse environments. 
+
+Collision Avoidance via Particle Beliefs: Inter-POMDP con-sistently achieves fewer or equal collisions, reaching zero for the second and third objects across all scenes with a clear decreasing pattern ( 1 → 0 → 0), while both baselines exhibit higher counts without systematic reduction. This improvement stems from our use of particle-based beliefs with reinvigoration at the low level rather than use histogram representations at all levels, particle beliefs capture geometric nuances critical for obstacle-aware navi-gation. Combined with interleaved feedback, this enables the robot to incrementally build accurate geometric understanding, directly contributing to the consistent collision reduction across all scenes. 
+
+Sensing Economy: Inter-POMDP consistently requires fewer detection activations. By the third object, it requires only a single detection across all scenes, compared to 2 (CSG-TL) and 1-4 (COSPOMDP). As shown in Figure 4, the aligned timestamps reveal that Inter-POMDP directs the robot to more precisely targeted locations, reducing exploratory sensing - an important advantage for real-world deployment where each detection incurs computational and time costs. 
+
+Cross-Scene Generalizability: These trends hold consistently across three ProcTHOR scenes. Inter-POMDP leverages LLMs for semantic reasoning and maintain stable performance across scenes, whereas CSG-TL and COSPOMDP learned correlation model ex-hibit high variance (e.g., 108 vs. 359 navigation steps for object 1 across train 1 and train 8). Additionally, model-based semantics alone are insufficient: CSG-TL’s lack of geometric feedback still leads to suboptimal navigation. The combination of model-based semantic priors with interleaved geometric feedback, as in Inter-POMDP, generalizes most reliably across diverse environments without scene-specific tuning. 
+
+D. Real-world Experiments 
+
+We deploy Inter-POMDP on a real mobile manipulator tasked with finding a cup, apple, and fork to prepare breakfast in an unknown multi-room environment. As shown in Figure 5, the robot maintains a dual-layer mapping process: the high-level POUCT planner updates the semantic map M st using object-furniture rela-tions to narrow the search space, while the low-level motion planner updates the topological map M pt from LiDAR observations to refine navigation paths. Upon each camera observation zt, both histogram and particle beliefs are updated simultaneously, enabling the low-level planner to propagate navigation costs back to the high-level planner for pruning redundant search branches. VI. C ONCLUSION 
+
+We present Inter-POMDP, a novel interleaved POMDP planning algorithm for multi-object search in unknown multi-room envi-ronments. By coupling a high-level semantic planner (histogram beliefs with LLM priors) with a low-level motion planner (particle-based beliefs), our framework captures both semantic and geometric uncertainties through principled interaction between the two levels. Both simulation and real-world experiments demonstrate that Inter-POMDP reduces collision counts by up to 63%, navigation steps by up to 35%, and detection counts by up to 32% compared with baselines. Future works could be: 1) extending to 3D en-vironments for more realistic household scenarios [6], [9]; 2) incorporating object manipulation in cluttered tabletop workspaces, where geometric uncertainties increase by orders of magnitude; 3) modeling continuous actions via POMCPOW [30] for finer navigation, with learned samplers such as conditional VAEs [31] to maintain planning efficiency. TABLE I: Comprehensive metric results of algorithm comparison between CSG-TL [8], COSPOMDP [5], and Inter-POMDP (ours). Totally we conduct 15 trials in 3 large ProcTHOR scenes where each one requires the robot to search 3 objects in mutilple rooms. Full videos are https://sites.google.com/view/inter-pomdp 
+
+Metrics Algorithms 15 Trials in 3 Large ProcTHOR Scenes scene 1 scene 8 scene 13 object 1 object 2 object 3 object 1 object 2 object 3 object 1 object 2 object 3 
+
+Collision Counts CSG-TL [8] 2 ± 0.1 1 ± 0.2 0 ± 0.1 1 ± 0.1 0 ± 0.1 0 ± 0.2 2 ± 0.2 1 ± 0.1 0 ± 0.1
+
+COSPOMDP [5] 2 ± 0.1 1 ± 0.1 0 ± 0.2 0 ± 0.1 0 ± 0.2 1 ± 0.1 2 ± 0.1 1 ± 0.1 1 ± 0.1
+
+Inter-POMDP (ours) 1 ± 0.1 0 ± 0.1 0 ± 0.1 1 ± 0.1 0 ± 0.1 0 ± 0.1 1 ± 0.1 0 ± 0.1 0 ± 0.1
+
+Navigation Steps CSG-TL [8] 313 ± 3 34 ± 2 34 ± 3 223 ± 4 31 ± 3 43 ± 3 69 ± 4 35 ± 1 80 ± 2
+
+COSPOMDP [5] 108 ± 3 27 ± 2 26 ± 2 359 ± 5 31 ± 3 24 ± 3 67 ± 5 34 ± 2 166 ± 5
+
+Inter-POMDP (ours) 101 ± 3 34 ± 2 12 ± 1 229 ± 3 31 ± 2 24 ± 2 77 ± 3 42 ± 2 14 ± 1
+
+Detection Counts CSG-TL [8] 4 ± 0.2 2 ± 0.2 2 ± 0.2 2 ± 0.2 1 ± 0.1 2 ± 0.1 2 ± 0.2 1 ± 0.1 2 ± 0.1
+
+COSPOMDP [5] 3 ± 0.3 2 ± 0.1 2 ± 0.2 4 ± 0.1 2 ± 0.1 1 ± 0.1 2 ± 0.1 2 ± 0.2 4 ± 0.3
+
+Inter-POMDP (ours) 3 ± 0.2 2 ± 0.1 1 ± 0.1 2 ± 0.2 1 ± 0.2 1 ± 0.2 2 ± 0.1 2 ± 0.2 1 ± 0.1
+
+Fig. 3: Aggregated performance comparison across unknown multi-room ProcTHOR scenes train 1, train 8, and train 13 between CSG-TL [8], COSPOMDP [5], and Inter-POMDP (ours) in terms of collision counts, navigation steps, and detection counts. REFERENCES 
+
+[1] L. P. Kaelbling, M. L. Littman, and A. R. Cassandra, “Planning and acting in partially observable stochastic domains,” Artificial intelli-gence , vol. 101, no. 1-2, pp. 99–134, 1998. [2] O. Madani, S. Hanks, and A. Condon, “On the undecidability of probabilistic planning and infinite-horizon partially observable markov decision problems,” Aaai/iaai , vol. 10, no. 315149.315395, 1999. [3] J. Pineau, G. Gordon, and S. Thrun, “Anytime point-based approxi-mations for large pomdps,” Journal of Artificial Intelligence Research ,vol. 27, pp. 335–380, 2006. [4] X. Chang, P. Ren et al. , “A comprehensive survey of scene graphs: Generation and application,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 45, no. 1, pp. 1–26, 2021. [5] K. Zheng, R. Chitnis et al. , “Towards optimal correlational object search,” in International Conference on Robotics and Automation .IEEE, 2022, pp. 7313–7319. [6] K. Zheng, A. Paul, and S. Tellex, “A system for generalized 3d multi-object search,” in IEEE International Conference on Robotics and Automation , 2023, pp. 1638–1644. [7] A. Wandzel, Y. Oh et al. , “Multi-object search using object-oriented pomdps,” in International Conference on Robotics and Automation .IEEE, 2019, pp. 7194–7200. [8] W. Ge, C. Tang, and H. Zhang, “Commonsense scene graph-based target localization for object search,” in IEEE/RSJ International Con-ference on Intelligent Robots and Systems , 2024, pp. 13 318–13 325. [9] K. Zheng, Y. Sung et al. , “Multi-resolution pomdp planning for multi-object search in 3d,” in IEEE/RSJ International Conference on Intelligent Robots and Systems , 2021, pp. 2022–2029. [10] F. Giuliari, A. Castellini et al. , “Pomp++: Pomcp-based active visual search in unknown indoor environments,” in IEEE/RSJ International Conference on Intelligent Robots and Systems , 2021, pp. 1523–1530. [11] I. Remy, A. Gupta, and K. Leung, “Semantically-driven object search using partially observed 3d scene graphs,” in NeurIPS 2023 Foundation Models for Decision Making Workshop , 2023. [12] R. Fu, J. Liu et al. , “Scene-llm: Extending language model for 3d visual understanding and reasoning,” arXiv preprint arXiv:2403.11401 ,2024. [13] L. Holzherr, J. F¨ orster et al. , “Efficient multi-scale pomdps for robotic object search and delivery,” in International Conference on Robotics and Automation . IEEE, 2021, pp. 6585–6591. [14] D. Silver and J. Veness, “Monte-carlo planning in large pomdps,” 
+
+Advances in neural information processing systems , vol. 23, 2010. [15] A. Somani, N. Ye, D. Hsu, and W. S. Lee, “Despot: Online pomdp planning with regularization,” Advances in neural information process-ing systems , vol. 26, 2013. [16] M. Hou, Y. Li et al. , “An interleaved algorithm for integration of robotic task and motion planning,” in American Control Conference .IEEE, 2023, pp. 539–544. [17] S. Wani, S. Patel et al. , “Multion: Benchmarking semantic map mem-ory using multi-object navigation,” Advances in Neural Information Processing Systems , vol. 33, pp. 9700–9712, 2020. [18] Z. Ravichandran, L. Peng et al. , “Hierarchical representations and explicit memory: Learning effective navigation policies on 3d scene graphs using graph neural networks,” in International Conference on Robotics and Automation . IEEE, 2022, pp. 9272–9279. [19] P. Chen, D. Ji et al. , “Learning active camera for multi-object navi-gation,” Advances in Neural Information Processing Systems , vol. 35, (a) CSG-TL [8] combines LLMs with scene graphs for target localization but assumes off-the-shelf navigation and ground-truth room-level hierarchy. As a result, it incurs more obstacle collisions and requires more navigation steps when facing narrow aisles and cluttered spaces. 
+
+(b) COSPOMDP [5] is limited by a naive correlation model that lacks generalizability for multi-room, multi-object settings, and histogram beliefs without low-level navigation feedback that lack fidelity for fine-grained planning. 
+
+(c) Our Inter-POMDP algorithm finds all three target objects more quickly while colliding fewer obstacles and requiring fewer camera activations. 
+
+Fig. 4: Qualitative comparison in ProcTHOR train 1 scene with aligned timestamps. Full videos are https://sites.google.com/ view/inter-pomdp (a) Top-down view of the planning interface. The red trajectory shows the robot’s path, while the side window displays real-time semantic object detection results (e.g., apple, cup, fork) in the current camera frame. 
+
+(b) Third-person perspective of the robot traversing the multi-room environment to locate breakfast items. The sequence highlights the robot’s navigation between topological nodes (e.g., dining table, sofa) as directed by Inter-POMDP. 
+
+Fig. 5: Real-world experiments of searching apple/cup/fork in an unknown multi-room environment to prepare breakfast. Driven by our Inter-POMDP algorithm, the robot efficiently found three targets. Full videos are https://sites.google.com/view/ inter-pomdp 
+
+pp. 28 670–28 682, 2022. [20] A. Sadek, G. Bono et al. , “Multi-object navigation in real environments using hybrid policies,” in IEEE International Conference on Robotics and Automation , 2023, pp. 4085–4091. [21] S. Y. Gadre, M. Wortsman et al. , “Cows on pasture: Baselines and benchmarks for language-driven zero-shot object navigation,” in 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2023, pp. 23 171–23 181. [22] Y. Chen and H. Kurniawati, “Pomdp planning for object search in partially unknown environment,” Advances in Neural Information Processing Systems , vol. 36, 2024. [23] S. Amiri, K. Chandan, and S. Zhang, “Reasoning with scene graphs for robot planning under partial observability,” IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 5560–5567, 2022. [24] A. Jamgochian, H. Buurmeijer et al. , “Constrained hierarchical monte carlo belief-state planning,” in IEEE International Conference on Robotics and Automation , 2024, pp. 2368–2374. [25] P. Auer, N. Cesa-Bianchi, and P. Fischer, “Finite-time analysis of the multiarmed bandit problem,” Machine learning , vol. 47, pp. 235–256, 2002. [26] M. Deitke, E. VanderBilt et al. , “ProcTHOR: Large-Scale Embodied AI Using Procedural Generation,” in NeurIPS , 2022. [27] R. Khanam and M. Hussain, “Yolov11: An overview of the key architectural enhancements,” arXiv preprint arXiv:2410.17725 , 2024. [28] A. Hurst, A. Lerer et al. , “Gpt-4o system card,” arXiv preprint arXiv:2410.21276 , 2024. [29] S. Brody, U. Alon, and E. Yahav, “How attentive are graph attention networks?” arXiv preprint arXiv:2105.14491 , 2021. [30] Z. Sunberg and M. Kochenderfer, “Online algorithms for pomdps with continuous state, action, and observation spaces,” in Proceedings of the International Conference on Automated Planning and Scheduling ,vol. 28, 2018, pp. 259–263. [31] K. Sohn, H. Lee, and X. Yan, “Learning structured output represen-tation using deep conditional generative models,” Advances in neural information processing systems , vol. 28, 2015.

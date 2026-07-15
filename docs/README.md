@@ -6,63 +6,55 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-14
-- 运行时间：2026-07-14 20:48:15 UTC
+- 最新运行日期：2026-07-15
+- 运行时间：2026-07-15 21:33:12 UTC
 - 运行状态：成功
-- 本次总论文数：13
-- 精读区：6
+- 本次总论文数：11
+- 精读区：4
 - 速读区：7
 
 ### 今日简报（AI）
-今日聚焦13篇论文，精读6篇、速读7篇，重点突破多智能体无通信探索与长时域路径规划。
-
-两篇9.0分精读值得关注：Dec-MARVEL实现预算约束下的去中心化无通信探索；Diffusion-based方法解决人类共享环境的长时段多机器人路径规划。
-
-建议优先精读上述两篇，速读中PIER-Flow的实时导航和分布式具身智能容错协作也值得跟进。
-- 详情：[/202607/14/README](/202607/14/README)
+今日聚焦多机器人编队导航与运动规划，两篇高分论文分别采用智能体LLM和扩散最优控制方法。  
+最值得关注的是《EFLUX》弹性编队自适应控制和《Model-Based Diffusion》最优运动规划，均获9.0分。  
+建议普通读者优先精读这两篇，关注LLM在多机器人协同中的实际应用与扩散模型在运动规划中的潜力。
+- 详情：[/202607/15/README](/202607/15/README)
 
 ### 精读区论文标签
-1. [Dec-MARVEL: Decentralized Multi-Agent Exploration without Communication under Budget Constraints](/202607/14/2607.09060v2-dec-marvel-decentralized-multi-agent-exploration-without-communication-under-budget-constraints)  
+1. [EFLUX: Elastic Multi-Robot Formation Navigation and Adaptation with Agentic LLMs](/202607/15/2607.12050v1-eflux-elastic-multi-robot-formation-navigation-and-adaptation-with-agentic-llms)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：无通信的分散式多智能体探索框架，用于机器人协调
-2. [Diffusion for Long-Horizon Multi-Robot Path Planning in Human-Shared Environments](/202607/14/2607.09911v1-diffusion-for-long-horizon-multi-robot-path-planning-in-human-shared-environments)  
+   evidence：弹性多机器人编队导航与自适应，结合LLM
+2. [Model-Based Diffusion Optimal Control for Multi-Robot Motion Planning](/202607/15/2607.12423v1-model-based-diffusion-optimal-control-for-multi-robot-motion-planning)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：多机器人路径规划与人机共享环境
-3. [Coverage Path Planning: Classical Foundations, Recent Advances, and Future Directions](/202607/14/2607.10649v1-coverage-path-planning-classical-foundations-recent-advances-and-future-directions)  
+   evidence：基于扩散模型的多机器人运动规划方法
+3. [Infra-Swarm: Robust Vision-Based Multi-Robot Swarming via Near-Infrared Spectral Vision](/202607/15/2607.12489v1-infra-swarm-robust-vision-based-multi-robot-swarming-via-near-infrared-spectral-vision)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：覆盖路径规划综述，涵盖多机器人系统
-4. [A Glimpse into Long-term Physical Coexistence with Intelligent Robots](/202607/14/2607.11377v1-a-glimpse-into-long-term-physical-coexistence-with-intelligent-robots)  
+   evidence：基于近红外视觉的多机器人集群协调
+4. [Globalized Constrained Stein Variational Inference for Diverse Feasible Robot Motion Planning](/202607/15/2607.12732v1-globalized-constrained-stein-variational-inference-for-diverse-feasible-robot-motion-planning)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：多机器人代理PHILIA实现跨实体协调
-5. [SEAMLiS: Visibility-Aware Safety for Perception-Limited Multi-Robot Exploration](/202607/14/2607.09959v1-seamlis-visibility-aware-safety-for-perception-limited-multi-robot-exploration)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：去中心化多机器人探索的安全框架
-6. [From Non-Rigid to Rigid: Safe Acquisition of Rigid Communication Graphs under Limited Sensing](/202607/14/2607.10170v1-from-non-rigid-to-rigid-safe-acquisition-of-rigid-communication-graphs-under-limited-sensing)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：面向多机器人编队控制的刚性通信图获取
+   evidence：使用斯坦变分推断生成多样可行运动计划，类似于质量多样性优化
 
 ### 速读区论文标签
-1. [PIER-Flow: Physics-Informed Efficient Rectified Flow for Real-Time Mobile Robot Navigation](/202607/14/2607.10288v1-pier-flow-physics-informed-efficient-rectified-flow-for-real-time-mobile-robot-navigation)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：仓储实时移动机器人导航
-2. [Distributed Agent System: Fault-Tolerant Collaboration Among Embodied Agents](/202607/14/2607.10811v1-distributed-agent-system-fault-tolerant-collaboration-among-embodied-agents)  
+1. [Implicit-Behavior Coordination from Unlabeled Sub-Task Demonstrations for Rearrangement Tasks](/202607/15/2607.09234v1-implicit-behavior-coordination-from-unlabeled-sub-task-demonstrations-for-rearrangement-tasks)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：面向具身代理容错协作的分布式代理系统
-3. [Multi-Agent LLMs Fail to Explore Each Other](/202607/14/2607.11250v1-multi-agent-llms-fail-to-explore-each-other)  
+   evidence：隐式行为协调用于重排任务，多机器人协调
+2. [GAE: Graph-Augmented Evolution for Scientific Discovery via Reinforcement Optimization](/202607/15/2607.10127v1-gae-graph-augmented-evolution-for-scientific-discovery-via-reinforcement-optimization)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：针对大语言模型智能体的多智能体探索框架，促进协调
-4. [Graph Sparse Sampling: Breaking the Curse of the Horizon in Continuous MDP Planning](/202607/14/2607.05359v1-graph-sparse-sampling-breaking-the-curse-of-the-horizon-in-continuous-mdp-planning)  
+   evidence：进化优化与强化学习结合
+3. [Interleaved POMDP Planning for Multi-Object Search in Unknown Multi-Room Household Environments](/202607/15/2607.10437v1-interleaved-pomdp-planning-for-multi-object-search-in-unknown-multi-room-household-environments)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：多目标搜索规划与POMDP
+4. [RoboTALES: Learning Reasoning-Guided Robot Policies via Task-Aligned Simulated Futures](/202607/15/2607.06018v1-robotales-learning-reasoning-guided-robot-policies-via-task-aligned-simulated-futures)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：连续MDP在线规划算法，可应用于多智能体路径规划
-5. [Task Planning for Mobile Manipulation in Retail Stores using Foundation Models with Iterative Re-planning](/202607/14/2607.09962v1-task-planning-for-mobile-manipulation-in-retail-stores-using-foundation-models-with-iterative-re-planning)  
+   evidence：模拟未来用于机器人策略学习
+5. [WAM-TTT: Steering World-Action Models by Watching Human Play at Test Time](/202607/15/2607.06988v2-wam-ttt-steering-world-action-models-by-watching-human-play-at-test-time)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：零售仓储自动化
-6. [Robotic Contextual Awareness for Human-Robot Collaboration and Environmental Understanding](/202607/14/2607.10372v1-robotic-contextual-awareness-for-human-robot-collaboration-and-environmental-understanding)  
+   evidence：世界-动作模型的世界模型适应
+6. [APIVOT: Adaptive Planning with Interleaved Vision-Language Thoughts](/202607/15/2607.08024v1-apivot-adaptive-planning-with-interleaved-vision-language-thoughts)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：用于环境理解的机器人情境感知
-7. [Towards Predictive, Aligned, and Scalable Robot Learning](/202607/14/2607.11270v1-towards-predictive-aligned-and-scalable-robot-learning)  
+   evidence：基于VLM的长时域规划器包含几何验证
+7. [LEEVLA: Seeing What Matters in Latent Environment Evolution for Vision-Language-Action](/202607/15/2607.08182v1-leevla-seeing-what-matters-in-latent-environment-evolution-for-vision-language-action)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：用于机器人学习的潜世界-行动模型，可应用于多机器人世界模型
+   evidence：视觉-语言-动作模型中潜在环境演化的世界表示
 
 
 <div class="dpr-home-promo-card">
