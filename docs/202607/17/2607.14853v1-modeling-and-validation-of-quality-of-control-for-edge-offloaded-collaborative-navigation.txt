@@ -1,0 +1,437 @@
+Title: Modeling and Validation of Quality of Control for Edge-Offloaded Collaborative Navigation
+
+URL Source: https://arxiv.org/pdf/2607.14853v1
+
+Published Time: Fri, 17 Jul 2026 01:34:52 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Modeling and Validation of Quality of Control for Edge-Offloaded Collaborative Navigation 
+
+Neelabhro Roy †, Mikael Hammarling †, Victor Nan Fernandez-Ayala †, Gourav Prateek Sharma ∗,Mani H. Dhullipalla †, Dimos V. Dimarogonas † and James Gross ††KTH Royal Institute of Technology, Stockholm, Sweden 
+
+∗National Institute of Technology, Kurukshetra, India Email: {nroy, mhammarl, vnfa, manihd, dimos, jamesgr}@kth.se, gourav.sharma@nitkkr.ac.in 
+
+Abstract—Collaborative control in complex environments is severely challenged by stochastic wireless delay and re-liability variations, which can degrade navigation, tracking, and collision avoidance. These network-induced uncertainties complicate the maintenance of energy efficiency during collab-orative tasks, and can potentially lead to over-provisioning of resources. In this paper, for a navigation setup with dynamic collision avoidance, we address this challenge by expanding the quality of control (QoC) framework from prior works to practical robotic models. Our approach (i) models end-to-end network effects on closed-loop performance, (ii) systematically explores the impact of various control parameters dictating robotic motion on network latency-reliability (iii) validates these models through experiments on a private 5G testbed across varying delay, reliability and control configurations. Our analysis indicates the optimal control-communication co-design operating regimes for practical robots and also compares the QoC performance of standard ROS 2 quality of service (QoS) policies under real-world conditions and showing how RELI-ABLE QoS offers 51.5% better QoC than BEST-EFFORT under certain experimental settings. Index Terms—Wireless collaborative robotics (WCR), 5G, Quality of Control (QoC), safe navigation, MPPI, ROS 2, QoS 
+
+I. Introduction With the emergence of cloud and edge computing promising low latency and ultra reliable wireless com-munications, several works have investigated offloading diverse workloads, ranging from perception to motion planning for industrial automated guided vehicles (AGVs) and collaborative robots to edge/cloud systems [1]–[3]. Such architectures enable advanced capabilities like exter-nal sensing, centralized mapping, and intensive compute offloading, thereby reducing the onboard compute burden while broadening robotic capabilities, important for flexi-ble automation and production [3]–[5]. However, the shift from rigid, wired industrial setups to adaptive wireless solutions introduces significant stochasticity in the form of delay, jitter, and packet loss [3], [6]. These uncertainties directly affect sensing, navigation, and, most critically, the stability of control loops in coordination or collaboration [3], [7]. Effective collaborative task execution remains a chal-lenging problem and often relies on a centralized task planner in an edge server responsible for mapping, path planning, and navigation [8]. A fundamental limitation and design parameter in these deployments is the robotic energy budget, due to battery constraints, which further warrants efficient path planning to prevent energy waste. Moreover, managing energy expenditure is not merely a hardware concern originating from battery issues, but a crucial constraint for wireless collaborative robotics (WCRs) [3] in general. As control offloading to the edge increases, managing communication-induced uncertainty becomes vital for state and energy regulation [3]. While energy-centric studies [9], [10] optimize search-and-rescue efficiency assuming the control loop is less time-sensitive and robust to typical 5G latencies, they overlook how stochastic delay and reliability shape closed-loop coordi-nation. Recent distributed evaluations, such as the robot operating system (ROS 2)-based 5G image-processing stack in [4], highlight the complex factors influencing reaction times but rely on simple safety timeouts to mitigate jitter. Existing literature [4], [11], [12] largely analyzes isolated parameters like sampling rate or latency for individual robots. Consequently, there is still a lack of a comprehensive abstraction that jointly accounts for communication and control parameters to quantify collaborative system performance and energy expenditure. Quality-of-Control (QoC)-based metrics and abstrac-tions have been studied in recent works [3], [6], [7] linking wireless parameters to robotic behaviour. By unifying energy and control expenditure into a single objective, QoC further enables energy gains by optimizing the delay-reliability trade-off as shown in [7]. However, this approach was limited to simulations only, considered simplified consensus dynamics and lacked experimental validation in [3], [7]. Crucially, it overlooked non-holonomic AGV dynamics, where the non-linear coupling of orientation and translation makes tracking more sensitive to network stochasticity than simpler linear, holonomic models [13]. To address these gaps, this work develops a system model tailored for practical robotic motion and validates its effectiveness through both extensive simulations and practical 5G testbed experiments. Our main contributions are summarized as follows: arXiv:2607.14853v1 [cs.RO] 16 Jul 2026 • Non-Holonomic System Modeling: We generalize the frameworks in [3], [7] by incorporating non-holonomic kinematic constraints. Unlike previously considred holonomic systems, which can translate instanta-neously in any direction, our proposed model accounts for motion restricted by the robot’s current heading. This enables the characterization of network stochas-ticity on coupled translational and rotational AGV dynamics, together.  
+
+> •
+
+QoC-Based Analysis: We propose and derive aQoC abstraction for 5G-Edge offloaded navigation featuring dynamic collision avoidance, quantifying the specific impact of various control parameters and network-induced impairments on system perfor-mance, towards co-design.  
+
+> •
+
+Experimental Validation: We validate our simulation framework using a private 5G testbed [14] and the Nav2 architecture. The experimental results confirm the framework’s utility, further demonstrating that ROS 2 RELIABLE QoS yields a 51.5% higher QoC compared to BEST-EFFORT under real-world set-tings. II. System Model In this work, we model a WCR system, illustrated in Fig. 1, which comprises robots collaborating over a shared 5G wireless network. This section discusses key system aspects, including the robot dynamics and navigation, aspects of the 5G network forming the underlying com-munication channel, and finally, the problem statement. A. Overview and Probem Statement Offloading control to the 5G edge enables advanced collaboration but introduces stochastic uncertainties that can compromise stability and system performance. Exist-ing frameworks often overlook the non-linear coupling of orientation and translation in practical AGVs, leaving a gap between theoretical models and real-world navigation. This paper addresses this by modeling and validating a QoC-based abstraction for non-holonomic motion to identify optimal control-communication regimes for co-design. We consider N AGVs (TurtleBot 3 1) performing navigation with dynamic collision avoidance via an edge-based controller. Because the robots collaborate exclu-sively through this centralized offloading rather than peer-to-peer links, our framework explicitly models the stochastic delay and reliability of the periodic, end-to-end information loop over a private 5G network [14]. B. Robot Dynamics and Control 1) Modeling robot dynamics: We extend the simulation framework discussed in [3], [7] towards modeling of AGV motion observed in practice. We consider planar and 
+
+> 1https://www.turtlebot.com/
+
+Fig. 1: Overview of a WCR setup with control offloaded to a centralized server running Nav2. TUL ,i , TC,i and TDL ,i 
+
+have been defined in Section II-D. 
+
+Fig. 2: Illustration of the costmap utilized by two different robots for Nav2-based navigation. angular motion of robots i ∈ { 1, . . . , N } under an AGV kinematic model [13] with state and commanded inputs: 
+
+xi(t) ≜ [ xi(t) yi(t) θi(t) ] ⊤ ∈ R3, (1) 
+
+ui(t) ≜ [ νi(t) ωi(t) ] ⊤ ∈ R2, (2) where (xi, y i) is the planar position, θi is the heading an-gle, and (νi, ω i) denote the translational and the rotational speeds, respectively. The state evolution [13] is given by: 
+
+˙xi(t) = J(θi(t)) ui(t), J(θ) ≜
+
+
+
+cos θ 0sin θ 00 1
+
+ , (3) i.e., ˙xi = νi cos θi, ˙yi = νi sin θi, and ˙θi = ωi.Let pi(t) ≜ [ xi(t) yi(t) ] ⊤. At discrete sampling instants tp = t0 + pτ , where t0 is the initial time, p is the sampling index, and τ is the fixed sampling period, the edge-based controller (Fig. 1) computes the control command, applied via a zero-order hold (ZOH), such that 
+
+xi(t) evolves as: 
+
+˙xi(t) = J(θi(t)) , ui(tp), t ∈ [tp, t p+1 ), (4) where J(θi) is the Jacobian mapping commanded veloci-ties to the global frame, as shown in Eq.(3). 2) Control commands: In this paper, the objective of the robots in the system is to arrive at their pre-specified destinations by successfully avoiding collisions. To facili-tate this, prior to designing appropriate control commands 
+
+ui(tp) in Eq.(4), we define the following variables: At sampling instants tp, the edge controller computes the desired planar velocity vdes  
+
+> i
+
+(tp) for each robot i moving towards the target coordinate p⋆ ∈ R2 using estimated positions ˆpi(tp):
+
+vdes  
+
+> i
+
+(tp) ≜ −κ(ˆpi(tp) − p⋆) + ∑ 
+
+> j̸=i
+
+vrep  
+
+> ij
+
+(tp), (5) where κ > 0 is the goal gain capturing the strength of the closed-loop response, also absorbing unmodeled nonlinearities 2, and vrep  
+
+> ij
+
+is a repulsive collision-avoidance term, tackling potential collisions between robots i and j.Note that Eq.(5) is inspired from robot control for obstacle avoidance using artificial potential fields (APFs) [15]. Let 
+
+dij (tp) ≜ ∥ˆpi(tp) − ˆpj (tp)∥2 be the estimated inter-robot distance and let deff safe be the effective safety radius that expands with information staleness: 
+
+deff safe (tp) ≜ dsafe + cmiss max 
+
+(
+
+0, max( ai(tp), a j (tp)) − ∆
+
+)
+
+,
+
+(6) where dsafe > 0 is the nominal safety distance, cmiss ≥
+
+0 is a penalty coefficient, and ∆ is the loop completion deadline. The age variable ai(t) captures the time since the last successful control update (Eq.(16)). This keeps robots from violating a minimum distance [15], and becomes more conservative under packet drops via Eq.(6). For a repulsion gain η > 0:
+
+vrep  
+
+> ij
+
+(tp) ≜
+
+
+
+η
+
+( 1 
+
+> dij
+
+− 1
+
+> deff safe
+
+) ˆpi(tp)−ˆpj (tp)
+
+> d3
+> ij
+
+, dij < d eff safe ,
+
+0, otherwise. (7) To accommodate AGV kinematics, vdes  
+
+> i
+
+is mapped to translational and rotational speeds (vi, ω i). The desired heading angle θdes  
+
+> i
+
+(tp) and the orientation error eθ,i (tp)
+
+relative to the estimated heading ˆθi(tp) are given by: 
+
+θdes  
+
+> i
+
+(tp) ≜ atan2 (vdes  
+
+> y,i
+
+(tp), v des  
+
+> x,i
+
+(tp)) (8) 
+
+eθ,i (tp) ≜ wrap (θdes  
+
+> i
+
+(tp) − ˆθi(tp)) ∈ [−π, π ]. (9) Eq.(8) computes a desired heading angle that points in the direction of the desired planar velocity, while 
+
+> 2Velocity commands are generated by the Nav2 stack (A*/MPPI) running on the edge. In simulation, we can use the analytical feedback law in this section as a surrogate controller to isolate QoC sensitivity to delay/reliability while matching the measured timing and loop-completion statistics.
+
+Eq.(9) compares the desired heading to the currently known heading estimate, and the wrap function ensures the shortest rotation direction. A proportional heading controller with gain γ > 0 converts the desired velocity into translational and rotational commands: 
+
+νi(tp) ≜ ∥vdes  
+
+> i
+
+(tp)∥2 max(cos( eθ,i (tp)) , 0) ,ωi(tp) ≜ γ e θ,i (tp). (10) The applied input ui(tp) = sat ∞(˜ ui(tp), umax ) is finally subject to componentwise velocity saturation with caps 
+
+umax ≜ [vmax , ω max ]⊤ (like [7]) and saturation law: 
+
+sat ∞(u, umax ) ≜
+
+[ max(0 , min( ν, ν max )) max( −ωmax , min( ω, ω max )) 
+
+]
+
+(11) C. Navigation Building on the simulation system model in Section II-B, we adopt the Nav2 and model predictive path integral (MPPI) stack [16] as a more general representative candidate for real experimental validation. While the preceding framework can generalize to various planning and control algorithms, this setup utilizes a hierarchical architecture: an A* global planner [17] for path generation and a rolling-horizon MPPI local controller for tracking. Both components rely on a multi-layer costmap [18] (Fig. 2) with a static layer shown in black for known, time-invariant structures of the environment (e.g., walls and permanent obstacles) derived from a prebuilt map; a light blue dynamic layer for obstacles detected online with a LiDAR; and lastly, an inflation layer in pink that expands obstacle boundaries for extra safety using the robot footprint, localization uncertainty, and network-induced control delays. Formally, the workspace is discretized into a 2D grid, with j denoting the direction in the x-dimension and k in the y-dimension. Each cell jk stores an aggregated cost cjk ∈ R≥0:
+
+cjk = cstat  
+
+> jk
+
++ cobs  
+
+> jk
+
++ cinfl  
+
+> jk
+
+, (12) with the superscripts denoting the static, obstacle, and inflation layer costs, respectively. The global planner treats this grid as a graph, computing paths that minimize cumulative cost. Similarly, MPPI evaluates candidate rollouts over horizon H by accumulating state-dependent costs: 
+
+Jmap = ∑
+
+> t∈H
+
+c(x(t)). (13) This unified representation facilitates the integration of spatial risk and safety margins across both planning and control layers. In contrast to conventional Nav2 archi-tectures, which typically employ distinct local and global costmaps, we adopt a single, shared map representation. While the current study does not exhaustively analyze these costmaps, this consolidated structure provides a formal framework for future research into network-aware navigation. D. Communication model Each control/navigation update described in Section II-B and II-C traverses a 5G network with a stochas-tic loop time Tnet ,i , comprising uplink ( TUL ,i ), compute (TC,i ), and downlink ( TDL ,i ) stages, as described here: 
+
+Tnet ,i ≜ TUL ,i + TC,i + TDL ,i . (14) For a deadline ∆, we define the loop completion proba-bility: 
+
+pnet  
+
+> i
+
+(∆) ≜ P(Tnet ,i ≤ ∆) = Fnet ,i (∆) , (15) where Fnet ,i is obtained from measured/simulated com-pute distributions (described as compute-time model in Table I). If the loop completes in time, the updated control applies to both axes; otherwise, the input stays equal to the previous sample: 
+
+ui(tp) = 
+
+{
+
+unew  
+
+> i
+
+(tp), Tnet ,i ≤ ∆
+
+ui(tp−1), otherwise. (16) This implicitly affects QoC computation discussed in Section II-E. E. Quality of Control To quantify the QoC for the navigation task, we define a nominal, time-varying reference trajectory ¯p(t). This reference trajectory represents the unconstrained optimal path to the destination, computed via Eq.(5) by neglecting obstacles. The control performance is then characterized by the tracking error or disagreement δi(t), representing the state deviation from this nominal trajectory: 
+
+δi(t) ≜ pi(t) − ¯p(t). (17) We define QoC from this disagreement energy. Let W =diag( wx, w y ) ≻ 0 be an optional axis-weighting matrix. Define the cost for robot i over horizon [0 , T ]:
+
+JCi ≜
+
+∫ T
+
+> 0
+
+∥δi(t)∥2 
+
+> W
+
+dt, ∥δi∥2 
+
+> W
+
+= δ⊤ 
+
+> i
+
+W δi. (18) The normalized cost or the area under the disagreement curve (AUC), denoted by JC
+
+> norm ,i
+
+, is defined as: 
+
+JC 
+
+> norm ,i
+
+≜
+
+∫ T
+
+> 0
+
+∥δi(t)∥2
+
+> W
+
+∥δi(0) ∥2
+
+> W
+
+dt. (19) We map this to a bounded QoC, defined by Qi, using: 
+
+Qi ≜ 11 + min( JC
+
+> norm ,max , J C
+> norm ,i )
+> JC
+> med
+
+, Qi ∈ [0 , 1] , (20) where JC 
+
+> norm ,max
+
+is a scenario-dependent reference maxi-mum ensuring convergence across experiments and JC 
+
+> med
+
+is the median AUC value. Since δi(t) depends on the applied saturated control and on missed updates through ZOH, 
+
+Qi captures the effects of saturation umax , delay, and reliability. Please note that this QoC measure is an energy-relevant proxy rather than a direct battery measurement. Larger disagreement, detours, oscillatory corrections, and stale-control recovery typically increase motion and con-trol effort, however, direct validation against battery usage is left for future work. III. QoC Abstraction for AGV motion We begin this section by detailing how a QoC model could be obtained, given a system of N AGVs. The objective is to observe how Eq.(18) can help us quantify system performance with respect to various control and communication parameters together. To realize this, we simulate the offloaded control loop where each robot evolves according to the AGV model ˙xi(t) = J(θi(t)) ui(t)
+
+with ui(t) = [ νi(t) ωi(t)] ⊤ and ZOH updates at tp =
+
+t0 + pτ , with the parameters described in Table I. Please note that N = 2 was simulated to match the experimental setup and the abstraction can readily scale for a higher number of robots [7]. For larger fleets, the aggregate network demand scales with the number of periodic state and control command streams, while the edge compute component may increase due to multi-robot planning, costmap updates, collision checking and queueing effects. Thus, scaling to multiple AGVs would primarily alter the empirical distribution of Tnet ,i in Eq.(15) and the required network resource provisioning, which is precisely the type of shift captured by the QoC abstraction through 
+
+pnet  
+
+> i
+
+(∆) . Fig. 3 shows how AUC ( JC
+
+> norm ,i
+
+) varies versus delay-reliability together for selected parameters η and τ .Here, we can observe that at very low latency-reliability  
+
+> (a) Repulsive Gain. (b) Sampling period.
+
+Fig. 3: AUC variation for selected control parameters levels, AUC and thus the system performance and energy expenditure worsens substantially, across the entire range of simulated values for both the repulsive gain and the sampling period. This is attributed to very high packet drops that did not let the control commands be updated. Once sufficient reliability is achieved, AUC remains largely unchanged with different sampling periods. On the con-trary, we still see worsening AUC as the repulsive gain grows together with high delays. IV. Experimental Validation In this section, we describe how we perform experiments with the system model in Section II and then perform a limited validation of the abstraction in Section III. TABLE I: Simulation parameters                        
+
+> Parameter Value Number of robots N= 2
+> Simulation horizon Tsim = 30 s
+> Sampling period (ZOH) τ= 10 ms
+> Compute-time model TruncNormal (μc, σ c)on [0 ,∞)
+> Compute-time mean/std μc= 0 .20s ,σc= 0 .05s
+> Goal and Repulsion gain κ= 2 ,η= 0 .6
+> Speed caps νmax = 0 .7,ωmax = 1 .4
+
+Fig. 4: Private 5G testbed with TurtleBots and 5G dongles. A. Testbed and Experimental parameters Our experiments use N = 2 TurtleBots (due to spatial, hardware and ROS 2 data distribution service (DDS) scaling constraints [19]) operating on a private 5G testbed in the KTH R1 hall, with edge computation [14]. The navigation stack for these robots runs on the edge system, and all communication occurs over the 5G network, operating on band n78. The TurtleBots were connected to the private 5G network through an external 5G dongle attached to the robot-side compute/network interface as shown in Fig. 4. Fig. 5 denotes how the robots are tasked with a naviga-tion objective with dynamic collision avoidance towards destination coordinate p⋆ ∈ R2. For each run, we log: (i) commanded velocities, (ii) ROS 2 QoS settings, and (iii) timestamps at UL send, edge receive, edge send, and DL receive for all control-relevant messages. To evaluate performance, pi(t) takes the pose estimate for robot 
+
+i ∈ { 1, . . . , N }, from the robot’s adaptive Monte Carlo localisation (AMCL) pose topic. We treat the AMCL pose as the best estimate of robot position in the global frame − − − −    
+
+> 
+> 
+> 
+>   
+> 
+> 
+>  
+>  p⋆
+
+Fig. 5: Adopted trajectory for a representative run of two Turtlebots performing navigation with 5G-Edge Con-trollers. for computing disagreement-based metrics. B. Validation methodology To emulate various delay-reliability combinations to-wards validating the abstraction simulations in Section III, we inject an artificial delay until Dcfg (ms) into the velocity command stream, generated by the edge. This utilizes robot-local timestamping, eliminating the need for clock synchronization between the robot and the edge server:  
+
+> •
+
+At time ts on the robot clock, a source state mes-sage generated on the robot is transmitted into the navigation pipeline (where robot i′s AMCL pose is computed).  
+
+> •
+
+The edge compute-based navigation stack produces a velocity command corresponding to that state.  
+
+> •
+
+A delay node buffers the command totalling a con-figured duration Dcfg and only then publishes the delayed command that is actually applied by the robot base (Eq.(16)). C. Experimental Validation In this subsection we discuss the assumptions made and the simulation settings based on the description in Section II to match the subsequent experimental settings. Let t(k) 
+
+> s,i
+
+be the generation time of the kth source state sample for robot i (robot clock), i.e., the times-tamp embedded in the source message header: t(k) 
+
+> s,i
+
+≜
+
+stamp (xi(t)(k)). Let t(k) 
+
+> a,i
+
+be the time at which the corre-sponding delayed command is applied on the robot: t(k) 
+
+> a,i
+
+≜
+
+record (u(k)
+
+> i
+
+), and we recover t(k) 
+
+> s,i
+
+from the propagated header stamp of the delayed command. The configured delay is then defined as: D(k) 
+
+> cf g
+
+≜ t(k) 
+
+> a,i
+
+− t(k) 
+
+> s,i
+
+. Provided the configured delays, and the simulation settings from Section III, let S(φ) denote the simulated AUC at configured delay 
+
+φ ∈ D and let E(φ) denote the experimentally measured AUC at the same φ. For comparison between these two metrics, we first normalize them using Eq.(21) and repeat the equivalent for E(φ):
+
+S(φ) = 100 · S(φ) − min φ′∈D S(φ′)max φ′∈D S(φ′) − min φ′∈D S(φ′) , (21) 1      
+
+>    φ 
+> 
+> 
+> 
+> 
+> 
+> 1
+>    
+>  φ
+> φ
+
+Fig. 6: Normalized simulation-based and experimental observations on the AUC variation versus delays. Fig. 6 plots how the experimental and the simulated AUC values (as in Eq.(21)) vary across different delay-reliability pairs. Both cases follow similar trends, con-sistent with findings in [3]. This alignment is reinforced further by how the reliability-vs-delay transition happens in both simulation and experiment at similar delays (e.g., reliability improving strongly around 100–200 ms), and the delay dominance region starts at similar delays as well. The observed mismatch between simulation and experiments should be interpreted in light of the different roles of the collision-avoidance mechanism in the two cases. In simulation, the repulsion gain ηrep in Eq.(7) provides a compact surrogate for inter-robot collision avoidance, allowing us to isolate how delay, reliability, and control parameters affect QoC. In the experimental Nav2/MPPI stack, however, collision avoidance is not governed by a single scalar gain, and instead emerges from the interaction of obstacle-layer updates, inflation costs, MPPI rollout costs, and local path-selection effects. Hence, varying ηrep experimentally would require retuning several Nav2/MPPI and costmap parameters rather than changing a single physical parameter. The comparison in Fig. 6 is therefore intended as a trend-level validation of the QoC abstraction, showing that the low-reliability, intermediate-reliability, and delay-dominant regimes are reproduced, while exact AUC matching is limited by the richer environment-dependent behavior of the real navigation stack. V. Evaluations In this section, we first describe how the QoC abstrac-tion simulations reveal the behavior of different parame-ters for AGV motion and indicate the optimal operating regimes across different parameters and then anlayze QoC experimenatlly for ROS-based reliability QoS settings. A. Impact of various parameters on QoC-Simulations In this subsection, we explore how varying different parameters crucial for AGV motion across various delay-reliability regions impacts QoC, via simulations. We further indicate optimal operating regimes towards co-design aimed at maximizing system performance and minimizing energy and state expenditure. For each design parameter Θ ∈ { νmax , η rep , τ, κ, γ, c miss } we perform a one-at-a-time sweep over a fixed grid ΛΘ while keeping all 
+
+Fig. 7: Parameter sweep across delay-reliability regions other parameters at their baseline values. For every pair 
+
+(Θ , ∆) on the delay axis ∆ ∈ [0 , 800] ms, assuming enough network resources or 5G physical resource block (PRBs) are available, we evaluate JC 
+
+> norm
+
+and compute QoC. We compare three policies per sweep: (i) Co-design selects optimal pair (Θ ⋆, ∆⋆) = arg max Θ∈ΛΘ,∆ Q(Θ , ∆) ; (ii) Min-Delay fixes ∆ = ∆ min and tunes Θ only for that regime, 
+
+Θ⋆D = arg max Θ∈ΛΘ Q(Θ , ∆min ); and (iii) MaxRel fixes 
+
+∆ = ∆ max (highest loop completion probability) and tunes 
+
+Θ only for that regime, Θ⋆R = arg max Θ∈ΛΘ Q(Θ , ∆max ).The grouped bar chart in Fig. 7 reports the achieved QoC at the chosen operating point per sweep. It shows MinDelay can be suboptimal because low delay does not guarantee timely/reliable loop completion, leading to stale/missed updates (ZOH) and increased disagree-ment; MaxRel improves delivery probability but incurs large delays, making the closed-loop response sluggish. In contrast, the co-design policy selects intermediate delay-reliability regimes and corresponding parameter values that maximize QoC, consistently, highlighting the need for control–communication co-design rather than optimizing delay or reliability in isolation. 1) Parameter-specific observations: (i) νmax governs how aggressively robots can react to goal and avoidance commands; under MinDelay (low reliability), higher νmax 
+
+amplifies the effect of stale headings and can increase disagreement, whereas co-design prefers moderate delays where updates are reliable enough to safely exploit higher mobility. (ii) ηrep trades cohesion against safety: larger repulsion spreads robots apart and can increase disagree-ment, so the QoC-optimal setting tends to be moderate (or lower), while still preventing close approaches. (iii) 
+
+τ changes both the control update rate and the per-attempt transmission granularity; when reliability is low, frequent updates do not help because many are missed (ZOH dominates), but at reliable operating points an appropriate τ reduces staleness without inducing overly sluggish behavior. (iv) κ sets the strength of goal at-traction; too large κ under stale information can cause overshoot/oscillation (worse QoC), while too small κ
+
+yields slow convergence, so co-design selects κ jointly with an intermediate delay where the loop is both re-sponsive and reliable. (v) γ controls heading correction; aggressive heading gains are sensitive to delayed direction B   B *, "'& &'&.0+, *#&'"  
+
+> 
+> 
+> 
+> 
+> 
+>  *-!*," Q     
+> *-!*," Q(") %, */$%+/.(")
+> 
+> %, */$%+/.  -
+
+Fig. 8: Experimental observations on QoC variation and throughput for different QoS reliability. estimates, so co-design improves QoC by operating in regimes where heading errors are updated reliably and 
+
+γ can be increased without instability. (vi) cmiss inflates safety margins with age-of-information; larger values are beneficial under packet drops (more conservative motion), but become unnecessarily restrictive at high delays where the system is already sluggish, leading to a moderate co-design choice. B. ROS2 QoS-based Reliability Analysis-Experiments A key parameter for practical experiments is the ROS 2 DDS middleware, which provides QoS policies to trade off delivery guarantees and latency [19]. In this evalu-ation, we analyze how QoC varies across different QoS settings, experimentally. We focus on the reliability policy, implemented at the application layer over user datagram protocol (UDP). Within this, BEST-EFFORT minimizes overheads by preceding retransmissions, prioritizing low latency while tolerating packet loss. Conversely, RELI-ABLE ensures delivery through application-layer retrans-missions, resulting in latency characteristics distinct from transmission control protocol (TCP). Fig. 8, plots the QoC score, which is significantly lower under BEST-EFFORT QoS, as robots frequently miss timely updates, degrading cohesion. This is further reinforced by the delay-reliability relations, leading to higher packet deadline misses under BEST EFFORT QoS, as captured by the cumulative distribution function (CDF) and packet loss quantification in Fig. 9, which also shows the 50, 95, and 99 percentile delays for both QoSs. While RELIABLE QoS restores performance (51.5 % higher QoC), it introduces higher throughput variability (leading to higher 5G PRB demand if resources are dimensioned) and demand, as illustrated by the increased mean and standard devia-tion of throughput. This provides a critical trade-off for network providers, as it implies that a system optimized for high QoC may require more aggressive resource over-provisioning at the 5G base station. These results confirm that reliability choices directly shape the measured QoC and energy efficiency. VI. Conclusions and Future Work This work introduces a validated QoC-based abstraction designed to characterize the performance of collaborative 0  0 00   0  00              
+
+> $$%  !"' #&
+> 00
+> 0
+> 0
+> 0
+> 0
+> 0
+> 
+>    % 0   %   %  #&
+>  % 0  %  %  #&
+>   
+> 0
+> 0
+> 
+> "$&&  
+>  
+
+Fig. 9: CDF of observed delay distributions and packet loss percentage for different QoS reliability. robotic systems under stochastic network conditions. By incorporating non-holonomic kinematic constraints, we extend past QoC frameworks to bridge the gap between theoretical models and practical, edge-offloaded AGV nav-igation with dynamic collision avoidance. Towards this, we provide optimal operating points for various parameters for different delay-reliability points. Our experimental results, gathered over a private 5G testbed, closely align with simulation-based predictions, confirming the frame-work’s utility. Furthermore, a comparative analysis of ROS 2 transport policies demonstrates that RELIABLE QoS yields a 51.5% improvement in QoC over BEST-EFFORT, albeit at the expense of increased throughput variability. These findings provide a principled foundation for control-communication co-design in next-generation industrial automation. Future work will further calibrate the surrogate repulsion model against the Nav2/MPPI collision-avoidance stack by jointly varying costmap in-flation, MPPI weights, and inter-robot spacing in larger experimental campaigns. VII. Acknowledgements This work was supported in part by (1) Digital Futures project ‘Toward Safe Smart Construction: Algorithms, Digital Twins and Infrastructures’ under Grant VF 2020-0315, in part by (2) VR (Swedish Research Council) project ‘Optimal Sampling for Interactive Networked Ap-plications’ under Grant 2022-03922 and lastly, (3) Styffes stiftelse. References 
+
+[1] A. Baxi, M. Eisen, S. Sudhakaran, F. Oboril, G. S. Murthy, V. S. Mageshkumar, M. Paulitsch, and M. Huang, “Towards factory-scale edge robotic systems: Challenges and research directions,” IEEE Internet of Things Magazine, vol. 5, no. 3, pp. 26–31, 2022. [2] Y. Qiao, Y. Fu, and M. Yuan, “Communication–control co-design in wireless networks: A cloud control agv example,” IEEE Internet of Things Journal, vol. 10, no. 3, pp. 2346–2359, 2023. [3] N. Roy, M. H. Dhullipalla, G. P. Sharma, D. V. Dimarogonas, and J. Gross, “Quality of control based resource dimensioning for collaborative edge robotics,” in 2025 IEEE 22nd Consumer Communications & Networking Conference (CCNC), 2025, pp. 1–7. [4] D. Urbaniak, S. Bro Damsgaard, W. Zhang, J. Rosell, R. Suárez, and M. Suppa, “Distributed control for collaborative robotic systems using 5g edge computing,” IEEE Access, vol. 12, pp. 148 706–148 718, 2024. [5] Z. Liu, J. Silva, R. Zhong, Q. Qin, N. Roy, V. Nan Fernandez-Ayala, J. Lesko, U. Håkansson, S. Sandberg, D. V. Dimarogonas, J. Gross, X. Vincent Wang, and L. Wang, “Constructwin: Digi-tal twin-driven multirobot construction system toward industry 5.0,” IEEE Transactions on Systems, Man, and Cybernetics: Systems, pp. 1–16, 2026. [6] K. Polachan, J. Pa, C. Singh, and T. Prabhakar, “Assessing quality of control in tactile cyber–physical systems,” IEEE Transactions on Network and Service Management, vol. 19, no. 4, pp. 5348–5365, 2022. [7] N. Roy, M. H. Dhullipalla, G. P. Sharma, S. Sandberg, D. V. Dimarogonas, and J. Gross, “Quality of control-based control-communication co-design for collaborative robotics,” IEEE Transactions on Industrial Informatics, vol. 22, no. 6, pp. 5219– 5230, 2026. [8] S. Mohanti, D. Roy, M. Eisen, D. Cavalcanti, and K. Chowd-hury, “L-norm: Learning and network orchestration at the edge for robot connectivity and mobility in factory floor environ-ments,” IEEE Transactions on Mobile Computing, vol. 23, no. 4, pp. 2898–2914, 2023. [9] M. Groshev, L. Zanzi, C. Delgado, X. Li, A. d. l. Oliva, and X. Costa-Pérez, “Energy-aware joint orchestration of 5g and robots: Experimental testbed and field validation,” IEEE Transactions on Network and Service Management, vol. 22, no. 4, pp. 3046–3059, 2025. [10] G. Carabin, E. Wehrle, and R. Vidoni, “A review on energy-saving optimization methods for robotic and automatic sys-tems,” Robotics, vol. 6, no. 4, p. 39, 2017. [11] M. Olguín Muñoz, N. Roy, and J. Gross, “CLEAVE: Scalable and edge-native benchmarking of networked control systems,” in Proceedings of the 5th International Workshop on Edge Systems, Analytics and Networking, ser. EdgeSys ’22. New York, NY, USA: Association for Computing Machinery, 2022, pp. 37–42. [12] A. A. Sardar, A. S. Rao, T. Alpcan, G. Das, and M. Palaniswami, “Network resource allocation for industry 4.0 with delay and safety constraints,” IEEE Transactions on Cognitive Communications and Networking, vol. 10, no. 1, pp. 223–237, 2024. [13] S. Tayade, P. Rost, A. Maeder, and H. D. Schotten, “Impact of short blocklength coding on stability of an agv control system in industry 4.0,” in 2020 IEEE International Conference on Communications Workshops (ICC Workshops), 2020, pp. 1–6. [14] S. Mostafavi, V. N. Moothedath, S. Ronngren, N. Roy, G. P. Sharma, S. Seo, M. O. Munoz, and J. Gross, “Expeca: An experimental platform for trustworthy edge computing applications,” in Proceedings of the Eighth ACM/IEEE Symposium on Edge Computing, ser. SEC ’23. New York, NY, USA: Association for Computing Machinery, 2024, p. 294–299. [Online]. Available: https://doi.org/10.1145/3583740.3626819 [15] A. Singletary, K. Klingebiel, J. Bourne, A. Browning, P. Toku-maru, and A. Ames, “Comparative analysis of control barrier functions and artificial potential fields for obstacle avoidance,” in 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2021, pp. 8129–8136. [16] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Trans-actions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018. [17] D. T. Xuan, N. T. Hung, and V. T. Thang, “A comprehensive review of improved a* path planning algorithms and their hybrid integrations,” Automation, vol. 6, no. 4, 2025. [Online]. Available: https://www.mdpi.com/2673-4052/6/4/52 [18] S. Macenski, F. Martin, R. White, and J. Ginés Clavero, “The marathon 2: A navigation system,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2020. [19] H.-S. Park, S. Lee, D. Um, H. Ryu, and K.-J. Park, “An analytical latency model of the data distribution service in ros 2,” in IEEE INFOCOM 2025 - IEEE Conference on Computer Communications, 2025, pp. 1–10.
