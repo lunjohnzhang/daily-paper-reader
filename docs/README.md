@@ -6,53 +6,30 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-17
-- 运行时间：2026-07-17 20:36:20 UTC
+- 最新运行日期：2026-07-18
+- 运行时间：2026-07-18 20:55:24 UTC
 - 运行状态：成功
-- 本次总论文数：11
-- 精读区：5
-- 速读区：6
+- 本次总论文数：3
+- 精读区：0
+- 速读区：3
 
 ### 今日简报（AI）
-今日精读两篇高分论文聚焦多智能体协作与通信效率，涵盖视觉位姿估计与环境感知取送货。最值得关注《Communication-Efficient Relative Pose Estimation》与《Stigmergic Graph Memory》在协作感知和任务分配上的创新。进阶读者可结合速读中的MIND-CAVs决策系统，探索通信与协同决策的交叉优化。
-- 详情：[/202607/17/README](/202607/17/README)
+今日速读3篇论文，涵盖世界建模、移动操作与黑盒优化。最值得关注的是评分最高的《DriftWorld: Fast World Modeling through Drifting》（7.0/10），其快速世界建模方法值得深挖。建议优先阅读该文，了解其如何在动态场景中高效构建世界模型。
+- 详情：[/202607/18/README](/202607/18/README)
 
 ### 精读区论文标签
-1. [Communication-Efficient Relative Pose Estimation with Vision Foundation Models for Ephemeral Collaborative Perception](/202607/17/2607.14539v1-communication-efficient-relative-pose-estimation-with-vision-foundation-models-for-ephemeral-collaborative-perception)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：多机器人协作感知中的通信高效相对位姿估计
-2. [Stigmergic Graph Memory: An Environment-Aware Approach for Many-to-Many Multi-Agent Pickup and Delivery](/202607/17/2607.15182v1-stigmergic-graph-memory-an-environment-aware-approach-for-many-to-many-multi-agent-pickup-and-delivery)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：仓储多智能体取送货的痕迹图记忆方法
-3. [World-Model-Aware Responsibility Allocation in Heterogeneous Logistics Systems](/202607/17/2607.14550v1-world-model-aware-responsibility-allocation-in-heterogeneous-logistics-systems)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：基于世界模型的责任分配在物流系统
-4. [Curvature-Constrained and Constant-Speed Distributed Simultaneous Arrival Control for Multi-Robot Systems](/202607/17/2607.14781v1-curvature-constrained-and-constant-speed-distributed-simultaneous-arrival-control-for-multi-robot-systems)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：多机器人分布式同时到达控制
-5. [Finite-Sample Conformal Coverage Recovery via Fusion under Degraded Local Guarantees in Occupancy Map Estimation](/202607/17/2607.14906v1-finite-sample-conformal-coverage-recovery-via-fusion-under-degraded-local-guarantees-in-occupancy-map-estimation)  
-   标签：评分：8.0/10、query:multi-robot
-   evidence：多机器人环境表示中的占用图估计
+- 本次无精读推荐。
 
 ### 速读区论文标签
-1. [MIND-CAVs: Multi-Intelligence Negotiation and Decision System for CAVs based on Intent-Driven Autonomy](/202607/17/2607.14688v1-mind-cavs-multi-intelligence-negotiation-and-decision-system-for-cavs-based-on-intent-driven-autonomy)  
+1. [DriftWorld: Fast World Modeling through Drifting](/202607/18/2607.15065v1-driftworld-fast-world-modeling-through-drifting)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：多智能体意图协商协调
-2. [Modeling and Validation of Quality of Control for Edge-Offloaded Collaborative Navigation](/202607/17/2607.14853v1-modeling-and-validation-of-quality-of-control-for-edge-offloaded-collaborative-navigation)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：边缘卸载协同导航与质量控制
-3. [Route, Communicate, and Reason: Gated Routing and Adaptive Depth for Efficient Multi-Agent Reasoning](/202607/17/2607.10836v1-route-communicate-and-reason-gated-routing-and-adaptive-depth-for-efficient-multi-agent-reasoning)  
+   evidence：快速世界建模用于机器人规划
+2. [Worlds in One Demo: A Synthetic Data Engine for Learning Open-World Mobile Manipulation](/202607/18/2607.13154v1-worlds-in-one-demo-a-synthetic-data-engine-for-learning-open-world-mobile-manipulation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：门控路由与自适应深度用于多智能体通信与推理
-4. [GigaWorld-Policy-0.5: A Faster and Stronger WAM Empowered by AutoResearch](/202607/17/2607.13960v1-gigaworld-policy-05-a-faster-and-stronger-wam-empowered-by-autoresearch)  
+   evidence：利用世界重建进行移动操作
+3. [Confidence-based Ranking with Adaptive Sampling for Noisy Black-Box Optimisation](/202607/18/2607.14936v1-confidence-based-ranking-with-adaptive-sampling-for-noisy-black-box-optimisation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：世界动作模型用于机器人策略学习，利用未来视觉动态
-5. [GigaWorld-Policy-0.5: A Faster and Stronger WAM Empowered by AutoResearch](/202607/17/2607.13960v2-gigaworld-policy-05-a-faster-and-stronger-wam-empowered-by-autoresearch)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：世界动作模型用于机器人策略学习
-6. [A Slow-Fast Stochastic Framework for Zeroth-Order Distributed Time-Varying Optimization](/202607/17/2607.14734v1-a-slow-fast-stochastic-framework-for-zeroth-order-distributed-time-varying-optimization)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：多智能体分布式优化方法
+   evidence：使用进化算法处理噪声黑箱优化
 
 
 <div class="dpr-home-promo-card">
