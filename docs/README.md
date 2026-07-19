@@ -6,30 +6,27 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-18
-- 运行时间：2026-07-18 20:55:24 UTC
+- 最新运行日期：2026-07-19
+- 运行时间：2026-07-19 21:11:50 UTC
 - 运行状态：成功
-- 本次总论文数：3
-- 精读区：0
-- 速读区：3
+- 本次总论文数：2
+- 精读区：2
+- 速读区：0
 
 ### 今日简报（AI）
-今日速读3篇论文，涵盖世界建模、移动操作与黑盒优化。最值得关注的是评分最高的《DriftWorld: Fast World Modeling through Drifting》（7.0/10），其快速世界建模方法值得深挖。建议优先阅读该文，了解其如何在动态场景中高效构建世界模型。
-- 详情：[/202607/18/README](/202607/18/README)
+今日精读两篇自动驾驶决策论文，聚焦协作鲁棒性与运动规划稳健性。重磅推荐“即插即用重加权”提升联网自动驾驶韧性，以及“世界模型对抗自我对弈”增强运动规划对抗性。建议关注多智能体强化学习与对抗训练在自动驾驶安全中的应用。
+- 详情：[/202607/19/README](/202607/19/README)
 
 ### 精读区论文标签
-- 本次无精读推荐。
+1. [Plug-and-Play Reweighting for Resilient Collaborative Decision-Making in Connected Autonomous Driving](/202607/19/2607.10037v1-plug-and-play-reweighting-for-resilient-collaborative-decision-making-in-connected-autonomous-driving)  
+   标签：评分：9.0/10、query:multi-robot
+   evidence：多机器人协作决策（网联自动驾驶车辆）
+2. [World Models as Adversaries: Multi-Agent Self-Play Fine-Tuning for Robust Motion Planning](/202607/19/2607.10630v1-world-models-as-adversaries-multi-agent-self-play-fine-tuning-for-robust-motion-planning)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：多智能体自博弈微调用于鲁棒运动规划
 
 ### 速读区论文标签
-1. [DriftWorld: Fast World Modeling through Drifting](/202607/18/2607.15065v1-driftworld-fast-world-modeling-through-drifting)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：快速世界建模用于机器人规划
-2. [Worlds in One Demo: A Synthetic Data Engine for Learning Open-World Mobile Manipulation](/202607/18/2607.13154v1-worlds-in-one-demo-a-synthetic-data-engine-for-learning-open-world-mobile-manipulation)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：利用世界重建进行移动操作
-3. [Confidence-based Ranking with Adaptive Sampling for Noisy Black-Box Optimisation](/202607/18/2607.14936v1-confidence-based-ranking-with-adaptive-sampling-for-noisy-black-box-optimisation)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：使用进化算法处理噪声黑箱优化
+- 本次无速读推荐。
 
 
 <div class="dpr-home-promo-card">
