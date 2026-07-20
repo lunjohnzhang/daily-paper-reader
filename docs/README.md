@@ -6,27 +6,43 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-19
-- 运行时间：2026-07-19 21:11:50 UTC
+- 最新运行日期：2026-07-20
+- 运行时间：2026-07-20 21:33:13 UTC
 - 运行状态：成功
-- 本次总论文数：2
-- 精读区：2
-- 速读区：0
+- 本次总论文数：7
+- 精读区：1
+- 速读区：6
 
 ### 今日简报（AI）
-今日精读两篇自动驾驶决策论文，聚焦协作鲁棒性与运动规划稳健性。重磅推荐“即插即用重加权”提升联网自动驾驶韧性，以及“世界模型对抗自我对弈”增强运动规划对抗性。建议关注多智能体强化学习与对抗训练在自动驾驶安全中的应用。
-- 详情：[/202607/19/README](/202607/19/README)
+今日精读无人机群形式化监视，速读三篇机器人协同与鲁棒控制前沿。  
+最值得关注分布式空中监视与多机器人相对位姿估计的创新解法，兼顾理论与实战。  
+建议普通读者优先精读方向，速读其余以拓宽应用视野。
+- 详情：[/202607/20/README](/202607/20/README)
 
 ### 精读区论文标签
-1. [Plug-and-Play Reweighting for Resilient Collaborative Decision-Making in Connected Autonomous Driving](/202607/19/2607.10037v1-plug-and-play-reweighting-for-resilient-collaborative-decision-making-in-connected-autonomous-driving)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：多机器人协作决策（网联自动驾驶车辆）
-2. [World Models as Adversaries: Multi-Agent Self-Play Fine-Tuning for Robust Motion Planning](/202607/19/2607.10630v1-world-models-as-adversaries-multi-agent-self-play-fine-tuning-for-robust-motion-planning)  
+1. [Distributed Continuous Aerial Surveillance by UAS Swarms Under Formal Mission Specifications](/202607/20/2607.15583v1-distributed-continuous-aerial-surveillance-by-uas-swarms-under-formal-mission-specifications)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多智能体自博弈微调用于鲁棒运动规划
+   evidence：面向空中监视集群的分布式协调框架
 
 ### 速读区论文标签
-- 本次无速读推荐。
+1. [Steering Robustness into World Action Models via Mechanistic Interpretability and Optimal Control](/202607/20/2607.14943v1-steering-robustness-into-world-action-models-via-mechanistic-interpretability-and-optimal-control)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：世界动作模型用于鲁棒控制；可应用于多机器人世界建模
+2. [Implicit Virtual Leader: Decentralized Vision-Only Relative Pose Estimation for Multi-Robot Formations](/202607/20/2607.15708v1-implicit-virtual-leader-decentralized-vision-only-relative-pose-estimation-for-multi-robot-formations)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：分布式视觉相对位姿估计用于多机器人编队，支持协调
+3. [Learning Latency-Aware Orchestration for Multi-Agent Systems](/202607/20/2607.13359v1-learning-latency-aware-orchestration-for-multi-agent-systems)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：多智能体系统编排框架，与协调方法相关
+4. [GigaWorld-Policy-0.5: A Faster and Stronger WAM Empowered by AutoResearch](/202607/20/2607.13960v3-gigaworld-policy-05-a-faster-and-stronger-wam-empowered-by-autoresearch)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：以动作为中心的世界动作模型，可用于多机器人世界模型
+5. [Multi-Objective Kinodynamic Motion Planning with Asymptotic Pareto Optimality](/202607/20/2607.15508v1-multi-objective-kinodynamic-motion-planning-with-asymptotic-pareto-optimality)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：多目标动力学运动规划框架，可用于机器人路径搜索
+6. [Vision-Language-Motion Maps: An Open-Vocabulary, Uncertainty-Aware, Queryable Motion Attribute for 3D Scene Maps](/202607/20/2607.16173v1-vision-language-motion-maps-an-open-vocabulary-uncertainty-aware-queryable-motion-attribute-for-3d-scene-maps)  
+   标签：评分：6.0/10、query:multi-robot
+   evidence：提供具有运动属性的世界模型，可通过语言查询
 
 
 <div class="dpr-home-promo-card">
