@@ -1,0 +1,1798 @@
+Title: Hybrid Augmented Lagrangian Method for General Constrained Optimization via Evolutionary Algorithms
+
+URL Source: https://arxiv.org/pdf/2607.16876v1
+
+Published Time: Tue, 21 Jul 2026 00:42:50 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# Hybrid Augmented Lagrangian Method for General Constrained Optimization via Evolutionary Algorithms 
+
+Lampros Printzios a, Konstantinos Chatzilygeroudis a
+
+> a
+
+Laboratory of Automation & Robotics (LAR), Department of Electrical & Computer Engineering, University of Patras, University Campus, Patras, GR-26504, Achaia, Greece 
+
+A R T I C L E I N F O 
+
+Keywords :Constrained optimization Augmented Lagrangian method Evolutionary algorithms Hybrid optimization Constraint handling Particle Swarm Optimization 
+
+A B S T R A C T 
+
+Constrained Optimization Problems are crucial in fields such as engineering, economics, and robotics, where high-dimensional search spaces and complex objectives and constraints are common. Numer-ical optimization methods, including Feasible Direction, Interior Point, and Sequential Quadratic Programming, have shown strong performance in finding feasible local optima, but require accurate analytical gradients and effective initialization, which can be challenging in real-world settings. Evolutionary Algorithms, on the other hand, offer gradient-free search and robustness to noisy landscapes, managing to detect global optima more often than numerical methods, but they often suffer from high computational costs and slow convergence. In this work, we propose a Hybrid Augmented Lagrangian (HyAL) method that integrates the AL framework’s constraint-handling strengths with the exploratory power of population-based search. Our approach employs evolutionary techniques to solve subproblems within the AL iterations, promoting exploration and aiding in the escape from local optima. We conduct extensive experiments on benchmark optimization problems, comparing our method against state-of-the-art optimizers, including IPOPT and CMA-ES, and a standalone evo-lutionary optimization baseline (with constraint enforcement via penalties). In addition, we evaluate four population-based methods integrated within the AL framework to study the effect of different evolutionary solvers. Our results show that HyAL consistently produces high-quality solutions across the benchmark suite. It outperforms purely evolutionary approaches and scales more effectively to high-dimensional constrained problems, where evolutionary-only methods often struggle. HyAL also surpasses state-of-the-art numerical optimization algorithms on complex landscapes containing numerous local minima and saddle points. 
+
+1. Introduction & Related Work 
+
+Constraint Optimization Problems (COPs) appear in many diverse research fields and applications, including, among others, structural optimization, engineering design, VLSI design, economics, allocation and location problems, robotics, and optimal control problems [15, 21, 44, 45, 49]. All these real-world problems are typically represented by a mathematical model that can contain both binary and continuous variables, as well as a set of linear and non-linear constraints, ranging from simple, low-dimensional numerical functions to high-dimensional noisy estimates. The Numerical Optimization literature [21, 29] has pro-vided us with a wide range of powerful tools to address these problems. Methods such as Feasible Direction (FD) [4], Sequential Quadratic Programming (SQP) [29], Gen-eralized Gradient Descent (GGD) [31], and Interior Point 
+
+(IP) [47] are able to effectively solve COPs even in high dimensions, as well as handle problems in cases where the objective function or any of the constraints is nonlinear or/and non-convex. Additionally, Augmented Lagrangian (AL)-based techniques have emerged as powerful methods for handling constrained optimization problems, ensuring feasibility while maintaining efficient convergence [3, 5, 25]. Despite their success, these methods require the availability  
+
+> printzios_lampros@ac.upatras.gr
+
+(L. Printzios);  
+
+> costashatz@upatras.gr
+
+(K. Chatzilygeroudis) 
+
+> ORCID
+
+(s): 0009-0009-9205-9715 (L. Printzios); 0000-0003-3585-1027 
+
+(K. Chatzilygeroudis) 
+
+of the exact gradient (and hessian) values of both the objec-tive and constraint functions, which can be difficult to obtain in several real-world situations where only approximations are available. Moreover, it is well known that in practice, these methods require good initialization to achieve reason-able convergence rates. On the other hand, many Evolutionary Algorithms (EAs) have been proposed for solving general optimization and COPs [8, 9, 10, 13, 14, 23, 34, 40, 43] and have been applied successfully to numerous COPs, even in cases where the corresponding objective function values are corrupted by noise. Most of the methods do not require knowledge of the gradients [23, 34], while some of them attempt to improve convergence or performance by using the gradient information [9, 10]. Nevertheless, EAs are known to require many function evaluations to find high-performing solutions and can often fail to identify the global optimum. The methods most closely related to our approach are those that integrate the AL framework within a Particle Swarm Optimization (PSO) procedure [26, 27, 39]. How-ever, existing studies are limited to small-scale problems and fail to provide insights into when and why this hybridization is effective. Moreover, these methods typically attempt to in-sert the AL framework into an evolutionary approach, while we deal with the problem from the opposite perspective. In particular, we introduce a novel Hybrid Augmented Lagrangian (HyAL) method that combines the robust-ness of the AL framework with the exploratory power of 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 1 of 16 arXiv:2607.16876v1 [cs.NE] 18 Jul 2026 Hybrid AL-EAs Scheme (HyAL ) for Generic Constrained Optimization 
+
+Evolutionary Algorithms (EAs)     
+
+> population initialization
+> fitness evaluation selection
+> mutation &
+> crossover
+> population update
+> repeat till
+> termination
+> criteria met
+> PSO DE SGA CEM
+> NO
+> YES
+
+Augmented Lagrangian (AL) Framework 
+
+Method of Multipliers 
+
+> initialize variables & parameters
+> check for constraint satisfaction & solution convergence
+> repeat
+> update
+> penalty coefficients
+> lagrangian multipliers
+> return solution x
+> optimize AL in x
+> unconstrained optimization subroutine
+> EAs integration
+> or
+> compute velocities
+> crossover
+> mutation
+> or
+
+Figure 1: Hybrid Augmented Lagrangian (HyAL) Method Overview 
+
+population-based algorithms. Our approach (see Fig. 1) em-ploys an evolutionary or population-based method to solve the unconstrained subproblem at each AL iteration. By lever-aging the AL mechanism for constraint enforcement and utilizing stochastic search strategies to escape local optima, our method synergizes the strengths of both paradigms. We evaluate our approach through extensive experi-ments on challenging benchmark problems. Furthermore, we compare four population-based methods combined with the AL framework and contrast them with established nu-merical methods (like IPOPT) and evolution strategies (e.g. CMA-ES). Our results provide a comprehensive analysis of the strengths and weaknesses of each approach, showcasing the conditions under which the proposed hybridization offers a significant performance advantage. 
+
+2. Problem Formulation 
+
+The general constrained optimization problem is defined as the search for the decision-variable vector 𝒙 ∈ ℝ𝑛 , that optimizes an objective function 𝑓 (𝒙 ) ∶ ℝ𝑛 → ℝ. For 𝒙 to be a feasible solution, it must satisfy a set of equality and in-equality constraints, which can be written as vector functions 
+
+𝒉 (𝒙 ) = [ℎ1(𝒙 ), … , ℎ 𝑙 (𝒙 )]⊤ and 𝒈 (𝒙 ) = [𝑔 1(𝒙 ), … , 𝑔 𝑚 (𝒙 )]⊤
+
+respectively. We are interested in constrained minimization problems, which are structured as shown below: 
+
+𝒙 ⋆ = arg min  
+
+> 𝒙 ∈ℝ𝒏
+
+𝑓 (𝒙 )
+
+s.t.: ℎ𝑖 (𝒙 ) = 0 , 𝑖 = 1 , 2, … , 𝑙 𝑔 𝑗 (𝒙 ) ≤ 0, 𝑗 = 1 , 2, … , 𝑚 
+
+(1) where (𝒙 ⋆, 𝑓 (𝒙 ⋆)) is the global minimum point. We may also assume that 𝒙 is bounded component-wise by lower limits 𝒍 𝒃 = [𝑙 𝑏, 1, … , 𝑙 𝑏,𝑛 
+
+]⊤ ∈ ( ℝ ∪ {−∞}) 𝑛 and upper limits 
+
+𝒖 𝒃 = [𝑢 𝑏, 1, … , 𝑢 𝑏,𝑛 
+
+]⊤ ∈ ( ℝ ∪ {+∞}) 𝑛 , meaning that 𝑥 𝑖 ∈[𝑙 𝑏,𝑖 , 𝑢 𝑏,𝑖 ], ∀𝑖 = 1 , … , 𝑛 , with the corresponding inequalities being 𝑔 𝒍 𝒃 ,𝑖 = 𝑙 𝑏,𝑖 − 𝑥 𝑖 ≤ 0 and 𝑔 𝒖 𝒃 ,𝑖 = 𝑥 𝑖 − 𝑢 𝑏,𝑖 ≤ 0,
+
+∀𝑖 = 1 , … , 𝑛 . In our implementation, these box constraints are enforced by projecting each variable onto its admissible interval, resulting in a computationally efficient procedure. In order to tackle the COP, we construct the correspond-ing classical Lagrangian function as follows [5, 30]: 
+
+(𝒙 , 𝝀 , 𝝁 ) = 𝑓 (𝒙 ) + 𝝀 ⊤𝒉 (𝒙 ) + 𝝁 ⊤𝒈 (𝒙 ) (2) where the Lagrange multipliers 𝝀 = [𝜆 1, … , 𝜆 𝑙 ]⊤ ∈ ℝ𝑙 
+
+and 𝝁 = [ 𝜇 1, … , 𝜇 𝑚 ]⊤ ∈ ℝ𝑚 are the dual variables for the equality and inequality constraints. 
+
+Theorem 1 Karush-Kuhn-Tucker (or Saddle Point) The-orem for constrained optimization If (𝒙 ⋆, 𝝀 ⋆, 𝝁 ⋆) is a saddle point for the Lagrangian (local minimum along the primal direction of 𝒙 and local maximum along the dual directions of 𝝀 , 𝝁 ), then it is also a local optimum for the constrained optimization problem (1) [42]. The Augmented Lagrangian [5] can be written as: 
+
+𝐴 (𝒙 , 𝝀 , 𝝁 ; 𝝆 𝜆 , 𝝆 𝜇 ) = (𝒙 , 𝝀 , 𝝁 ) + + 12
+
+> 𝑙
+
+∑
+
+> 𝑖 =1
+
+𝜌 𝜆 𝑖 ℎ2 
+
+> 𝑖
+
+(𝒙 ) + 12
+
+> 𝑚
+
+∑
+
+> 𝑗 =1
+
+𝜌 𝜇 𝑗 max(0 , 𝑔 𝑗 (𝒙 )) 2 (3) where 𝝆 𝜆 = [𝜌 𝜆  
+
+> 1
+
+, … , 𝜌 𝜆 𝑙 
+
+]⊤ ∈ ℝ𝑙 , 𝝆 𝜇 = [𝜌 𝜇  
+
+> 1
+
+, … , 𝜌 𝜇 𝑚 
+
+]⊤ ∈ ℝ𝑚 
+
+denote the penalty parameters associated with the equality and inequality constraints, respectively. For sufficiently large penalty coefficients 𝝆 , these terms strongly penalize con-straint violations and encourage feasible solutions. 
+
+3. Hybrid Augmented Lagrangian Method 
+
+Our HyAL approach consists of two main parts: a) the 
+
+Augmented Lagrangian Framework (AL) outer loop , and 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 2 of 16 b) the Evolutionary Algorithms (EAs) inner loop . These are shown in Fig. 1, and are further discussed in the follow-ing sections. Contrary to previous methods [9, 26, 27, 39], instead of incorporating ideas from the numerical optimiza-tion literature inside the evolutionary pipeline, we take the inverse approach and we embed evolutionary algorithms inside the AL framework. In more detail, while the first step of the AL frame-work (4) is typically solved using a numerical optimization method, in HyAL, we propose to employ an evolutionary algorithm to address the unconstrained minimization sub-problems (see Algo. 1). Our approach leverages the funda-mental property of the AL framework: if the unconstrained minimization subproblems are solved accurately, the overall method is guaranteed to converge to a feasible and, un-der appropriate assumptions, optimal point of the original constrained minimization problem [5]. We will experiment with four different evolutionary methods for solving the unconstrained subproblems. 
+
+3.1. Augmented Lagrangian Framework 
+
+For the construction of our Hybrid Augmented La-grangian Framework, we will rely on the Method of Multi-pliers [5, 20, 30, 37]. Having the already stated Augmented Lagrangian formula, (3), we start by choosing some initial values 𝒙 0, 𝝀 0, and 𝝁 0 for the decision and dual variables. Then, ∀𝑘 = 0 , … , 𝑖𝑡𝑒𝑟 𝐴𝐿 𝑚𝑎𝑥 , where 𝑖𝑡𝑒𝑟 𝐴𝐿 𝑚𝑎𝑥 is a predetermined maximum number of iterations, we: 1. Calculate a new estimate for 𝒙 , solving the follow-ing unconstrained minimization subproblem. It can be approximately solved by a sufficiently accurate (meta)heuristic method, whose population may be initialized near the previous solution 𝒙 𝑘 to leverage 
+
+warm-start information. 
+
+𝒙 𝑘 +1 ≈ arg min  
+
+> 𝒙
+
+𝐴 (𝒙 , 𝝀 𝑘 , 𝝁 𝑘 ; 𝝆 𝜆 𝑘 , 𝝆 𝜇 𝑘 ) (4) 2. Update the Lagrange multipliers for equality and in-equality constraints ( ⊙ denotes component-wise mul-tiplication): 
+
+𝝀 𝑘 +1 = 𝝀 𝑘 + 𝝆 𝜆 𝑘 ⊙ 𝒉 (𝒙 𝑘 +1 )
+
+𝝁 𝑘 +1 = max( 𝟎 , 𝝁 𝑘 + 𝝆 𝜇 𝑘 ⊙ 𝒈 (𝒙 𝑘 +1 )) (5) 3. Update the penalty parameters using a scaling factor 
+
+𝛽 > 1 and a predefined constant 𝜀 𝜌 > 0 to check for violations of equality and inequality constraints (we also want to keep them bounded between some 𝜌 𝑚𝑖𝑛 
+
+and 𝜌 𝑚𝑎𝑥 limits). 
+
+𝜌 𝜆 𝑖,𝑘 +1 =
+
+⎧⎪⎨⎪⎩
+
+𝛽 ⋅ 𝜌 𝜆 𝑖,𝑘 , |ℎ𝑖 (𝒙 𝑘 +1 )| > 𝜀 𝜌 𝜌 𝜆 𝑖,𝑘  
+
+> 𝛽
+
+, |ℎ𝑖 (𝒙 𝑘 +1 )| ≤ 𝜀 𝜌 
+
+𝜌 𝜇 𝑗,𝑘 +1 =
+
+⎧⎪⎨⎪⎩
+
+𝛽 ⋅ 𝜌 𝜇 𝑗,𝑘 , max(0 , 𝑔 𝑗 (𝒙 𝑘 +1 )) > 𝜀 𝜌 𝜌 𝜇 𝑗,𝑘  
+
+> 𝛽
+
+, max(0 , 𝑔 𝑗 (𝒙 𝑘 +1 )) ≤ 𝜀 𝜌 
+
+∀𝑖 = 1 , … , 𝑙 and ∀𝑗 = 1 , … , 𝑚 
+
+(6) The AL outer loop is terminated either when a maximum number of iterations 𝑖𝑡𝑒𝑟 𝐴𝐿 𝑚𝑎𝑥 is reached, or in a number of 
+
+𝑘 ≤ 𝑖𝑡𝑒𝑟 𝐴𝐿 𝑚𝑎𝑥 steps when the practical conditions below hold for 𝑠𝑡𝑎𝑔 𝐴𝐿 𝑚𝑎𝑥 consecutive iterations: 
+
+||𝑓 (𝒙 𝑘 ) − 𝑓 (𝒙 𝑘 −1 )|| ≤ 𝜀 𝑠 (or ‖𝒙 𝑘 − 𝒙 𝑘 −1 ‖2 ≤ 𝜀 𝑠 ) (7) 
+
+𝑐 (𝒙 𝑘 ) = 
+
+‖‖‖‖‖[ 𝒉 (𝒙 𝑘 )max( 𝟎 , 𝒈 (𝒙 𝑘 )) 
+
+]‖‖‖‖‖2
+
+≤≤
+
+> 𝑙
+
+∑
+
+> 𝑖 =1
+
+||ℎ𝑖 (𝒙 𝑘 )|| +
+
+> 𝑚
+
+∑
+
+> 𝑗 =1
+
+max (0, 𝑔 𝑗 (𝒙 𝑘 )) ≤ 𝜀 𝑐 
+
+(8) Here, 𝜀 𝑠 and 𝜀 𝑐 are sufficiently small tolerances to ensure that objective / solution - based convergence is achieved, Eq. (7), and that constraint violations do not exceed a certain thresh-old, Eq. (8). To avoid premature termination, a stagnation counter is used: when the convergence conditions are met, the counter is incremented, and the algorithm stops only if this occurs 𝑠𝑡𝑎𝑔 𝐴𝐿 𝑚𝑎𝑥 times in a row. An analogous stagnation mechanism also exists in the EAs inner loop. To understand how the AL method of multipliers can lead to a candidate solution 𝒙 ⋆ of the original COP in (1), we need to look at the Karush-Kuhn-Tucker (KKT) first-order necessary optimality conditions , and how our HyAL approach attempts to enforce them for a point 𝒙 ⋆ inside the search space 1.
+
+• Stationarity (at convergence to a feasible point, the subproblem (4) is solved to sufficient accuracy, so the Lagrangian gradient / stationarity residual vanishes): 
+
+∇𝒙 (𝒙 ⋆, 𝝀 ⋆, 𝝁 ⋆) = ∇ 𝒙 𝑓 +∇ 𝒙 𝒉 ⋅𝝀 ⋆ +∇ 𝒙 𝒈 ⋅𝝁 ⋆
+
+|||𝒙 ⋆
+
+= 𝟎 
+
+• Primal Feasibility (expresses constraint satisfaction): 
+
+𝒉 (𝒙 ⋆) = 𝟎 , 𝒈 (𝒙 ⋆) ≤ 𝟎 
+
+• Dual Feasibility (it is maintained by the projection in the update of 𝝁 in (5)): 
+
+𝝁 ⋆ ≥ 𝟎 
+
+• Complementary Slackness (inactive inequalities have zero multipliers, enforced via updates of 𝝁 and 𝝆 𝝁 in (5), (6), as constraints are gradually satisfied): 
+
+𝝁 ⋆ ⊙ 𝒈 (𝒙 ⋆) = 𝟎 
+
+Theorem 2 KKT first-order optimality conditions under regularity conditions Let 𝒙 ⋆ be a local minimizer of the COP (1), and assume that all objective and constraint func-tions are continuously differentiable. If a suitable regularity condition holds (such as LICQ, see Appendix B) at 𝒙 ⋆, then there exist multipliers 𝝀 ⋆ ∈ ℝ𝑙 and 𝝁 ⋆ ∈ ℝ𝑚 such that the KKT first-order optimality conditions hold [5, 30]. 
+
+> 1In the theoretical KKT formulation below, the box bounds are treated explicitly as ordinary inequality constraints. In our practical implementa-tion, however, they are enforced by projection onto the admissible intervals, while preserving the underlying theoretical formulation.
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 3 of 16 So, our HyAL approach aims to drive the iterates toward a KKT point of the original COP (1). However, it is impor-tant to note that the KKT conditions are only necessary and not generally sufficient for local optimality. A KKT point may correspond to a local minimizer, but it may also be a local maximizer, or even a saddle point. Our proposed approach is motivated by the observation that the AL outer loop progressively enforces feasibility, while the EAs inner loop provides effective exploration and exploitation of the search space. In practice, HyAL method often produces feasible stationary points, and the experimental results in Sec. 5 show that these solutions usually coincide with locally optimal, and even globally optimal, benchmark solutions. 
+
+Algorithm 1 Augmented Lagrangian (AL) outer loop  
+
+> 1:
+
+Input: 𝒙 0, 𝝀 0, 𝝁 0, 𝝆 𝜆  
+
+> 0
+
+, 𝝆 𝜇  
+
+> 0
+
+, EA  
+
+> 2:
+
+init.: (𝒙 , 𝝀 , 𝝁 ) ← (𝒙 0, 𝝀 0, 𝝁 0), (𝝆 𝜆 , 𝝆 𝜇 ) ← (𝝆 𝜆  
+
+> 0
+
+, 𝝆 𝜇  
+
+> 0
+
+), 𝑠𝑡𝑎𝑔 ← 0 
+
+> 3:
+
+set: 𝑖𝑡𝑒𝑟 𝐴𝐿 𝑚𝑎𝑥 , 𝑠𝑡𝑎𝑔 𝐴𝐿 𝑚𝑎𝑥 , 𝛽, 𝜀 𝜌 , 𝜀 𝑠 , 𝜀 𝑐  
+
+> 4:
+
+for 𝑘 = 0 to 𝑖𝑡𝑒𝑟 𝐴𝐿 𝑚𝑎𝑥 do  
+
+> 5:
+
+𝒙 𝑛𝑒𝑤 ← EA 
+
+[
+
+𝐴 (𝒙 , 𝝀 , 𝝁 ; 𝝆 𝜆 , 𝝆 𝜇 )
+
+]
+
+→ to solve (4)  
+
+> 6:
+
+𝝀 𝑛𝑒𝑤 , 𝝁 𝑛𝑒𝑤 ← updated via (5)  
+
+> 7:
+
+𝝆 𝜆 𝑛𝑒𝑤 , 𝝆 𝜇 𝑛𝑒𝑤 ← updated via (6)  
+
+> 8:
+
+if conditions (7) and (8) are satisfied then  
+
+> 9:
+
+𝑠𝑡𝑎𝑔 ← 𝑠𝑡𝑎𝑔 + 1  
+
+> 10:
+
+if 𝑠𝑡𝑎𝑔 ≥ 𝑠𝑡𝑎𝑔 𝐴𝐿 𝑚𝑎𝑥 then  
+
+> 11:
+
+break → convergence & feasibility achieved  
+
+> 12:
+
+else  
+
+> 13:
+
+𝑠𝑡𝑎𝑔 ← 0 
+
+> 14:
+
+update : 𝒙 ← 𝒙 𝑛𝑒𝑤 , 𝝀 ← 𝝀 𝑛𝑒𝑤 , 𝝆 𝜆 ← 𝝆 𝜆 𝑛𝑒𝑤 , 𝝆 𝜇 ← 𝝆 𝜇 𝑛𝑒𝑤  
+
+> 15:
+
+return 𝒙 𝑛𝑒𝑤 
+
+Algorithm 2 Evolutionary Algorithm (EA) inner loop  
+
+> 1:
+
+Input: 𝐴 (𝒙 ) 
+
+> 2:
+
+init. : 𝑃 ← {𝒙 1, … , 𝒙 𝑀 }, (𝒙 𝑏𝑒𝑠𝑡 , 𝜙 ) ← (𝒙 1, +∞) , 𝑠𝑡𝑎𝑔 ← 0 
+
+> 3:
+
+set : 𝑖𝑡𝑒𝑟 𝐸𝐴 𝑚𝑎𝑥 , 𝑠𝑡𝑎𝑔 𝐸𝐴 𝑚𝑎𝑥 , 𝜀 𝐸𝐴  
+
+> 4:
+
+for 𝑘 = 0 to 𝑖𝑡𝑒𝑟 𝐸𝐴 𝑚𝑎𝑥 do  
+
+> 5:
+
+if min 𝒙 ∈𝑃 𝐴 (𝒙 ) < 𝜙 then  
+
+> 6:
+
+𝒙 𝑏𝑒𝑠𝑡 ← arg min 𝒙 ∈𝑃 𝐴 (𝒙 ) → to solve (4)  
+
+> 7:
+
+𝜙 𝑏𝑒𝑠𝑡 ← 𝐴 (𝒙 𝑏𝑒𝑠𝑡 ) 
+
+> 8:
+
+if 𝑘 > 0 and |𝜙 𝑏𝑒𝑠𝑡 − 𝜙 | ≤ 𝜀 𝐸𝐴 then  
+
+> 9:
+
+𝑠𝑡𝑎𝑔 ← 𝑠𝑡𝑎𝑔 + 1  
+
+> 10:
+
+if 𝑠𝑡𝑎𝑔 ≥ 𝑠𝑡𝑎𝑔 𝐸𝐴 𝑚𝑎𝑥 then  
+
+> 11:
+
+break → EA convergence achieved  
+
+> 12:
+
+else  
+
+> 13:
+
+𝑠𝑡𝑎𝑔 ← 0 
+
+> 14:
+
+update : 𝜙 ← 𝜙 𝑏𝑒𝑠𝑡 , 𝑃 ← EA rule on current P  
+
+> 15:
+
+return 𝒙 𝑏𝑒𝑠𝑡 
+
+3.2. Evolutionary Algorithms 
+
+In the following, we briefly analyze the main aspects and properties of the Evolutionary Algorithms (EAs), namely SGA, CEM, DE, and PSO, that will be utilized to solve the inner loop’s unconstrained optimization subroutines (4). Our choices were made to include strong representatives from various subfields of evolutionary computation. The unconstrained subproblem arising in each AL iteration is solved only approximately by the EAs, as these methods are metaheuristics and cannot provide an exact, analytically derived minimizer. In our implementation (see Algo. 2), the EAs inner loop is terminated when the best ever found AL objective, also called fitness value 𝜙 , changes by less than a small tolerance 
+
+𝜀 𝐸𝐴 for a fixed number of consecutive iterations 𝑠𝑡𝑎𝑔 𝐸𝐴 𝑚𝑎𝑥 , or when a maximum number 𝑖𝑡𝑒𝑟 𝐸𝐴 𝑚𝑎𝑥 of iterations is reached. 
+
+3.2.1. Simple Genetic Algorithm 
+
+The Simple Genetic Algorithm (SGA) [38] is a stochastic EA inspired by the natural selection theory. It begins with a random 𝑁 -dimensional, 𝑀 -sized population of candidate solutions 𝑃 = { 𝒙 1(0) , … , 𝒙 𝑀 (0)} . Then, it evaluates their fitness, and applies selection, mutation, and crossover pro-cesses to produce new individuals, favoring fitter members, while exploring new areas of the solution space via random variations. For the 𝑘 -th iteration the algorithmic steps are: 1. Evaluate each individual in the population using a fitness function (the Augmented Lagrangian 𝐴 here), and construct the evaluation set 
+
+ = { 𝐴 (𝒙 1(𝑘 )) , … , 𝐴 (𝒙 𝑀 (𝑘 ))} .
+
+2. Sort the evaluation set  . Then, select the best in-dividuals 𝑃 𝑒𝑙𝑖𝑡𝑒 = {𝒙 𝑒𝑙𝑖𝑡𝑒  
+
+> 1
+
+(𝑘 ), … , 𝒙 𝑒𝑙𝑖𝑡𝑒  
+
+> Ξ
+
+(𝑘 )} (small-est evaluations) for reproduction and the worst ones 
+
+𝑃 𝑤𝑒𝑎𝑘 = {𝒙 𝑤𝑒𝑎𝑘  
+
+> 1
+
+(𝑘 ), … , 𝒙 𝑤𝑒𝑎𝑘  
+
+> Ξ
+
+(𝑘 )} (largest evalua-tions) for substitution, where Ξ ≤ 𝑀 .3. For each individual 𝒙 𝑒𝑙𝑖𝑡𝑒 𝑖 (𝑘 ) ∈ 𝑒𝑙𝑖𝑡𝑒 :(a) Randomly select a different 𝒙 𝒆𝒍𝒊𝒕𝒆 𝒋 (𝑘 ) ∈ 𝑒𝑙𝑖𝑡𝑒 
+
+(𝑖 ≠ 𝑗 ∈ {1 , 2, … , Ξ} ). (b) Calculate an offspring child individual by addi-tive mutation and subtractive crossover on the chosen elite parent individuals (we use mutation and crossover operators inspired by [46]): 
+
+𝒙 𝑜𝑓 𝑓 𝑠𝑝𝑟𝑖𝑛𝑔 𝑖 (𝑘 ) = 𝒙 𝑒𝑙𝑖𝑡𝑒 𝑖 (𝑘 ) + 𝜺 𝑚𝑢𝑡,𝑘 ++ 𝜀 𝑐𝑟𝑜𝑠𝑠,𝑘 (𝒙 𝒋 𝑒𝑙𝑖𝑡𝑒 (𝑘 ) − 𝒙 𝑒𝑙𝑖𝑡𝑒 𝑖 (𝑘 )) 
+
+where 𝜺 𝑚𝑢𝑡,𝑘 ∈ ℝ𝑁 ∼  (𝟎 , 𝝈 2
+
+> 𝑚𝑢𝑡,𝑘
+
+) is the muta-tion strength, and 𝜀 𝑐𝑟𝑜𝑠𝑠,𝑘 ∈ ℝ ∼  (0 , 𝜎 2
+
+> 𝑐𝑟𝑜𝑠𝑠,𝑘
+
+)
+
+scales the crossover. (c) Replace 𝒙 𝑤𝑒𝑎𝑘 𝑖 with 𝒙 𝑜𝑓 𝑓 𝑠𝑝𝑟𝑖𝑛𝑔 𝑖 .4. Increase 𝑘 by 1 and repeat the steps until the stopping criterion is met. SGA excels at exploring the search space and producing diverse solutions. Adjusting the standard deviations 𝝈 𝑚𝑢𝑡 ∈
+
+ℝ𝑁 , and 𝜎 𝑐𝑟𝑜𝑠𝑠 ∈ ℝ we can control the amount of variation and, consequently, the exploration range for each iteration. 
+
+3.2.2. Cross Entropy Method 
+
+The Cross Entropy Method (CEM) [6] is a distribution-shaping evolutionary method that generates a completely new population each iteration, with stochastic properties determined by the previous generation’s elite sampled mem-bers. The algorithmic process for the 𝑘 -th iteration is: 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 4 of 16 1. Generate a random population 𝑃 = { 𝒙 1(𝑘 ), … , 𝒙 𝑀 (𝑘 )} 
+
+of dimension 𝑁 and size 𝑀 obeying the normal distribution  (𝝁 𝑘 , 𝝈 2
+
+> 𝑘
+
+), with mean value vector 𝝁 𝑘 
+
+and standard deviation vector 𝝈 𝑘 .2. Evaluate each individual in the population using a fitness function (the Augmented Lagrangian 𝐴 here), and construct the evaluation set 
+
+ = { 𝐴 (𝒙 1(𝑘 )) , … , 𝐴 (𝒙 𝑀 (𝑘 ))} .
+
+3. Sort the evaluation set  . Then, select the best individ-uals 𝑃 𝑒𝑙𝑖𝑡𝑒 = { 𝒙 𝑒𝑙𝑖𝑡𝑒  
+
+> 1
+
+(𝑘 ), … , 𝒙 𝑒𝑙𝑖𝑡𝑒  
+
+> Ξ
+
+(𝑘 )} with the smallest evaluations (where Ξ ≤ 𝑀 ). 4. Update the mean values vector for the next generation: 
+
+𝝁 𝑘 +1 = 1Ξ
+
+∑Ξ 
+
+> 𝑖
+
+𝒙 𝑒𝑙𝑖𝑡𝑒 𝑖 (𝑘 ) (initially we have 𝝁 0 = 𝒙 0). 5. Update (element-wise) the standard deviation for the next generation: 𝝈 𝑘 +1 =
+
+√ 1Ξ
+
+∑Ξ 
+
+> 𝑖
+
+(𝒙 𝑒𝑙𝑖𝑡𝑒 𝑖 (𝑘 ) − 𝝁 𝑘 )2.6. Increase 𝑘 by 1 and repeat the steps until the stopping criterion is met. The primary advantage of CEM is its focused search, favoring the exploitation of high-quality solutions over broad exploration, which enables precise identification of local minima. But this is also a limitation, since CEM needs to start close enough to global minima in order to detect them. 
+
+3.2.3. Differential Evolution 
+
+Differential Evolution (DE) [11] is a simple and effec-tive population-based EA designed for globally optimizing continuous functions. It iteratively evolves the population by first generating trial vectors via mutation, using scaled dif-ferences between candidate solutions and other population members. It then applies crossover between each candidate and its corresponding trial vector, followed by a greedy selection step that retains only the improved solutions. Formally, we start with a random initial population of 𝑀 
+
+candidate solutions 𝒙 𝑞 (0) ∈ ℝ𝑁 . At iteration 𝑘 they have positions 𝒙 𝑞 (𝑘 ) ∈ ℝ𝑁 , with 𝑞 ∈ {1 , 2, … , 𝑀 }. For the mutation step we may follow many approaches. Here, we chose a DE/rand-to-best/1 -style update [11], that generates a new trial vector for each candidate by combining the current candidate and the best ever candidate, together with two other randomly selected individuals: 
+
+𝒚 𝑞 (𝑘 ) = 𝒙 𝑞 (𝑘 ) + 𝜆 (𝒙 𝑏𝑒𝑠𝑡 (𝑘 ) − 𝒙 𝑞 (𝑘 )) + 𝑤 
+
+(
+
+𝒙 𝑟 1 (𝑘 ) − 𝒙 𝑟 2 (𝑘 )
+
+)
+
+where 𝒙 𝑏𝑒𝑠𝑡 (𝑘 ) denotes the best ever individual found so far, 
+
+𝑟 1, 𝑟 2 ≠ 𝑞 are distinct random indices, 𝜆 ∈ ℝ controls the pull toward the current best ever solution, and 𝑤 ∈ ℝ is the differential weight. In the crossover step, a new trial vector 𝒗 𝑞 (𝑘 ) is produced by recombining the mutant vector with the current solution: 
+
+𝑣 𝑞,𝑗 (𝑘 ) = 
+
+{
+
+𝑦 𝑞,𝑗 (𝑘 ), 𝑢 𝑗 ≤ 𝑐 𝑟 or 𝑗 = 𝑗 𝑟 
+
+𝑥 𝑞,𝑗 (𝑘 ), otherwise , 𝑗 = 0 , 1, … , 𝑁 
+
+where 𝑐 𝑟 ∈ [0 , 1] is the crossover probability, 𝑢 𝑗 ∼  (0 , 1) is an independently sampled uniform random variable for each dimension 𝑗 , and 𝑗 𝑟 ∈ {1 , 2, … , 𝑁 } is a randomly selected index that ensures that at least one component is inherited from the mutant trial vector 𝒚 𝑞 (𝑘 ).Finally, the selection step updates the population by eval-uating the fitness of the crossover trial 𝒗 𝑞 (𝑘 ) and retaining the better solution, using a greedy replacement rule: 
+
+𝒙 𝑞 (𝑘 +1) = 
+
+{
+
+𝒗 𝑞 (𝑘 ), 𝑓 (𝒗 𝑞 (𝑘 )) ≤ 𝑓 (𝒙 𝑞 (𝑘 )) 
+
+𝒙 𝑞 (𝑘 ), otherwise , 𝑘 = 0 , 1, …
+
+The above iterative process balances exploration and exploitation, allowing DE to effectively search complex optimization landscapes. The algorithm’s performance can be fine-tuned by adjusting the parameters 𝜆 , 𝑤 and 𝑐 𝑟 to suit the problem’s domain. 
+
+3.2.4. Particle Swarm Optimization 
+
+Particle Swarm Optimization (PSO) [33, 35] is inspired by collective swarming behavior, in which randomly initial-ized particles iteratively evaluate the objective function and update their positions based on their own experience and that of neighboring particles or the entire swarm. The two main strategies are local PSO (PSO-LS) and global PSO (PSO-GS), where particles track their personal best ever position and also, either their neighborhood best ever or the global best ever position, respectively. Formally, the algorithm initializes 𝑀 particles with ran-dom positions 𝒙 𝑞 (0) ∈ ℝ𝑁 and velocities 𝒗 𝑞 (0) ∈ ℝ𝑁 , with 
+
+𝑞 ∈ {1 , 2, … , 𝑀 }, that can explore the search space. The position update for particle 𝑞 at iteration 𝑘 + 1 is defined as: 
+
+𝒙 𝑞 (𝑘 + 1) = 𝒙 𝑞 (𝑘 ) + 𝒗 𝑞 (𝑘 + 1) , 𝑘 = 0 , 1, …
+
+In local PSO , the velocity update is:            
+
+> 𝒗 𝑙 𝑞 (𝑘 +1) = 𝜒
+> [
+> 𝒗 𝑞 (𝑘 ) + 𝑐 1𝑟 𝑙
+> 1(𝒙 𝑏 𝑞 (𝑘 ) − 𝒙 𝑞 (𝑘 )) + 𝑐 2𝑟 𝑙
+> 2(𝒙 𝑙𝑏 𝑞 (𝑘 ) − 𝒙 𝑞 (𝑘 ))
+> ]
+
+whereas for global PSO , the velocity update becomes:             
+
+> 𝒗 𝑔 𝑞 (𝑘 +1) = 𝜒
+> [
+> 𝒗 𝑞 (𝑘 ) + 𝑐 1𝑟 𝑔
+> 1(𝒙 𝑏 𝑞 (𝑘 ) − 𝒙 𝑞 (𝑘 )) + 𝑐 2𝑟 𝑔
+> 2(𝒙 𝑔𝑏 (𝑘 ) − 𝒙 𝑞 (𝑘 ))
+> ]
+
+Here, 𝒙 𝑏 𝑞 (𝑘 ) denotes the particle’s personal best position, 
+
+𝒙 𝑙𝑏 𝑞 (𝑘 ) its neighborhood best position, and 𝒙 𝑔𝑏 (𝑘 ) the global best position ever found by the entire swarm. The parameters 
+
+𝑐 1, 𝑐 2 ∈ ℝ>0 are the cognitive and social acceleration coefficients respectively, 𝑟 𝑙 
+
+> 1
+
+, 𝑟 𝑙 
+
+> 2
+
+, 𝑟 𝑔 
+
+> 1
+
+, 𝑟 𝑔  
+
+> 2
+
+∼ 𝑈 (0 , 1) are uni-formly distributed random variables, and 𝜒 ∈ ℝ>0 is an inertia/constriction factor analogous to a gradient-descent learning rate. The Unified Particle Swarm Optimizer (UPSO) [34] merges local and global strategies into a single framework, so the total velocity update is computed as the following convex combination: 
+
+𝒗 𝑞 (𝑘 + 1) = 𝑢 ⋅ 𝒗 𝑔 𝑞 (𝑘 + 1) + (1 − 𝑢 ) ⋅ 𝒗 𝑙 𝑞 (𝑘 + 1) 
+
+where 𝑢 ∈ [0 , 1] is a parameter that blends the two strategies (𝑢 = 0 yields PSO-LS, while 𝑢 = 1 yields PSO-GS). In our implementation, we add a small Gaussian noise term to avoid stagnation, and we clamp the velocities within reasonable bounds to ensure stability. We adopt the unified approach to balance exploration and exploitation.   
+
+> Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 5 of 16
+
+4. Experimental Setup 
+
+Our experimental and evaluation framework is designed to investigate three main questions: 1. Can HyAL effectively tackle diverse, challenging, and high-dimensional constrained optimization problems, in terms of both solution quality and runtime? 2. Which EA performs best in this HyAL setting? 3. Can HyAL outperform state-of-the-art numerical op-timization and evolution strategies on complex COPs? 
+
+4.1. Benchmark Problems 
+
+To address the evaluation objectives listed above, we as-sess HyAL on a diverse suite of 10 constrained optimization benchmark problems drawn from the literature [16, 41, 50], as they are written in Appendix A, where both the global minima and the optimal Lagrange multipliers associated with the non-box inequality constraints are reported for each COP. We report only these multipliers because variable bounds are handled separately through projection onto the prescribed intervals. The selected problems span a wide range of difficulties and structural properties, exhibiting challenging and complex search spaces due to: 
+
+• highly nonlinear and nonconvex objectives (e.g. Prob. 1, 5, 8), 
+
+• nonconvex feasible regions arising from high-order polynomials or trigonometric constraints (e.g. Prob. 2, 4, 6), 
+
+• highly multimodal landscapes with multiple local minima (e.g. Prob. 7, 9), 
+
+• equality-constrained manifolds restricting the search (e.g. Prob. 3, 7, 10), 
+
+• high-dimensionality with strongly coupled variables (e.g. Prob. 10). 
+
+4.2. Evaluation Methodology 
+
+For each constrained optimization problem, we evalu-ate the proposed evolutionary methods and compare them against established baselines. In particular, we consider: 
+
+• AL-EAs comparison: the four evolutionary optimiz-ers used within the augmented Lagrangian frame-work, namely SGA-AL , CEM-AL , DE-AL , and PSO-AL , in order to identify the most effective evolutionary search strategy among the chosen representative EAs. 
+
+• Penalty-based baseline: a standalone PSO imple-mentation with a penalty formulation, PSO-PEN , to check the evolutionary search behavior when the Aug-mented Lagrangian mechanism is not leveraged. 
+
+• Classical Numerical baseline: the IPOPT (Interior Point Optimizer) solver [48], included as a repre-sentative state-of-the-art gradient-based and nonlinear interior point numerical optimization method. 
+
+• Evolution Strategy baseline: CMA-ES [19] (Covari-ance Matrix Adaptation - Evolution Strategy), in-cluded to contrast AL-EAs against a state-of-the-art derivative-free and evolutionary optimizer. The comparison focuses on convergence to the global minimum and satisfaction of the constraints. Each con-strained problem is evaluated over 100 independent repli-cates/runs initialized from distinct starting points, except for Problem 10, which we evaluate over 25 independent runs. For two-dimensional problems, initial points are arranged on a rectangular grid of evenly spaced values, whereas for higher-dimensional problems, they are randomly sampled from a Gaussian distribution within the prescribed bounds. Convergence is assessed using the thresholds 𝜀 𝑠 = 10 −3 
+
+and 𝜀 𝑐 = 10 −4 , reflecting acceptable solution accuracy while prioritizing feasibility (in many cases, the final solution accuracy and constraint satisfaction exceed these nominal thresholds before termination, due to the inserted stagnation phases 𝑠𝑡𝑎𝑔 𝐴𝐿 𝑚𝑎𝑥 = 50 and 𝑠𝑡𝑎𝑔 𝐸𝐴 𝑚𝑎𝑥 = 100 ). For EAs we set the population size to 4096 individuals and the convergence tolerance to 𝜀 𝐸𝐴 = 10 −6 . The maximum number of itera-tions for the AL outer loop and EAs inner loop are set to 
+
+𝑖𝑡𝑒𝑟 AL  
+
+> max
+
+= 2 ,000 and 𝑖𝑡𝑒𝑟 EA  
+
+> max
+
+= 5 ,000 , respectively (even though EAs inner loop usually terminates much earlier, espe-cially for the simpler COPs). Any further tunable parameters mentioned in Sec. 3.2 related to the exact implementations of the EAs, as well as the HyAL framework implementation, can be found in the source codes available, respectively, at https://github.com/NOSALRO/algevo and https://github. com/NOSALRO/halm . Additional details regarding the other test optimizers considered in our comparisons, are provided in Sec. 5.2. Crucially, all methods are evaluated using the same external success criteria (𝜀 𝑠 , 𝜀 𝑐 ), ensuring that error metrics, convergence times, and success rates are directly comparable across all optimizers. Experiments were conducted on a workstation equipped with an Intel Core Ultra 9 285K processor (24 physical cores, 36 MiB L3 cache, 64GB RAM) running Arch Linux. All methods were evaluated under identical hardware and software conditions to ensure a fair comparison. 
+
+5. Results 
+
+Using the parameters and criteria defined in Sec. 4.2, we can now evaluate the various optimizers on all benchmark problems in Sec. 4.1, with known global minima 𝒙 ⋆. An estimated solution ̄ 𝒙 𝑜𝑝𝑡 will be considered 𝜀 𝑠 -optimal and 
+
+𝜀 𝑐 -feasible, if the conditions (7) ( |𝑓 (𝒙 ⋆) − 𝑓 (̄𝒙 𝑜𝑝𝑡 )| ≤ 𝜀 𝑠 
+
+or ‖𝒙 ⋆ −̄ 𝒙 𝑜𝑝𝑡 ‖2 ≤ 𝜀 𝑠 , depending on the chosen convergence criterion) and (8) ( 𝑐 (̄ 𝒙 𝑜𝑝𝑡 ) ≤ 𝜀 𝑐 ) are satisfied, respectively. For the comparisons coming next, we also define 𝒙 𝑓 as the final solution estimation computed by the current optimizer. 
+
+5.1. Comparing EAs inside the AL Framework 
+
+Tab. 1 summarizes the performance of all AL-EA op-timizers across the whole benchmark set, presenting use-ful quantitative metrics. For each problem, we report the   
+
+> Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 6 of 16
+
+Table 1 Aggregated performance comparison of all AL-EA optimizers (PSO-AL, DE-AL, SGA-AL, CEM-AL) on the whole benchmark set (10 COPs), reporting the 5th , median , and 95th percentiles of final solution absolute error , objective absolute error and constraint violation . In addition, objective-value success is evaluated under tolerances 𝜀 𝑠 = 10 −3 and 𝜀 𝑐 = 10 −4 : Ever Hits counts runs that satisfy the criteria at least once, 1st -Hit Med. Time [msec] reports the median first-satisfaction time, and Final Hits counts runs meeting the criteria at the final iteration. Best and worst results per problem are highlighted in green and red, respectively. For presentation purposes, numbers with absolute value less than 10 −10 are considered insignificantly small and reported as 0.
+
+Problem Optimizer ‖𝒙 ⋆ − 𝒙 𝒇 ‖𝟐 |𝒇 (𝒙 ⋆) − 𝒇 (𝒙 𝒇 )| 𝒄 (𝒙 𝒇 ) Obj. value Success 
+
+(𝜀 𝑠 = 10 −3 , 𝜀 𝑐 = 10 −4 )
+
+5% Med. 95% 5% Med. 95% 5% Med. 95% Ever Hits 
+
+1st -Hit Med. Time [msec] Final Hits (1) Rosenbrock 2D PSO-AL 0 0 0 0 0 0 0 0 2.8e-10 100/100 7 100/100 DE-AL 0 0 0 0 0 0 0 0 0 100/100 6 100/100 SGA-AL 0 5.0e-6 3.2e-5 0 1.9e-9 1.3e-8 1.9e-7 4.8e-6 3.4e-5 100/100 89.8 100/100 CEM-AL 0 0 0 0 0 0 0 6.1e-9 3.8e-8 100/100 58.7 100/100 (2) Quadratic PSO-AL 0 0 6 0 0 16 0 0 0 78/100 20.4 78/100 
+
+DE-AL 0 0 0 0 0 0 0 0 0 100/100 20.2 100/100 SGA-AL 2.2e-5 1.2e-4 0.001 0.003 0.016 0.031 0 0 1.1e-5 2/100 2.0e+3 2/100 CEM-AL 0 0 11.225 0 0 146 0 4.5e-8 4.4e-7 53/100 1.2e+3 53/100 
+
+(3) Power-Terms Objective PSO-AL 3.3e-6 3.3e-6 3.3e-6 0 0 0 1.4e-9 4.3e-8 2.3e-7 100/100 17.3 100/100 DE-AL 3.3e-6 3.3e-6 3.3e-6 0 0 0 3.6e-10 1.5e-9 2.0e-9 100/100 16 100/100 SGA-AL 3.3e-6 2.0e-5 4.2e-5 0 5.5e-5 1.6e-4 6.9e-6 3.6e-5 9.3e-5 100/100 501.8 100/100 CEM-AL 3.3e-6 3.3e-6 3.3e-6 0 0 0 1.8e-8 2.0e-7 1.2e-6 100/100 228.7 100/100 (4) Linear Objective PSO-AL 0 0 0 0 0 0 1.5e-10 1.6e-9 6.4e-9 100/100 13.5 100/100 DE-AL 0 0 0 0 0 0 0 4.2e-10 1.2e-9 100/100 11.4 100/100 SGA-AL 1.0e-5 2.0e-5 4.0e-5 9.5e-6 2.0e-5 5.0e-5 5.8e-6 2.6e-5 6.0e-5 100/100 299.3 100/100 CEM-AL 0 0 0 0 0 0 8.1e-9 3.2e-8 6.8e-8 100/100 93.5 100/100 (5) Mishra’s Bird PSO-AL 3.9e-6 3.9e-6 3.9e-6 4.6e-4 4.6e-4 4.6e-4 0 0 0 100/100 8.3 100/100 DE-AL 3.9e-6 3.9e-6 3.9e-6 4.6e-4 4.6e-4 4.6e-4 0 0 0 100/100 7 100/100 SGA-AL 3.9e-6 3.9e-6 1.0e-5 4.6e-4 4.6e-4 4.6e-4 0 0 0 100/100 74 100/100 CEM-AL 3.9e-6 3.9e-6 5.928 4.6e-4 4.6e-4 85.928 0 0 2.8e-9 79/100 57.3 79/100 (6) Constrained Gomez-Levy PSO-AL 4.0e-7 4.0e-7 4.0e-7 1.5e-6 1.5e-6 1.5e-6 0 0 0 100/100 8.5 100/100 DE-AL 4.0e-7 4.0e-7 4.0e-7 1.5e-6 1.5e-6 1.5e-6 0 0 0 100/100 7.2 100/100 SGA-AL 9.9e-7 4.0e-6 9.2e-6 1.5e-6 1.5e-6 1.5e-6 0 0 0 100/100 86.4 100/100 CEM-AL 4.0e-7 4.0e-7 4.0e-7 1.5e-6 1.5e-6 1.5e-6 0 0 0 100/100 61.9 100/100 (7) Drop-Wave PSO-AL 0 0 0 2.0e-6 2.0e-6 2.0e-6 2.7e-10 5.3e-9 2.2e-8 100/100 8.4 100/100 DE-AL 0 0 0 2.0e-6 2.0e-6 2.0e-6 8.7e-10 6.6e-9 1.8e-8 100/100 8 100/100 SGA-AL 0 2.2e-5 9.3e-5 2.0e-6 2.0e-6 2.0e-6 2.0e-6 1.8e-5 7.3e-5 100/100 87 100/100 CEM-AL 0 0 0 2.0e-6 2.0e-6 2.0e-6 1.6e-9 2.8e-8 1.4e-7 100/100 68.6 100/100 (8) Egg-Holder PSO-AL 2.0e-4 2.0e-4 2.0e-4 3.4e-4 3.4e-4 3.4e-4 0 0 0 100/100 11.3 100/100 DE-AL 2.0e-4 2.0e-4 2.0e-4 3.4e-4 3.4e-4 3.4e-4 0 0 0 100/100 6.5 100/100 SGA-AL 2.0e-4 2.0e-4 2.0e-4 3.4e-4 3.4e-4 3.4e-4 0 0 0 100/100 82.5 100/100 CEM-AL 2.0e-4 190.203 334.287 3.4e-4 70.692 652.473 0 0 0 14/100 57.3 14/100 (9) Griewank 2D PSO-AL 3.8e-9 1.2e-8 1.7e-8 0 0 0 0 0 0 100/100 8.5 100/100 DE-AL 6.3e-6 3.3e-5 7.4e-5 0 3.9e-10 1.9e-9 0 0 0 100/100 11.5 100/100 SGA-AL 5.2e-6 1.7e-5 3.6e-5 0 1.0e-10 4.6e-10 0 0 0 100/100 105.6 100/100 CEM-AL 6.2e-9 5.437 16.441 0 0.007 0.068 0 0 0 45/100 87.7 45/100 (10) Double Integrator PSO-AL 0.011 0.016 0.024 1.0e-4 0.001 0.004 2.8e-5 4.4e-5 7.0e-5 25/25 4.7e+4 11/25 DE-AL 32.121 41.193 45.908 76.963 286.209 607.748 4.0266 5.7035 7.6766 0/25 - 0/25 SGA-AL 2.074 2.301 3.001 0.03 0.352 0.914 0.0654 0.076 0.0857 0/25 - 0/25 CEM-AL 5.328 7.875 10.9 1.187 3.048 6.414 0.0018 0.0039 0.0098 0/25 - 0/25 
+
+5th , 50 th (median), and 95 th percentiles of key metrics, such as the final solution error ‖𝒙 ⋆ − 𝒙 𝑓 ‖2, the objective error |𝑓 (𝒙 ⋆) − 𝑓 (𝒙 𝑓 )|, and the total constraint violation 
+
+𝑐 (𝒙 𝑓 ) (8). Additionally, Tab. 1 provides objective-value success metrics under the nominal (𝜀 𝑠 , 𝜀 𝑐 ) = (10 −3 , 10 −4 )
+
+thresholds. Specifically, we record the number of runs that satisfy the convergence criteria at least once ( Ever Hits ), the median time required to first meet these criteria ( First-Hit Median Time ), and the number of runs that satisfy the criteria until the final iteration ( Final Hits ). Best and worst results for each problem-metric pair are highlighted in green and red, respectively, facilitating immediate visual comparison across all AL-EA optimizers. In general, we conclude that PSO-AL and DE-AL achieve the smallest solution and constraint errors, with very low 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 7 of 16 Table 2 Aggregated time comparison of all AL-EA optimizers on the whole benchmark set (10 COPs), reporting the median total running time [msec] for each optimizer-problem pair. Best and worst times per problem are highlighted in green and red, respectively.                                                      
+
+> Total Running Times [msec] (Median)  Optimizer Problem (1) Rosenbrock 2D (2) Quadratic (3) Power-Terms Objective (4) Linear Objective (5) Mishra’s Bird (6) Constrained Gomez-Levy (7) Drop-Wave (8) Egg-Holder (9) Griewank 2D (10) Double Integrator PSO-AL 158.2 208.7 200.1 199.8 184.5 200.5 184.1 205.4 184.9 5.4e+4 DE-AL 147 307.3 214 205 170.4 175.7 190.8 158 279.5 3.8e+5
+> SGA-AL 2.0e+3 3.4e+3 6.9e+3 2.0e+3 1.7e+3 2.1e+3 2.0e+3 1.9e+3 1.7e+3 9.9e+5
+> CEM-AL 1.4e+3 3.4e+3 5.1e+3 1.6e+3 1.4e+3 1.5e+3 1.5e+3 1.3e+3 1.4e+3 5.9e+6 0.0
+> start
+> 0.2 0.4 0.6 0.8 1.0
+> end
+> Normalized progress τ=k/( Kr− 1)
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> |f(x⋆) −  f(xk)| (log scale)
+> 10 : Double Integrator — PSO-AL
+> Objective convergence → f⋆= 23.8724
+> 5th-95th percentile band
+> Median
+> εs= 1.0 e− 03
+
+(a) Objective error 0.0             
+
+> start
+> 0.2 0.4 0.6 0.8 1.0
+> end
+> Normalized progress τ=k/( Kr− 1)
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> c(xk) (log scale)
+> 10 : Double Integrator — PSO-AL
+> Constraint violation convergence → 0
+> 5th-95th percentile band
+> Median
+> εc= 1.0 e− 04
+
+(b) Constraint violation 
+
+Figure 2: Convergence behavior of PSO-AL on Prob. 10. The plots show the evolution of the objective error and constraint violation versus normalized progress, 𝜏 = 𝑘 ∕( 𝐾 𝑟 − 1) ∈ [0 , 1] ,where 𝑘 denotes the current AL outer loop iteration and 𝐾 𝑟 
+
+the final iteration of run 𝑟 , thus, 𝜏 = 0 denotes the start and 
+
+𝜏 = 1 the end of a run. The solid line shows the median across runs, the shaded region the 5th-95th percentile band, and the dashed horizontal line the nominal convergence threshold. 
+
+variance and almost perfect success rates across all bench-marks (exceptions include Prob. 2 for PSO-AL and Prob. 10 for DE-AL). Meanwhile, CEM-AL and SGA-AL typically yield higher solution errors and lower convergence success (Prob. 2, 5, 8, 9, 10 being characteristic examples for CEM-AL and Prob. 2, 10 for SGA). This is to be expected, since SGA-AL is a less sophisticated algorithm than PSO-AL and DE-AL, featuring simpler crossover and mutation rules, and CEM-AL is inherently more exploitative than exploratory, making it prone to local minima. Notably, in the high-dimensional case of Problem 10, only PSO-AL achieves decent performance, revealing its superior exploration capabilities relative to the other AL-EAs. In this case, the lower number of Final Hits relative to Ever Hits is caused only by the solution accuracy requirement, as the constraint violation threshold is satisfied in all runs. More generally, a gap between Ever Hits and Final Hits may reflect oscillatory or unstable behavior, where the optimizer identifies the global optimum but loses track of it and fails to retain it until termination. This phenomenon is not observed for the proposed AL-EAs in any of the considered benchmark problems (with the only exception as we said of Prob. 10 for PSO-AL, where still the solution accuracy remains very good), further showcasing their robust and stable convergence behavior. Regarding the execution times of the AL-EAs, we ob-serve that, first of all, EAs reach the desired solution pre-cision rapidly, in a matter of milliseconds, as indicated by the 1st -Hit Time Median metric in Tab. 1. However, their overall running times, as reported in Tab. 2, tend to be much higher due to the stagnation phases incorporated in both the AL outer loop and the EAs inner loop. Median total times highlight that PSO-AL and DE-AL not only converge more reliably, but also consistently faster than the other evolutionary approaches SGA-AL and CEM-AL, typically in around 0.2 seconds (for all COPs instead of Prob. 10, where the "curse of dimensionality" increases the required fitness function evaluations and the computational cost). We have established that the evolutionary methods are effective at recovering the global minimum, some of them more efficiently than the others. However, we have not yet verified whether our AL-EAs scheme itself is functioning as intended. In particular, we must assess whether the AL outer loop contributes meaningfully to the optimization process by accurately estimating the Lagrange multipliers and driving them toward their optimal values. This is examined in Tab. 3, which reports the 𝓁 2-norm errors 
+
+‖‖‖‖‖[𝝀 ⋆ − 𝝀 𝑓 
+
+𝝁 ⋆ − 𝝁 𝑓 
+
+]‖‖‖‖‖2
+
+between the final estimated multipliers (𝝀 𝑓 , 𝝁 𝑓 ) and their optimal counterparts (𝝀 ⋆, 𝝁 ⋆). We report only the multiplier errors associated with the active non-box constraints, since we dealt with variable bounds via projection onto the prescribed intervals. The results indicate that the AL-EAs estimate the Lagrange multipliers with very small errors, even in the most challenging cases where the optimal multiplier vector is nonzero (Prob. 2, 3, 4, and 10), with the only exception of Quadratic Prob. 2. For this COP, the comparatively larger multiplier estimation errors are consistent with the lower overall success rates observed for the majority of EAs rel-ative to the remaining benchmark problems, suggesting that accurate multiplier estimation is closely linked to successful convergence. It’s important to note that, for Prob. 10, the total multiplier estimation error of PSO-AL is an order of magnitude smaller than any individual component of the high-dimensional optimal multiplier vector, demonstrating strong numerical accuracy. Overall, PSO-AL and DE-AL once again outperform the remaining AL-EAs. It should also be noted that the accuracy of the estimated Lagrange multipliers is influenced by the update strategy of the AL framework, including the initialization, scaling factor, and maximum values of the penalty parameters in (6), which affect the conditioning of the subproblems and the conver-gence of the multiplier estimates. In our experiments we have used the same update setup for all COPs and AL-EAs. 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 8 of 16 Table 3 Aggregated AL framework performance comparison of all AL-EA optimizers on all 10 COPs, reporting the median final Lagrange-multipliers 𝓁 2-norm errors . Best and worst median errors per problem are highlighted in green and red, respectively.                                          
+
+> 𝓁 2-Norm Errors (Median) of Lag. Multipliers
+> Optimizer Problem (1) Rosenbrock 2D (2) Quadratic (3) Power-Terms Objective (4) Linear Objective (5) Mishra’s Bird (6) Constrained Gomez-Levy (7) Drop-Wave (8) Egg-Holder (9) Griewank 2D (10) Double Integrator PSO-AL 4.5e-9 2.3e+3 0.011 5.8e-4 007.1e-9 000.213 DE-AL 02.3e+3 0.011 5.8e-4 003.6e-9 004.1e+5
+> SGA-AL 0.001 2.3e+3 0.467 0.087 006.6e-4 001.0e+4
+> CEM-AL 1.5e-6 15.246 0.011 7.4e-4 003.2e-8 001.1e+3
+
+To further inspect the internal behavior of our HyAL scheme, Fig. 2 shows the convergence of the best AL-EA optimizer, PSO-AL, on the Double Integrator Prob. 10, with respect to two metrics: the objective error and constraint violation . In these plots, the horizontal axis is the normalized progress of each run, 𝜏 ∈ [0 , 1] , where 𝜏 = 0 and 𝜏 = 1 
+
+denote the start and end of the run, respectively. To enable comparison across runs of different lengths, all trajecto-ries are linearly interpolated onto a common normalized progress grid before computing the median and the 5th-95th percentile band. The solid curve represents the median across runs at each 𝜏 value, while the shaded region indicates the corresponding 5th-95th percentile band. The dashed horizontal line marks the nominal convergence threshold (𝜀 𝑠 or 𝜀 𝑐 ). The plots reveal a consistent convergence trend across both metrics, with the objective error and constraint violation decreasing rapidly during the early stages of the optimization, and then almost flattening near their limiting values as the runs approach completion. These observations are consistent with the statistics reported in Tab. 1. 
+
+5.2. Comparing different Kinds of Optimizers 
+
+Before evaluating the last set of benchmark optimiz-ers, we need to summarize briefly their main functional-ity. First, we have PSO-PEN , which is the penalty-based alternative to PSO-AL . We chose to use PSO, as it was experimentally (Sec. 5.1) the best AL-EA. PSO-PEN main-tains the usual PSO movement rule (Sec. 3.2.4) with the same exact hyper-parameters, but the population’s quality at 𝑘 -th iteration is judged by a cost function 𝐽 consisting of the objective function plus an increasing penalty term, computed from the equality and inequality violations (this is inspired from [32]): 𝐽 (𝒙 ) = 𝑓 (𝒙 ) + 𝑡 (𝑘 ) ⋅ 𝑝 (𝒙 ), where 
+
+𝑝 (𝒙 ) =
+
+(∑𝑙 𝑖 =1 𝜉 (|ℎ𝑖 (𝒙 )|) + ∑𝑚 𝑗 =1 𝜉 (max(0 , 𝑔 𝑗 (𝒙 ))) 
+
+)
+
+, 𝑡 (𝑘 )
+
+is an iteration-dependent growing weight and 𝜉 (⋅) is some monotonous increasing function. So, the only key difference from PSO-AL is that there is no AL outer loop, instead, fea-sibility is handled directly inside the penalty-shaped fitness function in a single PSO run. The second optimizer is IPOPT [48], a deterministic primal-dual barrier interior-point algorithm with a filter line search, for nonlinear programming. We worked with python’s cyipopt (https://github.com/mechmotum/cyipopt) interface, where we passed, for each COP, the objective function and its gradient, the constraints and their Jacobians (in dense form), and the variable bounds. We configured the solver with a strict internal convergence tolerance of 
+
+10 −7 (for the bounds of the scaled KKT residual, that com-bines stationarity and equality/inequality feasibility viola-tion terms) and a maximum of 2,000 iterations to ensure reliable and stable termination. The final benchmark optimizer is CMA-ES [19], which is a Covariance Matrix Adaptation evolution strategy. We used the standard Python’s pycma (https://github.com/CMA-ES/pycma) library, developed by the authors of the method. In general, CMA-ES samples a Gaussian population around a current mean, evaluates the candidates, and then adapts the mean, step size (standard deviation), and covariance matrix from the best solutions, similarly to the CEM optimizer (Sec. 3.2.2). Here, we employed the Augmented-Lagrangian approach AL-CMA-ES, proposed in [12, 17], in order to handle the COP constraints. Following the recommended default choice in [19], we used the (𝜇 ∕𝜇 𝑤 , 𝜆 )-CMA-ES version, with initial step size 𝜎 0 = 0.25 and offsprings population size 𝜆 = 4+ ⌊3 ln( 𝑛 )⌋ (𝑛 is the COP’s dimension), while the remaining strategy parameters were automatically derived from 𝜆 , including the parent population size 𝜇 (typi-cally ⌊𝜆 ∕2 ⌋), the recombination weights 𝑤 which determine the variance-effective selection mass 𝜇 𝑤 , and the step-size adaptation. We capped the base run at 5,000 generations and used an IPOP-CMA-ES restart scheme [2], sharing the corresponding evaluation budget across the initial run and up to 3 restarts. A restart was launched only if the current run terminated early according to CMA-ES’s stopping criteria, and each restart used the remaining budget with a doubled 𝜆 .Additionally, we scaled the decision variables to comparable ranges in order for the step size to act more uniformly across coordinates and to prevent ill-conditioned covariances. Fur-thermore, we decided to follow a "best-feasible tracking" approach, retaining the best feasible point observed across all generations and restarts. Without it, CMA-ES’s reported solutions were considerably less robust, i.e. the Final Hits 
+
+column would be far lower than the Ever Hits column in Tab. 4, indicating loss of global minima tracking. We avoided (1 + 1) -CMA-ES, as it is ”a poor global optimizer and not usefully applied to multimodal problems” [1], and also “on unconstrained multimodal problems (𝜇 ∕𝜇 𝑤 , 𝜆 )-CMA-ES vastly outperforms the (1 + 1) -CMA-ES” [12]. The new comparison metrics are gathered in Tab. 4, and the time data in Tab. 5. Initially, we notice that PSO-PEN performs at best comparably to, and more often worse than PSO-AL, across all 10 COPs, regarding both solution 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 9 of 16 Table 4 Aggregated performance comparison of optimizers PSO-AL (best of the AL-EAs), PSO-PEN, IPOPT, and CMA-ES , on the whole benchmark set (10 COPs). The metrics reported here and the presentation of the results are the same as in Tab. 1. 
+
+Problem Optimizer ‖𝒙 ⋆ − 𝒙 𝒇 ‖𝟐 |𝒇 (𝒙 ⋆) − 𝒇 (𝒙 𝒇 )| 𝒄 (𝒙 𝒇 ) Obj. value Success 
+
+(𝜀 𝑠 = 10 −3 , 𝜀 𝑐 = 10 −4 )
+
+5% Med. 95% 5% Med. 95% 5% Med. 95% Ever Hits 
+
+1st -Hit Med. Time [msec] Final Hits (1) Rosenbrock 2D PSO-AL 0 0 0 0 0 0 0 0 2.8e-10 100/100 7 100/100 PSO-PEN 0 1.0e-6 3.0e-6 0 5.0e-10 3.2e-9 0 0 2.9e-7 100/100 9.2 100/100 IPOPT 1.2e-6 1.411 1.411 7.3e-10 0.999 0.999 0 9.9e-9 1.0e-8 18/100 2.6 18/100 CMA-ES 7.6e-10 1.411 1.411 0 0.999 0.999 0 9.7e-5 1.0e-4 35/100 514.4 35/100 
+
+(2) Quadratic PSO-AL 0 0 6 0 0 16 0 0 0 78/100 20.4 78/100 PSO-PEN 12.317 24.657 38.931 39.408 1.5e+3 6.6e+3 0.1241 16.2035 46.5129 0/100 - 0/100 IPOPT 3.8 7.874 12.728 11.4 126 162.6 9.3e-9 1.4e-8 1.4e-8 5/100 3.1 5/100 
+
+CMA-ES 7.0e-5 6 6.126 0.01 11.988 70.968 0 9.6e-5 1.0e-4 7/100 964.8 0/100 (3) Power-Terms Objective PSO-AL 3.3e-6 3.3e-6 3.3e-6 0 0 0 1.4e-9 4.3e-8 2.3e-7 100/100 17.3 100/100 PSO-PEN 6.7e-6 6.7e-6 18.128 1.0e-5 1.0e-5 69.437 3.8e-6 5.0e-6 46.7052 76/100 64 76/100 
+
+IPOPT 5.1e-8 5.7e-8 1.856 1.7e-6 1.7e-6 1.631 0 7.5e-9 1.0e-8 91/100 70 91/100 
+
+CMA-ES 4.7e-5 4.216 4.216 1.5e-4 4.514 4.514 7.5e-5 9.8e-5 1.0e-4 47/100 412.8 47/100 (4) Linear Objective PSO-AL 0 0 0 0 0 0 1.5e-10 1.6e-9 6.4e-9 100/100 13.5 100/100 PSO-PEN 1.0e-5 1.0e-5 0.823 1.0e-5 1.0e-5 0.609 3.4e-6 5.0e-6 2.3383 88/100 29.5 88/100 
+
+IPOPT 3.1e-6 0.813 1.738 3.3e-6 1.088 1.454 1.4e-8 1.4e-8 1.4e-8 42/100 1.7 42/100 CMA-ES 6.3e-5 7.3e-5 7.6e-5 6.8e-5 7.6e-5 7.9e-5 8.6e-5 9.7e-5 1.0e-4 100/100 269.7 100/100 (5) Mishra’s Bird PSO-AL 3.9e-6 3.9e-6 3.9e-6 4.6e-4 4.6e-4 4.6e-4 0 0 0 100/100 8.3 100/100 PSO-PEN 3.9e-6 3.9e-6 3.9e-6 4.6e-4 4.6e-4 4.6e-4 0 0 0 100/100 8.8 100/100 IPOPT 2.3e-8 4.619 7.899 4.9e-8 85.246 108.252 0 0 1.0e-8 46/100 3.2 46/100 CMA-ES 1.6e-8 2.3e-8 3.1e-8 4.9e-8 4.9e-8 4.9e-8 0 0 0 99/100 251.4 99/100 
+
+(6) Constrained Gomez-Levy PSO-AL 4.0e-7 4.0e-7 4.0e-7 1.5e-6 1.5e-6 1.5e-6 0 0 0 100/100 8.5 100/100 PSO-PEN 4.0e-7 6.3e-7 1.0e-6 1.5e-6 1.5e-6 1.5e-6 0 0 0 100/100 8.2 100/100 IPOPT 1.1e-8 1.383 1.413 4.7e-8 0.044 0.667 0 9.3e-9 9.9e-9 43/100 2.7 43/100 CMA-ES 9.3e-9 1.3e-8 2.3e-8 4.7e-8 4.7e-8 4.7e-8 0 0 0 98/100 282.7 98/100 
+
+(7) Drop-Wave PSO-AL 0 0 0 2.0e-6 2.0e-6 2.0e-6 2.7e-10 5.3e-9 2.2e-8 100/100 8.4 100/100 PSO-PEN 0 1.0e-5 3.3e-5 2.0e-6 2.0e-6 2.0e-6 2.2e-8 1.4e-7 5.6e-7 96/100 11.8 96/100 
+
+IPOPT 4.4e-4 1.629 6.977 3.8e-6 0.193 0.332 0 0 46.8162 8/100 81.6 7/100 CMA-ES 1.7e-6 0.613 2.119 2.3e-6 0.08 0.216 0 1.6e-7 9.4e-5 37/100 772.2 37/100 
+
+(8) Egg-Holder PSO-AL 2.0e-4 2.0e-4 2.0e-4 3.4e-4 3.4e-4 3.4e-4 0 0 0 100/100 11.3 100/100 PSO-PEN 2.0e-4 2.0e-4 41.226 3.4e-4 3.4e-4 2.723 0 0 0 81/100 12.1 81/100 
+
+IPOPT 5.2e-6 44.749 344.504 2.0e-5 37.539 873.608 0 0 1.0e-8 43/100 255.5 43/100 CMA-ES 5.0e-6 5.1e-6 41.227 2.7e-6 2.7e-6 6.396 0 0 0 81/100 648.3 81/100 
+
+(9) Griewank 2D PSO-AL 3.8e-9 1.2e-8 1.7e-8 0 0 0 0 0 0 100/100 8.5 100/100 PSO-PEN 2.7e-7 1.0e-6 2.3e-6 0 0 0 0 0 0 100/100 9.5 100/100 IPOPT 2.8e-4 15.629 27.184 2.3e-8 0.089 0.736 0 0 1.0e-8 13/100 28.6 13/100 
+
+CMA-ES 5.3e-8 5.496 10.874 0 0.01 0.03 0 0 0 9/100 262.2 9/100 (10) Double Integrator PSO-AL 0.011 0.016 0.024 1.0e-4 0.001 0.004 2.8e-5 4.4e-5 7.0e-5 25/25 4.7e+4 11/25 
+
+PSO-PEN 11.099 14.688 21.146 6.345 10.508 24.522 0.0034 0.0232 0.7571 0/25 - 0/25 IPOPT 2.4e-5 2.4e-5 2.5e-5 4.4e-6 4.4e-6 4.4e-6 0 0 0 25/25 16.4 25/25 CMA-ES 22.379 27.816 32.419 25.62 39.585 55.008 9.4e-5 9.8e-5 9.9e-5 0/25 - 0/25 
+
+convergence and constraint satisfaction. Moreover, PSO-PEN is unable to handle higher-dimensional COPs, such as Prob. 2 and 10, where it totally fails. This showcases that the AL framework is crucial in ensuring constraint satisfaction. We also tested a second PSO-PEN variant, obtained by keeping identical the PSO-AL framework but removing the Lagrange multiplier updates (5). On the COPs for which the optimal vector is (𝝀 ⋆, 𝝁 ⋆) = 𝟎 , this simple quadratic penalty method retains the same high success rate as PSO-AL, since the multipliers are initialized at zero and remain at their optimal values throughout the optimization. However, on prob. 2, 3, 4, and 10, where (𝝀 ⋆, 𝝁 ⋆) ≠ 𝟎 , this approach neither achieves solution convergence nor ensures constraint satisfaction, and it completely fails in every run. On the other hand, IPOPT appears to fail in reliably reaching the global minimum in almost all COPs (less than 
+
+50% success, except Prob. 3 and 10), displaying worse performance than PSO-PEN, and high variability in solu-tion and objective errors. Although IPOPT converges very rapidly, in a matter of milliseconds (Tab. 5) due to its gradient-based updates, its inability to consistently locate the global minimum highlights the advantage of the AL-based population framework in addressing nonlinear, nonconvex, 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 10 of 16 Table 5 Aggregated time comparison of optimizers PSO-AL (best of the AL-EAs), PSO-PEN, IPOPT, and CMA-ES , on the whole benchmark set (10 COPs), reported in a similar way as in Tab. 2. 
+
+> Total Running Times [msec] (Median)
+
+Optimizer Problem (1) Rosenbrock 2D (2) Quadratic (3) Power-Terms Objective (4) Linear Objective (5) Mishra’s Bird (6) Constrained Gomez-Levy (7) Drop-Wave (8) Egg-Holder (9) Griewank 2D (10) Double Integrator PSO-AL 158.2 208.7 200.1 199.8 184.5 200.5 184.1 205.4 184.9 5.4e+4 
+
+PSO-PEN 9.2 300 63.3 29 8.8 8.2 11.8 11.7 9.5 4.1e+3 
+
+IPOPT 5.4 2.7 76.6 1.9 3.5 3.3 195.5 6.3e+3 56.5 23.6 CMA-ES 1.2e+3 2.7e+3 2.0e+3 1.4e+3 1.2e+3 1.2e+3 1.6e+3 1.3e+3 1.2e+3 3.5e+4 
+
+and multimodal problems. The comparatively weak perfor-mance of IPOPT can be intuitively explained by the struc-tural characteristics of the benchmark landscapes considered in this study, that pose significant challenges to gradient-based or Newton-based local search methods, which are inherently prone to converging to suboptimal local stationary points. Classic examples such as the flat, banana-shaped Rosenbrock valley (Prob. 1) and the highly multimodal structures of Drop-Wave (Prob. 7) and Griewank (Prob. 9) illustrate these difficulties. As shown in the convergence contour plots of Fig. 3, IPOPT often gets trapped in local minima. For the Rosenbrock problem, it converges near 
+
+(0 , 0) rather than to the global minimum at (1 , 1) , located at the intersection of the two active nonlinear inequality constraints, due to the narrow and curved geometry of the valley. For the Griewank problem, IPOPT often terminates at interior points within the feasible region instead of reaching the boundary global minimum on the active circular inequal-ity constraint, primarily because of the large number of local minima. Similarly, for the Drop-Wave problem, it converges to local minima along the circular equality constraint, as these stationary points are difficult to distinguish from the global minimum using local information alone. In contrast, population-based EAs leverage exploration and diversity to navigate such complex, nonconvex topographies more effec-tively, maintaining progress toward the true global optima (for example, PSO-AL converges to the global minima from any initial point, for all the cases described above). Up to this point, we have shown that our HyAL ap-proach handles the benchmark black-box COPs substantially more effectively than the state-of-the-art numerical opti-mizer IPOPT. The last benchmark optimizer is the state-of-the-art evolution strategy AL-(𝜇 ∕𝜇 𝑤 , 𝜆 )-CMA-ES, which in general converges better than IPOPT. But it exhibits much weaker performance relative to HyAL on the higher-dimensional Prob. 2, and 10, and on the multimodal Prob. 7, and 9. Also, it seems that it struggles in these specific COPs more than the others, which is consistent with the constrained-CMA-ES literature: [12] restricts its evaluation to unimodal test problems, explicitly noting that ”...The per-formance of the CMA-ES on multimodal test problems has not been investigated...”, while [17] evaluates its proposed variant mainly on simple sphere and ellipsoid problems with linear constraints, rather than on the more complex, mul-tiply constrained, high-dimensional and multimodal search spaces considered here. Overall, bringing CMA-ES to a level competitive with HyAL required considerable tuning, −1.5 −1.0 −0.5 0.0 0.5 1.0 1.5  
+
+> x
+> −0.5
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> y
+> Rosenbrock & IPOPT - Convergence Contour Map
+> Constraint boundary
+> Initial → Global minimum
+> Initial → Failures
+> Global minimum ( f⋆= 0.00000)
+> Failed final points
+
+(a) Rosenbrock 2D −10.0 −7.5 −5.0 −2.5 0.0 2.5 5.0 7.5 10.0   
+
+> x
+> −10.0
+> −7.5
+> −5.0
+> −2.5
+> 0.0
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> y
+> Drop-Wave & IPOPT - Convergence Contour Map
+> Equality Constraint - Feasible Region
+> Initial points → Global minima
+> Initial points → Failures
+> Global minima ( f⋆= -0.36913)
+> Failed final points
+
+(b) Drop-Wave −100 −75 −50 −25 0 25 50 75 100          
+
+> x
+> −100
+> −75
+> −50
+> −25
+> 0
+> 25
+> 50
+> 75
+> 100
+> y
+> Full domain
+> Constraint boundary
+> Initial points → Global minimum
+> Initial points → Failures
+> Global minimum ( f⋆= 0.00000)
+> Failed final points
+> −10 −5 0510 15 20 25 30
+> x
+> −10
+> −5
+> 0
+> 5
+> 10
+> 15
+> 20
+> 25
+> 30
+> y
+> Zoomed-in view
+> Griewank & IPOPT - Convergence Contour Map
+
+(c) Griewank 2D 
+
+Figure 3: Convergence contour maps for three 2D COPs using IPOPT. Top left: Rosenbrock 2D (Prob. 1). Top right: Drop-Wave (Prob. 7). Bottom: Griewank 2D (full domain + zoomed in view) (Prob. 9). Green dots show initial points that reached the global minimum, red dots show those that did not, black crosses mark final points of failed runs, and black squares mark the global minima positions. Constraint boundaries are in purple, with feasible regions shaded light green. 
+
+whereas our approach requires much less. CMA-ES was also noticeably slower in wall-clock time than the other optimizers (Tab. 5), likely due to the additional restarts and because pycma is implemented in pure Python, unlike the AL-EAs and IPOPT, which rely on compiled C++ backends. 
+
+5.3. Comparing all Optimizers together 
+
+Finally, we conduct a more visual total comparison be-tween all tested optimizers, by creating objective and solu-tion - based success rate plots. Fig. 4 presents the success rates for Prob. 1, 2, 7, 9, 10, while the remaining plots are shown in Appendix C in Fig. 5. We highlight these par-ticular problems because, taken together, they represent all the major categories of challenging search spaces described in Sec. 4.1, including nonconvex objectives and feasible 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 11 of 16 10 −6                                                   
+
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Objective convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 1 : Rosenbrock 2D
+> Objective + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Solution convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 1 : Rosenbrock 2D
+> Solution + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Objective convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 2 : Quadratic
+> Objective + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Solution convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 2 : Quadratic
+> Solution + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Objective convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 7 : Drop-Wave
+> Objective + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Solution convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 7 : Drop-Wave
+> Solution + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Objective convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 9 : Griewank 2D
+> Objective + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Solution convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 9 : Griewank 2D
+> Solution + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Objective convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 10 : Double Integrator
+> Objective + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Solution convergence threshold εs(log scale)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> 10 : Double Integrator
+> Solution + Constraint Success Rate (constant εc= 1.0e-04, varying εs)
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES
+
+Figure 4: Total comparison success rate curves for Prob. 1, 2, 7, 9, 10 (from top to bottom). Left / Right panels show the objective / solution - based success rates, respectively, with fixed constraint violation 𝑐 (𝒙 𝒇 ) ≤ 10 −4 . A run is considered successful if the objective / solution - based convergence error is |𝑓 (𝒙 ⋆) − 𝑓 (𝒙 𝑓 )| ≤ 𝜀 𝑠 / ‖𝒙 ⋆ − 𝒙 𝑓 ‖2 ≤ 𝜀 𝑠 .Each plot presents the success rate curve for each optimizer as a function of the solution threshold 𝜀 𝑠 .
+
+regions, multimodality, equality-constrained manifolds, and high-dimensionality. The plots summarize optimizer per-formance across all runs for each COP, showing success rates over a range of solution convergence thresholds 𝜀 𝑠 ,while maintaining a fixed constraint threshold 𝜀 𝑐 = 10 −4 .Interestingly, despite relying on an objective-based success criterion, the proposed methods attain solution-based con-vergence in most COPs, indicating that objective conver-gence typically accompanies convergence of the iterates toward the true solution. The vertical dashed line marks the nominal solution threshold 𝜀 𝑠 = 10 −3 (the last column of Tab. 1, 4 contains the success rates on this line), considered sufficient for practical convergence, while further improve-ments beyond 𝜀 𝑠 ≈ 10 −6 are not expected due to the limited precision of the known minima solutions on most benchmark problems (Sec. 4.1). From the success rate plots, we observe that PSO-AL and DE-AL consistently achieve perfect 100% success rates at the nominal solution threshold 𝜀 𝑠 = 10 −3 (with the exception of Prob. 10), and remain robust as the tolerance 𝜀 𝑠 
+
+decreases. In contrast, SGA-AL and more so CEM-AL ex-hibit less stable performance, with noticeably lower average success rates, particularly on Prob. 2 and 10. Regarding the other optimizers, we verify our previous findings that PSO-PEN mainly struggles with high-dimensional problems (e.g. Prob. 2, 10), just like CMA-ES, while the latter cannot easily converge to the global minima of multimodal problems (such as Prob. 7, 9). IPOPT has generally the worst performance, with success rates below 50% on almost all benchmarks (except for Prob. 3, and especially 10, where it outperforms all the other optimizers, since the Double Integrator COP is convex, thus well suited to IPOPT). Interestingly, constraint satisfaction is mostly reliable across all methods and bench-marks (with only PSO-PEN having difficulties satisfying the constraints on Prob. 2 and 10), indicating that feasibility is not the main limiting factor in these experiments. Instead, the primary differences, as demonstrated in the previous comparisons, lie in solution convergence. 
+
+5.4. Verdict 
+
+Overall, our experimental analysis effectively answers the three experimental questions that we set out to address (Sec. 4): (1) HyAL is able to solve a wide range of problems with different characteristics while also being able to scale to high-dimensional problems; (2) PSO and DE are the most effective EAs for this AL setting; and (3) HyAL is able to outperform the state-of-the-art IPOPT and CMA-ES opti-mizers in the complex Prob. 1-9, while being competitive, albeit with some limitations, in high-dimensional Prob. 10. 
+
+6. Conclusion 
+
+This work demonstrates that the proposed HyAL frame-work is a robust and effective approach for constrained, non-linear, nonconvex, continuous optimization. Across the 10 benchmark COPs, it consistently finds high-quality feasible solutions and, in the AL-EA comparison, PSO-AL and DE-AL emerge as the strongest variants, achieving the smallest errors and near-perfect success rates on almost all problems, with the only notable exception of Prob. 10. By embedding population-based evolutionary algorithms within an Aug-mented Lagrangian scheme, HyAL successfully balances feasibility and optimality, even in the presence of multi-modality and complex constraint structures. Among the evolutionary strategies considered, PSO-AL and DE-AL are clearly the most effective unconstrained subproblem solvers, delivering superior solution accuracy, 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 12 of 16 higher success rates, and faster convergence than other evo-lutionary variants such as SGA-AL and CEM-AL. In partic-ular, these methods typically reach the target precision in a matter of milliseconds, while also reducing constraint viola-tions to near machine precision, despite relying exclusively on derivative-free optimization. The framework remains ef-fective in higher-dimensional settings (Prob. 10), where evolutionary methods alone, without gradient information, are known to fail [9], nevertheless PSO-AL, functioning inside an AL framework, preserves strong performance. At the same time, the results confirm that reaching machine-precision accuracy without gradient information is espe-cially difficult in high-dimensional problems. Overall, our findings highlight the advantages of evo-lutionary methods in navigating nonlinearities, multimodal landscapes, and constrained search spaces, where gradient-based approaches often converge to suboptimal stationary points. The comparison against other optimizers further shows that HyAL substantially outperforms pure penalty methods like PSO-PEN, which fails on the harder high-dimensional problems, and also outperforms IPOPT and AL-CMA-ES on most benchmarks. IPOPT is fast but un-reliable at finding the global minimum, while CMA-ES is more competitive yet still weaker than HyAL on the multimodal and higher-dimensional problems. Our study not only validates the robustness of HyAL but also highlights its broader potential for real-world constrained optimization problems. Promising directions for future work include exploiting 
+
+GPU-based parallelization to improve computational effi-ciency [7, 28, 22, 24] and combining evolutionary methods with gradient-based methods [36, 18, 9] to further accel-erate convergence and enhance solution accuracy in high-dimensional settings. 
+
+Acknowledgments 
+
+This work was supported by the Hellenic Foundation for Research and Innovation (H.F.R.I.) under the “3rd Call for H.F.R.I. Research Projects to support Post-Doctoral Re-searchers” (Project Acronym: NOSALRO, Project Number: 7541). The authors have no competing interests. 
+
+References 
+
+[1] Arnold, D.V., Hansen, N., 2012. A (1+1)-cma-es for constrained op-timisation, in: Proceedings of the 14th annual conference on Genetic and evolutionary computation, pp. 297–304. [2] Auger, A., Hansen, N., 2005. A restart CMA evolution strategy with increasing population size, in: 2005 IEEE Congress on Evolutionary Computation, IEEE. pp. 1769–1776. [3] Bambade, A., El-Kazdadi, S., Taylor, A., Carpentier, J., 2022. Prox-qp: Yet another quadratic programming solver for robotics and be-yond, in: Proceedings of Robotics: Science and Systems. doi: 10. 15607/RSS.2022.XVIII.040 .[4] Beck, A., Hallak, N., 2022. The regularized feasible directions method for nonconvex optimization. Operations Research Letters 50, 517–523. [5] Birgin, E.G., Martínez, J.M., 2014. Practical augmented Lagrangian methods for constrained optimization. SIAM. [6] Botev, Z.I., Kroese, D.P., Rubinstein, R.Y., L’Ecuyer, P., 2013. Chap-ter 3: The cross-entropy method for optimization, in: Handbook of Statistics. Elsevier. volume 31, pp. 35–59. URL: https://doi.org/10. 1016/B978-0-444-53859-8.00003-5 , doi: 10.1016/B978-0-444-53859-8. 00003-5 .[7] Chalumeau, F., Lim, B., Boige, R., Allard, M., Grillotti, L., Flageat, M., Macé, V., Richard, G., Flajolet, A., Pierrot, T., et al., 2024. Qdax: A library for quality-diversity and population-based algorithms with hardware acceleration. Journal of Machine Learning Research 25, 1–16. [8] Chatzilygeroudis, K., Cully, A., Vassiliades, V., Mouret, J.B., 2021. Quality-diversity optimization: a novel branch of stochastic optimiza-tion, in: Black Box Optimization, Machine Learning, and No-Free Lunch Theorems. Springer, pp. 109–135. [9] Chatzilygeroudis, K.I., Vrahatis, M.N., 2023. Fast and robust con-strained optimization via evolutionary and quadratic programming, in: International Conference on Learning and Intelligent Optimiza-tion, Springer. pp. 46–61. [10] Chootinan, P., et al., 2006. Constraint handling in genetic algorithms using a gradient-based repair method. Computers & Operations research 33, 2263–2281. [11] Deng, W., Shang, S., Cai, X., Zhao, H., Song, Y., Xu, J., 2021. An improved differential evolution algorithm and its ap-plication in optimization problem. Soft Computing 25, 5277– 5298. URL: https://doi.org/10.1007/s00500-020-05527-x , doi: 10. 1007/s00500-020-05527-x .[12] Dufossé, P., Hansen, N., 2021. Augmented lagrangian, penalty techniques and surrogate modeling for constrained optimization with cma-es, in: Proceedings of the Genetic and Evolutionary Computation Conference, pp. 519–527. [13] D’Angelo, G., Palmieri, F., 2021. GGA: A modified genetic algorithm with gradient-based local search for solving constrained optimization problems. Information Sciences 547, 136–162. [14] Elsayed, S.M., Sarker, R.A., Mezura-Montes, E., 2013. Parti-cle swarm optimizer for constrained optimization, in: 2013 IEEE Congress on Evolutionary Computation, IEEE. pp. 2703–2711. [15] Floudas, C.A., Pardalos, P.M., 1990. A collection of test problems for constrained global optimization algorithms. volume 455. Springer Science & Business Media. [16] Floudas, C.A., Pardalos, P.M., Adjiman, C.S., Esposito, W.R., Gümüş, Z.H., Harding, S.T., Klepeis, J.L., Meyer, C.A., Schweiger, C.A., 1999. Handbook of Test Problems in Local and Global Optimization. Springer US. [17] Girardin, O., Hansen, N., Brockhoff, D., Auger, A., 2025. Classification-based linear surrogate modeling of constraints for al-cma-es, in: Proceedings of the Genetic and Evolutionary Computation Conference, Association for Computing Machinery, New York, NY, USA. p. 728–736. URL: https://doi.org/10.1145/3712256.3726435 ,doi: 10.1145/3712256.3726435 .[18] Han, H., Lu, W., Zhang, L., Qiao, J., 2017. Adaptive gradient multiobjective particle swarm optimization. IEEE Transactions on Cybernetics 48, 3067–3079. [19] Hansen, N., 2006. The CMA Evolution Strategy: A Comparing Review, in: Towards a New Evolutionary Computation: Advances in the Estimation of Distribution Algorithms. Springer, pp. 75–102. doi: 10.1007/3-540-32494-1_4 .[20] Hestenes, M.R., 1969. Multiplier and gradient methods. Journal of Optimization Theory and Applications 4. URL: https://doi.org/10. 1007/BF00927673 , doi: 10.1007/BF00927673 .[21] Himmelblau, D.M., et al., 2018. Applied nonlinear programming. McGraw-Hill. [22] Hu, Y., Li, T.M., Anderson, L., Ragan-Kelley, J., Durand, F., 2019. Taichi: a language for high-performance computation on spatially sparse data structures. ACM Transactions on Graphics (TOG) 38, 1–16. [23] Jain, H., Deb, K., 2013. An evolutionary many-objective optimiza-tion algorithm using reference-point based nondominated sorting approach, part ii: Handling constraints and extending to an adaptive 
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 13 of 16 approach. IEEE Transactions on evolutionary computation 18, 602– 622. [24] Jakob, W., Speierer, S., Roussel, N., Vicini, D., 2022. Dr. jit: A just-in-time compiler for differentiable rendering. ACM Transactions on Graphics (TOG) 41, 1–19. [25] Jallet, W., Bambade, A., Arlaud, E., El-Kazdadi, S., Mansard, N., Carpentier, J., 2025. Proxddp: Proximal constrained trajectory op-timization. IEEE Transactions on Robotics 41, 2605–2624. doi: 10. 1109/TRO.2025.3554437 .[26] Jansen, P.W., Perez, R.E., 2011. Constrained structural design optimization via a parallel augmented Lagrangian particle swarm optimization approach. Computers & Structures URL: https://doi. org/10.1016/j.compstruc.2011.03.005 , doi: 10.1016/j.compstruc.2011. 03.005 .[27] Khoukhi, A., Al-Sunni, F.M., Khalid, H.M., Rizvi, S., 2011. Non-linear constrained optimal control problem: a hybrid pso-ga-based discrete augmented lagrangian approach, in: 2011 Annual Meeting of the North American Fuzzy Information Processing Society, IEEE. pp. 1–6. [28] Lim, B., Allard, M., Grillotti, L., Cully, A., 2023. Accelerated quality-diversity through massive parallelism. Transactions on Machine Learning Research . [29] Nocedal, J., Wright, S., 2006a. Numerical optimization, Second Edition. Springer Science , 497–528. [30] Nocedal, J., Wright, S.J., 2006b. Numerical Optimization. Springer. [31] Norkin, V.I., 2020. Generalized gradients in dynamic optimization, optimal control, and machine learning problems. Cybernetics and Systems Analysis 56, 243–258. [32] Parsopoulos, K.E., Vrahatis, M.N., 2002a. Particle swarm optimiza-tion method for constrained optimization problems, in: Intelligent technologies-theory and application: New trends in intelligent tech-nologies, IOS Press. pp. 214–220. [33] Parsopoulos, K.E., Vrahatis, M.N., 2002b. Recent approaches to global optimization problems through particle swarm optimization. Natural Computing 1, 235–306. [34] Parsopoulos, K.E., Vrahatis, M.N., 2005. Unified particle swarm optimization for solving constrained engineering optimization prob-lems, in: International conference on natural computation, Springer. pp. 582–591. [35] Parsopoulos, K.E., Vrahatis, M.N., 2010. Particle swarm optimization and intelligence: Advances and applications. Information Science Publishing. [36] Plevris, V., Papadrakakis, M., 2011. A hybrid particle swarm—gradient algorithm for global structural optimization. Computer-Aided Civil and Infrastructure Engineering 26, 48–68. [37] Powell, M.J.D., 1978. Algorithms for nonlinear constraints that use lagrangian functions. Mathematical Programming 14. URL: https: //doi.org/10.1007/BF01588967 , doi: 10.1007/BF01588967 .[38] Reed, P., Minsker, B., Goldberg, D.E., 2000. Designing a com-petent simple genetic algorithm for search and optimization. Wa-ter Resources Research 36, 3757–3761. URL: https://agupubs. onlinelibrary.wiley.com/doi/abs/10.1029/2000WR900231 , doi: https:// doi.org/10.1029/2000WR900231 .[39] Sedlaczek, K., Eberhard, P., 2006. Using augmented lagrangian particle swarm optimization for constrained problems in engineer-ing. Structural and Multidisciplinary Optimization URL: https:// link.springer.com/article/10.1007/s00158-006-0032-z , doi: 10.1007/ s00158-006-0032-z .[40] Sun, Y., Shi, W., Gao, Y., 2022. A particle swarm optimization algo-rithm based on an improved deb criterion for constrained optimization problems. PeerJ Computer Science 8. [41] Surjanovic, S., Bingham, D., 2013. Virtual library of simulations experiments: Test functions and datasets, optimization test problems. URL: https://www.sfu.ca/~ssurjano/optimization.html .[42] Tabak, D., Kuo, B.C., 1971. Optimal control by mathematical programming. Prentice-Hall. URL: https://api.semanticscholar. org/CorpusID:60030572 .[43] Tsakonas, C., Chatzilygeroudis, K., 2025. Vector quantized-elites: Unsupervised and problem-agnostic quality-diversity optimization. IEEE Transactions on Evolutionary Computation . [44] Tsiatsianas, E., Kiourt, C., Chatzilygeroudis, K., 2025. A comparative study of floating-base space parameterizations for agile whole-body motion planning, in: 2025 IEEE-RAS 24th International Conference on Humanoid Robots (Humanoids), IEEE. pp. 1187–1194. [45] Tsikelis, I., Tsiatsianas, E., Kiourt, C., Ivaldi, S., Chatzilygeroudis, K., Hoffman, E.M., 2025. Ahmp: Agile humanoid motion planning with contact sequence discovery, in: 2025 IEEE-RAS 24th International Conference on Humanoid Robots (Humanoids), IEEE. pp. 33–40. [46] Vassiliades, V., Mouret, J.B., 2018. Discovering the elite hypervol-ume by leveraging interspecies correlation, in: Proceedings of the Genetic and Evolutionary Computation Conference, pp. 149–156. [47] Wächter, A., Biegler, L.T., 2006a. On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming. Mathematical programming 106, 25–57. [48] Wächter, A., Biegler, L.T., 2006b. On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming. Mathematical Programming 106, 25– 57. URL: https://doi.org/10.1007/s10107-004-0559-y , doi: 10.1007/ s10107-004-0559-y .[49] Wensing, P.M., Posa, M., Hu, Y., Escande, A., Mansard, N., Del Prete, A., 2023. Optimization-based control for dynamic legged robots. IEEE Transactions on Robotics . [50] Wikipedia contributors, 2025. Test functions for optimization — wikipedia, the free encyclopedia. URL: https://en.wikipedia.org/ wiki/Test_functions_for_optimization .
+
+A. Benchmark Problems Set 
+
+Problem 1 : Rosenbrock Function (2D) with Cubic & Linear Inequality Constraints 
+
+min  
+
+> 𝑥,𝑦
+
+(1 − 𝑥 )2 + 100( 𝑦 − 𝑥 2)2
+
+s.t.: 𝑔 1 ∶ ( 𝑥 − 1) 3 − 𝑦 + 1 ≤ 0, 𝑔 2 ∶ 𝑥 + 𝑦 − 2 ≤ 0,𝑥 ∈ [−1 .5, 1.5] , 𝑦 ∈ [−0 .5, 2.5] 
+
+Global minimum: 𝑓 (1 , 1) = 0 .Optimal multipliers: (𝜇 𝑔 1 
+
+> ⋆
+
+, 𝜇 𝑔 2 
+
+> ⋆
+
+) = (0 , 0) .
+
+Problem 2 : Quadratic Objective with Quadratic & Lin-ear Inequality Constraints 
+
+min  
+
+> 𝒙
+
+−25( 𝑥 1 −2) 2 −( 𝑥 2 −2) 2 −( 𝑥 3 −1) 2 −( 𝑥 4 −4) 2 −( 𝑥 5 −1) 2 −( 𝑥 6 −4) 2
+
+s.t.: 𝑔 1 ∶ ( 𝑥 3 − 3) 2 + 𝑥 4 ≥ 4, 𝑔 2 ∶ ( 𝑥 5 − 3) 2 + 𝑥 6 ≥ 4,𝑔 3 ∶ 𝑥 1 − 3 𝑥 2 ≤ 2, 𝑔 4 ∶ − 𝑥 1 + 𝑥 2 ≤ 2,𝑔 5 ∶ 𝑥 1 + 𝑥 2 ≤ 6, 𝑔 6 ∶ 𝑥 1 + 𝑥 2 ≥ 2,𝑥 1, 𝑥 2 ∈ [0 , 100] , 𝑥 3 ∈ [1 , 5] , 𝑥 4 ∈ [0 , 6] , 𝑥 5 ∈ [1 , 5] , 𝑥 6 ∈ [0 , 10] 
+
+Global minimum: 𝑓 (5 , 1, 5, 0, 5, 10) = −310 .Optimal multipliers: (𝜇 𝑔 1 
+
+> ⋆
+
+, 𝜇 𝑔 2 
+
+> ⋆
+
+, 𝜇 𝑔 3 
+
+> ⋆
+
+, 𝜇 𝑔 4 
+
+> ⋆
+
+, 𝜇 𝑔 5 
+
+> ⋆
+
+, 𝜇 𝑔 6 
+
+> ⋆
+
+) = (0 , 0, 38 , 0, 112 , 0) .
+
+Problem 3 : Power-Terms Objective with Linear Equality & Inequality Constraints 
+
+min  
+
+> 𝒙
+
+𝑥 0.61 + 𝑥 0.62 − 6 𝑥 1 − 4 𝑥 3 + 3 𝑥 4
+
+s.t.: ℎ1 ∶ 𝑥 2−3 𝑥 1−3 𝑥 3 = 0 , 𝑔 1 ∶ 𝑥 1+2 𝑥 3 ≤ 4, 𝑔 2 ∶ 𝑥 2+2 𝑥 4 ≤ 4,𝑥 1 ∈ [0 , 3] , 𝑥 2 ∈ [0 , 100] , 𝑥 3 ∈ [0 , 100] , 𝑥 4 ∈ [0 , 1] 
+
+Global minimum: 𝑓 ( 43 , 4, 0, 0) ≈ −4 .51420 .Optimal multipliers: (𝜆 ℎ1 
+
+> ⋆
+
+, 𝜇 𝑔 1 
+
+> ⋆
+
+, 𝜇 𝑔 2 
+
+> ⋆
+
+) = (−1 .82174 , 0, 1.47713) .
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 14 of 16 Problem 4 : Linear Objective with Polynomial Inequality Constraints 
+
+min  
+
+> 𝑥,𝑦
+
+−𝑥 − 𝑦 
+
+s.t.: 𝑔 1 ∶ 𝑦 ≤ 2𝑥 4−8 𝑥 3+8 𝑥 2+2 , 𝑔 2 ∶ 𝑦 ≤ 4𝑥 4−32 𝑥 3+88 𝑥 2−96 𝑥 +36 ,𝑥 ∈ [0 , 3] , 𝑦 ∈ [0 , 4] 
+
+Global minimum: 𝑓 (2 .32952 , 3.17849) ≈ −5 .50801 .Optimal multipliers: (𝜇 𝑔 1 
+
+> ⋆
+
+, 𝜇 𝑔 2 
+
+> ⋆
+
+) ≈ (0 .28760 , 0.71240) .
+
+Problem 5 : Mishra’s Bird Function with Quadratic Inequality Constraint 
+
+min  
+
+> 𝑥,𝑦
+
+sin( 𝑦 )𝑒 (1−cos 𝑥 )2
+
++ cos( 𝑥 )𝑒 (1−sin 𝑦 )2
+
++ ( 𝑥 − 𝑦 )2
+
+s.t.: 𝑔 1 ∶ ( 𝑥 + 5) 2 + ( 𝑦 + 5) 2 ≤ 25 ,𝑥 ∈ [−10 , 0] , 𝑦 ∈ [−6 .5, 0] 
+
+Global minimum: 𝑓 (−3 .13025 , −1 .58214) ≈ −106 .76454 .Optimal multipliers: 𝜇 𝑔 1 
+
+> ⋆
+
+= 0 .
+
+Problem 6 : Constrained Gomez and Levy Function with Trigonometric Inequality Constraint 
+
+min  
+
+> 𝑥,𝑦
+
+4𝑥 2 − 2 .1𝑥 4 + 13 𝑥 6 + 𝑥𝑦 − 4 𝑦 2 + 4 𝑦 4
+
+s.t.: 𝑔 1 ∶ − sin(4 𝜋𝑥 ) + 2 sin 2(2 𝜋𝑦 ) ≤ 1.5,𝑥 ∈ [−1 , 0.75] , 𝑦 ∈ [−1 , 1] 
+
+Global minimum: 𝑓 (0 .08984 , −0 .71266) ≈ −1 .03163 .Optimal multipliers: 𝜇 𝑔 1 
+
+> ⋆
+
+= 0 .
+
+Problem 7 : Drop-Wave Function with Quadratic Equal-ity Constraint 
+
+min  
+
+> 𝑥,𝑦
+
+− 1 + cos(12 √𝑥 2 + 𝑦 2)0.5( 𝑥 2 + 𝑦 2) + 2 
+
+s.t.: ℎ1 ∶ ( 𝑥 − 3) 2 + ( 𝑦 − 3) 2 = 4 ,𝑥 ∈ [−10 , 10] , 𝑦 ∈ [−10 , 10] 
+
+Global minimum: 𝑓 (2 .36699 , 1.10282) = 𝑓 (1 .10282 , 2.36699) ≈ −0 .36913 .Optimal multipliers: 𝜆 ℎ1 
+
+> ⋆
+
+= 0 .
+
+Problem 8 : Egg-Holder Function with Linear Inequality Constraints 
+
+min  
+
+> 𝑥,𝑦
+
+−( 𝑦 + 47) sin 
+
+(√ ||| 
+
+> 𝑥
+> 2
+
++ 𝑦 + 47 |||)
+
+− 𝑥 sin 
+
+(√ |𝑥 − 𝑦 − 47 |)
+
+s.t.: 𝑔 1 ∶ 2 𝑥 + 𝑦 ≥ 700 , 𝑔 2 ∶ 𝑥 − 3 𝑦 ≤ −300 ,𝑥 ∈ [−512 , 512] , 𝑦 ∈ [−512 , 512] 
+
+Global minimum: 𝑓 (512 , 404 .23180) ≈ −959 .64066 .Optimal multipliers: (𝜇 𝑔 1 
+
+> ⋆
+
+, 𝜇 𝑔 2 
+
+> ⋆
+
+) = (0 , 0) .
+
+Problem 9 : Griewank Function (2D) with Quadratic Spherical Inequality Constraint 
+
+min  
+
+> 𝑥,𝑦
+
+1 + 𝑥 2 + 𝑦 2
+
+4000 − cos ( 𝑥 ) cos 
+
+(
+
+𝑦 
+
+√2
+
+)
+
+s.t.: 𝑔 1 ∶ ( 𝑥 − 10) 2 + ( 𝑦 − 10) 2 ≤ 200 ,𝑥 ∈ [−100 , 100] , 𝑦 ∈ [−100 , 100] 
+
+Global minimum: 𝑓 (0 , 0) = 0 .Optimal multipliers: 𝜇 𝑔 1 
+
+> ⋆
+
+= 0 .
+
+Problem 10 : 1D Double Integrator Optimal Control Problem (box mass accelerating on a line, under variable controlled force) 
+
+min  
+
+> 𝐱 1∶ 𝐾 −1 ,𝒖 0∶ 𝐾 −1
+
+ = 12
+
+> 𝐾 −1
+
+∑
+
+> 𝑘 =0
+
+(𝐱 𝑘 − 𝐱 𝑡𝑎𝑟𝑔𝑒𝑡 )⊤(𝐱 𝑘 − 𝐱 𝑡𝑎𝑟𝑔𝑒𝑡 ) + 12
+
+> 𝐾 −1
+
+∑
+
+> 𝑘 =0
+
+0.1𝑢 2
+
+> 𝑘
+
+,
+
+s.t.: 𝐱 𝑘 =
+
+[𝑥 𝑘 
+
+𝑣 𝑘 
+
+]
+
+, 𝒙 𝑘 +1 = 𝒙 𝑘 + 𝑑𝑡 
+
+[ 𝑣 𝑘  
+
+> 1
+> 𝑚
+
+𝑢 𝑘 
+
+]
+
+, 𝑘 = 0 , … , 𝐾 − 1 ,
+
+𝐱 𝐾 = 𝐱 𝑡𝑎𝑟𝑔𝑒𝑡 , 𝑥 𝑘 , 𝑣 𝑘 , 𝑢 𝑘 ∈ [−10 , 10] .x0u0v0xfvfxkvkukDouble integrator system of a mass m accelerated by a variable controlled force m
+
+Here, 𝐱 𝑘 = [𝑥 𝑘 , 𝑣 𝑘 ]⊤ ∈ ℝ2 is the state and 𝒖 𝑘 ∈ ℝ is the control input at node k, with known initial state 𝐱 0 = 𝐱 𝑠𝑡𝑎𝑟𝑡 and fixed terminal state 𝐱 𝐾 = 𝐱 𝑡𝑎𝑟𝑔𝑒𝑡 . We set 𝐾 = 21 nodes, so we get 61 decision variables, and 42 equality constraints. This is a finite LQR problem (with bound constraints), it has one unique global minimizer, and we can compute it via iterative methods like multiple shooting DDP [49, 25]. Global minimum: 𝑓 (𝒙 ⋆) ≈ 23 .87240 (𝐱 𝑠𝑡𝑎𝑟𝑡 = [0 , 0] ⊤, 𝐱 𝑡𝑎𝑟𝑔𝑒𝑡 =[1 , 2] ⊤, the full optimal 𝒙 ⋆ ∈ ℝ61 is omitted for brevity) 
+
+𝒙 ⋆ ≈ [0, 0.18254 , 0.00913 , … , 2.55968 , 3.00173 , 3.52111 ]⊤.Optimal multipliers: the full optimal 𝝀 ⋆ ∈ ℝ42 is similarly omitted 
+
+𝝀 ⋆ ≈ [11 .33964 , −7 .30164 , … , 24 .29632 , −7 .04222 ]⊤.
+
+B. Regularity Conditions for the Benchmark Constrained Optimization Problems 
+
+We can establish that every COP in our benchmark set satisfies at least one standard regularity condition, also referred to as a constraint qualification. Specifically, LICQ (Linear Independence Constraint Qualification) holds for all problems, with the exception of the Quadratic problem 2, for which we instead verify MFCQ (Mangasarian-Fromovitz Constraint Qualification) in the case of inequality constraints only. For illustration, we provide here the LICQ verification for the Rosenbrock problem 1 and the MFCQ verfication for the Quadratic problem 2. 
+
+Definition 1 (LICQ). We consider the constrained opti-mization problem (1). We let  (𝒙 ⋆) = { 𝑖 ∶ 𝑔 𝑖 (𝒙 ⋆) = 0} 
+
+denote the active inequality set at the minimizer 𝒙 ⋆. LICQ holds at 𝒙 ⋆ if the set of vectors below is linearly independent: 
+
+{∇𝒙 𝑔 𝑖 (𝒙 ⋆) ∶ 𝑖 ∈ (𝒙 ⋆)} ∪ {∇𝒙 ℎ𝑗 (𝒙 ⋆) ∶ 𝑗 = 1 , … , 𝑙 }
+
+Definition 2 (MFCQ for inequality constraints only). We again consider problem (1), but without equality constraints. We let  (𝒙 ⋆) = { 𝑖 ∶ 𝑔 𝑖 (𝒙 ⋆) = 0} be the active inequality set at the minimizer 𝒙 ⋆. MFCQ holds at 𝒙 ⋆ if there exists 
+
+𝒅 ∈ ℝ𝑛 such that the directional derivatives below are negative: 
+
+𝐷 𝒅 𝑔 𝑖 (𝒙 ⋆) = ∇ ⊤ 
+
+> 𝒙
+
+𝑔 𝑖 (𝒙 ⋆) ⋅ 𝒅 < 0 for all 𝑖 ∈ (𝒙 ⋆)
+
+Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 15 of 16 Proof. LICQ check for Rosenbrock problem 1 
+
+We write the inequality constraints in the standard form 
+
+𝑔 𝑖 ≤ 0:
+
+𝑔 1(𝑥, 𝑦 ) = ( 𝑥 − 1) 3 − 𝑦 + 1 ≤ 0, 𝑔 2(𝑥, 𝑦 ) = 𝑥 + 𝑦 − 2 ≤ 0
+
+At the global minimizer 𝒙 ⋆ = [1 1]⊤ (interior point of the search domain, meaning that the box bounds for the decision variables are inactive at 𝒙 ⋆), both inequality constraints are active ( 𝑔 1(𝒙 ⋆) = 𝑔 2(𝒙 ⋆) = 0 ). Their gradients at 𝒙 ⋆ are: 
+
+∇𝑔 1(𝒙 ⋆) = 
+
+[3( 𝑥 − 1) 2
+
+−1 
+
+]
+
+𝒙 ⋆
+
+=
+
+[ 0−1 
+
+]
+
+, ∇𝑔 2(𝒙 ⋆) = 
+
+[11
+
+]
+
+The equality relation 𝑎 ⋅∇𝒙 ⋆ 𝑔 1(𝒙 ⋆)+ 𝑏 ⋅∇𝒙 ⋆ 𝑔 2(𝒙 ⋆) = 0 is true only for 𝑎 = 𝑏 = 0 . Hence the active gradients are linearly independent, so LICQ holds at the minimizer 𝒙 ⋆.
+
+Proof. MFCQ check for Quadratic problem 2 
+
+The global minimizer is at 𝒙 ⋆ = [5 1 5 0 5 10 ]⊤,where the following constraints 𝑔 𝑎, 1, 𝑔 𝑎, 2, … , 𝑔 𝑎, 7 (written in standard form 𝑔 𝑎,𝑖 ≤ 0, along with their gradients at 𝒙 ⋆) are active, while the box bounds on 𝑥 1 and 𝑥 2 are inactive: 
+
+𝑔 𝑎, 1(𝒙 ) = 4 − ( 𝑥 3 − 3) 2 − 𝑥 4, ∇𝒙 𝑔 𝑎, 1(𝒙 ⋆) = [0, 0, −4 , −1 , 0, 0]⊤
+
+𝑔 𝑎, 2(𝒙 ) = 𝑥 1 − 3 𝑥 2 − 2 , ∇𝒙 𝑔 𝑎, 2(𝒙 ⋆) = [1, −3 , 0, 0, 0, 0]⊤
+
+𝑔 𝑎, 3(𝒙 ) = 𝑥 1 + 𝑥 2 − 6 , ∇𝒙 𝑔 𝑎, 3(𝒙 ⋆) = [1, 1, 0, 0, 0, 0]⊤
+
+𝑔 𝑎, 4(𝒙 ) = 𝑥 3 − 5 , ∇𝒙 𝑔 𝑎, 4(𝒙 ⋆) = [0, 0, 1, 0, 0, 0]⊤
+
+𝑔 𝑎, 5(𝒙 ) = − 𝑥 4, ∇𝒙 𝑔 𝑎, 5(𝒙 ⋆) = [0, 0, 0, −1 , 0, 0]⊤
+
+𝑔 𝑎, 6(𝒙 ) = 𝑥 5 − 5 , ∇𝒙 𝑔 𝑎, 6(𝒙 ⋆) = [0, 0, 0, 0, 1, 0]⊤
+
+𝑔 𝑎, 7(𝒙 ) = 𝑥 6 − 10 , ∇𝒙 𝑔 𝑎, 7(𝒙 ⋆) = [0, 0, 0, 0, 0, 1]⊤
+
+We notice that the active gradients are linearly dependent: 
+
+∇𝒙 𝑔 𝑎, 1(𝒙 ⋆) = −4 ∇ 𝒙 𝑔 𝑎, 4(𝒙 ⋆) + ∇ 𝒙 𝑔 𝑎, 5(𝒙 ⋆)
+
+Therefore, LICQ does not hold at 𝒙 ⋆.However, we can show that the regularity condition MFCQ is satisfied. We construct the direction: 
+
+𝒅 = [−1 , 0, −1 , 5, −1 , −1 ]⊤
+
+Then, for every active inequality we can verify that: 
+
+∇⊤
+
+𝒙 𝑔 𝑎,𝑘 (𝒙 ⋆) ⋅ 𝒅 < 0, 𝑘 = 1 , … , 7
+
+Hence, there exists a direction that strictly decreases all active inequalities, so MFCQ holds at the minimizer 𝒙 ⋆.
+
+C. Success Rate Plots 
+
+In Fig. 5, we present the remaining set of success rate plots that were not shown in Sec. 5, for Prob. 3, 4, 5, 6, 8. 10 −6 
+
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Objective convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+3 : Power-Terms Objective 
+
+Objective + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Solution convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+3 : Power-Terms Objective 
+
+Solution + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Objective convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+4 : Linear Objective 
+
+Objective + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Solution convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+4 : Linear Objective 
+
+Solution + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Objective convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+5 : Mishra's Bird 
+
+Objective + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Solution convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+5 : Mishra's Bird 
+
+Solution + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Objective convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+6 : Constrained Gomez-Levy 
+
+Objective + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Solution convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+6 : Constrained Gomez-Levy 
+
+Solution + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Objective convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+8 : Egg-Holder 
+
+Objective + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+
+Solution convergence threshold εs (log scale) 
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+
+8 : Egg-Holder 
+
+Solution + Constraint Success Rate (constant εc = 1.0e-04, varying εs)
+
+> PSO-AL
+> DE-AL
+> SGA-AL
+> CEM-AL
+> PSO-PEN
+> IPOPT
+> CMA-ES
+
+Figure 5: Total comparison success rate curves for the remain-ing Prob. 3, 4, 5, 6, 8 (from top to bottom). Left / Right panels show the objective / solution - based success rates, respectively, with fixed constraint violation 𝑐 (𝒙 𝒇 ) ≤ 10 −4 . A run is considered successful if the objective / solution - based convergence error is |𝑓 (𝒙 ⋆) − 𝑓 (𝒙 𝑓 )| ≤ 𝜀 𝑠 / ‖𝒙 ⋆ − 𝒙 𝑓 ‖2 ≤ 𝜀 𝑠 .Each plot presents the success rate curve for each optimizer as a function of the solution threshold 𝜀 𝑠 .Printzios and Chatzilygeroudis: Preprint submitted to Elsevier Page 16 of 16
