@@ -6,49 +6,53 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-23
-- 运行时间：2026-07-23 21:40:10 UTC
+- 最新运行日期：2026-07-24
+- 运行时间：2026-07-24 21:45:52 UTC
 - 运行状态：成功
-- 本次总论文数：9
-- 精读区：4
-- 速读区：5
+- 本次总论文数：11
+- 精读区：5
+- 速读区：6
 
 ### 今日简报（AI）
-1) 今日精读聚焦多智能体强化学习与机器人艇自重构运动规划两项高分研究。  
-2) 最值得关注CHMAS分层框架与带安全保证的分布式运动规划，前者解决多智能体协同，后者保障自重构系统安全。  
-3) 建议深入研读这两篇9分论文的理论细节，并尝试将其思想迁移至类似分布式控制场景。
-- 详情：[/202607/23/README](/202607/23/README)
+今日更新11篇论文，精读5篇速读6篇，重点聚焦多机器人轨迹优化与安全控制。最值得关注的是分布式模型扩散优化（9.0分）和基于CBF的强化学习零样本迁移（8.0分），分别解决可扩展性和安全泛化难题。建议优先精读这两篇高分论文，为机器人协同任务设计提供直接借鉴。
+- 详情：[/202607/24/README](/202607/24/README)
 
 ### 精读区论文标签
-1. [CHMAS: A Coupled Hierarchical Framework for Multi-Agent Reinforcement Learning](/202607/23/2607.19555v1-chmas-a-coupled-hierarchical-framework-for-multi-agent-reinforcement-learning)  
+1. [Distributed Model-Based Diffusion For Scalable Multi-Robot Trajectory Optimization](/202607/24/2607.20992v1-distributed-model-based-diffusion-for-scalable-multi-robot-trajectory-optimization)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：多智能体协调框架，分层全局-局部规划
-2. [Distributed Motion Planning with Safety Guarantees for Self-Reconfiguring Robotic Boats](/202607/23/2607.20352v1-distributed-motion-planning-with-safety-guarantees-for-self-reconfiguring-robotic-boats)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：分布式MPC与CBF结合实现多智能体形状重构与碰撞避免
-3. [Coordinating from Memory: Graph-Structured Experience Reuse for Multi-Agent Adaptation in Dynamic Manufacturing](/202607/23/2607.19985v1-coordinating-from-memory-graph-structured-experience-reuse-for-multi-agent-adaptation-in-dynamic-manufacturing)  
+   evidence：分布式基于模型的扩散用于多机器人轨迹优化
+2. [Safe and Scalable Multi-Drone Payload Transport via CBF-based Reinforcement Learning with Zero-Shot Sim-to-Real Transfer](/202607/24/2607.20665v1-safe-and-scalable-multi-drone-payload-transport-via-cbf-based-reinforcement-learning-with-zero-shot-sim-to-real-transfer)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：动态制造中基于图结构记忆的多智能体协调
-4. [Courteous Anticipation: Improving Long-Lived Task Planning in Persistent Shared Environments](/202607/23/2607.20289v1-courteous-anticipation-improving-long-lived-task-planning-in-persistent-shared-environments)  
+   evidence：基于CBF强化学习的安全可扩展多无人机协同载荷运输
+3. [Emergent Compositional Skills in Mixture-of-Experts VLAs](/202607/24/2607.20771v1-emergent-compositional-skills-in-mixture-of-experts-vlas)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：共享环境中多机器人任务规划的礼貌性预期规划
+   evidence：通过混合专家模型涌现组合技能，促进机器人行为多样性
+4. [Socially Consistent Multi-Robot Navigation Using Decoupled Planning and Trajectory Coordination](/202607/24/2607.20772v1-socially-consistent-multi-robot-navigation-using-decoupled-planning-and-trajectory-coordination)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：多机器人导航中的解耦规划与轨迹协调
+5. [Compact Latent Coordination for Autonomous Vehicles at Unsignalized Intersections](/202607/24/2607.21488v1-compact-latent-coordination-for-autonomous-vehicles-at-unsignalized-intersections)  
+   标签：评分：8.0/10、query:multi-robot
+   evidence：分层深度强化学习协调无信号交叉口自动驾驶车辆
 
 ### 速读区论文标签
-1. [WorldScape Policy 2.0: Empowering Steerable World Action Modeling with Reasoning-Augmented Memory](/202607/23/2607.18840v1-worldscape-policy-20-empowering-steerable-world-action-modeling-with-reasoning-augmented-memory)  
+1. [A Self-Evolving Default Action for Cooperative Tasks with Continuous Action Space](/202607/24/2607.18597v2-a-self-evolving-default-action-for-cooperative-tasks-with-continuous-action-space)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：具有推理增强记忆的世界动作模型用于机器人操作
-2. [BridgeFlow: Fast and Robust SE(2)-Equivariant Motion Planning with Flow Matching](/202607/23/2607.14725v1-bridgeflow-fast-and-robust-se2-equivariant-motion-planning-with-flow-matching)  
+   evidence：多智能体强化学习用于连续动作合作任务
+2. [RoboInter1.5: A Holistic Intermediate Representation Suite for Embodied World Modeling and Robotic Manipulation](/202607/24/2607.18709v1-robointer15-a-holistic-intermediate-representation-suite-for-embodied-world-modeling-and-robotic-manipulation)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：具身世界模型与机器人中间表示
+3. [Enhancing Transformer-based Routing by Encoding Distance via Relative Positional Encoding](/202607/24/2607.18909v1-enhancing-transformer-based-routing-by-encoding-distance-via-relative-positional-encoding)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：基于Transformer的路由方法用于多智能体路径优化
+4. [Robostral Navigate](/202607/24/2607.20785v1-robostral-navigate)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：面向可扩展机器人部署的视觉-语言导航系统
+5. [Predictive Training with Latent Imagination for Visual Quadruped Navigation](/202607/24/2607.17574v1-predictive-training-with-latent-imagination-for-visual-quadruped-navigation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：基于流匹配的SE(2)等变运动规划方法，可用于机器人路径规划
-3. [A Generative Partially Specified Finite State Machine Approach to Complex Behaviour Planning](/202607/23/2607.15674v1-a-generative-partially-specified-finite-state-machine-approach-to-complex-behaviour-planning)  
+   evidence：使用潜在想象预测训练用于动态环境导航
+6. [RoboInter1.5: A Holistic Intermediate Representation Suite for Embodied World Modeling and Robotic Manipulation](/202607/24/2607.18709v2-robointer15-a-holistic-intermediate-representation-suite-for-embodied-world-modeling-and-robotic-manipulation)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：用于自主机器人的生成式行为规划有限状态机
-4. [Stochastic Multi-Objective Kinodynamic Planning Against Adversaries](/202607/23/2607.19284v1-stochastic-multi-objective-kinodynamic-planning-against-adversaries)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：对抗环境下的随机多目标运动学规划
-5. [Swarm and Evolutionary Computation for Near-Field Localization](/202607/23/2607.20139v1-swarm-and-evolutionary-computation-for-near-field-localization)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：群与进化计算用于近场定位优化
+   evidence：用于具身世界建模和机器人操作的整体中间表示
 
 
 <div class="dpr-home-promo-card">
