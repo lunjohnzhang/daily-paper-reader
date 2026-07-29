@@ -6,55 +6,61 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-28
-- 运行时间：2026-07-28 21:46:24 UTC
+- 最新运行日期：2026-07-29
+- 运行时间：2026-07-29 21:24:51 UTC
 - 运行状态：成功
-- 本次总论文数：11
-- 精读区：5
-- 速读区：6
+- 本次总论文数：13
+- 精读区：4
+- 速读区：9
 
 ### 今日简报（AI）
-1) 今日精选5篇论文，精读的两篇高分研究聚焦多智能体强化学习驱动的无人机轨迹规划与人机共享空间AR-SLAM，速读覆盖代码进化、多样性参数化及世界模型。  
-2) 最值得关注的是TRUAV（无人机辅助车联网的分布式RL路由增强）和SHARE（用户中心SLAM在AR人机协作中的突破），均为9.0高分。  
-3) 建议优先精读这两篇论文，理解其核心方法如何解决实际部署难题，再根据领域兴趣速读其余三篇。
-- 详情：[/202607/28/README](/202607/28/README)
+1. 今日推荐13篇论文，精读4篇，重点关注多智能体协同与开放任务学习两方向。
+2. 最值得看9.0分的室内无人机多智能体强化制导方法和8.0分的开放智能体-任务指针学习框架。
+3. 建议优先精读这两篇高评分论文，并速读其余三篇7分论文以拓宽时空逻辑与进化优化视野。
+- 详情：[/202607/29/README](/202607/29/README)
 
 ### 精读区论文标签
-1. [TRUAV: Distributed Multi-Agent Reinforcement Learning for Trajectory Planning and Routing Enhancement in UAV-Aided IoT-Enabled VANETs](/202607/28/2607.23734v1-truav-distributed-multi-agent-reinforcement-learning-for-trajectory-planning-and-routing-enhancement-in-uav-aided-iot-enabled-vanets)  
+1. [Shared Voxel-Map-Based Cooperative Indoor UAV Guidance with a Multi-Agent Soft Actor-Critic Controller](/202607/29/2607.25728v1-shared-voxel-map-based-cooperative-indoor-uav-guidance-with-a-multi-agent-soft-actor-critic-controller)  
    标签：评分：9.0/10、query:multi-robot
-   evidence：分布式多智能体强化学习用于无人机网络轨迹规划
-2. [SHARE: Towards Head-Mounted AR with User-Centric SLAM in Shared Human-Robot Workspaces](/202607/28/2607.23901v1-share-towards-head-mounted-ar-with-user-centric-slam-in-shared-human-robot-workspaces)  
-   标签：评分：9.0/10、query:multi-robot
-   evidence：人机协作中用于环境表示的多智能体SLAM
-3. [A Self-Evolving Default Action for Cooperative Tasks with Continuous Action Space](/202607/28/2607.18597v3-a-self-evolving-default-action-for-cooperative-tasks-with-continuous-action-space)  
+   evidence：多机器人共享体素地图世界模型
+2. [PLATO: Pointer Learner for Agent and Task Openness](/202607/29/2607.25082v1-plato-pointer-learner-for-agent-and-task-openness)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多智能体强化学习反事实信用分配用于连续动作合作任务
-4. [Focus Is All You Need: Adaptive Goal-aware Attention Orchestration for Multi-Agent Graph Systems](/202607/28/2607.23678v1-focus-is-all-you-need-adaptive-goal-aware-attention-orchestration-for-multi-agent-graph-systems)  
+   evidence：基于指针网络的多智能体强化学习解决开放性问题
+3. [OrchBench: Evaluating Multi-Agent Orchestration Plans in Isolation via Deterministic Simulation](/202607/29/2607.25656v1-orchbench-evaluating-multi-agent-orchestration-plans-in-isolation-via-deterministic-simulation)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多智能体图系统的自适应注意力编排
-5. [Quality-Adaptive Multi-UAV 3D Reconstruction with Sparse Workload Redistribution](/202607/28/2607.24233v1-quality-adaptive-multi-uav-3d-reconstruction-with-sparse-workload-redistribution)  
+   evidence：多智能体编排计划评估基准
+4. [Cooperative Multi-UAV Navigation in Complex Environments via Systematic Multi-Agent Deep Reinforcement Learning](/202607/29/2607.25754v1-cooperative-multi-uav-navigation-in-complex-environments-via-systematic-multi-agent-deep-reinforcement-learning)  
    标签：评分：8.0/10、query:multi-robot
-   evidence：多无人机协调与路径规划用于3D重建
+   evidence：基于深度强化学习的多无人机协作导航
 
 ### 速读区论文标签
-1. [MEMENTO: Memory-Guided Memetic Code-as-Policy Evolution](/202607/28/2607.22832v1-memento-memory-guided-memetic-code-as-policy-evolution)  
+1. [STL-GCS: A Planner-Controller Framework for Signal Temporal Logic via Graphs of Time-varying Convex Sets](/202607/29/2607.19196v1-stl-gcs-a-planner-controller-framework-for-signal-temporal-logic-via-graphs-of-time-varying-convex-sets)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：通过模因代码策略进化的优化方法
-2. [On the diversity problems parameterized by the size of the solutions](/202607/28/2607.23188v1-on-the-diversity-problems-parameterized-by-the-size-of-the-solutions)  
+   evidence：面向STL规范的轨迹规划框架，可应用于多机器人协调
+2. [Learning Spatiotemporal Decision Priors for Efficient Path Planning under Partial Observability](/202607/29/2607.22166v1-learning-spatiotemporal-decision-priors-for-efficient-path-planning-under-partial-observability)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：多样性优化理论
-3. [WorldDiT: A Unified Diffusion Architecture for World and Action Modeling](/202607/28/2607.23909v1-worlddit-a-unified-diffusion-architecture-for-world-and-action-modeling)  
+   evidence：部分可观测条件下的路径规划，利用学习先验
+3. [Provable Speedups From Dynamic Population Sizes in Evolutionary Algorithms for Multiobjective Optimization](/202607/29/2607.23800v1-provable-speedups-from-dynamic-population-sizes-in-evolutionary-algorithms-for-multiobjective-optimization)  
    标签：评分：7.0/10、query:multi-robot
-   evidence：用于机器人动作生成的世界模型
-4. [Multi-Agent System-driven Digital Twins for predictive maintenance: architectures, technologies and open research challenges](/202607/28/2607.21873v1-multi-agent-system-driven-digital-twins-for-predictive-maintenance-architectures-technologies-and-open-research-challenges)  
+   evidence：进化多目标优化中的动态种群规模
+4. [LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments](/202607/29/2607.23969v1-leapbot-wa-world-anchor-action-models-via-predictive-latent-alignments)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：通过预测潜在对齐的世界锚点动作模型
+5. [MR-TGN: A Meta-Role Temporal Graph Network for Team-Level Intent Prediction in Multi-Agent Systems](/202607/29/2607.25316v1-mr-tgn-a-meta-role-temporal-graph-network-for-team-level-intent-prediction-in-multi-agent-systems)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：多智能体团队意图预测以协调
+6. [DC-WAM: Dynamic-Centric Visual Supervision and Reasoning for World-Action Models](/202607/29/2607.25918v1-dc-wam-dynamic-centric-visual-supervision-and-reasoning-for-world-action-models)  
+   标签：评分：7.0/10、query:multi-robot
+   evidence：以动态为中心的视觉推理世界动作模型
+7. [WCM: World-Cognition Model for Generalizable Human-Robot Interaction](/202607/29/2607.22999v1-wcm-world-cognition-model-for-generalizable-human-robot-interaction)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：多智能体系统协调方法综述
-5. [ViTacWorld: Scaling Visuo-Tactile World Models for Contact-Rich Robot Manipulation](/202607/28/2607.22530v1-vitacworld-scaling-visuo-tactile-world-models-for-contact-rich-robot-manipulation)  
+   evidence：用于人机交互的世界认知模型，与多机器人世界模型相关
+8. [ArmnetBench v0.1: Parallel Real-World Evaluation of Manipulation Policies on a Low-Cost Arm Farm](/202607/29/2607.24481v1-armnetbench-v01-parallel-real-world-evaluation-of-manipulation-policies-on-a-low-cost-arm-farm)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：视觉触觉世界模型用于接触丰富操作
-6. [Learning to Optimize: Joint Routing and Flow Allocation on Sparse Non-Euclidean Networks](/202607/28/2607.23467v1-learning-to-optimize-joint-routing-and-flow-allocation-on-sparse-non-euclidean-networks)  
+   evidence：用于仓储自动化的机器人操作基准
+9. [Decentralized Scalable Exploration via Emergent Adaptive Lévy Walks on Minimal-Sensing Platforms](/202607/29/2607.25195v1-decentralized-scalable-exploration-via-emergent-adaptive-lvy-walks-on-minimal-sensing-platforms)  
    标签：评分：6.0/10、query:multi-robot
-   evidence：稀疏网络上的联合路由与流量分配，与仓储物流相关
+   evidence：基于莱维行走的分散式多机器人探索
 
 
 <div class="dpr-home-promo-card">
