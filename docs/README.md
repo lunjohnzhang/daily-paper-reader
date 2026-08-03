@@ -1,38 +1,106 @@
-<div class="dpr-home-notice-card">
-  <h3 class="dpr-home-notice-title">🚀 Start Here</h3>
-  <ul class="dpr-home-notice-list">
-    <li><a href="#/tutorial/README">使用教程</a></li>
-  </ul>
+<div class="dpr-home-notice-card dpr-home-panel">
+  <div class="dpr-home-notice-header dpr-home-panel-header">
+    <h3 class="dpr-home-notice-title">公告与更新</h3>
+    <a class="dpr-home-notice-tutorial" href="#/tutorial/README">使用教程 <span aria-hidden="true">›</span></a>
+  </div>
+  <div class="dpr-home-notice-entry">
+    <time class="dpr-home-notice-date" datetime="2026-07-20">07.20</time>
+    <div>
+      <strong class="dpr-home-notice-entry-title">反馈功能上线</strong>
+      <span class="dpr-home-notice-entry-summary">新增反馈功能，欢迎大家踊跃反馈各种建议，我们会第一时间查看并协调处理。</span>
+    </div>
+  </div>
+  <div class="dpr-home-notice-entry">
+    <time class="dpr-home-notice-date" datetime="2026-07-19">07.19</time>
+    <div>
+      <strong class="dpr-home-notice-entry-title">首页新增社区统计</strong>
+      <span class="dpr-home-notice-entry-summary">现在可以看到今天看论文的人数和项目加入人数。</span>
+    </div>
+  </div>
+  <div class="dpr-home-site-stats" data-dpr-site-stats hidden aria-live="polite">
+    <span>今天有 <strong class="dpr-home-site-stat-value" data-dpr-daily-readers>--</strong> 人在看论文</span>
+    <span class="dpr-home-site-stat-separator" aria-hidden="true">·</span>
+    <span>昨天有 <strong class="dpr-home-site-stat-value" data-dpr-yesterday-readers>--</strong> 人在看论文</span>
+    <span class="dpr-home-site-stat-separator" aria-hidden="true">·</span>
+    <span>已有 <strong class="dpr-home-site-stat-value" data-dpr-fork-count>--</strong> 人加入 Daily Paper Reader</span>
+    <span class="dpr-home-history">
+      <button type="button" class="dpr-home-history-trigger" data-dpr-history-trigger aria-label="查看最近 14 天阅读趋势"><span aria-hidden="true">🔍</span></button>
+      <span class="dpr-home-history-popover" data-dpr-history-popover role="tooltip">
+        <span class="dpr-home-history-header">近 14 天阅读趋势</span>
+        <span class="dpr-home-history-meta">
+          <span data-dpr-history-range>--</span>
+          <span>峰值 <strong data-dpr-history-peak>--</strong></span>
+        </span>
+        <span class="dpr-home-history-chart" data-dpr-history-chart></span>
+      </span>
+    </span>
+  </div>
 </div>
 
-## 每次日报
-- 最新运行日期：2026-08-02
-- 运行时间：2026-08-02 21:09:46 UTC
-- 运行状态：成功
-- 本次总论文数：2
-- 精读区：0
-- 速读区：2
+<div class="dpr-home-dashboard-grid">
+<section class="dpr-home-dashboard-card dpr-home-report-card">
+  <div class="dpr-home-dashboard-header">
+    <div>
+      <span class="dpr-home-dashboard-kicker">2026-08-03</span>
+      <h3 class="dpr-home-dashboard-title">今日汇总</h3>
+    </div>
+    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
+  </div>
+  <dl class="dpr-home-dashboard-stats">
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
+  </dl>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-03 20:39:12 UTC<br>状态：成功</p>
+</section>
+<section class="dpr-home-dashboard-card dpr-home-brief-card">
+  <div class="dpr-home-dashboard-header">
+    <div>
+      <span class="dpr-home-dashboard-kicker">合并后生成</span>
+      <h3 class="dpr-home-dashboard-title">今日简报</h3>
+    </div>
+    <strong class="dpr-home-dashboard-count">AI</strong>
+  </div>
+  <div class="dpr-home-dashboard-body">
+<p>今日聚焦多机器人异构协作与时空约束规划，精读两篇高分论文，另涉路径生成、语义通信与仿真模拟。最值得关注D-VLC的分布式视觉-语言协作框架（9.0分），及STL-GO融合时空拓扑约束的多智能体规划方法（8.0分）。建议从视觉语言模型驱动的机器人协作与可验证规划方向切入，关注低成本世界模拟器的应用潜力。</p>
+  </div>
+</section>
+<section class="dpr-home-dashboard-card dpr-home-deep-card">
+  <div class="dpr-home-dashboard-header">
+    <div>
+      <span class="dpr-home-dashboard-kicker">今日累计</span>
+      <h3 class="dpr-home-dashboard-title">精读推荐</h3>
+    </div>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
+  </div>
+  <div class="dpr-home-dashboard-body">
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="D-VLC: Decentralized Vision-Language Collaboration for Heterogeneous Embodied Multi-Robot Systems in Unknown Environments">D-VLC: Decentralized Vision-Language Collaboration for Heterogeneous Embodied Multi-Robot Systems in Unknown Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="Multi-Agent Planning with Spatio-Temporal and Topological Constraints using STL-GO">Multi-Agent Planning with Spatio-Temporal and Topological Constraints using STL-GO</span></li><li><span class="dpr-home-dashboard-paper-title" title="MROPE: A Multi-Robot Safe Cooperative Strategy via combined Predictive Safety Filters and Ellipse-based Constraint Compression">MROPE: A Multi-Robot Safe Cooperative Strategy via combined Predictive Safety Filters and Ellipse-based Constraint Compression</span></li></ul>
+  </div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+</section>
+<section class="dpr-home-dashboard-card dpr-home-skim-card">
+  <div class="dpr-home-dashboard-header">
+    <div>
+      <span class="dpr-home-dashboard-kicker">今日累计</span>
+      <h3 class="dpr-home-dashboard-title">速读推荐</h3>
+    </div>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
+  </div>
+  <div class="dpr-home-dashboard-body">
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Homotopy-Aware Corridor Generation without Predefined Reference Paths">Homotopy-Aware Corridor Generation without Predefined Reference Paths</span></li><li><span class="dpr-home-dashboard-paper-title" title="When Robots Exchange Meaning: A Demo of Goal-Oriented Semantic Communications for Collaborative Robotics">When Robots Exchange Meaning: A Demo of Goal-Oriented Semantic Communications for Collaborative Robotics</span></li><li><span class="dpr-home-dashboard-paper-title" title="BWM: A Low-Cost High-Fidelity World Simulator for Robot Learning">BWM: A Low-Cost High-Fidelity World Simulator for Robot Learning</span></li></ul>
+  </div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
+</section>
+</div>
 
-### 今日简报（AI）
-今日速读2篇论文，聚焦无人机群空间控制与自适应学习预测控制。最值得关注《FleetScape》提出的混合现实沙盘，可实现大规模无人机编队空间监控与指挥。建议对无人机群人机交互控制感兴趣的读者精读该文，其余可快速浏览。
-- 详情：[/202608/02/README](/202608/02/README)
-
-### 精读区论文标签
-- 本次无精读推荐。
-
-### 速读区论文标签
-1. [FleetScape: A Mixed Reality Sandtable for Spatial Supervision and Control of Scalable Drone Fleets](/202608/02/2607.26423v1-fleetscape-a-mixed-reality-sandtable-for-spatial-supervision-and-control-of-scalable-drone-fleets)  
-   标签：评分：7.0/10、query:multi-robot
-   evidence：面向无人机机队空间监督的混合现实系统
-2. [Self-Adaptive Learning and Model Predictive Control for Tracking Unknown Dynamics with No Regret](/202608/02/2607.26370v1-self-adaptive-learning-and-model-predictive-control-for-tracking-unknown-dynamics-with-no-regret)  
-   标签：评分：6.0/10、query:multi-robot
-   evidence：自适应学习与模型预测控制用于跟踪未知动态，应用于动态绘图与追逐对抗
-
-
-<div class="dpr-home-promo-card">
-  <h3 class="dpr-home-promo-title">💬 社区与支持</h3>
-  <ul class="dpr-home-promo-list">
-    <li>欢迎 Star / Fork / Issue / PR</li>
-    <li>QQ群：583867967（欢迎交流，已有：1151人）</li>
-  </ul>
+<div class="dpr-home-promo-card dpr-home-panel">
+  <div class="dpr-home-panel-header">
+    <h3 class="dpr-home-promo-title">社区与支持</h3>
+  </div>
+  <p class="dpr-home-promo-copy">欢迎通过 Star、Fork、Issue 或 PR 一起完善 Daily Paper Reader。</p>
+  <div class="dpr-home-promo-meta">
+    <span>QQ群 <strong>583867967</strong></span>
+    <span class="dpr-home-promo-separator" aria-hidden="true">·</span>
+    <span>已有 <strong>1,491</strong> 人参与交流</span>
+  </div>
 </div>
