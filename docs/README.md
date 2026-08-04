@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-03</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-04</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-03 20:39:12 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-04 21:33:11 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日聚焦多机器人异构协作与时空约束规划，精读两篇高分论文，另涉路径生成、语义通信与仿真模拟。最值得关注D-VLC的分布式视觉-语言协作框架（9.0分），及STL-GO融合时空拓扑约束的多智能体规划方法（8.0分）。建议从视觉语言模型驱动的机器人协作与可验证规划方向切入，关注低成本世界模拟器的应用潜力。</p>
+<p>今日精读聚焦仓储布局优化与多智能体轨迹规划，两篇均获9分高分。最值得关注：无仿真退火算法可多项式时间内优化自动化仓库，动态博弈框架显著提升多智能体协同规划质量。建议普通读者优先了解仓储布局优化思路，其效率提升方法可迁移至物流调度场景。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="D-VLC: Decentralized Vision-Language Collaboration for Heterogeneous Embodied Multi-Robot Systems in Unknown Environments">D-VLC: Decentralized Vision-Language Collaboration for Heterogeneous Embodied Multi-Robot Systems in Unknown Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="Multi-Agent Planning with Spatio-Temporal and Topological Constraints using STL-GO">Multi-Agent Planning with Spatio-Temporal and Topological Constraints using STL-GO</span></li><li><span class="dpr-home-dashboard-paper-title" title="MROPE: A Multi-Robot Safe Cooperative Strategy via combined Predictive Safety Filters and Ellipse-based Constraint Compression">MROPE: A Multi-Robot Safe Cooperative Strategy via combined Predictive Safety Filters and Ellipse-based Constraint Compression</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Stress-Relief Annealing: Polynomial-Time Simulation-Free Layout Optimization for Automated Warehouses">Stress-Relief Annealing: Polynomial-Time Simulation-Free Layout Optimization for Automated Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="A Forward-Inverse Dynamic Game Framework for Enhanced Multi-Agent Trajectory Planning">A Forward-Inverse Dynamic Game Framework for Enhanced Multi-Agent Trajectory Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning-Based Motion Planning for Dynamic Environments: From Foundational Algorithms to Emerging Paradigms">Learning-Based Motion Planning for Dynamic Environments: From Foundational Algorithms to Emerging Paradigms</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Homotopy-Aware Corridor Generation without Predefined Reference Paths">Homotopy-Aware Corridor Generation without Predefined Reference Paths</span></li><li><span class="dpr-home-dashboard-paper-title" title="When Robots Exchange Meaning: A Demo of Goal-Oriented Semantic Communications for Collaborative Robotics">When Robots Exchange Meaning: A Demo of Goal-Oriented Semantic Communications for Collaborative Robotics</span></li><li><span class="dpr-home-dashboard-paper-title" title="BWM: A Low-Cost High-Fidelity World Simulator for Robot Learning">BWM: A Low-Cost High-Fidelity World Simulator for Robot Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MixedComplementarityProblems.jl: A Fast, Batched, Open-Source Interior Point Solver for Mixed Complementarity Problems">MixedComplementarityProblems.jl: A Fast, Batched, Open-Source Interior Point Solver for Mixed Complementarity Problems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Policy Optimality Measurement for Multi-Vehicle Decision-Making: From Extrinsic Indicators to Intrinsic Quality">Policy Optimality Measurement for Multi-Vehicle Decision-Making: From Extrinsic Indicators to Intrinsic Quality</span></li><li><span class="dpr-home-dashboard-paper-title" title="FBFM: A Training-Free Asynchronous Feedback Mechanism for Flow-Matching in World-Action Models Execution">FBFM: A Training-Free Asynchronous Feedback Mechanism for Flow-Matching in World-Action Models Execution</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 </div>
 
