@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-04</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-05</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-04 21:33:11 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-05 21:34:42 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精读聚焦仓储布局优化与多智能体轨迹规划，两篇均获9分高分。最值得关注：无仿真退火算法可多项式时间内优化自动化仓库，动态博弈框架显著提升多智能体协同规划质量。建议普通读者优先了解仓储布局优化思路，其效率提升方法可迁移至物流调度场景。</p>
+<p>今日精选7篇论文，其中1篇精读、6篇速读，重点聚焦智能体协调与策略干预。最值得关注的是精读论文《CoWAM》（8.0分），探讨通过协调合约实现选择性策略干预；速读中《DreamTrajectory》涉及移动操作与世界模型对齐，可作交叉参考。建议普通读者优先从CoWAM的合约机制入手，再结合自身领域延伸至分布式优化或自组装等应用场景。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">5 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Stress-Relief Annealing: Polynomial-Time Simulation-Free Layout Optimization for Automated Warehouses">Stress-Relief Annealing: Polynomial-Time Simulation-Free Layout Optimization for Automated Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="A Forward-Inverse Dynamic Game Framework for Enhanced Multi-Agent Trajectory Planning">A Forward-Inverse Dynamic Game Framework for Enhanced Multi-Agent Trajectory Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning-Based Motion Planning for Dynamic Environments: From Foundational Algorithms to Emerging Paradigms">Learning-Based Motion Planning for Dynamic Environments: From Foundational Algorithms to Emerging Paradigms</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CoWAM: Coordination Contracts for Selective Policy Intervention with WAMs">CoWAM: Coordination Contracts for Selective Policy Intervention with WAMs</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -87,7 +87,7 @@
     <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MixedComplementarityProblems.jl: A Fast, Batched, Open-Source Interior Point Solver for Mixed Complementarity Problems">MixedComplementarityProblems.jl: A Fast, Batched, Open-Source Interior Point Solver for Mixed Complementarity Problems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Policy Optimality Measurement for Multi-Vehicle Decision-Making: From Extrinsic Indicators to Intrinsic Quality">Policy Optimality Measurement for Multi-Vehicle Decision-Making: From Extrinsic Indicators to Intrinsic Quality</span></li><li><span class="dpr-home-dashboard-paper-title" title="FBFM: A Training-Free Asynchronous Feedback Mechanism for Flow-Matching in World-Action Models Execution">FBFM: A Training-Free Asynchronous Feedback Mechanism for Flow-Matching in World-Action Models Execution</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DreamTrajectory: Trajectory-Guided Action Generation with World Model Alignment for Mobile Manipulation">DreamTrajectory: Trajectory-Guided Action Generation with World Model Alignment for Mobile Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="DeRP: An Algorithm for Self-Assembly of Power-Delivery Networks using Recursive Branching in Information-Limited Environments">DeRP: An Algorithm for Self-Assembly of Power-Delivery Networks using Recursive Branching in Information-Limited Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="Argonaut: Interactive Visual Exploration for Distributed Optimization">Argonaut: Interactive Visual Exploration for Distributed Optimization</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
