@@ -44,14 +44,14 @@
       <span class="dpr-home-dashboard-kicker">2026-08-07</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 17 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-07 02:14:53 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-07 21:21:59 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共读6篇论文，精读2篇、速读4篇；最高分聚焦多智能体路径规划与机器人群体物流。</p>
-<p>最值得关注的是满分论文《PRIMAL3》（强化+模仿学习的多智能体路径规划）及8分《Enabling Urgency-aware Robot Swarm》（智能IoT标签驱动的紧急感知集群物流）。</p>
-<p>建议后续可深入探索多智能体协作与紧急任务调度结合的实际应用场景。</p>
+<p>今日17篇论文中，精读6篇，核心聚焦多智能体路径寻路，两篇满分工作成为绝对焦点。</p>
+<p>最值得关注的是PRIMAL3与Search-Aided联合学习，二者通过强化学习与搜索机制的结合，显著提升路径规划的鲁棒性与长期表现。</p>
+<p>对普通读者，建议下一步从速读的LAWM-3D切入，了解3D人类视频驱动的世界模型，拓展具身智能视野。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PRIMAL3: Pathfinding via Reinforcement and Imitation Multi-Agent Learning - Leveraging LaCAM3">PRIMAL3: Pathfinding via Reinforcement and Imitation Multi-Agent Learning - Leveraging LaCAM3</span></li><li><span class="dpr-home-dashboard-paper-title" title="Enabling Urgency-aware Robot Swarm Intralogistics using Smart IoT Tags">Enabling Urgency-aware Robot Swarm Intralogistics using Smart IoT Tags</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PRIMAL3: Pathfinding via Reinforcement and Imitation Multi-Agent Learning - Leveraging LaCAM3">PRIMAL3: Pathfinding via Reinforcement and Imitation Multi-Agent Learning - Leveraging LaCAM3</span></li><li><span class="dpr-home-dashboard-paper-title" title="Search-Aided Joint Agent-Environment Reinforcement Learning for Robust Lifelong Multi-Agent Path Finding with Rotations">Search-Aided Joint Agent-Environment Reinforcement Learning for Robust Lifelong Multi-Agent Path Finding with Rotations</span></li><li><span class="dpr-home-dashboard-paper-title" title="Coordinated Multi-Robot Disassembly for Makespan Optimization of Large-Scale Assemblies">Coordinated Multi-Robot Disassembly for Makespan Optimization of Large-Scale Assemblies</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Contact-Driven Localization in a Freeform Robotic Self-Assembled Structure">Contact-Driven Localization in a Freeform Robotic Self-Assembled Structure</span></li><li><span class="dpr-home-dashboard-paper-title" title="History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning">History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Action Chunk Scheduling for Batched Robot Policy Serving">Action Chunk Scheduling for Batched Robot Policy Serving</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="LAWM-3D: Learning 3D-Aware Latent Actions from Human Videos for Generalizable Robot World Models">LAWM-3D: Learning 3D-Aware Latent Actions from Human Videos for Generalizable Robot World Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Robust-WAM: Bridging Generative Pretraining and Semantic Foresight in World-Action Models">Robust-WAM: Bridging Generative Pretraining and Semantic Foresight in World-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning">History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>11</strong></span></div>
 </section>
 </div>
 
