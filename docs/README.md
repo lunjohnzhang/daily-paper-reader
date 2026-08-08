@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-07</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-08</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 17 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-07 21:21:59 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-08 20:52:32 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日17篇论文中，精读6篇，核心聚焦多智能体路径寻路，两篇满分工作成为绝对焦点。</p>
-<p>最值得关注的是PRIMAL3与Search-Aided联合学习，二者通过强化学习与搜索机制的结合，显著提升路径规划的鲁棒性与长期表现。</p>
-<p>对普通读者，建议下一步从速读的LAWM-3D切入，了解3D人类视频驱动的世界模型，拓展具身智能视野。</p>
+<p>今日精读1篇、速读6篇，聚焦多智能体强化学习的前沿进展。最值得关注的是8.0分的《History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning》，揭示了历史信息在异构多智能体元策略委派中的关键作用。普通读者可延展了解动作分块调度与运动规划等应用方向，以拓宽视野。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PRIMAL3: Pathfinding via Reinforcement and Imitation Multi-Agent Learning - Leveraging LaCAM3">PRIMAL3: Pathfinding via Reinforcement and Imitation Multi-Agent Learning - Leveraging LaCAM3</span></li><li><span class="dpr-home-dashboard-paper-title" title="Search-Aided Joint Agent-Environment Reinforcement Learning for Robust Lifelong Multi-Agent Path Finding with Rotations">Search-Aided Joint Agent-Environment Reinforcement Learning for Robust Lifelong Multi-Agent Path Finding with Rotations</span></li><li><span class="dpr-home-dashboard-paper-title" title="Coordinated Multi-Robot Disassembly for Makespan Optimization of Large-Scale Assemblies">Coordinated Multi-Robot Disassembly for Makespan Optimization of Large-Scale Assemblies</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning">History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">11 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="LAWM-3D: Learning 3D-Aware Latent Actions from Human Videos for Generalizable Robot World Models">LAWM-3D: Learning 3D-Aware Latent Actions from Human Videos for Generalizable Robot World Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Robust-WAM: Bridging Generative Pretraining and Semantic Foresight in World-Action Models">Robust-WAM: Bridging Generative Pretraining and Semantic Foresight in World-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning">History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Action Chunk Scheduling for Batched Robot Policy Serving">Action Chunk Scheduling for Batched Robot Policy Serving</span></li><li><span class="dpr-home-dashboard-paper-title" title="RIT*: Riemannian Informed Trees for Cost-Adaptive Optimal Motion Planning">RIT*: Riemannian Informed Trees for Cost-Adaptive Optimal Motion Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Stochastic Multiple Shooting Trajectory Optimization via Sequential Local Policy Evaluation">Stochastic Multiple Shooting Trajectory Optimization via Sequential Local Policy Evaluation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>11</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 </div>
 
