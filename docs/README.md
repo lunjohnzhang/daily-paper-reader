@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-08</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-09</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-08 20:52:32 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-09 19:46:00 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精读1篇、速读6篇，聚焦多智能体强化学习的前沿进展。最值得关注的是8.0分的《History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning》，揭示了历史信息在异构多智能体元策略委派中的关键作用。普通读者可延展了解动作分块调度与运动规划等应用方向，以拓宽视野。</p>
+<p>今日聚焦多智能体协同感知与路径规划，精读2篇高分论文、速读3篇。</p>
+<p>最值得关注的是LLM辅助自动驾驶协同感知（8.0）与分层稀疏协调（8.0），后者在多智能体拓扑互补上具启发性。</p>
+<p>普通读者可优先看速读中MobileWAM，它把世界模型接入移动操作，概念直观有趣。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning">History Matters: Meta-policy Delegation with Heterogeneous Multi-agent Reinforcement Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="LLM-Assisted Coalition Formation for Cooperative Perception in Autonomous Driving">LLM-Assisted Coalition Formation for Cooperative Perception in Autonomous Driving</span></li><li><span class="dpr-home-dashboard-paper-title" title="HELENA:Hierarchical Sparse Coordination over a Union of Complementary Topologies for MAS">HELENA:Hierarchical Sparse Coordination over a Union of Complementary Topologies for MAS</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Action Chunk Scheduling for Batched Robot Policy Serving">Action Chunk Scheduling for Batched Robot Policy Serving</span></li><li><span class="dpr-home-dashboard-paper-title" title="RIT*: Riemannian Informed Trees for Cost-Adaptive Optimal Motion Planning">RIT*: Riemannian Informed Trees for Cost-Adaptive Optimal Motion Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Stochastic Multiple Shooting Trajectory Optimization via Sequential Local Policy Evaluation">Stochastic Multiple Shooting Trajectory Optimization via Sequential Local Policy Evaluation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="StochSIPP: Safe Interval Path Planning in Stochastic Dynamic Environments">StochSIPP: Safe Interval Path Planning in Stochastic Dynamic Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="SCOPE: Field-of-View-Aware Path Planning in Unknown 3D Environments via Safety-Volume Certification">SCOPE: Field-of-View-Aware Path Planning in Unknown 3D Environments via Safety-Volume Certification</span></li><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 </div>
 
