@@ -1,0 +1,747 @@
+Title: Ising Acceleration for Multi-Robot Multi-Target Planning
+
+URL Source: https://arxiv.org/pdf/2608.06803v1
+
+Published Time: Mon, 10 Aug 2026 00:27:40 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# Ising Acceleration for Multi-Robot Multi-Target Planning 
+
+## Ahmet Efe, Recep B. Uludag, Chris H. Kim, and Ulya R. Karpuzcu 
+
+University of Minnesota Minneapolis, Minnesota, USA 
+
+Abstract 
+
+Ising machines are emerging as promising hardware for combinato-rial optimization. With recent advances in CMOS Ising technology, they are becoming attractive as low-power accelerator systems for robotics, where energy is limited and combinatorial optimization arises in multiple forms. However, a hardware-aware analysis of where such chips fit within a robotics planning stack is still missing. This paper studies the capabilities and limitations of CMOS Ising machines for low-power acceleration in multi-robot multi-target planning. We analyze three planning layers—target sharing, tour construc-tion, and pathfinding—using real 45-spin all-to-all connected CMOS Ising chips as representative devices. We propose new Ising-based planning methods and a multi-mapping pipeline that uses spin merging, coefficient quantization, and spin-budget branching to adapt subproblems to spin- and coefficient-limited hardware. Our results show that the proposed recursive target-sharing method naturally matches the Ising hardware, achieving up to 8,000 × lower energy than a classical baseline. End to end, the Ising pipeline produces routes within 9% of a strong classical baseline at 130 ×
+
+lower energy, showing that compact CMOS Ising machines can be effective in selected parts of the planning stack. 
+
+1 Introduction 
+
+Robotic systems that operate autonomously—warehouse robots, delivery drones, and search-and-rescue teams—must make a stream of combinatorial planning decisions under tight energy budgets. A multi-robot fleet visiting a set of targets in an obstacle-filled environment faces three interleaved problems: assigning targets to robots, ordering each robot’s assigned targets, and finding obstacle-avoiding paths between successive waypoints. Classical solvers for these problems are mature and effective, but they run on general-purpose processors whose energy cost can be significant on battery-powered platforms. This has motivated interest in specialized hardware such as Ising machines, which approximately minimize quadratic binary objectives by exploiting device dynamics. Recent advances in CMOS-based Ising chips have produced small, low-power devices that can be integrated alongside a host processor, making them attractive candidates for on-board robotics acceleration. However, it is not clear whether current Ising hardware can handle realistic robotics workloads. Today’s compact CMOS Ising chips offer limited spin counts, narrow coefficient ranges, and fixed hardware interfaces. The question is not whether robotics problems 
+
+can be expressed as Ising optimization in principle—they can— but whether the resulting models can be mapped to real chips at useful problem sizes, and whether the energy savings justify the decomposition and mapping effort. What is missing is a hardware-aware, end-to-end analysis of where compact low-power CMOS Ising chips fit within a robotics planning stack. Planning workload Mapping pipeline Hybrid execution 
+
+> host commits valid candidates and stitches global planning decisions
+> Target sharing assign targets Tour construction order visits Pathfinding realize routes Decompose
+> QUBO / Ising
+> Multi-map + solve
+> Decode + score Classical host control + validation Spin/coefficient-limited CMOS Ising machine Global robot plan assignments + routes
+
+Figure 1: Hardware-aware Ising acceleration pipeline. A spin-and coefficient-limited CMOS Ising chip generates candi-dates, while the host validates, scores, and stitches them into a global robot plan. 
+
+This paper studies that question using multi-robot multi-target planning as both a target application and a structured workload. The problem naturally decomposes into three planning layers—target sharing, tour construction, and pathfinding—that stress different hardware limits. For each layer, we develop a hardware-aware Ising-based method: recursive target sharing as a distance-weighted binary partitioning problem, clustered tour construction using spin-limited Ising subproblems, and patch-sliding pathfinding using local Ising solves. Together, these methods show where compact CMOS Ising hardware provides useful acceleration, where coefficient and spin limits break direct mappings, and which mapping strategies recover useful candidates. Rather than attempting to solve any planning layer globally on the chip, we decompose each layer into chip-sized subproblems and generate multiple hardware-compatible mappings per subproblem. The chip acts as a low-power candidate-generation accelerator, not as a standalone planner. Classical logic does not repair Ising outputs; it validates, scores, and stitches candidates generated by the Ising solver. Our contributions are as follows: 
+
+• We provide a hardware-aware characterization of multi-robot multi-target planning on compact CMOS Ising hard-ware, showing that target sharing, tour construction, and pathfinding expose different bottlenecks: spin count, coeffi-cient range, or decode validity. 
+
+• We propose a multi-mapping pipeline for spin- and coefficient-limited Ising accelerators. The pipeline decomposes plan-ning problems into chip-sized subproblems and evaluates mapping portfolios formed by spin merging, coefficient quantization, and spin-budget branching. 
+
+• We propose three Ising-based planning methods for the MRMT stack: patch-sliding pathfinding with spin merging, clustered tour construction with spin-budget branching, and recursive target sharing with coefficient quantization and batching. Classical logic is used for decomposition, validation, scoring, and stitching rather than repair. 
+
+• We evaluate the resulting Ising pipeline on a real 45-spin all-to-all connected CMOS Ising chip. Pathfinding and target arXiv:2608.06803v1 [cs.ET] 7 Aug 2026 Ahmet Efe, Recep B. Uludag, Chris H. Kim, and Ulya R. Karpuzcu 
+
+sharing run directly on the chip, achieving energy reduc-tions of 37 × and 8,000 ×, while tour construction exposes a coefficient-range limitation. End to end, the Ising pipeline produces routes within 9% of a strong classical baseline at 130 × lower energy. The rest of the paper is organized as follows. Section 2 provides background on Ising machines and multi-robot planning. Section 3 characterizes the three planning layers and their QUBO formula-tions. Section 4 describes the shared mapping pipeline. Section 5 instantiates the pipeline for each layer. Section 6 presents the ex-perimental evaluation. Sections 7 and 8 discuss related work and conclude. 
+
+2 Background 2.1 Ising Machines and QUBO 
+
+A quadratic unconstrained binary optimization (QUBO) problem seeks a binary vector 𝑥 ∈ { 0, 1}𝑛 that minimizes a quadratic objec-tive 
+
+𝐸 QUBO (𝑥 ) =∑︁ 
+
+> 𝑖
+
+𝑞 𝑖 𝑥 𝑖 +∑︁ 
+
+> 𝑖 <𝑗
+
+𝑄 𝑖 𝑗 𝑥 𝑖 𝑥 𝑗 , (1) where 𝑞 𝑖 and 𝑄 𝑖 𝑗 are real-valued coefficients encoding the problem structure. A constant offset is omitted because it does not affect the optimizer. Many combinatorial optimization problems—including graph partitioning, satisfiability, and variants of the traveling sales-man problem—can be cast in this form [19]. An equivalent representation uses Ising spins 𝑠 𝑖 ∈ {− 1, +1} with the energy 
+
+𝐸 Ising (𝑠 ) =∑︁ 
+
+> 𝑖
+
+ℎ𝑖 𝑠 𝑖 +∑︁ 
+
+> 𝑖 <𝑗
+
+𝐽 𝑖 𝑗 𝑠 𝑖 𝑠 𝑗 , (2) where ℎ𝑖 are local fields and 𝐽 𝑖 𝑗 are pairwise couplings. The two forms are related by the substitution 𝑥 𝑖 = (1 + 𝑠 𝑖 )/ 2. Ising machines are physical systems designed to approximately find low-energy spin configurations of (2) by exploiting device dynamics such as an-nealing, oscillator coupling, or probabilistic bit flipping [20]. Their appeal is that part of the optimization is carried out by the hardware dynamics rather than by sequential software, potentially offering energy and latency advantages over general-purpose processors. 
+
+2.2 Ising Hardware Landscape 
+
+Ising machines span a wide range of scales and technologies. At the large end, quantum annealers such as D-Wave systems offer thousands of qubits but require cryogenic cooling and occupy rack-scale infrastructure [16]. Coherent Ising machines (CIMs) based on optical parametric oscillators have been demonstrated with up to 100,000 spins, but they rely on fiber-loop cavities and laboratory-scale optical setups [12]. Digital annealers and simulated-bifurcation systems can also reach large spin counts through digital or time-multiplexed simulation [29]. While these systems achieve impres-sive scale, they are not the target class for this work: quantum annealers and optical CIMs require infrastructure unsuitable for mobile robots, while large digital annealing systems target scale rather than tightly integrated low-power coprocessing. At the other end of the spectrum, CMOS-based Ising chips target compact and low-power operation. Prior designs include CMOS annealing processors, fully connected digital annealers, coupled-oscillator chips, and probabilistic p-bit solvers [1, 5, 23, 28, 30, 31]. These systems show that Ising acceleration can be realized in sev-eral hardware styles, but their practical mapping constraints vary widely. This paper focuses on compact all-to-all connected CMOS Ising chips that can serve as plug-in coprocessors alongside a host CPU. In this class of hardware, all-to-all connectivity simplifies embed-ding, but practical mapping is shaped by several constraints. Lim-ited spin count means that application-scale problems cannot be mapped globally. Narrow coefficient ranges limit the dynamic range available for encoding constraint penalties and objective terms, making structures such as one-hot permutation constraints difficult to realize. Parallel solver resources , either within a chip or across multiple chips on the same board, provide a natural way to evaluate multiple mappings. Low-power operation makes these systems attractive for embedded and battery-powered platforms. We target representative hardware from this class: 45-spin all-to-all connected CMOS Ising cores with narrow integer coefficient ranges, parallel solver resources, and a low-power operating en-velope. These constraints motivate the hardware-aware analysis and mapping pipeline developed in the rest of the paper, but the pipeline is not specific to any single chip design. 
+
+2.3 Multi-Robot Multi-Target Planning 
+
+Multi-robot multi-target (MRMT) planning considers a team of 𝑅 
+
+robots operating in a shared environment with obstacles. A set of 𝑁 target locations must be collectively visited, and the planner must decide the assignment of targets to robots, the visit order for each robot, and the obstacle-aware paths between successive waypoints. This setting arises in applications such as warehouse logistics, search and rescue, and autonomous inspection. The MRMT planning problem can be decomposed into three layers, each corresponding to a different combinatorial subproblem: 
+
+Target sharing. Deciding which robot is responsible for each tar-get. This is an allocation problem related to the multi-robot task allocation (MRTA) literature [7, 17] and to the multiple traveling salesman problem (mTSP) [2]. 
+
+Tour construction. Given a robot and its assigned targets, deciding the order in which the targets should be visited. This is an open-route variant of the traveling salesman problem. 
+
+Pathfinding. Given two locations and a map with obstacles, finding a valid low-cost path. Classical algorithms such as A* [10] and Dijkstra’s algorithm [6] solve this efficiently on general-purpose hardware. These layers are coupled: obstacle-aware path distances are used by the tour-construction and target-sharing layers, and target as-signments determine the per-robot tours that must be constructed. Section 3 examines each layer as an Ising mapping target, and later sections develop hardware-aware Ising methods for each layer. 
+
+3 Workload Characterization 
+
+This section characterizes the three planning layers of multi-robot multi-target planning as Ising mapping targets and shows why direct QUBO/Ising formulations are insufficient on current compact CMOS Ising hardware. The analysis motivates the hardware-aware mapping pipeline and layer-specific Ising methods introduced in later sections. Ising Acceleration for Multi-Robot Multi-Target Planning (a) inefficient target order       
+
+> R
+> 53214
+> (a) cost = 18 (b) better target order
+> R
+> 23451
+> (b) cost = 15
+> robot target poor order better order obstacle
+
+Figure 2: Tour construction as target ordering. The robot and target set are the same in both panels, but different visit or-ders produce different route costs. The tour solver therefore optimizes the order of targets using obstacle-aware path dis-tances from the pathfinding layer. 
+
+3.1 Pathfinding 
+
+Pathfinding determines how a robot moves between two locations on a grid map while avoiding obstacles. We view the grid as a graph 𝐺 = (𝑉 , 𝐸 ), where each free cell is a node and edges connect horizontally or vertically adjacent free cells. Given a start node 𝑠 
+
+and a goal node 𝑡 , the task is to select a connected sequence of neighboring nodes from 𝑠 to 𝑡 .Several QUBO formulations of this problem are possible, differing in how the path is represented. A cell-based formulation assigns one binary variable 𝑥 𝑖 ∈ { 0, 1} per free cell, indicating whether that cell belongs to the path. The objective 
+
+𝐸 cell = 𝐴 𝐸 end + 𝐴 𝐸 conn + 𝐵 ∑︁ 
+
+> 𝑖
+
+𝑥 𝑖 (3) enforces start/goal endpoints ( 𝐸 end ), encourages connectivity ( 𝐸 conn ), and penalizes unnecessarily long paths. This formulation scales as 𝑂 (| 𝑉 |) and is the most compact: an obstacle-free 10 × 10 grid requires 100 variables. However, connectivity is only encouraged indirectly, so disconnected or looping solutions can still appear. An edge-based formulation assigns a variable 𝑦 𝑖 𝑗 ∈ { 0, 1} to each possible move, scaling as 𝑂 (| 𝐸 |) for undirected edges or 𝑂 (2|𝐸 |) for directed edges. This represents motion more directly but requires 180 undirected variables or 360 directed variables on a 10 × 10 grid. A time-expanded formulation introduces 𝑧 𝑖,𝜏 ∈ { 0, 1} for each node 𝑖 
+
+and time step 𝜏 , encoding the robot’s position at every step. This is the most expressive model but also the largest: a 10 × 10 grid over 
+
+𝑇 =20 steps already requires 100 × 21 = 2,100 variables. All three direct full-map formulations exceed the 45-spin budget of the target hardware for maps of practical size. Even the most com-pact cell-based model requires 100 variables on a modest 10 ×10 grid. Moreover, even when a local pathfinding instance is small enough in variable count, endpoint and connectivity penalties can still pro-duce Ising coefficients outside the supported hardware range after QUBO-to-Ising conversion. 
+
+3.2 Tour Construction 
+
+When a robot must visit multiple targets, the planner must decide the visit order. Given a start position and a target set T = {1, . . . , 𝑁 },the goal is to find an open route—starting at the robot and visiting every target exactly once—that minimizes total path distance. The edge costs come from the pathfinding layer and therefore reflect obstacles and map geometry. Figure 2 illustrates how different orderings of the same target set produce different route costs. (a) multi-robot multi-target problem     
+
+> R
+> R
+> R
+> (b) target sharing and per-robot tours
+> R
+> R
+> R
+> robot target before sharing assigned target per-robot path obstacle
+
+Figure 3: Multi-robot multi-target planning as target sharing plus per-robot tour construction. The left panel shows the full problem before allocation. The right panel shows a de-composed solution in which targets are assigned to robots and each robot constructs a route through its assigned tar-gets. 
+
+This problem is closely related to the traveling salesman prob-lem (TSP). A standard QUBO formulation uses position-indexed variables 𝑥 𝑖,𝑝 ∈ { 0, 1}, where 𝑥 𝑖,𝑝 = 1 means target 𝑖 is visited at position 𝑝 . A valid tour corresponds to a permutation matrix, and the objective 
+
+𝐸 TSP = 𝐴 𝐸 target + 𝐴 𝐸 position + 𝐵 𝐸 route (4) penalizes repeated or missing targets ( 𝐸 target ), empty or overloaded positions ( 𝐸 position ), and travel cost ( 𝐸 route ). The position-indexed formulation requires 𝑁 2 binary variables. A 7-target tour already needs 49 variables, slightly above the 45-spin hardware budget, while a 20-target tour needs 400. However, the spin count is not the only constraint. The one-hot row and column penalties must dominate the route-cost terms to ensure valid permutations. On hardware with a narrow integer coefficient range, these penalty strengths are difficult to realize. If the penalties are too weak relative to the route costs, the chip returns assign-ments with repeated targets, missing positions, or other constraint violations. Thus, even a small TSP instance that is close to the spin budget can be numerically incompatible with the hardware. 
+
+3.3 Target Sharing 
+
+When multiple robots share a common set of targets, the planner must decide which robot is responsible for each target. This is closely related to the multiple traveling salesman problem (mTSP), where the planner makes two coupled decisions: target-to-robot as-signment and per-robot visit ordering. Even small instances create enormous search spaces; three robots and twelve targets yield ap-proximately 12!  14 2
+
+ ≈ 43 billion possible assignment-and-ordering combinations. Figure 3 illustrates this decomposition. A direct QUBO formulation assigns a variable 𝑥 𝑟,𝑖,𝑝 ∈ { 0, 1} for every robot 𝑟 , target 𝑖 , and tour position 𝑝 :
+
+𝐸 mTSP = 𝐴 𝐸 visit + 𝐴 𝐸 pos + 𝐵 𝐸 route , (5) where 𝐸 visit ensures each target is visited exactly once, 𝐸 pos enforces per-robot tour consistency, and 𝐸 route captures travel cost. The variable count scales as 𝑅𝑁 2: three robots and twelve targets require 3 × 12 2 = 432 variables, far beyond the hardware capacity. This motivates our recursive target-sharing approach, which separates allocation from ordering and replaces the global mTSP formulation with smaller binary split problems. Ahmet Efe, Recep B. Uludag, Chris H. Kim, and Ulya R. Karpuzcu 
+
+Table 1: Direct QUBO formulations and hardware bottlenecks. Example counts assume a 10 ×10 grid, 7–20 targets, and 3 robots with 12 targets.                        
+
+> Layer Scaling Example Hardware bottleneck Pathfinding 𝑂 ( | 𝑉 | ) –𝑂 ( | 𝑉 |𝑇 )100–2 100 spins + coeff. range Tour construction 𝑂 (𝑁 2)49–400 coeff. range + spins Target sharing 𝑂 (𝑅𝑁 2)432 spin count
+
+3.4 Summary 
+
+Table 1 summarizes the direct formulations and their hardware bottlenecks. In every case, a direct QUBO formulation exceeds the 45-spin budget at practical problem sizes. Pathfinding and tar-get sharing are primarily spin-limited, while tour construction is limited by both spin count and coefficient range because one-hot constraints require strong penalty terms. These observations moti-vate the hardware-aware mapping pipeline and layer-specific Ising methods described next. 
+
+4 Hardware-Aware Ising Mapping Pipeline 
+
+Building on the workload characterization in Section 3, we pro-pose a hardware-aware Ising mapping pipeline for compact spin-and coefficient-limited CMOS Ising hardware. The pipeline decom-poses each planning layer into small Ising subproblems, generates multiple hardware-compatible mappings, decodes and scores re-turned candidates, and stitches accepted candidates into a planning decision. The chip serves as a low-power candidate-generation ac-celerator, while the host handles decomposition, validation, scoring, and global consistency. 
+
+4.1 Layer-Specific Decomposition 
+
+We first propose a layer-specific decomposition for each part of the MRMT stack. The goal is not to solve the planning layer with a classical heuristic and then polish the result with Ising hardware; instead, each decomposition exposes small combinatorial subprob-lems for which the Ising solver remains the candidate-generation engine. For pathfinding, we propose a patch-sliding decomposition in which the full map is replaced by a small spatial patch centered around the robot. Only free cells inside this window are modeled, keeping the local variable count below the spin limit. For tour construction, we propose a clustered decomposition. The target set is divided into distance-based clusters, the clusters are ordered at a coarse level, and each cluster is solved as a local ordering subproblem. The tour is assembled from Ising-generated local orders rather than repaired by classical tour-improvement heuristics. For target sharing, we propose a recursive split decomposi-tion. Robots and targets are recursively partitioned using distance-weighted graph splits, and the sequence of Ising-generated splits produces robot-level assignments. Across layers, the design principle is the same: replace one large hardware-incompatible optimization problem with a sequence of spin- and coefficient-limited Ising subproblems. The host performs decomposition and bookkeeping, but candidate solutions are gen-erated by the Ising solver. q     
+
+> Original
+> S
+> SS
+> 16 9
+> q
+> Merge S
+> S
+> SS
+> S
+> m8854
+> q
+> Merge S
+> S
+> SS
+> S
+> m889
+> q
+> Merge S
+> S
+> SS
+> S
+> m16 54
+
+Figure 4: Representative spin-merging styles for mapping the same logical interaction pattern to hardware using an extra physical spin. Different merge choices redistribute the couplings differently, leading to different decoded outcomes. q
+
+> Original
+> S
+> S
+> S
+> S
+> 12.5 7.2 4.0 2.1 9.4
+> q
+> Linear
+> S
+> S
+> S
+> S
+> 74215
+> q
+> Rank bins
+> S
+> S
+> S
+> S
+> 75316
+> q
+> Sqrt
+> S
+> S
+> S
+> S
+> 75436
+
+Figure 5: Representative quantized mappings of the same reduced Ising problem. The original floating-point couplers are shown on the left, followed by chip-compatible integer mappings produced by different quantization rules. Each mapping preserves a different view of the coefficient struc-ture. 
+
+4.2 Multi-Mapping Generation 
+
+A central contribution of the pipeline is to treat hardware mapping as a portfolio problem rather than as a single deterministic QUBO-to-Ising conversion. A single conversion gives only one hardware realization of a logical problem, and on a small physical chip that realization may be poor. Rather than relying on one mapping rule, the pipeline generates multiple independent, hardware-compatible variants of the same logical problem. These variants are solved as a portfolio and can be dispatched concurrently across solver cores or chips. Returned candidates are decoded and selected using the original objective rather than the distorted hardware coefficients. The pipeline uses three forms of multi-mapping across the plan-ning layers. 
+
+Spin merging. When individual Ising coefficients exceed the hard-ware range, spin merging duplicates an overloaded logical spin onto an available extra physical spin and redistributes large couplings across the original and duplicated copies. This reduces coefficient magnitudes while approximately preserving the logical interaction structure. We generate several spin-merging styles that choose the duplicated spin and redistributed couplings differently, giving different hardware-compatible views of the same patch problem. Figure 4 illustrates representative merge styles. Spin merging is used in pathfinding, where local cell-based QUBOs can produce strong endpoint and connectivity penalties. 
+
+Coefficient quantization. Distance-based objectives often pro-duce real-valued Ising coefficients, while the chip accepts integer coefficients. We therefore generate multiple quantized mappings, including linear, clipped, rank-based, and compressed mappings. These schemes preserve different aspects of the coefficient struc-ture, so they are evaluated as a portfolio rather than selected by a fixed rule. Figure 5 shows representative quantized mappings. Quantization is used in target sharing, where distance-weighted split objectives produce continuously valued couplings. Ising Acceleration for Multi-Robot Multi-Target Planning 
+
+Table 2: Summary of proposed Ising-based planning methods across the three planning layers.             
+
+> Layer Decomposition Mapping technique Backend Pathfinding spatial patches spin merging on-chip Tour construction clusters + patches branching logical Ising Target sharing recursive splits quantization + batching on-chip
+
+Spin-budget branching. Some logical subproblems are only slightly larger than the spin budget. The pipeline then freezes a small num-ber of spins and enumerates all assignments of the frozen variables. For example, a 49-variable model with a 45-spin budget requires freezing four spins, producing 2 4 = 16 reduced branches. The branches are solved independently, and the candidate with the best original objective value is selected. Branching is used in tour con-struction, where local TSP models can reach 49 logical variables. Because this layer is limited by coefficient range rather than only spin count, the reduced branches are evaluated with the logical Ising solver in this work. 
+
+4.3 Parallel Dispatch and Decode 
+
+The target hardware provides parallel solver resources, either as multiple cores within a chip or as multiple chips on the same board. The independent mappings generated by the portfolio can therefore be evaluated concurrently. Recursive decomposition can also pro-duce independent subproblems at the same stage. In target sharing, for example, multiple groups can be packed into one chip submis-sion by placing each split in a separate block of the Ising matrix and setting all cross-block couplings to zero. The returned spin vector is then decoded back into separate candidate splits. After solver evaluation, each spin assignment is decoded into a candidate planning decision: a local path segment, a target ordering, or a group partition. Invalid candidates, such as disconnected paths, violated one-hot constraints, or degenerate partitions, are rejected. The remaining candidates are scored using the original unquantized objective, and the best valid candidate is selected. This decode-filter-score loop is always performed classically. Parallel solver resources can reduce latency, but they do not change the decoding and selection logic. The host performs all surrounding planning logic and fallback decisions; the Ising solver is used only for candidate generation within each subproblem. 
+
+5 Case Studies 
+
+This section presents three hardware-aware Ising-based planning methods that instantiate the mapping pipeline from Section 4. Each method targets a different layer of the MRMT stack and is designed around the spin-count, coefficient-range, and decode-validity con-straints of compact CMOS Ising hardware. Across all three methods, classical logic decomposes, validates, scores, and stitches candidates, but does not repair Ising outputs using traditional planning heuris-tics. Table 2 summarizes the three methods. 
+
+5.1 Pathfinding 
+
+Rather than solving the full map as one Ising instance, we propose a patch-sliding Ising pathfinder that uses the chip as a local accel-erator inside a receding-horizon planner. At each step, we center a small 5 ×5 patch around the robot’s current position. We model only robot global target local target obstacle candidate path cells decoded path next path active patch 
+
+Figure 6: Overview of the patch-sliding pathfinding method. The left panel shows the current patch-level solve toward a local target. The right panel shows the committed segment and the continuation toward the final global target after the patch shifts forward. 
+
+the free cells inside this local window and solve a local pathfinding problem toward a local target on the patch boundary. Once a valid local path is found, we append it to the global route, advance the robot, and shift the patch forward. Figure 6 illustrates this process. 
+
+Local patch model. Within each patch, we use the cell-based formulation introduced in Section 3.1. We assign one binary variable to each free cell and exclude obstacle cells from the local model. We pin the robot position and the selected local target as fixed endpoints. The local objective is 
+
+𝐸 patch = 𝐴 𝐸 end + 𝐴 𝐸 conn + 𝐵 ∑︁  
+
+> 𝑖 ∈ P
+
+𝑥 𝑖 , (6) where P is the set of free cells in the current patch. In an obstacle-free 5 ×5 patch, at most 23 active variables remain after pinning the two endpoints. Obstacles reduce this number further, so the patch-level problem fits within the 45-spin budget. 
+
+Local-target ranking. The local target determines how the patch-level decision contributes to the global route. We rank candidate boundary cells by Manhattan distance to the final goal and try them in order, starting from the most promising candidate. This ranking is performed classically as an external heuristic rather than embedded into the Ising objective. Keeping the ranking outside the chip avoids adding extra terms to the QUBO and preserves the limited coefficient range for path-validity penalties. 
+
+Multi-mapping via spin merging. Although the patch model is small in variable count, its endpoint and connectivity penalties can produce Ising coefficients outside the hardware range after QUBO-to-Ising conversion. We address this using spin merging, as described in Section 4.2. For each patch problem, we generate several merge-style mappings and solve them as a small portfolio. We decode the returned spin assignments into candidate local paths, discard invalid candidates such as disconnected selections or loops, and select the best remaining path using the original local objec-tive. Figure 7 shows a representative example in which different mappings of the same patch produce different decoded outputs. 
+
+Planning loop. Algorithm 1 summarizes the complete procedure. The chip solves only the local patch problem; patch placement, candidate ranking, decoding, validation, and path commitment are handled classically. This pathfinding method runs on the physical chip. It exercises the spin-merging and multi-mapping components of the pipeline and shows how pathfinding can be made chip-compatible by reduc-ing the full-map problem to a sequence of small spatial patches. Ahmet Efe, Recep B. Uludag, Chris H. Kim, and Ulya R. Karpuzcu q q q q
+
+> robot global target local target obstacle candidate path cells decoded path next path active patch
+
+Figure 7: Representative decoded results from different hard-ware mappings of the same local patch problem. Invalid out-puts are discarded, and the best valid local path is selected. Algorithm 1 Patch-sliding Ising pathfinding  
+
+> 1:
+
+Initialize current position 𝑝 ← 𝑠  
+
+> 2:
+
+while 𝑝 ≠ 𝑡 do  
+
+> 3:
+
+Center a 5 × 5 patch around 𝑝  
+
+> 4:
+
+Rank candidate local targets by Manhattan distance to 𝑡  
+
+> 5:
+
+for candidate local target 𝑔 in ranked order do  
+
+> 6:
+
+Build a local cell-based QUBO on the free patch cells  
+
+> 7:
+
+Generate multiple merge-style hardware mappings  
+
+> 8:
+
+Solve all mappings on the Ising chip  
+
+> 9:
+
+Decode returned spins into candidate local paths  
+
+> 10:
+
+Reject invalid local paths  
+
+> 11:
+
+if at least one valid path exists then  
+
+> 12:
+
+Select the best valid local path  
+
+> 13:
+
+Append the selected segment to the global route  
+
+> 14:
+
+Move 𝑝 to the end of the selected segment  
+
+> 15:
+
+break  
+
+> 16:
+
+end if  
+
+> 17:
+
+end for  
+
+> 18:
+
+end while 
+
+5.2 Tour Construction 
+
+We propose a clustered Ising tour-construction method for ordering the targets assigned to one robot. A direct one-hot TSP formulation grows quadratically with the number of targets and requires strong feasibility penalties, as discussed in Section 3.2. Instead of solving the full target-ordering problem at once, we decompose it into smaller Ising subproblems through clustering, cluster ordering, local TSP solving, and patch refinement. We then assemble the full tour from these Ising-generated ordering decisions. 
+
+Distance-Ising clustering. We first reduce the tour problem by re-cursively splitting the target set with an Ising-compatible distance-weighted cut objective. Let 𝑤 𝑖 𝑗 denote the obstacle-aware path distance between targets 𝑖 and 𝑗 , and let 𝑥 𝑖 ∈ { 0, 1} indicate which side of the split target 𝑖 belongs to. For each split, we solve cut (𝑥 ) =∑︁ 
+
+> 𝑖 <𝑗
+
+𝑤 𝑖 𝑗 
+
+ 𝑥 𝑖 + 𝑥 𝑗 − 2𝑥 𝑖 𝑥 𝑗 
+
+ . (7) Maximizing this objective separates distant targets, producing smaller spatially coherent clusters that can be handled by spin-limited lo-cal ordering subproblems. In our implementation, each local TSP subproblem contains at most seven targets. We further refine the cluster set up to an ordering limit of eight clusters. Since we fix the first cluster as the one closest to the robot start, ordering 𝐾 clusters requires only (𝐾 −1)2 variables; with 𝐾 = 8, this gives 49 logical variables. 
+
+Cluster ordering and local TSP solving. After clustering, we fix the cluster closest to the robot start as the first cluster and order the remaining clusters with a position-indexed QUBO using the same one-hot idea as the TSP formulation in Section 3.2, but applied to (a) target set           
+
+> R
+> (a)
+> (b) distance-Ising clusters
+> R
+> C0 C1 C2 C3
+> (b)
+> (c) Ising cluster order
+> R
+> C0 C1 C2 C3
+> 1234
+> (c)
+> (d) stitched local TSPs
+> R
+> 456789231
+> (d) cost = 20
+> robot target clustered target cluster order stitched tour obstacle
+
+Figure 8: Overview of clustered Ising tour construction. Tar-gets are recursively split into distance-based clusters, the clusters are ordered with an Ising/QUBO model, and each cluster is solved as a small local TSP before the local orders are stitched into a complete tour. 
+
+clusters rather than individual targets. We then solve each cluster as a local open TSP with at most 7 2 = 49 logical variables. The local model includes soft boundary costs from the previous endpoint to the first local target and from the last local target toward the next cluster. This lets the solver choose the internal order and the entry/exit targets jointly, while still encouraging the stitched route to connect well across cluster boundaries. Figure 8 illustrates the clustering, ordering, and stitching process. 
+
+Ising patch refinement. The stitched tour can still contain local mistakes, especially near cluster boundaries. To improve the route while keeping the problem small, we randomly select a contiguous patch of at most seven targets and re-solve only that patch as a local one-hot TSP QUBO. The rest of the tour is kept fixed. The patch objective includes the cost from the previous waypoint into the patch, the internal ordering cost, and the cost from the patch to the next waypoint. If the reordered patch improves the full tour cost, we accept it; otherwise, we reject it. The process stops after a fixed number of consecutive non-improving attempts. No classical tour-improvement heuristic such as 2-opt or 3-opt is used inside the proposed tour method; these algorithms appear only as baselines in the evaluation. 
+
+Spin-budget branching. The local ordering models can use up to 49 logical variables. With a 45-spin budget, we freeze four spins and enumerate all 2 4 = 16 assignments of the frozen variables, as described in Section 4.2. Each assignment produces a reduced Ising problem with 45 spins. We solve the reduced problems indepen-dently and select the decoded candidate with the best original tour cost. 
+
+Execution: logical Ising. Unlike pathfinding and target sharing, we evaluate the tour-construction layer with a logical Ising solver rather than direct physical-chip execution. The limitation is not only spin count but also coefficient range: the one-hot permutation constraints require penalty strengths that exceed the useful integer coefficient range of the chip. In practice, we observe that direct chip samples often violate these constraints and decode to invalid permutations. We therefore use a logical Ising backend for this layer: Tabu sampling replaces the physical chip as the Ising solver, while the decomposition, QUBO encoding, branching, decoding, and scoring logic remain unchanged. This method exposes an im-portant hardware limitation: problem structure, not just variable count, determines whether a subproblem can be executed on the chip. 
+
+Planning loop. Algorithm 2 summarizes the complete procedure. 
+
+5.3 Target Sharing 
+
+We propose recursive Ising target sharing for assigning targets to robots. Instead of solving the full mTSP-style allocation and Ising Acceleration for Multi-Robot Multi-Target Planning 
+
+Algorithm 2 Clustered Ising tour construction  
+
+> 1:
+
+Compute start-to-target and target-to-target path distances  
+
+> 2:
+
+Initialize one cluster containing all targets  
+
+> 3:
+
+while some cluster is larger than the local TSP limit do  
+
+> 4:
+
+Split the cluster using the distance-Ising objective  
+
+> 5:
+
+end while  
+
+> 6:
+
+while the number of clusters is below the ordering limit do  
+
+> 7:
+
+Select a cluster for refinement  
+
+> 8:
+
+Split it using the distance-Ising objective  
+
+> 9:
+
+end while  
+
+> 10:
+
+Fix the first cluster as the cluster closest to the robot start  
+
+> 11:
+
+Build an Ising/QUBO model to order the remaining clusters  
+
+> 12:
+
+Solve the cluster-ordering model  
+
+> 13:
+
+Initialize an empty global tour  
+
+> 14:
+
+for each cluster in the selected cluster order do  
+
+> 15:
+
+Build a local one-hot TSP QUBO with soft boundary costs  
+
+> 16:
+
+Solve the local TSP model  
+
+> 17:
+
+Append the decoded local target order to the global tour  
+
+> 18:
+
+end for  
+
+> 19:
+
+Initialize failed patch attempts 𝑚 ← 0 
+
+> 20:
+
+while 𝑚 < 𝑀 do  
+
+> 21:
+
+Randomly select a contiguous local patch of the tour  
+
+> 22:
+
+Solve the patch as a local one-hot TSP QUBO  
+
+> 23:
+
+if the patched tour improves the full route cost then  
+
+> 24:
+
+Accept the patch and set 𝑚 ← 0 
+
+> 25:
+
+else  
+
+> 26:
+
+Reject the patch and set 𝑚 ← 𝑚 + 1 
+
+> 27:
+
+end if  
+
+> 28:
+
+end while  
+
+> 29:
+
+return final target order 
+
+ordering problem directly, we divide the global set of robots and targets into smaller groups using recursive distance-weighted graph partitioning. Each chip submission solves one or more small split problems, and the sequence of Ising-generated splits gradually produces robot-target assignments. 
+
+Recursive split model. We represent robots and targets as nodes in a weighted graph whose edge weights are pairwise path distances. Each Ising solve splits the current group into two parts using the distance-weighted cut objective cut (𝑥 ) =∑︁ 
+
+> 𝑖 <𝑗
+
+𝑤 𝑖 𝑗 
+
+ 𝑥 𝑖 + 𝑥 𝑗 − 2𝑥 𝑖 𝑥 𝑗 
+
+ , (8) which encourages distant nodes to be placed on opposite sides. Starting from one group containing all robots and targets, we re-peatedly apply this two-way split. We split groups containing more than one robot first, so that robots are gradually separated. Once every group contains at most one robot, the groups define a pre-liminary allocation. Additional refinement splits can break large target groups into smaller bundles. Figure 9 illustrates this process. 
+
+Anchor fixing. To guide each split, we fix two anchor nodes to opposite sides before solving. If the group contains multiple robots, we choose the farthest pair of robots. If the group contains one robot, we choose that robot and the farthest target from it. If the group contains no robots, we choose the farthest pair of targets. We substitute the anchors directly into the QUBO rather than enforcing them with penalty terms. This reduces the number of free variables and guarantees that the anchors land on different sides of the split. 
+
+Multi-mapping via quantization. After anchor substitution and QUBO-to-Ising conversion, we quantize the coefficients to the chip’s integer range using multiple quantization rules, as described in (a) initial group     
+
+> R0 R1
+> (b) robot-separation split
+> R0 R1
+> A-A+
+> (c) refinement split
+> R0 R1
+> A-A+
+> (d) final groups
+> R0 R1
+> bundle
+> robot target target-only bundle split boundary obstacle
+
+Figure 9: Recursive target sharing with anchored splits. The method starts from one group containing all robots and targets, then repeatedly divides groups using a distance-weighted split objective. Two anchors are fixed to opposite sides in each split, and refinement can create target-only bun-dles that are assigned later. Algorithm 3 Recursive Ising target sharing  
+
+> 1:
+
+Build a node set from all robots and targets  
+
+> 2:
+
+Initialize one group containing all nodes  
+
+> 3:
+
+while some group contains more than one robot do  
+
+> 4:
+
+Select groups that require splitting  
+
+> 5:
+
+for each selected group do  
+
+> 6:
+
+Choose two anchors inside the group  
+
+> 7:
+
+Build the distance-weighted split QUBO  
+
+> 8:
+
+Fix anchors to opposite sides by substitution  
+
+> 9:
+
+Convert the reduced QUBO to native Ising form  
+
+> 10:
+
+Generate multiple quantized chip mappings  
+
+> 11:
+
+end for  
+
+> 12:
+
+Batch independent split problems when possible  
+
+> 13:
+
+Solve the chip mappings and decode candidate splits  
+
+> 14:
+
+Score candidates using the original split objective  
+
+> 15:
+
+Replace each selected group by its best split  
+
+> 16:
+
+end while  
+
+> 17:
+
+Optionally refine large target groups into smaller bundles  
+
+> 18:
+
+Assign one-robot groups as base target sets  
+
+> 19:
+
+Assign robotless bundles by minimum marginal tour-cost increase 
+
+Section 4.2. We solve each quantized mapping on the chip and decode it into a candidate partition. We score the candidates using the original unquantized cut objective and select the best one. 
+
+Batching independent splits. Recursive splitting can produce several independent split problems at the same stage. We pack these splits into a single chip submission by placing each split in a sepa-rate block of the Ising matrix with zero cross-block couplings, as described in Section 4.3. We then decode the returned spin vector back into separate candidate splits and score each split indepen-dently. 
+
+Robotless bundle assignment. After all splits are complete, groups containing exactly one robot define that robot’s base target set, while groups with no robot form robotless bundles. We assign each bundle to the robot whose tour cost increases the least when the bundle is added, using the downstream tour solver for evaluation. The chip handles the partitioning stage; the final bundle decision is made classically. 
+
+Planning loop. Algorithm 3 summarizes the complete procedure. The recursive split and quantization stages run on the physical chip. This target-sharing method exercises the coefficient-quantization, batching, and parallel-dispatch components of the pipeline and shows that recursive graph partitioning is a natural fit for small Ising hardware. Ahmet Efe, Recep B. Uludag, Chris H. Kim, and Ulya R. Karpuzcu 
+
+Figure 10: Experimental hardware setup. The CMOS Ising chip board is connected to a Linux host that performs decom-position, mapping, decoding, validation, and stitching. 
+
+6 Evaluation 
+
+This section evaluates the proposed hardware-aware Ising plan-ning pipeline. The evaluation asks three questions: whether each planning layer produces useful solutions compared with classical baselines, whether the complete Ising pipeline remains competitive end to end, and what the mapping outcomes reveal about using a small spin- and coefficient-limited Ising machine as a candidate-generation accelerator. 
+
+6.1 Experimental Setup and Baselines 
+
+All experiments use randomly generated 10 × 10 grid worlds with 20% known obstacle density and unit-cost four-neighbor motion. Robot starts, target locations, and obstacles are sampled randomly. Obstacle-aware shortest-path distances are computed on the grid and used by the tour-construction and target-sharing layers. The number of robots, targets, and random instances varies by evalua-tion layer and is stated in the corresponding result subsection. Physical-chip experiments use the CMOS Ising chip board shown in Figure 10. Each Ising core supports 45 all-to-all connected spins with integer coefficients ℎ𝑖 , 𝐽 𝑖 𝑗 ∈ [− 7, +7]. The evaluation board contains four chips with two solver cores per chip, for a total of eight parallel Ising cores. In this work, chip calls are submitted sequentially to isolate per-call behavior and make energy account-ing unambiguous. We use 50 𝜇 s solve time and 9 mW chip power, giving 0.45 𝜇 J per chip call. The chip is controlled by a Linux host with an Intel Core i7-12700 CPU and 16 GiB of memory, running Ubuntu 24.04 and Python 3.12. Classical baselines and all host-side planning logic run on the same host. For classical baselines, solver time is measured as CPU wall-clock runtime, and the CPU energy is computed using a 15 W per-core power estimate obtained by normalizing the CPU TDP by the num-ber of physical cores. For physical-chip layers, chip time and chip energy are computed from the number of chip calls using 50 𝜇 s and 0.45 𝜇 J per call. For tour construction, the current chip coefficient range is insufficient for the one-hot permutation constraints, so the clustered Ising tour method is evaluated with spin-limited logical Tabu sampling; its reported chip time and energy are projections obtained by replacing each logical Tabu call with one chip solve. Reported Ising energy is accelerator energy: measured chip-call BFS A* GBFS Ising chip 2.5 5.0 7.5 10.0 12.5       
+
+> Total path traveled
+> (a) Solution quality
+> BFS A* GBFS Ising chip 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> Runtime (s)
+> (b) Solver time
+> BFS A* GBFS Ising chip 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> Energy (J)
+> (c) Energy
+
+Figure 11: Pathfinding evaluation on 1000 random single-target queries. Quality is measured by total path length. Clas-sical methods report CPU runtime and core-normalized CPU energy proxy; the Ising method reports accumulated chip time and chip energy. 
+
+energy for physical-chip layers and projected chip-call energy for logical-Ising tour construction. For pathfinding, we compare against breadth-first search (BFS), A*, and Greedy Best-First Search (GBFS). For tour construction, we compare against nearest-neighbor ordering, 2-opt, 3-opt, and exact brute force when the target count permits. For target sharing, we compare against round-robin assignment, parallel single-item auction (PSA), and sequential single-item auction (SSA). The end-to-end classical pipelines combine A* pathfinding with either PSA and nearest-neighbor ordering (fast classical) or SSA and 3-opt (strong classical). The end-to-end Ising pipeline combines recursive Ising target sharing, clustered logical-Ising tour construction, and patch-sliding Ising pathfinding. These classical methods are used only as baselines; the proposed Ising methods do not invoke A*, 2-opt, 3-opt, auctions, or other classical repair heuristics to repair Ising outputs. We report success rate, solution cost, solver time, and energy proxy. Cost is path length for pathfinding, optimality gap or tour length for tour construction, and total route length for target shar-ing and end-to-end planning. 
+
+6.2 Results 
+
+We present results separately for the three planning layers and then evaluate the complete pipeline. Each plot reports distributions over the random instances described in the corresponding subsection. Boxplots show the median, interquartile range, and outliers. For cost, time, and energy, lower is better; for success rate and valid decode rate, higher is better. 
+
+6.2.1 Pathfinding . Figure 11 compares the patch-sliding Ising pathfinder against BFS, A*, and GBFS on 1000 random single-target queries. All classical methods solve every instance. The Ising pathfinder solves 996 out of 1000 instances despite using probabilistic local patch solves. Its median path length is 6.0, matching the medians of BFS, A*, and GBFS. The Ising pathfinder uses a median of 14 𝜇 J per query, including every hardware call, compared with 523 𝜇 J for A*, corresponding to a roughly 37 × energy reduction. This comes at the cost of latency: the Ising pathfinder accumulates a median of 1.6 ms in chip annealing time, corresponding to 32 chip calls at 50 𝜇 s per call, whereas A* completes in 35 𝜇 s on the CPU. 
+
+6.2.2 Tour Construction . Figure 12 evaluates the tour-construction layer on 100 random 10-target instances. Exact brute force provides the optimal reference, while nearest neighbor, 2-opt, and 3-opt provide classical heuristic baselines. Ising Acceleration for Multi-Robot Multi-Target Planning NN 2-opt 3-opt Exact Ising cluster 010 20 30   
+
+> Optimality gap (%)
+> (a) Solution quality
+> NN 2-opt 3-opt Exact Ising cluster 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> Runtime / projected time (s)  (b) Solver time
+> NN 2-opt 3-opt Exact Ising cluster 10 −4
+> 10 −2
+> 10 0
+> 10 2
+> Energy proxy (J)
+> (c) Energy
+
+Figure 12: Tour-construction evaluation on 100 random 10-target instances. Quality is reported as optimality gap relative to exact brute force. The clustered Ising tour method uses a 45-spin-limited logical Tabu backend; its time and energy are projected by replacing each Tabu call with one chip solve. 
+
+Tour construction is evaluated with a logical Ising backend rather than direct physical-chip execution. The clustered Ising formulation works under logical Ising evaluation, but the one-hot permutation constraints require penalty coefficients larger than the useful chip coefficient range. To isolate the algorithmic value of the formula-tion, we use a spin-limited Tabu backend with the same 45-spin subproblem limit as the chip, but without the chip’s coefficient-range restriction. The clustered Ising tour method achieves a median optimality gap of 0.0%, matching exact brute force and 3-opt. Its mean op-timality gap is 1.63%, close to the 1.31% mean gap of 3-opt and better than nearest neighbor and 2-opt, which have mean gaps of 11.61% and 4.62%, respectively. For projected time and energy, the clustered Ising tour method uses a median of 98 logical Ising calls, corresponding to 4.9 ms projected chip time and 44 𝜇 J projected chip energy. This projected energy is roughly 770 × lower than the core-normalized CPU energy proxy of 3-opt. 
+
+6.2.3 Target Sharing . Figure 13 evaluates recursive Ising target sharing on 100 random instances with 3 robots and 10 targets. Round robin, PSA, and SSA provide classical allocation baselines. Our proposed recursive Ising target-sharing method maps naturally to the physical chip because each split is a max-cut-like binary partitioning problem, so every spin assignment corresponds to a valid split candidate. In allocation quality, the recursive Ising target-sharing method is close to the strongest classical baseline. SSA achieves the best median total route cost of 28.0, while recursive Ising target sharing obtains 29.0. Relative to the best observed result per instance, recur-sive Ising target sharing has a median gap of 2.78%, compared with 0.0% for SSA. Both methods produce balanced allocations, with iden-tical median makespan of 16.0; recursive Ising target sharing also has a slightly lower median workload imbalance, 12.0 compared with 14.0 for SSA. The energy comparison is strongest in this layer. Recursive Ising target sharing uses a median of 20 chip calls organized into 5 batches, corresponding to 1.0 ms accumulated chip annealing time and 9 𝜇 J chip energy. SSA uses a median of 73 mJ under the core-normalized CPU energy proxy, giving a roughly 8,000 × energy reduction. 
+
+6.2.4 End-to-End Pipeline . Figure 14 compares the full Ising pipeline against two classical pipelines on random multi-robot multi-target instances with 3 robots and 10 targets. The fast classical pipeline uses PSA, nearest-neighbor tour construction, and A*. The Round robin PSA SSA Ising split 20 40 60 80     
+
+> Total route length
+> (a) Solution quality
+> Round robin PSA SSA Ising split 10 −5
+> 10 −3
+> 10 −1
+> 10 1
+> Runtime (s)
+> (b) Solver time
+> Round robin PSA SSA Ising split 10 −5
+> 10 −3
+> 10 −1
+> 10 1
+> Energy (J)
+> (c) Energy
+
+Figure 13: Target-sharing evaluation on 100 random in-stances with 3 robots and 10 targets. Quality is reported as total route length. Classical methods report CPU runtime and energy proxy; recursive Ising target sharing reports ac-cumulated chip time and chip energy. Fast classical Strong classical Ising pipeline 20 30 40 50 60 70 
+
+> Total route length
+> (a) Solution quality
+> Fast classical Strong classical Ising pipeline 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Runtime (s)
+> (b) Solver time
+> Fast classical Strong classical Ising pipeline 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> Energy (J)
+> (c) Energy
+
+Figure 14: End-to-end pipeline comparison on instances with 3 robots and 10 targets. The Ising pipeline uses physical-chip calls for pathfinding and target sharing, and projected chip costs for clustered Ising tour construction using logical Tabu sampling. 
+
+strong classical pipeline uses SSA, 3-opt, and A*. The Ising pipeline uses physical-chip Ising calls for target sharing and pathfinding, and logical Tabu sampling for tour construction. The Ising pipeline achieves a median total route cost of 32.0, compared with 28.0 for the strong classical pipeline and 45.0 for the fast classical pipeline. Its median gap to the strong classical result is 9.1%. Its median energy is 3.07 mJ, compared with 399 mJ for the strong classical pipeline and 14.8 mJ for the fast classical pipeline, corresponding to roughly 130 × and 4.8 × lower energy, respectively. The energy advantage comes at the cost of higher latency. The Ising pipeline takes a median of 341 ms, compared with 27 ms for the strong classical pipeline and 0.99 ms for the fast classical pipeline. The bottleneck is pathfinding: completed Ising-pipeline runs use a median of 6,720 pathfinding chip calls, corresponding to 336 ms at 50 𝜇 s per call. Recursive Ising target sharing uses only 20 chip calls, and clustered Ising tour construction contributes 88 projected Ising calls. 
+
+6.2.5 Multi-Mapping Outcomes . Table 3 tests our multi-mapping hypothesis: hardware-compatible mapping should be treated as a portfolio rather than as a fixed rule. For pathfinding, we generate four spin-merging styles for each local patch problem. Each style alone decodes to a valid local path only about 45% of the time, but the failures occur on different patch instances. Using the four styles together lets the pathfinder solve 996 out of 1000 queries. The selected-solution win shares are nearly uniform, showing that no single spin-merging style dominates. For target sharing, each recursive split is mapped using four coefficient-quantization rules. All four quantization schemes pro-duce valid candidates, and their win shares are again approximately uniform, ranging from 24% to 25%. These results support the multi-mapping strategy: no single mapping rule dominates, so evaluat-ing multiple hardware-compatible variants improves robustness Ahmet Efe, Recep B. Uludag, Chris H. Kim, and Ulya R. Karpuzcu 
+
+Table 3: Mapping outcome summary for the two physical-chip layers. Pathfinding reports valid-decode rate and selected-solution win share for each spin-merging style. Tar-get sharing reports candidate share and selected-solution win share for each coefficient-quantization rule.                            
+
+> Layer Mapping choice Valid/candidate share Win share Pathfinding Overload 44.8% valid 24.9% Pathfinding Max-coeff. 45.1% valid 25.1% Pathfinding High-degree 45.1% valid 25.0% Pathfinding Balanced 45.1% valid 25.0% Target sharing Linear 25.0% candidates 25.2% Target sharing Clip95 25.0% candidates 25.4% Target sharing Rank 25.0% candidates 25.3% Target sharing Sqrt 25.0% candidates 24.0%
+
+without committing to a fixed mapping heuristic. Parallel solver resources could evaluate these independent mappings concurrently, although this work submits them sequentially for unambiguous chip-call accounting. 
+
+7 Related Work 
+
+QUBO and Ising formulations provide a common interface for map-ping combinatorial optimization problems to specialized hardware. Lucas surveys Ising formulations for many NP-hard problems, while Mohseni et al. review Ising machines as hardware solvers for com-binatorial optimization [19, 20]. Hardware implementations span CMOS annealing processors, fully connected digital annealers, prob-abilistic p-bit machines, coupled-oscillator Ising chips, and adaptive ReRAM-based solvers [1, 4, 5, 23, 28, 30, 31]. These works demon-strate that Ising-style optimization can be realized in hardware. Our work asks a different question: how a compact, low-power CMOS Ising chip can be used inside a robotics planning stack under real spin-count, coefficient-range, parallelism, and decode-validity constraints. Several works study QUBO or Ising formulations for planning, routing, and scheduling problems [15, 19, 33]. These efforts show that planning and scheduling problems can often be written in QUBO form, but direct formulations can be too large, too penalty-sensitive, or too dependent on postprocessing for resource-limited hardware. In contrast, we study a multi-layer robotics workload and propose hardware-aware Ising methods for target sharing, tour construction, and pathfinding. The proposed methods use Ising solvers for candidate generation, while classical logic validates, scores, and stitches candidates rather than repairing them with traditional planning heuristics. A broader architecture literature studies how applications should be mapped to specialized accelerators [11, 13]. These works are not Ising-specific, but they support the same systems-level lesson: accelerator efficiency depends on mapping choices, not only on the hardware. We propose a multi-mapping pipeline for approximate Ising solvers that uses decomposition, spin merging, coefficient quantization, spin-budget branching, decode-time validation, and fallback behavior. Our evaluation shows that no single merge or quantization rule dominates, motivating the use of mapping port-folios. Hardware acceleration for robotics and autonomous systems is another closely related area [8, 9, 14, 18, 21, 22, 24, 26, 32]. These systems primarily target deterministic numerical kernels, collision checking, factor-graph inference, quadratic programming, dynam-ics, or control. Our work targets a different role for hardware: using an Ising chip as a low-power candidate generator for small combi-natorial planning subproblems in a larger classical planning loop. The planning workload itself builds on classical multi-robot plan-ning and routing. Target sharing is related to multi-robot task allo-cation and the multiple traveling salesman problem [2, 3, 7, 17, 25]. Tour construction is related to TSP-style target ordering, while pathfinding builds on shortest-path methods such as Dijkstra’s algorithm and A* [6, 10]. Multi-agent path finding also studies path planning for multiple robots, often through search or compila-tion to SAT, CSP, or MILP [27]. We use these classical methods as baselines and global orchestration tools, while the proposed local combinatorial cores use Ising-based candidate generation. 
+
+8 Conclusion 
+
+This paper studied whether compact CMOS Ising machines can be used as practical accelerators for multi-robot multi-target plan-ning. Rather than treating the Ising chip as a standalone optimizer, we use it as a candidate-generation accelerator inside a classical planning loop. This framing is important because realistic planning instances exceed current hardware limits in several ways: pathfind-ing and target sharing quickly exceed the spin budget, while tour construction stresses the available coefficient range through one-hot permutation constraints. We characterized three planning layers—target sharing, tour con-struction, and pathfinding—and showed that each layer exposes a different hardware bottleneck. Based on this characterization, we proposed a hardware-aware Ising mapping pipeline that decom-poses global planning problems into chip-sized subproblems, gen-erates multiple hardware-compatible mappings, validates decoded outputs, and stitches accepted candidates into a global plan. We instantiated the pipeline with three Ising-based planning methods: patch-sliding Ising pathfinding, clustered Ising tour construction, and recursive Ising target sharing. The main lesson is that current compact Ising chips are useful only when the surrounding system is designed around their con-straints. Spin count, coefficient range, quantization, and decode validity are not implementation details; they determine which parts of the planning stack can run on hardware and which must remain logical or classical. Our results show that pathfinding and recursive target sharing can be mapped to physical-chip subproblems, while one-hot tour construction requires logical Ising sampling because the physical coefficient range is insufficient for reliable permutation constraints. More broadly, this work suggests that near-term Ising accel-eration for robotics should focus on hardware-aware candidate generation rather than global replacement of classical planners. Classical logic should manage decomposition, validation, scoring, fallback, and global consistency, while Ising hardware generates candidates for carefully selected local combinatorial subproblems. As CMOS Ising chips scale in spin count, coefficient precision, and programmability, the proposed pipeline can be extended to larger patches, richer assignment models, and more tightly integrated multi-robot planning systems. Ising Acceleration for Multi-Robot Multi-Target Planning 
+
+References 
+
+[1] Navid Anjum Aadit, Andrea Grimaldi, Mario Carpentieri, Luke Theogarajan, John M. Martinis, Giovanni Finocchio, and Kerem Y. Camsari. 2022. Massively parallel probabilistic computing with sparse Ising machines. Nature Electronics 
+
+5, 7 (2022), 460–468. doi:10.1038/s41928-022-00774-2 [2] Tolga Bektaş. 2006. The Multiple Traveling Salesman Problem: An Overview of Formulations and Solution Procedures. Omega 34, 3 (2006), 209–219. doi:10. 1016/j.omega.2004.10.004 [3] Hamza Chakraa, François Guérin, Edouard Leclercq, and Dimitri Lefebvre. 2023. Optimization Techniques for Multi-Robot Task Allocation Problems: Review on the State-of-the-Art. Robotics and Autonomous Systems 168 (2023), 104492. doi:10.1016/j.robot.2023.104492 [4] Hao-Wei Chiang, Chin-Fu Nien, Hsiang-Yun Cheng, and Kuei-Po Huang. 2024. ReAIM: A ReRAM-Based Adaptive Ising Machine for Solving Combinatorial Optimization Problems. In Proceedings of the 51st Annual International Symposium on Computer Architecture (ISCA) . 58–72. doi:10.1109/ISCA59077.2024.00015 [5] Hüsrev Cılasun, William Moy, Ziqing Zeng, Tahmida Islam, Hao Lo, Alex Vanasse, Megan Tan, Mohammad Anees, Ramprasath S, Abhimanyu Kumar, Sachin S. Sapatnekar, Chris H. Kim, and Ulya R. Karpuzcu. 2025. A Coupled-Oscillator-Based Ising Chip for Combinatorial Optimization. Nature Electronics 8, 6 (2025), 537–546. doi:10.1038/s41928-025-01393-3 [6] Edsger W. Dijkstra. 1959. A Note on Two Problems in Connexion with Graphs. 
+
+Numer. Math. 1 (1959), 269–271. doi:10.1007/BF01386390 [7] Brian P. Gerkey and Maja J. Matarić. 2004. A Formal Analysis and Taxonomy of Task Allocation in Multi-Robot Systems. The International Journal of Robotics Research 23, 9 (2004), 939–954. doi:10.1177/0278364904045564 [8] Yuhui Hao, Yiming Gan, Bo Yu, Qiang Liu, Yinhe Han, Zishen Wan, and Shaoshan Liu. 2024. ORIANNA: An Accelerator Generation Framework for Optimization-Based Robotic Applications. In Proceedings of the 29th ACM International Confer-ence on Architectural Support for Programming Languages and Operating Systems (ASPLOS) . 813–829. doi:10.1145/3620665.3640379 [9] Yuhui Hao, Yiming Gan, Bo Yu, Qiang Liu, Shao-Shan Liu, and Yuhao Zhu. 2023. BLITZCRANK: Factor Graph Accelerator for Motion Planning. In Proceedings of the 60th ACM/IEEE Design Automation Conference (DAC) . 1–6. doi:10.1109/ DAC56929.2023.10247780 [10] Peter E. Hart, Nils J. Nilsson, and Bertram Raphael. 1968. A Formal Basis for the Heuristic Determination of Minimum Cost Paths. IEEE Transactions on Systems Science and Cybernetics 4, 2 (1968), 100–107. doi:10.1109/TSSC.1968.300136 [11] Kartik Hegde, Po-An Tsai, Sitao Huang, Vikas Chandra, Angshuman Parashar, and Christopher W. Fletcher. 2021. Mind Mappings: Enabling Efficient Algorithm-Accelerator Mapping Space Search. In Proceedings of the 26th ACM International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS) . 943–958. doi:10.1145/3445814.3446762 [12] Toshimori Honjo, Tomohiro Sonobe, Kensuke Inaba, Takahiro Inagaki, Takuya Ikuta, Yasuhiro Yamada, Takushi Kazama, Koji Enbutsu, Takeshi Umeki, Ryoichi Kasahara, Ken-ichi Kawarabayashi, and Hiroki Takesue. 2021. 100,000-spin coherent Ising machine. Science Advances 7, 40 (2021), eabh0952. doi:10.1126/ sciadv.abh0952 [13] Qijing Huang, Minwoo Kang, Grace Dinh, Thomas Norell, Aravind Kalaiah, James Demmel, John Wawrzynek, and Yakun Sophia Shao. 2021. CoSA: Scheduling by Constrained Optimization for Spatial Accelerators. In Proceedings of the 48th Annual International Symposium on Computer Architecture (ISCA) . 554–566. doi:10. 1109/ISCA52012.2021.00050 [14] Yiyang Huang, Yuhui Hao, Bo Yu, Feng Yan, Yuxin Yang, Feng Min, Yinhe Han, Lin Ma, Shaoshan Liu, Qiang Liu, and Yiming Gan. 2025. Dadu-Corki: Algorithm-Architecture Co-Design for Embodied AI-Powered Robotic Manipulation. In 
+
+Proceedings of the 52nd Annual International Symposium on Computer Architecture (ISCA) . 327–343. doi:10.1145/3695053.3731099 [15] Daniel Jaroszewski, Fabian Klos, and Benedikt Sturm. 2020. Ising Formulations of Routing Optimization Problems. arXiv:2012.05022 [quant-ph] [16] Mark W. Johnson, Mohammad H. S. Amin, Suzanne Gildert, Trevor Lanting, Firas Hamze, Neil Dickson, Richard Harris, Andrew J. Berkley, Jan Johansson, Paul Bunyk, Eric M. Chapple, Colin Enderud, Jeremy P. Hilton, Kamran Karimi, Eric Ladizinsky, Nicolas Ladizinsky, Travis Oh, Ilya Perminov, Chris Rich, Murray C. Thom, Elena Tolkacheva, Christoph J. S. Truncik, Sergei Uchaikin, Ji Wang, Bryan Wilson, and Geordie Rose. 2011. Quantum annealing with manufactured spins. 
+
+Nature 473 (2011), 194–198. doi:10.1038/nature10012 [17] G. Ayorkor Korsah, Anthony Stentz, and M. Bernardine Dias. 2013. A Compre-hensive Taxonomy for Multi-Robot Task Allocation. The International Journal of Robotics Research 32, 12 (2013), 1495–1512. doi:10.1177/0278364913496484 [18] Weizhuang Liu, Bo Yu, Yiming Gan, Qiang Liu, Jie Tang, Shaoshan Liu, and Yuhao Zhu. 2021. Archytas: A Framework for Synthesizing and Dynamically Optimizing Accelerators for Robotic Localization. In Proceedings of the 54th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO) . 479– 493. doi:10.1145/3466752.3480077 [19] Andrew Lucas. 2014. Ising formulations of many NP problems. Frontiers in Physics 2 (2014), 5. doi:10.3389/fphy.2014.00005 [20] Naeimeh Mohseni, Peter L. McMahon, and Tim Byrnes. 2022. Ising machines as hardware solvers of combinatorial optimization problems. Nature Reviews Physics 4, 6 (2022), 363–379. doi:10.1038/s42254-022-00440-8 [21] Sean Murray, Will Floyd-Jones, George Konidaris, and Daniel J. Sorin. 2019. A Programmable Architecture for Robot Motion Planning Acceleration. In Pro-ceedings of the 30th IEEE International Conference on Application-specific Systems, Architectures and Processors (ASAP) . 185–188. doi:10.1109/ASAP.2019.000-4 [22] Sean Murray, William Floyd-Jones, Ying Qi, George Konidaris, and Daniel J. Sorin. 2016. The Microarchitecture of a Real-Time Robot Motion Planning Accelerator. In Proceedings of the 49th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO) . 45:1–45:12. doi:10.1109/MICRO.2016.7783748 [23] Srijan Nikhar, Sidharth Kannan, Navid Anjum Aadit, Shuvro Chowdhury, and Kerem Y. Camsari. 2024. All-to-all reconfigurability with sparse and higher-order Ising machines. Nature Communications 15 (2024), 8977. doi:10.1038/s41467-024-53270-w [24] Xiaoyu Niu, Yanjun Zhang, Yifan Zhang, Hongzheng Tian, Bo Yu, Shaoshan Liu, and Sitao Huang. 2024. Accelerating Autonomous Path Planning on FP-GAs with Sparsity-Aware HW/SW Co-Optimizations. In Proceedings of the 2024 ACM/SIGDA International Symposium on Field Programmable Gate Arrays (FPGA) .42. doi:10.1145/3626202.3637597 [25] Félix Quinton, Christophe Grand, and Charles Lesire. 2023. Market Approaches to the Multi-Robot Task Allocation Problem: A Survey. Journal of Intelligent & Robotic Systems 107, 2 (2023), 29. doi:10.1007/s10846-022-01803-0 [26] Deval Shah, Ningfeng Yang, and Tor M. Aamodt. 2023. Energy-Efficient Realtime Motion Planning. In Proceedings of the 50th Annual International Symposium on Computer Architecture (ISCA) . 1–17. doi:10.1145/3579371.3589092 [27] Pavel Surynek. 2022. Problem Compilation for Multi-Agent Path Finding: A Survey. In Proceedings of the Thirty-First International Joint Conference on Artificial Intelligence (IJCAI) . 5615–5622. doi:10.24963/ijcai.2022/783 [28] Takashi Takemoto, Masato Hayashi, Chihiro Yoshimura, and Masanao Yamaoka. 2020. A 2 × 30 k-Spin Multi-Chip Scalable CMOS Annealing Processor Based on a Processing-in-Memory Approach for Solving Large-Scale Combinatorial Optimization Problems. IEEE Journal of Solid-State Circuits 55, 1 (2020), 145–156. doi:10.1109/JSSC.2019.2949230 [29] Kosuke Tatsumura, Masaya Yamasaki, and Hayato Goto. 2021. Scaling out Ising machines using a multi-chip architecture for simulated bifurcation. Nature Electronics 4 (2021), 208–217. doi:10.1038/s41928-021-00546-4 [30] Kasho Yamamoto, Kazushi Kawamura, Kota Ando, Normann Mertig, Takashi Takemoto, Masanao Yamaoka, Hiroshi Teramoto, Akira Sakai, Shinya Takamaeda-Yamazaki, and Masato Motomura. 2021. STATICA: A 512-Spin 0.25M-Weight Annealing Processor With an All-Spin-Updates-at-Once Architecture for Combi-natorial Optimization With Complete Spin–Spin Interactions. IEEE Journal of Solid-State Circuits 56, 1 (2021), 165–178. doi:10.1109/JSSC.2020.3027702 [31] Masanao Yamaoka, Chihiro Yoshimura, Masato Hayashi, Takuya Okuyama, Hidetaka Aoki, and Hiroyuki Mizuno. 2016. A 20k-Spin Ising Chip to Solve Combinatorial Optimization Problems With CMOS Annealing. IEEE Journal of Solid-State Circuits 51, 1 (2016), 303–309. doi:10.1109/JSSC.2015.2498601 [32] Yuxin Yang, Xiaoming Chen, and Yinhe Han. 2023. Dadu-RBD: Robot Rigid Body Dynamics Accelerator with Multifunctional Pipelines. In Proceedings of the 56th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO) .297–309. doi:10.1145/3613424.3614298 [33] Jiachen Zhang, Giovanni Lo Bianco, and J. Christopher Beck. 2022. Solving Job-Shop Scheduling Problems with QUBO-Based Specialized Hardware. In 
+
+Proceedings of the Thirty-Second International Conference on Automated Planning and Scheduling (ICAPS) . 404–412. doi:10.1609/icaps.v32i1.19826

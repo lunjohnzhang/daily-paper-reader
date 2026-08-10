@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-09</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-10</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 5 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-09 19:46:00 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-10 19:56:11 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日聚焦多智能体协同感知与路径规划，精读2篇高分论文、速读3篇。</p>
-<p>最值得关注的是LLM辅助自动驾驶协同感知（8.0）与分层稀疏协调（8.0），后者在多智能体拓扑互补上具启发性。</p>
-<p>普通读者可优先看速读中MobileWAM，它把世界模型接入移动操作，概念直观有趣。</p>
+<p>今日聚焦多机器人领域，精读两篇高分规划研究，另涉猎通信攻击与强化学习安全。</p>
+<p>最值得关注的是《Scalable Long-Horizon Planning with Staggered Updates for Lifelong MAPF》（10分），其交错更新机制为长期多智能体路径规划带来效率突破；《Ising Acceleration》（9分）则展示了物理加速计算的潜力。</p>
+<p>下一步建议普通读者关注LLM控制多机器人系统的通信攻击风险，提前思考防御策略。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="LLM-Assisted Coalition Formation for Cooperative Perception in Autonomous Driving">LLM-Assisted Coalition Formation for Cooperative Perception in Autonomous Driving</span></li><li><span class="dpr-home-dashboard-paper-title" title="HELENA:Hierarchical Sparse Coordination over a Union of Complementary Topologies for MAS">HELENA:Hierarchical Sparse Coordination over a Union of Complementary Topologies for MAS</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Scalable Long-Horizon Planning with Staggered Updates for Lifelong MAPF">Scalable Long-Horizon Planning with Staggered Updates for Lifelong MAPF</span></li><li><span class="dpr-home-dashboard-paper-title" title="Ising Acceleration for Multi-Robot Multi-Target Planning">Ising Acceleration for Multi-Robot Multi-Target Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="SyncSBC: Decentralized Swarm Behavior Prediction for Synchronized Autonomous Control">SyncSBC: Decentralized Swarm Behavior Prediction for Synchronized Autonomous Control</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="StochSIPP: Safe Interval Path Planning in Stochastic Dynamic Environments">StochSIPP: Safe Interval Path Planning in Stochastic Dynamic Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="SCOPE: Field-of-View-Aware Path Planning in Unknown 3D Environments via Safety-Volume Certification">SCOPE: Field-of-View-Aware Path Planning in Unknown 3D Environments via Safety-Volume Certification</span></li><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="When Coordination Becomes a Threat: Communication Attacks in LLM-Controlled Multi-Robot Systems">When Coordination Becomes a Threat: Communication Attacks in LLM-Controlled Multi-Robot Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="LyEvO: Lyapunov-Guided Evolutionary Optimization for Safe and Robust Sim-to-Real Policy Learning">LyEvO: Lyapunov-Guided Evolutionary Optimization for Safe and Robust Sim-to-Real Policy Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 </div>
 
