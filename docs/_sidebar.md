@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-08-21 <!--dpr-date:20260821-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202608/21/2608.16801v1-when-agents-coordinate-measuring-coordination-in-multi-agent-ai-coding" data-sidebar-item="{&quot;title&quot;: &quot;When Agents Coordinate: Measuring Coordination in Multi-Agent AI Coding&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2608.16801v1-when-agents-coordinate-measuring-coordination-in-multi-agent-ai-coding&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;多代理团队协作的协调度量工具，可迁移至机器人协调评估&quot;}">When Agents Coordinate: Measuring Coordination in Multi-Agent AI Coding</a>
   * 2026-08-20 <!--dpr-date:20260820-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202608/20/2608.18292v1-guidefetch-a-task-coordination-framework-for-concurrent-navigation-and-object-retrieval-in-assistive-robot-dogs" data-sidebar-item="{&quot;title&quot;: &quot;GuideFetch: A Task Coordination Framework for Concurrent Navigation and Object Retrieval in Assistive Robot Dogs&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2608.18292v1-guidefetch-a-task-coordination-framework-for-concurrent-navigation-and-object-retrieval-in-assistive-robot-dogs&quot;, &quot;score&quot;: &quot;9.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;面向并发导航与物体取回的多机器人任务协调框架&quot;}">GuideFetch: A Task Coordination Framework for Concurrent Navigation and Object Retrieval in Assistive Robot Dogs</a>
