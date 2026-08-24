@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-23</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-24</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 10 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>9</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-23 20:19:03 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-24 20:44:27 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日聚焦4篇论文，精读1篇、速读3篇，核心围绕自动驾驶协同与机器人感知。</p>
-<p>最值得关注的是《G-MARK》，以知识图谱驱动多智能体协同驾驶，8.0分显著领先其余6.0分论文。</p>
-<p>建议优先精读G-MARK，速读三篇可快速了解单目SLAM、不确定奖励路径规划及具身交互场景。</p>
+<p>今日共读10篇论文，精读1篇、速读9篇，重点聚焦多智能体通信与机器人规划。最值得关注的是精读论文（8.0分）：奖励引导的自回归图生成方法，显著提升多智能体通信拓扑设计效率；速读中VLA层次化基础模型与随机图监控也具参考价值。建议优先阅读该精读论文，并跟进多智能体拓扑优化与仿真实验。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -76,7 +74,7 @@
     <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="G-MARK: Grounded Multi-Agent Reasoning for Cooperative Driving via Knowledge Graphs">G-MARK: Grounded Multi-Agent Reasoning for Cooperative Driving via Knowledge Graphs</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Reward-Guided Autoregressive Graph Generation for Efficient Multi-Agent Communication Topology Design">Reward-Guided Autoregressive Graph Generation for Efficient Multi-Agent Communication Topology Design</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
@@ -86,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">9 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Scalix: Uncertainty-Aware Scale-Consistent Monocular SLAM">Scalix: Uncertainty-Aware Scale-Consistent Monocular SLAM</span></li><li><span class="dpr-home-dashboard-paper-title" title="Orienteering Problem with Uncertain Time-Varying Rewards: Framework and Benchmark for Everyday Service Robotics">Orienteering Problem with Uncertain Time-Varying Rewards: Framework and Benchmark for Everyday Service Robotics</span></li><li><span class="dpr-home-dashboard-paper-title" title="Beyond Placement and Articulation: Usage-Driven Code Scenes for Embodied Interaction">Beyond Placement and Articulation: Usage-Driven Code Scenes for Embodied Interaction</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="$τ_0$-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation">$τ_0$-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Deciding Relabeling Observation Consistency in Multi-Agent Discrete-Event Systems">Deciding Relabeling Observation Consistency in Multi-Agent Discrete-Event Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Stochastic Multi-Robot Monitoring on Graphs under Markovian Mobility">Stochastic Multi-Robot Monitoring on Graphs under Markovian Mobility</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>9</strong></span></div>
 </section>
 </div>
 
