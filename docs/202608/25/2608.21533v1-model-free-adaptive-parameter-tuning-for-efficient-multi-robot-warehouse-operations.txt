@@ -1,0 +1,236 @@
+Title: Model-Free Adaptive Parameter Tuning for Efficient Multi-Robot Warehouse Operations
+
+URL Source: https://arxiv.org/pdf/2608.21533v1
+
+Published Time: Tue, 25 Aug 2026 00:10:59 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Model-Free Adaptive Parameter Tuning for Efficient Multi-Robot Warehouse Operations 
+
+Pratap Tokekar, Mouhacine Benosman, Rahul Chandan, Alexandre Ormiga Galvao Barbosa, Michael Caldara, Joseph W. Durham 
+
+Abstract — Robotic Fulfillment Centers (FCs) store inventory on shelves (pods) arranged in dense blocks. Retrieving atarget pod that is buried deep in a block requires moving obstructing pods out of the way (i.e., digout). Multi-robot planners use parameterized cost functions to control digout behavior, producing a spectrum of strategies: at one extreme, obstructing pods are sent to other blocks (using more robots in travel lanes); at the other, pods are shuffled within the block (avoiding lane congestion but increasing extraction time). Each point on this spectrum has different downstream consequences for floor congestion and throughput. The optimal operating point depends on the specific facility configuration and shifts with operational conditions such as varying station demand and congestion patterns, making offline tuning impractical. We present an adaptive parameter tuning framework based on Extremum Seeking Control (ESC) that continuously adjusts planner parameters in response to measured throughput. ESC performs model-free optimization by perturbing parameters with sinusoidal dither signals and correlating perturbations with performance changes to estimate gradients, making it robust to the multi-minute delayed effects and credit assignment challenges inherent in large FC operations. Simulation studies demonstrate that the adaptive policy improves upon fixed policies across several conditions. We observe an improvement in throughput by an average of 5.0% across map and robot fleet size variations, and by 8.4% under dynamic operating condi-tions. This work eliminates manual parameter provisioning and enables real-time adaptation, providing a self-tuning paradigm for FC storage operations. 
+
+I. I NTRODUCTION 
+
+Robotic Fulfillment Centers (FCs) rely on fleets of mobile robots to execute large-scale storage and retrieval operations. Robots transport pods (shelves containing inventory) to pick stations where associates retrieve items to fulfill customer orders [1], [2]. Pods are arranged in dense storage blocks where target pods may be obstructed by other pods and must be extracted, i.e., “dug out”, to reach the boundary (Figure 1). A central challenge in these systems is deciding how to perform extraction of pods stored deep within a block. Classical planning algorithms compute digout plans that move obstructing pods out of the way [2], [3], [4] by minimizing a parameterized cost function (Figure 1). The cost parameters control the planner’s behavior along a spectrum of strategies (Figure 2): at one end, obstructing pods are sent to other blocks, using multiple robots in travel      
+
+> The authors are with Amazon Robotics. Emails: {tokekar, mbenos, rcd, aormiga, caldaram, josepdur}@amazon.com
+> Tokekar holds concurrent appointments as an Associate Professor of Computer Science at the University of Maryland and as an Amazon Scholar. This paper describes work performed at Amazon and is not associated with the University of Maryland.
+
+lanes; at the other, pods are shuffled within the block using free cells, avoiding lane congestion but requiring longer extraction sequences; intermediate values produce hybrid plans. Crucially, each point on this spectrum has different downstream consequences for the floor as a whole: sending pods away increases lane traffic and storage contention at block peripheries, while in-block shuffling increases lo-cal extraction time. Together, these parameters determine throughput, the metric of ultimate interest. Finding the parameter configuration that maximizes long-term throughput, rather than optimizing any individual plan’s makespan or path length, is difficult for several reasons. No closed-form model relates parameters to throughput, so optimization requires running time-consuming grid searches over expensive simulations. Even when good parameters are found in simulation, they may not transfer directly to real systems due to modeling discrepancies in robot dynamics, traffic patterns, and station behavior. Moreover, the optimal operating point depends on the specific facility (map lay-out, robot count, storage density) and shifts with dynamic operational conditions such as varying station demand and congestion patterns. Static parameters tuned offline for one configuration are unlikely to remain optimal when conditions change, motivating an adaptive approach. 
+
+Fig. 1: Fulfillment center where the storage pods (yellow) are arranged in grid blocks separated by travel lanes. Robots can lift and move pods to bring them to the stations for item picking or stowing. Target pods (orange) that are buried deep in a block require moving obstructing pods. To address these challenges, we propose an adaptive parameter tuning framework based on Extremum Seeking Control (ESC). The framework addresses both automatic parameter provisioning (eliminating grid search) and dy-namic parameter adaptation based on real-time feedback. ESC continuously adjusts planner parameters in response to measured throughput, performing derivative-free optimiza-tion that is robust to noise, delayed effects, and unmodeled dynamics [5], [6], [7], [8]. By perturbing parameters with a arXiv:2608.21533v1 [cs.RO] 21 Aug 2026 dither signal and correlating the perturbation with throughput changes, ESC estimates gradients without requiring a closed-form model of the system. In this paper, we investigate four targeted research ques-tions. First, there is no closed-form model relating parameters to throughput, precluding gradient-based optimization and requiring model-free techniques. A fundamental question is whether parameter perturbations even produce observable throughput changes that can be exploited for optimization (RQ1: Does dither in cost manifest in throughput? ). Second, parameters only control the local behavior of how a target pod is extracted, but this change ripples through the floor over time. For example, a parameter choice that leads to more robots sending away obstructing pods, rather than shuffling them locally to bubble target pods, might cause congestion in the future, reducing throughput. This delayed effect makes credit assignment of parameter changes difficult (RQ2: What is the phase delay between parameter changes and throughput response? ). Third, the optimal configuration depends on the specific FC characteristics: number of robots, amount of work, size of the floor, and storage density. The best parameter configuration on one floor may not transfer to another, necessitating a new grid search for each deployment. We investigate whether an adaptive policy can automatically converge to good configurations, eliminating manual parameter sweeps (RQ3: What is the on-policy performance under nominal conditions? ). Fourth, measuring the effectiveness of a parameter choice requires evaluation on downstream metrics, primarily throughput, which can only be assessed after long simulation runs. Moreover, static parameters cannot adapt when operational conditions change, such as varying station availability or workload patterns (RQ4: What is the on-policy performance under dynamic conditions? ). Extensive simulation studies, on a high fidelity discrete event FC simulator, using realistic FC parameters demon-strate that ESC automatically converges to near-optimal parameters across various operational conditions. When fixed policies tuned on one configuration are transferred to different maps or robot counts, they incur an average throughput loss of 5.0% compared to an ESC policy that adapts online. Under dynamic conditions where 50% of stations log off mid-operation, ESC improves throughput by 8.4% overall and 14.3% in the post-disturbance period by automatically adjusting parameters to match the changed operating regime. This work bridges search-based planning with adaptive control, providing a self-tuning paradigm for dense FC operations. II. R ELATED WORK 
+
+Extremum Seeking Control. ESC has a rich history in adaptive control, with foundational work by [6] establish-ing stability and convergence guarantees under averaging assumptions. [5] extended these results to practical real-time optimization settings. Recent surveys [7], [9], [10] highlight applications in automotive, aerospace, and process control, though applications to multi-robot warehouse systems remain limited. Our work extends the application of ESC to the domain of combinatorial planning parameters, where the relationship between cost function weights and system-level throughput is mediated by a large scale discrete event system. 
+
+Black-Box Optimization for Robotics. Several derivative-free approaches have been explored for parameter tuning in robotic systems. Bayesian optimization (BO) [11] constructs probabilistic surrogate models and offers strong sample efficiency, though it typically assumes stationary objectives, and relies on underlying nonlinear optimization algorithms that are not always amenable to simple industrial implementation under compute constraints. Contextual bandits [12] provide a framework for adaptive decision-making in continuous and discrete settings, though they typically assume immediate reward signals, an assumption that may not hold in FC environments where parameter changes have delayed, cascading effects on throughput. Iterative Feedback Tuning (IFT) [13] offers a data-driven approach to controller parameter optimization using closed-loop experiments to estimate performance gradients. However, IFT requires multiple probes of the system to estimate the cost gradient, which is impractical in real-time and makes it less suitable for continuously varying FC conditions. In contrast, ESC operates in continuous parameter spaces while remaining model-free and offering principled gradient estimation with convergence guarantees, making it well-suited for the non-stationary conditions found in FC operations. 
+
+Multi-Robot Coordination. Recent work addresses block rearrangement problem where pods within a storage block must be moved to their assigned target sets [3], [14]. How-ever, adaptive tuning of planner parameters in response to real-time throughput feedback remains underexplored. Our contribution bridges this gap by treating parameter selection as an online feedback gain tuning problem amenable to adaptive control techniques. III. P ROBLEM FORMULATION 
+
+An FC floor typically consists of pods containing inventory arranged in grid-like blocks (Figure 1) with several work stations throughout the floor [1], [3]. During FC operation, each station generates requests for target pods to be retrieved. The target pods may be obstructed by other pods that must be moved to access and retrieve the target. We can use a discrete search algorithm (specifically, A* [15]) to compute digout plans that extract target pods and bring them to requesting stations. The A* planner plans one pod extraction at a time, though each plan may involve several robots allocated to execute the necessary actions. Stations may generate multiple concurrent requests up to a per-station limit. The objective is to maximize throughput: the total number of pod retrievals completed per unit time across all stations. The planner operates on a graph representation of the storage block, where vertices correspond to storage locations and edges represent adjacency between storage locations. Pods occupy vertices with the constraint that no two pods can occupy the same vertex simultaneously. Since pods cannot move themselves but require robots to lift and lower them, the planner reasons about four atomic actions: SLIDE (p, u, v ): Move lifted pod p from vertex u to adjacent vertex v, LIFT (p, u ): Change state of pod p at vertex u to lifted, LOWER (p, u ): Change state of pod p at vertex u
+
+to lowered, DIG (p, u ): Remove lifted pod p from boundary vertex u (send to another block). The planner evaluates candidate digout plans using aparameterized cost function. The total cost of a plan, which is fed as the heuristic of the A* planner, is the weighted sum of action counts: 
+
+Fθ (plan ) = α · nslide + β · nlift + γ · ndig , (1) where nslide , nlift , and ndig count the number of each action type in the plan, and [α, β, γ ]⊤ ∈ R3 are tunable cost pa-rameters. The dig cost parameter γ controls the fundamental trade-off in digout behavior. When γ is low, the planner favors traditional digouts that send obstructing pods to other blocks, using multiple robots and adding laden robots to travel lanes. When γ is high, the planner favors slide-only plans that shuffle pods within the block using free cells, avoiding travel lane congestion but potentially requiring longer extraction times. Intermediate values produce hybrid plans combining both strategies (Figure 2). In this work we focus on tuning γ while fixing α and β based on operational considerations. Beyond these parameters, we also have additional param-eters that regulates the amount of work that can queue up at each station. Let ρ be a queue size parameter that regulates (relative to a nominal value) the amount of queuing allowed at each station. In this work, we focus on tuning γ and ρ
+
+while fixing α and β based on operational considerations, i.e., θ = {γ, ρ } ∈ R2.The A* planner includes additional parameters beyond these three that control other aspects of planning behavior, all captured in the general cost function Fθ . The A* search expands states (configurations of pod locations) and selects the plan with minimum total cost to move the target pod to the boundary. For a given choice of Fθ , the A* planner finds the optimal (minimum cost) individual digout plan. However, our ultimate goal is to maximize throughput: the total number of pod retrievals completed per unit time across all stations. The key challenge is determining which parameter values 
+
+θt = θ(t) at each time t will maximize long-term cumulative throughput, even though each individual plan is optimal with respect to its local cost function Fθt .Let J(θ, t ) denote the throughput (pods retrieved per unit time) achieved under parameter θ at time t. The online tuning problem seeks to maximize cumulative throughput over a time horizon T :
+
+max 
+
+> θt
+
+J := 
+
+Z t+Tt
+
+J(θs, s ) ds (2) The optimizer does not have access to gradients ∇J and only observes noisy scalar throughput measurements J(θt, t )
+
+during operation. At discrete update times, the tuning law adjusts the parameter: 
+
+θt+1 = proj Θ(θt + ∆ θt), (3) where ∆θt is computed by the ESC controller and projection ensures θt+1 ∈ Θ ⊂ R.IV. P ROPOSED METHOD 
+
+We present an adaptive tuning approach based on dither-based ESC for optimizing planner cost parameters in multi-robot digout planning. For ease of notation, we focus on the scalar case where γ is the parameter to be tuned with α and 
+
+β held constant; the approach extends naturally to the vector case θ ∈ Rd (refer to Section IV-C). 
+
+A. Continuous-Time Dither-Based ESC 
+
+Consider the continuous-time performance functional 
+
+J (θ) that we seek to maximize. Classical dither-based ESC [5], [6] employs sinusoidal perturbation and demod-ulation to estimate the gradient ∇J (θ) without explicit differentiation. The control law begins by adding a sinusoidal dither signal ξ(t) = a sin( ωt ) with amplitude a > 0 and frequency ω > 0 to the parameter estimate ˆθ(t):
+
+θ(t) = ˆθ(t) + ξ(t). (4) The measured performance y(t) = J (θ(t)) is then passed through a high-pass filter to remove the DC component: 
+
+˙yhp (t) = −ωhyhp (t) + ˙ y(t), (5) where ωh > 0 is the high-pass cutoff frequency. The filtered signal is multiplied by the dither signal (demodulation) and passed through a low-pass filter: 
+
+˙ξlp (t) = −ωlξlp (t) + ωlyhp (t) sin( ωt ), (6) where ωl > 0 is the low-pass cutoff frequency. Finally, the parameter estimate is updated via: 
+
+˙ˆθ(t) = ¯kξ lp (t), (7) where ¯k > 0 is the integration gain. Under standard singular perturbation and averaging assumptions [6], the demodulated signal ξlp (t) approximates (a/ 2) ∇J (ˆθ), yielding gradient ascent on J .
+
+B. Discrete-Time Implementation 
+
+Since in practice we can update the dig cost γ only periodically every ∆t time units, we consider the discrete time version of the ESC law, where the learning cost is discretized: 
+
+max 
+
+> θk
+
+J := 
+
+> K−1
+
+X
+
+> j=0
+
+J(θk, t k+j ) ∆ t, (8) where θk is the parameter value during time interval 
+
+[tk, t k+1 ), ∆t = tk+1 − tk is the update period, and K =
+
+T / ∆t is the number of update intervals. Let tk = k∆t denote discrete time steps and yk = J (θk)
+
+the measured throughput at step k. The high-pass filter is Fig. 2: Three behaviors that free up space to extract the target pod (orange) that can result from setting different parameter values in Fθ . The leftmost one involves sending two pods to a different block. The rightmost one sends no pods in the travel lanes and only shuffles block within a block. The middle one involves a combination of the two. discretized using backward Euler with time constant τh =1/ω h:
+
+yhp  
+
+> k
+
+= h (yhp  
+
+> k−1
+
++ yk − yk−1), (9) where h = 1 /(1+ ωh∆t) is the discrete filter coefficient. This formulation removes the DC component from the throughput signal while preserving variations at the dither frequency. The demodulated signal is computed as: 
+
+ξk = yhp  
+
+> k
+
+sin( ωt k). (10) The low-pass filter is discretized using exponential smooth-ing with time constant τl = 1 /ω l:
+
+ξlp  
+
+> k
+
+= αlξk + (1 − αl)ξlp 
+
+> k−1
+
+, (11) where αl = ωl∆t/ (1 + ωl∆t). The discrete integration step becomes ˆθk+1 = ˆθk + ¯k ξ lp  
+
+> k
+
+∆t, and the applied parameter is 
+
+θk = ˆθk + a sin( ωt k). The parameter θk is clamped to the feasible set Θ via projection. To account for the system delay 
+
+τ between parameter changes and throughput response, the demodulation signal can be phase-shifted: 
+
+ξk = yhp  
+
+> k
+
+sin( ω(tk − τ )) . (12) In the next section, we discuss how this phase change can be measured. 
+
+C. Multi-Parameter Extension 
+
+The proposed framework extends naturally to vector-valued parameters θ ∈ Rd by using orthogonal dither frequencies. For d parameters, we employ: 
+
+θi(t) = ˆθi(t) + a sin( ωit), i = 1 , . . . , d, (13) where the frequencies {ωi} are mutually distinct and suf-ficiently separated (e.g., ωi = ω1 · ri−1 for irrational r). The demodulation for each parameter uses its corresponding frequency: ξlp ,i = LPF [yhp sin( ωit)] ensuring that cross-coupling between parameter updates averages to zero over time. 
+
+D. Convergence of Dither-Based ESC 
+
+We analyze the convergence of the dither-based extremum seeking controller (ESC) used to tune the parameters θ ∈ Rd.For the analysis, we make the following two assumptions. 
+
+Assumption A1: 1) Θ is convex and compact; A* with 
+
+Fθ is complete w.r.t. free space on G. 2) J is bounded, smooth and locally Lipschitz in θ ∈ Θ. 3) J ∈ C3 in a neighborhood N of a local maximizer θ⋆; ∇J (θ⋆) = 0 and 
+
+−H⋆ ≺ 0, where H⋆ := ∇2J (θ⋆). 4) Episode lengths T are uniformly bounded, and safety monitors prevent deadlock by backoff (finite recovery). 5) Measurements of J(θ, t ) may be noisy but have bounded variance. 
+
+Assumption A2: 1) Frequency ω > 0 satisfies ω ≫
+
+ωl; the low-pass removes sum/difference harmonics. 2) The dither amplitude a > 0 is small such that the higher-order terms O(a2) and filtering remainders O(1 /ω ) are negligible. 
+
+Lemma 1 (Local practical convergence of ESC): Under Assumptions A1, A2, and the dither ESC control law (4)-(7) for sufficiently small a and sufficiently large ω, there exist 
+
+c1, c 2, ε > 0 such that if ∥ˆθ(0) − θ⋆∥ is small, then 
+
+∥ˆθ(t) − θ⋆∥ ≤ c1e−c2t ∥ˆθ(0) − θ⋆∥ + O(ε),
+
+with ultimate bound O a + ω−1. In particular, as a → 0 and 
+
+ω → ∞ , the trajectories converge to the local maximizer θ⋆.
+
+Proof: See [8]. 
+
+Remark 1: In this empirical paper, the primary goal is to demonstrate how ESC can be efficiently incorporated into a large-scale discrete-event system. Nevertheless, we recall the main convergence result of a continuous ESC loop for a single variable to state the sufficient conditions of the algorithm. Extensions to multi-variable continuous ESC are well established [5], [8]. Convergence guarantees under discretization still hold; see, e.g., [16], [17]. The projection step in (3) onto the convex compact set Θ does not affect convergence, as constrained ESC on compact sets is naturally handled within the hybrid ESC framework of [16]. V. E XPERIMENTAL VALIDATION 
+
+A. Experimental Setup 
+
+We evaluate the proposed ESC controller using a discrete-event simulator that models an FC that implements robot kinematics, pod handling dynamics, and station request pat-terns that broadly model FC behavior. The simulator tracks individual robot states, pod locations, and station queues to compute throughput and other operational metrics. We use two floors, termed MAP1 and MAP2, that represent a smaller (hundreds of robots) and a larger floor (more than a thousand robots). Each simulation runs for 8 hours of simulated time, with the first 10 minutes excluded from analysis to allow the system to reach steady state. We initialize the ESC with 
+
+ˆθ0 = θ0, yhp ,0 = 0 , and ξlp ,0 = 0 .Recall from Section I the four key challenges in parameter optimization: FC-specific optimal configurations, expensive throughput evaluation, delayed effects with difficult credit assignment, and lack of closed-form models. To address these challenges, we design four experiments corresponding to research questions RQ1–RQ4. RQ1 validates that param-eter perturbations produce observable throughput changes, enabling gradient estimation. RQ2 characterizes the phase delay to inform update timing and address credit assign-ment. RQ3 evaluates whether adaptive policies can eliminate manual parameter sweeps by automatically converging to good configurations. RQ4 examines adaptation to dynamic operational changes. ESC parameters for experiments reported under RQ3 and RQ4 were selected to satisfy timescale separation require-ments after preliminary analysis in RQ1 and RQ2. The dither frequency ω = 0.002 rad/s (period ≈ 52 min) was chosen to be significantly slower than the 4-minute phase delay identified in RQ2. For experiments involving simultaneous adaptation of both parameters (transfer analysis and RQ4), we use frequency-separated dither signals with 
+
+ωρ = 0 .0028 rad/s and ωγ = 0 .0007 rad/s to avoid cross-coupling, as described in Section IV-C. The high-pass filter time constant τh = 42 minutes removes slow throughput drift caused by gradual floor state changes unrelated to parameter perturbations, while the low-pass filter time constant τl =24 minutes (approximately half the dither period) smooths noisy gradient estimates by averaging over sufficient dither cycles. These time constants satisfy the required separation 
+
+τh > τ l > 1/ω . The amplitude was chosen to be 10% of the range of the parameter which was validated via RQ1 to produce observable throughput oscillations. The integration gain ¯k = 0 .0003 was tuned to balance convergence speed against stability, yielding convergence within the 8-hour simulation horizon. 
+
+B. RQ1: Does Dither in Control Input Manifest in Through-put? 
+
+A fundamental requirement for ESC is that perturbations in the control parameter 1 must produce observable changes in the performance metric (throughput). We analyze this using Power Spectral Density (PSD) analysis of both signals during ESC operation. Figure 3a shows the PSD plots for dig cost and throughput signals. The throughput signal shows a local peak ≥ 15 dB above the noise floor at the same frequency as the dig cost signal, demonstrating that the dither in dig cost propagates through the system and manifests as observable oscillations 
+
+> 1In this experiment, we focus only on dig cost; the results are similar for
+> ρ.
+> (a) Power spectral density analysis showing that dither in dig cost produces corresponding oscillations in throughput at the same frequency, validating system responsiveness for ESC.
+> (b) Cross-correlation analysis showing peak correlation at ap-proximately 4 minutes, indicating the phase delay between dig cost changes and throughput response.
+
+Fig. 3: System characterization: (a) frequency response val-idation and (b) phase delay analysis. in throughput. This validates that the system is responsive to parameter changes and that ESC can extract gradient information from throughput measurements. The throughput PSD also reveals a strong DC component (low-frequency content) and some high-frequency noise. The DC component represents the baseline throughput level and is removed by the high-pass filter in the ESC controller. The high-frequency noise is attenuated by the low-pass filter, ensuring that gradient estimates are based primarily on the dither-induced signal component. 
+
+C. RQ2: What is the Phase Delay Between Cost and Throughput? 
+
+The effectiveness of ESC depends on proper timing be-tween parameter updates and performance measurements. If throughput is measured before the system responds to a dig cost change, gradient estimates will be corrupted by transient effects or outdated parameter values. We characterize the phase delay using cross-correlation analysis between dig cost and throughput signals. Figure 3b shows the correlation strength as a function of time shift. The peak correlation occurs at approximately 4 minutes, in-dicating that throughput changes lag dig cost changes by this amount. This delay represents the time required for a change in dig cost to propagate through the planning decisions, robot allocations, and pod movements before affecting measured throughput. Fig. 4: Throughput comparison during the last 2 hours of simulation. ESC achieves an average improvement of 11.16% over fixed policies in steady-state, demonstrating that adaptive benefits compound as the controller converges to optimal parameter configurations. Based on this analysis, we set the ESC update period to ∆t = 5 minutes. This ensures that when we measure throughput to compute gradient estimates, the system has had sufficient time to settle into steady-state behavior under the current dig cost. Updating more frequently would risk measuring transient effects or attributing throughput changes to the wrong parameter values. 
+
+D. RQ3: Performance Under Nominal Conditions 
+
+We evaluate whether the adaptive ESC policy can match or exceed the performance of fixed policies under nominal operating conditions. In our first test, we vary the queue size parameter ρ ∈ { 1, 2, 3} used to initialize the ESC policy. The initial dig cost γ is set fixed to 0.4 in these experiments. Both the parameters are adapted using the ESC controller described in the previous section. We evaluate across five different robot counts (200, 300, 400, 500, 600) to assess scalability of the method. Each experiment was run for 8 hours of simulated time with 5 random seeds to ensure statistical reliability. Figure 4 presents the throughput comparison between fixed and ESC dither policies across all experimental con-ditions. The figure shows data from the final 2 hours of each 8-hour simulation, representing the system’s behavior after ESC adaptation. The results demonstrate that ESC consistently outperforms fixed policies, with the magnitude of improvement varying by operational regime, the initial ρ
+
+setting, and the system scale. Figure 5 demonstrates ESC’s ability to automatically dis-cover optimal parameter configurations across all experi-mental conditions. The figure shows the average queue size 
+
+ρ during the final 2 hours of simulation, representing the converged parameter values after 8 hours of ESC adaptation. Regardless of the initial ρ value (1, 2, or 3), ESC consistently drives the parameter toward a narrow optimal range of approximately ρ = 1 .6 − 2.0 across different robot counts. The tight clustering of final ρ values around the optimal range, independent of initialization, provides strong evidence 
+
+Fig. 5: Convergence of queue size parameter ρ across all experimental conditions. ESC consistently drives ρ toward optimal values regardless of initialization, with final con-verged values showing clear patterns: ρ ≈ 1.6 − 2.0 for most conditions, demonstrating automatic parameter discov-ery without manual tuning. that ESC discovers true system optima rather than merely improving upon poor initial guesses. At low queue sizes ( ρ = 1 ), ESC achieves substantial improvements of 24-42% over fixed policies, indicating that adaptive parameter tuning provides the greatest benefit when the system operates far from optimal initial conditions. At medium queue sizes and high queue sizes ( ρ = 2), the performance difference is more modest, suggesting that the initial parameter choice is closer to optimal. The slight per-formance degradation observed in these regimes is expected when ESC is initialized near optimal parameter values, as the dither signal necessary for gradient estimation introduces small perturbations around the optimum that can temporarily reduce performance. To illustrate the adaptive behavior of ESC, Figure 6 shows the time-series evolution of both queue size ρ alongside throughput for a representative experiment (300 robots, ini-tial ρ = 1 ). The figure illustrates an example of how ESC automatically adjusts the queue size from its initial value of 1 to an optimal range around 2, corresponding to the system’s learned preference for moderate queuing levels that balance station utilization with congestion avoidance. In the experiments with MAP1, the choice of dig cost does not affect the throughput significantly. However, MAP2 is a much larger warehouse with significantly higher number of robots (1600) than MAP1. MAP2 shows much more sensitivity to the choice of dig cost γ. Table I presents normalized throughput comparison between the fixed and the ESC policy on MAP2 as a function of the initial dig cost. When initialized far from optimal parameters (normalized dig cost = 0.4), ESC achieves substantial improvements of 3-4%, demonstrating effective parameter discovery. When initialized closer to optimal values (normalized dig cost = 0.5-0.9), ESC shows modest but consistent improvements of 1-2%, with the controller maintaining stability when gradients are near zero. Fig. 6: Time-series evolution of ESC parameter adaptation for a representative experiment (300 robots, initial ρ = 1 ): Queue size ρ adaptation showing convergence from initial value of 1 to optimal range around 2. Note that we plot the normalized ρ value; the true, unnormalized ρ value used in the simulations is an integer which is why the sinusoidal dither looks rounded off. TABLE I: Normalized throughput and dig cost comparison between fixed and ESC policies on MAP2 with 1600 robots.                         
+
+> Initial Dig Cost Fixed ESC Improvement (Normalized) Throughput Throughput (%)
+> 0.4 1.00 1.035 3.5 0.5 1.04 1.075 3.4 0.6 1.02 1.038 1.8 0.7 1.03 1.048 1.8 0.8 1.03 1.048 1.8 0.9 1.04 1.044 0.6
+
+Transfer Regret Analysis: A practical concern with fixed policies is that parameters optimized for one FC configura-tion may not transfer well to different configurations. As stated earlier, manually running sweeps of the parameters to find the best configuration for each new map is not practical. Instead one may pick representative configurations to find the best parameters on, and then use them in other similar configurations. To quantify this, we evaluate the transfer regret of fixed policies: the throughput loss incurred when deploying pa-rameters tuned on one configuration (the “train” setting) to a different configuration (the “test” setting), compared to an ESC policy that adapts online. We consider three transfer scenarios: (i) train and test use the same map (MAP1) but different number of robots, (ii) train and test use different maps but same number of robots, and (iii) train and test use different map and different number of robots. The fixed policy uses parameters optimized for 300 robots on MAP1; the ESC policy starts from the same initial parameters but adapts online during each test run. The test configurations use 200 and 400 robots and version of MAP1 that has larger individual blocks (i.e., the test map has blocks that are (N + 1) × (N + 1) instead of N × N ). Table II summarizes the results. Each entry reports the mean throughput improvement of ESC over the transferred fixed policy, computed per-seed across 5 random seeds TABLE II: Transfer regret analysis: mean ESC improvement over fixed policy with 95% confidence intervals. Fixed policy uses parameters tuned for 300 robots on MAP1.             
+
+> Transfer Scenario Mean ∆%95% CI
+> Same map, diff. num. robots +4 .2% [+2 .4% ,+5 .9%]
+> Diff. map, same num. robots +5 .6% [+1 .4% ,+9 .7%]
+> Diff. map, diff. num. robots +4 .0% [−1.4% ,+9 .3%]
+
+TABLE III: Dynamic conditions: mean ESC improvement over fixed policy across 5 experiments with randomized station logout times (150–250 min). MAP2, 1600 robots, 50% station logout.            
+
+> ∆% pre ∆% post ∆% full ρpre ρpost Mean +3 .5+14 .3+8 .43.34.3
+
+per configuration, along with the 95% confidence interval. Across all 25 unique test seeds, ESC improves throughput by an average of 5.0% (95% CI: [2 .6% , 7.4%] ). The worst-case ESC loss across all seeds is −3.0% , while the best-case gain is +17 .3% . The ESC loss can be attributed to the dither that intentionally perturbs the system from the optimal configuration. That marginal loss is amply compensated by the significant gains over using fixed configurations. These results highlight that fixed policies incur non-trivial transfer regret when deployed outside their training configu-ration, particularly when the map changes. ESC’s ability to adapt online eliminates this transfer cost, providing robust performance across diverse operating conditions without requiring configuration-specific parameter sweeps. 
+
+E. RQ4: Performance Under Dynamic Conditions 
+
+A key motivation for adaptive control is the ability to respond to changing operational conditions without manual intervention. We simulate a scenario on MAP2 (1600 robots) where 50% of pick stations log off at t = 150 minutes, representing a common operational event such as a shift change. Figure 7 shows a representative run where the fixed policy maintains constant ρ while throughput drops sharply after the station reduction, whereas the adaptive ESC policy adjusts ρ in response to the changed conditions. To quantify the effect, we run 5 paired experiments with randomized logout times uniformly sampled between 150 and 250 minutes, controlling for the phase relationship between the dither signal and the disturbance. Table III summarizes the averaged results. Pre-logout, ESC achieves a modest +3 .5% improvement from online tuning of ρ. Post-logout, the advantage increases to +14 .3% as ESC adapts 
+
+ρ from approximately 3.3 to 4.3 in response to the reduced station capacity, while the fixed policy remains at ρ = 3 .Over the full 8-hour simulation, ESC improves throughput by 
+
++8 .4% . Note that the dig cost γ does not change significantly across these runs, as the adaptation is driven primarily by ρ.Fig. 7: Representative response to 50% station reduction on MAP2 with 1600 robots. The fixed policy (left) maintains constant ρ while throughput drops. The adaptive ESC policy (right) increases ρ after the disturbance, recovering higher throughput. VI. C ONCLUSIONS 
+
+We presented an adaptive parameter tuning framework for a multi-robot planner in robotic fulfillment centers. The framework addresses two key challenges in dense storage operations: eliminating time-consuming manual parameter sweeps across different FC configurations, and enabling real-time adaptation to dynamic operational conditions. Our approach uses ESC, a model-free adaptive control technique that continuously adjusts planner parameters in response to measured throughput. By perturbing the parameter with a sinusoidal dither signal and correlating perturbations with throughput changes, ESC estimates gradients without requir-ing an analytical model of the complex relationship between planning parameters and system-level performance. This is relevant given the delayed effects and credit assignment chal-lenges inherent in FC operations, where local planning deci-sions ripple through the floor over time. Through simulation studies using realistic FC configurations, we demonstrated that: (1) parameter perturbations manifest as observable throughput changes, validating the feasibility of gradient-based adaptation; (2) the 4-minute phase delay between cost changes and throughput response informs appropriate update timing; (3) the adaptive policy improves upon fixed policies. This work bridges search-based planning with adaptive control, providing a self-tuning paradigm for dense FC operations. The ESC framework generalizes beyond the two planning and allocation parameters considered in this work and could be applied to other parameters or planning systems where the relationship between control parameters and performance metrics is complex and time-varying. REFERENCES [1] P. R. Wurman, R. D’Andrea, and M. Mountz, “Coordinating hundreds of cooperative, autonomous vehicles in warehouses,” AI Mag. , vol. 29, no. 1, p. 9–19, Mar. 2008. [Online]. Available: https://doi.org/10.1609/aimag.v29i1.2082 [2] W. Hönig, S. Kiesel, A. Tinka, J. W. Durham, and N. Ayanian, “Persistent and robust execution of mapf schedules in warehouses,” 
+
+IEEE Robotics and Automation Letters , vol. 4, no. 2, pp. 1125–1131, 2019. [3] B. Fu, Z. Chen, R. Chandan, A. Barbosa, M. Caldara, J. Durham, and F. Pecora, “Symbolic planning and multi-agent path finding in ex-tremely dense environments with movable obstacles,” in Proceedings of the AAAI Conference on Artificial Intelligence , 2026. [4] J. Li, A. Tinka, S. Kiesel, J. W. Durham, T. S. Kumar, and S. Koenig, “Lifelong multi-agent path finding in large-scale warehouses,” in 
+
+Proceedings of the AAAI Conference on Artificial Intelligence , vol. 35, no. 13, 2021, pp. 11 272–11 281. [5] K. B. Ariyur and M. Krsti´ c, Real-Time Optimization by Extremum Seeking Control . Wiley, 2003. [6] M. Krsti´ c and H.-H. Wang, “Stability of extremum seeking feedback for general nonlinear dynamic systems,” Automatica , vol. 36, no. 4, pp. 595–601, 2000. [7] Y. Tan, D. Neši´ c, and I. Mareels, “Nonlinear extremum seeking control and applications,” IEEE Transactions on Automatic Control , vol. 51, no. 10, pp. 1639–1659, 2006. [8] M. Benosman, Learning-Based Adaptive Control: An Extremum Seek-ing Approach . Butterworth-Heinemann, 2016. [9] A. Scheinker, “100 years of extremum seeking: A survey,” Automatica ,vol. 161, pp. 111–481, 2024. [10] M. Benosman, “Examples of extremum seeking control in industry: Auto-tuning applications from electromagnetic brakes to fluid dynam-ics,” IEEE Control Systems , vol. 46, no. 2, pp. 1–20, 2026. [11] B. Shahriari, K. Swersky, Z. Wang, R. P. Adams, and N. de Freitas, “Taking the human out of the loop: A review of bayesian optimiza-tion,” Proceedings of the IEEE , vol. 104, no. 1, pp. 148–175, 2016. [12] S. Agrawal and N. Goyal, “Thompson sampling for contextual bandits with linear payoffs,” International Conference on Machine Learning, PMLR , vol. 28, no. 3, pp. 127–135, 2013. [13] H. Hjalmarsson, “Iterative feedback tuning—an overview,” Interna-tional Journal of Adaptive Control and Signal Processing , vol. 12, no. 7, pp. 495–518, 1998. [14] U. A. Khan, M. Benosman, W. Liu, F. Pecora, and J. W. Durham, “Multi-robot path planning and scheduling via model predictive opti-mal transport (mpc-ot),” in 2025 IEEE 64th Conference on Decision and Control (CDC) , 2025, pp. 3169–3175. [15] P. Hart, N. Nilsson, and B. Raphael, “A formal basis for the heuristic determination of minimum cost paths.” IEEE Transactions on Systems Science and Cybernetics , vol. 4, no. 2, pp. 100–107, 1968. [16] J. Poveda and A. Teel, “A framework for a class of hybrid extremum seeking controllers with dynamic inclusions,” Automatica , vol. 76, pp. 113–126, 2017. [17] R. G. Sanfelice and A. R. Teel, “Dynamical properties of hybrid systems simulators,” Automatica , vol. 46, pp. 239–248, 2010.

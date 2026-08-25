@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-24</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-25</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 10 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>9</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-24 20:44:27 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-25 20:51:40 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共读10篇论文，精读1篇、速读9篇，重点聚焦多智能体通信与机器人规划。最值得关注的是精读论文（8.0分）：奖励引导的自回归图生成方法，显著提升多智能体通信拓扑设计效率；速读中VLA层次化基础模型与随机图监控也具参考价值。建议优先阅读该精读论文，并跟进多智能体拓扑优化与仿真实验。</p>
+<p>今日聚焦多机器人高效协作，精读两篇高分论文并速读一篇双臂规划研究。最值得关注的是无模型自适应调参与异构任务分配在分布偏移下的强化学习解法，为仓库与复杂场景提供新思路。建议下一步拓展双臂硬约束规划的实操验证，补足从仿真到落地的关键一环。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Reward-Guided Autoregressive Graph Generation for Efficient Multi-Agent Communication Topology Design">Reward-Guided Autoregressive Graph Generation for Efficient Multi-Agent Communication Topology Design</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Model-Free Adaptive Parameter Tuning for Efficient Multi-Robot Warehouse Operations">Model-Free Adaptive Parameter Tuning for Efficient Multi-Robot Warehouse Operations</span></li><li><span class="dpr-home-dashboard-paper-title" title="Model-Based Reinforcement Learning for Heterogeneous Multi-Robot Task Assignment Under Distribution Shifts">Model-Based Reinforcement Learning for Heterogeneous Multi-Robot Task Assignment Under Distribution Shifts</span></li><li><span class="dpr-home-dashboard-paper-title" title="GenCoord: Skill-Path Commitments under Private Information">GenCoord: Skill-Path Commitments under Private Information</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">9 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="$τ_0$-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation">$τ_0$-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Deciding Relabeling Observation Consistency in Multi-Agent Discrete-Event Systems">Deciding Relabeling Observation Consistency in Multi-Agent Discrete-Event Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Stochastic Multi-Robot Monitoring on Graphs under Markovian Mobility">Stochastic Multi-Robot Monitoring on Graphs under Markovian Mobility</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Fast Coordinated Bimanual Motion Planning With Hard Constraints">Fast Coordinated Bimanual Motion Planning With Hard Constraints</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>9</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 </div>
 
