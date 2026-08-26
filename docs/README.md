@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-25</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-26</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 9 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>5</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-25 20:51:40 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-26 22:11:09 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日聚焦多机器人高效协作，精读两篇高分论文并速读一篇双臂规划研究。最值得关注的是无模型自适应调参与异构任务分配在分布偏移下的强化学习解法，为仓库与复杂场景提供新思路。建议下一步拓展双臂硬约束规划的实操验证，补足从仿真到落地的关键一环。</p>
+<p>今日精读1篇、速读3篇，聚焦多智能体路径规划与机器人学习控制前沿。最值得关注的是《Pivot-and-Station Multi-Agent Path Finding》满分论文，系统分析了枢轴-站点式MAPF的可解性、复杂度与算法；同时《SRL-MPC》等三篇速读覆盖形状感知强化学习控制与变分迭代导航规划。建议普通读者优先从精读论文入手，理解多智能体路径规划的核心理论边界，再按兴趣延伸至机器人控制或导航方向。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">5 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Model-Free Adaptive Parameter Tuning for Efficient Multi-Robot Warehouse Operations">Model-Free Adaptive Parameter Tuning for Efficient Multi-Robot Warehouse Operations</span></li><li><span class="dpr-home-dashboard-paper-title" title="Model-Based Reinforcement Learning for Heterogeneous Multi-Robot Task Assignment Under Distribution Shifts">Model-Based Reinforcement Learning for Heterogeneous Multi-Robot Task Assignment Under Distribution Shifts</span></li><li><span class="dpr-home-dashboard-paper-title" title="GenCoord: Skill-Path Commitments under Private Information">GenCoord: Skill-Path Commitments under Private Information</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Pivot-and-Station Multi-Agent Path Finding: Solvability, Complexity, and Algorithms">Pivot-and-Station Multi-Agent Path Finding: Solvability, Complexity, and Algorithms</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">8 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Fast Coordinated Bimanual Motion Planning With Hard Constraints">Fast Coordinated Bimanual Motion Planning With Hard Constraints</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SRL-MPC: Shape-Aware Reinforcement Learned Model Predictive Control">SRL-MPC: Shape-Aware Reinforcement Learned Model Predictive Control</span></li><li><span class="dpr-home-dashboard-paper-title" title="VIP: Variation-based Iterative-learning Planning for Robotic Navigation">VIP: Variation-based Iterative-learning Planning for Robotic Navigation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Do Robotic World Models Really Follow Actions? Diagnosing and Aligning Action-Conditioned Generation for Policy Learning">Do Robotic World Models Really Follow Actions? Diagnosing and Aligning Action-Conditioned Generation for Policy Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>8</strong></span></div>
 </section>
 </div>
 
