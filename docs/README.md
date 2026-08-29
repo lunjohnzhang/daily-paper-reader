@@ -44,14 +44,14 @@
       <span class="dpr-home-dashboard-kicker">2026-08-29</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 15 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 21 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>9</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>7</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>14</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-29 03:33:52 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-29 22:41:21 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精读聚焦密集仓库多智能体调度与多机器人弹性规划，共处理15篇论文，其中两篇高分精读获9.0以上评分。最值得关注的是分布式拾取交付的“避难所预留”机制，以及融合信任评估的序贯决策框架，显著提升系统抗扰能力。建议从仓库场景的预留策略入手，结合速读中的噪声感知分组聚合方法，验证小规模多机器人任务的实际效果。</p>
+<p>今日聚焦多智能体仓库调度，从21篇论文中精读出两篇满分研究，并速览机器人控制与多智能体系统优化方向。</p>
+<p>最值得关注的是MAPD中的“避风港”（Haven）选择机制：固定与动态策略分别在密集和受限仓库中表现优异，直接决定调度效率上限。</p>
+<p>若想快速上手，建议从“动态避风港选择”切入，理解其如何在空间约束下平衡路径冲突与任务分配。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">7 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Fixed-Haven Reservation for Online Multi-Agent Pickup and Delivery in Dense Warehouses">Fixed-Haven Reservation for Online Multi-Agent Pickup and Delivery in Dense Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="Trust-Aware Sequential Decision Making and Rollout Planning for Resilient Multi-Robot Systems">Trust-Aware Sequential Decision Making and Rollout Planning for Resilient Multi-Robot Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Dynamic Haven Selection for Multi-Agent Pickup and Delivery in Constrained Warehouses">Dynamic Haven Selection for Multi-Agent Pickup and Delivery in Constrained Warehouses</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Fixed-Haven Reservation for Online Multi-Agent Pickup and Delivery in Dense Warehouses">Fixed-Haven Reservation for Online Multi-Agent Pickup and Delivery in Dense Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="Dynamic Haven Selection for Multi-Agent Pickup and Delivery in Constrained Warehouses">Dynamic Haven Selection for Multi-Agent Pickup and Delivery in Constrained Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="Trust-Aware Sequential Decision Making and Rollout Planning for Resilient Multi-Robot Systems">Trust-Aware Sequential Decision Making and Rollout Planning for Resilient Multi-Robot Systems</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>7</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">9 篇</strong>
+    <strong class="dpr-home-dashboard-count">14 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SIGMA: Structured Noise-Effect-Aware Grouped Multi-Agent Aggregation">SIGMA: Structured Noise-Effect-Aware Grouped Multi-Agent Aggregation</span></li><li><span class="dpr-home-dashboard-paper-title" title="OptiMAS: Automatically Optimize Multi-Agent System">OptiMAS: Automatically Optimize Multi-Agent System</span></li><li><span class="dpr-home-dashboard-paper-title" title="Tensegrity Continuum Robots Enable Task-Adaptive Morphologies for Cooperative Behaviors">Tensegrity Continuum Robots Enable Task-Adaptive Morphologies for Cooperative Behaviors</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Graph-Operator World Models for Morphology-Parameter Generalization in Continuous Control">Graph-Operator World Models for Morphology-Parameter Generalization in Continuous Control</span></li><li><span class="dpr-home-dashboard-paper-title" title="OptiMAS: Automatically Optimize Multi-Agent System">OptiMAS: Automatically Optimize Multi-Agent System</span></li><li><span class="dpr-home-dashboard-paper-title" title="TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks">TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>9</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>14</strong></span></div>
 </section>
 </div>
 
