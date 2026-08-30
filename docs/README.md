@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-29</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-30</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 21 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>7</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>14</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-29 22:41:21 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-30 22:22:28 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日聚焦多智能体仓库调度，从21篇论文中精读出两篇满分研究，并速览机器人控制与多智能体系统优化方向。</p>
-<p>最值得关注的是MAPD中的“避风港”（Haven）选择机制：固定与动态策略分别在密集和受限仓库中表现优异，直接决定调度效率上限。</p>
-<p>若想快速上手，建议从“动态避风港选择”切入，理解其如何在空间约束下平衡路径冲突与任务分配。</p>
+<p>今日共推荐6篇论文，均速读完成，无精读篇目。</p>
+<p>最值得关注的是基于潜在世界模型的导航策略预测（7.0/10），其次非完整移动机器人控制与智能货运走廊仿真（6.0/10）可作参考。</p>
+<p>建议普通读者优先浏览高分文章摘要，后续可尝试精读以掌握具体方法细节。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">7 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Fixed-Haven Reservation for Online Multi-Agent Pickup and Delivery in Dense Warehouses">Fixed-Haven Reservation for Online Multi-Agent Pickup and Delivery in Dense Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="Dynamic Haven Selection for Multi-Agent Pickup and Delivery in Constrained Warehouses">Dynamic Haven Selection for Multi-Agent Pickup and Delivery in Constrained Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="Trust-Aware Sequential Decision Making and Rollout Planning for Resilient Multi-Robot Systems">Trust-Aware Sequential Decision Making and Rollout Planning for Resilient Multi-Robot Systems</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>7</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">14 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Graph-Operator World Models for Morphology-Parameter Generalization in Continuous Control">Graph-Operator World Models for Morphology-Parameter Generalization in Continuous Control</span></li><li><span class="dpr-home-dashboard-paper-title" title="OptiMAS: Automatically Optimize Multi-Agent System">OptiMAS: Automatically Optimize Multi-Agent System</span></li><li><span class="dpr-home-dashboard-paper-title" title="TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks">TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Predicting Consequences and Reinforcing Navigation Policies with Latent World Models">Predicting Consequences and Reinforcing Navigation Policies with Latent World Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Scaling-Based Reciprocal Control Barrier Functions for Nonholonomic Mobile Robots">Scaling-Based Reciprocal Control Barrier Functions for Nonholonomic Mobile Robots</span></li><li><span class="dpr-home-dashboard-paper-title" title="Simulating Cognitive Smart Freight Corridors with Agent-Based Models and Reinforcement Learning">Simulating Cognitive Smart Freight Corridors with Agent-Based Models and Reinforcement Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>14</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 </div>
 
