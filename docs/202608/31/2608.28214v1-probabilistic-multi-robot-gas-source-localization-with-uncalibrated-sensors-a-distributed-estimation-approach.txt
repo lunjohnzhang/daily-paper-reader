@@ -1,0 +1,339 @@
+Title: Probabilistic Multi-Robot Gas Source Localization with Uncalibrated Sensors: A Distributed Estimation Approach
+
+URL Source: https://arxiv.org/pdf/2608.28214v1
+
+Published Time: Mon, 31 Aug 2026 00:52:19 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Probabilistic Multi-Robot Gas Source Localization with Uncalibrated Sensors: A Distributed Estimation Approach 
+
+Wanting Jin, Marc Zoel Arias Mitjà, and Alcherio Martinoli 
+
+Distributed Intelligent Systems and Algorithms Laboratory School of Architecture, Civil and Environmental Engineering École Polytechnique Fédérale de Lausanne (EPFL), Switzerland 
+
+wanting.jin@epfl.ch, mariasmitja@gmail.com, alcherio.martinoli@epfl.ch 
+
+Abstract. Estimating environmental states with multi-robot systems becomes particularly challenging when robots are equipped with uncal-ibrated and therefore heterogeneous sensors, whose nonlinear and in-consistent responses prevent reliable information fusion. In this paper, we propose a distributed probabilistic framework for source localization tasks that enables calibration-free estimation in the presence of sensor heterogeneity. The key idea is that each robot independently estimates a local belief using a rank-based feature that captures the relative evolu-tion of observations and is invariant to sensor scaling and nonlinearities. These local beliefs are then fused through a product of experts formula-tion to obtain a consistent global estimate across the team. To further improve the efficiency of team coordination, we introduce an informative region allocation and path planning strategy that reduces redundant exploration while balancing exploration and exploitation. We validate the proposed framework using high-fidelity simulations with realistic gas sensor models. Results demonstrate that our method significantly out-performs a benchmark method based on standard measurement aggrega-tion, achieving reliable source localization accuracy despite strong sensor heterogeneity. More broadly, this work demonstrates how calibration-free sensing representations can be effectively extended to distributed robotic systems, paving the way for their application to other estimation tasks involving heterogeneous sensors. 
+
+Keywords: Gas Source Localization · Multi-Robot Systems · Distributed Estimation · Information Sharing · Coordinated Active Perception 
+
+## 1 Introduction 
+
+Estimating environmental states from partial observation collected by a Multi-robot System (MRS) is an active research area in robotics, with applications in Simultaneous Localization and Mapping (SLAM) [18], moving target track-ing [10], and source localization, including sound [17], radiation[21], and gas sources[20]. These tasks are often time-sensitive, particularly in emergency sce-narios, where rapid and accurate estimation is critical. A MRS can significantly arXiv:2608.28214v1 [cs.RO] 28 Aug 2026 2 W. Jin et al. 
+
+speed up the estimation process by concurrently gathering data at multiple lo-cations. However, practical deployments of a MRS introduce two key challenges. First, robots are often equipped with heterogeneous sensors whose responses can dif-fer significantly due to manufacturing variability and nonlinear characteristics. This is particularly evident in gas sensing, where in-situ sensors exhibit diverse sensitivities and nonlinear responses to concentration levels. In addition, their sensitivity is influenced by temperature, humidity, and sensor age, which makes them difficult to remain calibrated for a long time. Second, effective coordination is required to ensure that robots collect complementary information while avoid-ing redundant exploration. In this paper, we tackle the information sharing 
+
+and coordinated active perception for a MRS endowed with heterogeneous gas sensors and carrying out a Gas Source Localization (GSL) task. Probabilistic approaches have been widely used for GSL tasks [14], where the belief over candidate source locations is updated by comparing measured gas concentrations with predictions from gas plume models. In multi-robot settings, existing methods [2, 3, 15, 16, 22] typically aggregate measurements directly from all robots to estimate a shared belief. However, these approaches often assume homogeneous sensors or rely on simple noise models, which limit their applica-bility in realistic scenarios with heterogeneous sensing responses. In [12], a dis-tributed estimation has been explored where robots maintain individual beliefs and gradually converge to a consensus. Nevertheless, it still assumes comparable sensor responses across robots, which is difficult to guarantee with physical gas sensors. Regarding coordination strategies, a wide range of approaches have been pro-posed for multi-robot information gathering, ranging from centralized [13, 22] to decentralized strategies [2] and learning-based methods [19]. In [3, 16], robots co-ordinate their navigation by independently selecting sampling locations, sharing these decisions, and exchanging goals to reduce the overall travel cost. A graph neural network is proposed in [19] that takes robot states and local estimations as input and outputs the next goal positions. These methods rely on assigning discrete informative points to robots, typically following a stop-sense-go strat-egy [9], where robots must stop at sampling locations to acquire measurements. While sense-in-motion approaches [8] have been shown to lead to superior per-formance at the single robot level, in particular by enabling the robot to exploit measurements collected during motion, they introduce additional coordination challenges at the multi-robot level. In particular, partially overlapping trajecto-ries can lead to redundant observations and reduced overall information gain. To reduce overlap and improve coverage of the MRS, [12] employs a Voronoi-based partitioning of the environment, assigning each robot to a distinct region for exploration. Unlike existing works, where the homogeneous sensor response is assumed, and the path planning is generally designed for stop-sense-go strategy, in this work, we propose a distributed GSL framework for MRS equipped with heteroge-neous gas sensors, while gathering samples during motion. Each robot indepen-Distributed Multi-Robot Gas Source Localization with Uncalibrated Sensors 3
+
+dently estimates a local belief map based on its individual measurements using a rank-based gas feature that is invariant to sensor scaling and nonlinearities. The local beliefs are then fused through a Product of Experts (PoE) formulation to obtain a global belief map. Based on the fused belief, we introduce an informative region allocation strategy that partitions the environment into spatially distinct regions, encouraging efficient exploration while reducing redundancy. Each robot then conducts the Informative Path Planning (IPP) inside its assigned region. This approach enables the robot team to balance exploration and exploitation, and to effectively utilize measurements collected during motion. Building on our previously proposed single-robot rank-based Source Term Estimation (STE) framework [7], this paper presents the following contributions: 
+
+– A distributed source estimation framework that enables robots equipped with uncalibrated sensors to independently estimate local posteriors and fuse them through a PoE formulation. 
+
+– An informative region allocation and path planning strategy that promotes coordinated exploration and efficient information gathering. 
+
+– An extensive evaluation against a benchmark method in a high-fidelity simu-lation environment with realistic MOX sensor models under both calibrated and uncalibrated sensing conditions. Wind  
+
+> Fig. 1. A screenshot of the high-fidelity simulator Webots showing a MRS engaged in a GSL task.
+
+## 2 Problem Statement 
+
+Consider a two-dimensional indoor workspace Ω ⊂ R2 containing obstacles O,and assume that a single stationary gas source is located at an unknown position within the free space F = Ω \ O . The workspace is discretized equally into 4 W. Jin et al. 
+
+Ne grid cells. We define a discrete random variable S ∈ { 1, ..., N e}, where the event S = i indicates that the gas source is located at the center of the i-th grid cell. A team of M robots navigates in the environment and collects gas concentration measurements. Let zmt representing the gas measurements gathered by robot m ∈ { 1, ..., M } at time step t. Suppose the robot m collected 
+
+N mk measurements up to iteration k. The corresponding measurement set is denoted as: Zmk = {zm 
+
+> 1
+
+, z m 
+
+> 2
+
+, ..., z mN mk
+
+}.The objective of GSL is to estimate the posterior distribution of the source location based on collected measurements. At iteration k, the robot team main-tains a belief map bk over the discretized environment as: 
+
+bk(i) = Pr( S = i|Z1 
+
+> k
+
+, ..., Z Mk ), i = 1 , ..., N e, (1) To quantify the uncertainty of the estimation, we use the entropy of the belief map: 
+
+H(bk) = −
+
+> Ne
+
+X
+
+> i=1
+
+bk(i) log bk(i). (2) The estimated source location is given by the Maximum a Posteriori (MAP) estimate: ˆSk = arg max  
+
+> i∈{ 1,...,N e}
+
+bk(i). (3) The estimation process continues until either the entropy of the belief map falls below a predefined threshold or a maximum number of iterations is reached. 
+
+## 3 Methodology 
+
+We propose a distributed probabilistic framework for GSL using a MRS with heterogeneous sensors. The overall workflow is illustrated in Fig. 2. Each robot independently estimates a belief map over the source location using its local observations within a STE framework, which will be detailed in Sec. 3.1. These local beliefs are then shared and fused among the group to form a global belief, which will be detailed in Sec. 3.2. The fused belief map is used to partition the map into M non-overlapping regions, and then allocate one region to each robot. Each robot then plans its own informative path in its assigned region. The region allocation and IPP will be detailed in Sec. 3.3. At each iteration, robots collect measurements, update local beliefs, perform belief fusion, and replan their trajectories based on the updated global belief. The process terminates when the entropy of the global belief falls below a predefined threshold or the maximum iteration cycle is reached, and then the source location is declared. 
+
+3.1 Source Term Estimation Framework 
+
+STE is an inverse modeling approach used to infer parameters governing gas dis-persion [6]. In this work, we formulate STE as a Bayesian inference problem over Distributed Multi-Robot Gas Source Localization with Uncalibrated Sensors 5Gas Sampling Module Bayesian Inference  
+
+> Estimated Gas Concentration Measured Gas Concentration
+> Candidate Source Locations
+> Gas Dispersion Model
+> Source 1 Source 2 Source Ne …
+> Source Term Estimation Source Term Estimation Rank Based Gas Feature Extraction Rank Based Gas Feature Extraction
+> Belief map m
+
+…   
+
+> Robot 1 Robot M
+> Belief map M Belief map 1 Belief Fusion Belief Fusion Region Allocation Region Allocation Informative Path Planning Informative Path Planning
+> Path of robot m Source Term Estimation
+
+Fig. 2. Workflow of the distributed STE framework. 
+
+the discrete source location variable S. This process incorporates a steady-state plume model and gas concentration measurements within the environment. As shown in Fig. 2, at each iteration, for every candidate source location i, a forward gas dispersion model predicts the expected gas concentration field ˆc(·| S = i) orig-inating from this source. Given a robot’s measurement set Zmk , both measured and predicted gas features are extracted and compared. The alignment between these features defines the likelihood of each source hypothesis, which is used to update the posterior belief over S. After reaching its goal location, each robot shares its local belief map with the team. Once all local beliefs are received, they are fused to obtain a global belief, which is then used to guide subsequent IPP. 
+
+Gas plume model - To incorporate physical knowledge into the estimation process, we employ a gas plume model to predict concentrations under each source hypothesis. In complex indoor environments with obstacles, analytical models, such as the Pseudo-Gaussian plume model [5], are often too inaccurate. Therefore, we adopt a Data-Driven Plume Model (DDPM) from our previous work [9] to predict the gas concentration field in built environments. This approach leverages a convolutional neural network that takes as input the environment configuration (e.g., inlet/outlet conditions and obstacle layout) and a candidate source location S = i, and outputs the predicted gas concen-tration field ˆc(·| S = i). Given a robot trajectory, predicted concentrations are 6 W. Jin et al. 
+
+sampled at robot positions: ˆcmt (i) = ˆ c(xmt |S = i), where xmt is the position of robot m at time step t. For more information about DDPM structure and training process, please refer to [9]. 
+
+Rank-based gas feature - To estimate the likelihood of a hypothesis S = i,the alignment between the predicted gas concentration ˆcmt (i) and the measured gas intensity zmt is evaluated. However, direct comparison between predicted concentrations and sensor measurements is unreliable due to sensor heterogene-ity and nonlinear responses, as well as the contrast between a predicted value derived from a stationary plume model and a real-time measurement. To address this aspect, we use a rank-based feature proposed in our previous work [7] that captures the relative magnitude evolution of observations. For robot m, consider its measurement set Zmk = {zm 
+
+> 1
+
+, ..., z mN mk
+
+} up to iter-ation k. We compute the Empirical Distribution Function (EDF) for the mea-surements: 
+
+˜zmt = 1
+
+N mkN mkX
+
+> j=1
+
+1zmj ≤zmt , (4) which represents the normalized rank of each measurement zmt in the set Zmk .Similarly, for predicted concentrations: 
+
+˜cmt (i) = 1
+
+N mkN mkX
+
+> j=1
+
+1ˆcmj (i)≤ˆcmt (i). (5) This representation enables comparison without requiring consistent scaling be-tween measurements and predictions. It relies on the assumption that the sensor response is a monotonic transformation of the true gas concentration, which is generally satisfied for in-situ gas sensors despite their nonlinearities. Since rank-ing is computed independently for each robot, differences in sensor characteristics do not interfere across robots. 
+
+Probabilistic distribution estimation - Each robot evaluates the likelihood of its observations under each source hypothesis. We model the discrepancy between rank-based features using a Gaussian assumption, which provides a smooth and robust similarity measure while accounting for both measurement and model uncertainties. The likelihood for robot m is defined as: 
+
+pm(Zm  
+
+> 1: Nkm
+
+| S = i) ∝ exp 
+
+− 12 
+
+> Nkm
+
+X
+
+> t=1
+
+(˜ cmt (i) − ˜zmt )2
+
+σ2 
+
+> M
+
++ σ2
+
+> E
+
+ , (6) where σ2 
+
+> M
+
+and σ2 
+
+> E
+
+denote the measurement and model uncertainty, respectively. Since the relative rank of each zmt and cmt will be adapted when new mea-surements are available, at each iteration k, all the historical measurements are used to update the local belief map: 
+
+bmk (i) ∝ pm(Zm  
+
+> 1: Nkm
+
+| S = i)P (S = i), (7) Distributed Multi-Robot Gas Source Localization with Uncalibrated Sensors 7
+
+followed by normalization such that PNe 
+
+> i=1
+
+bmk (i) = 1 . The prior p(S = i) is initialized as a uniform distribution over the free space of the environment, while cells occupied by obstacles are assigned zero probability. 
+
+3.2 Belief Sharing and Merging 
+
+After computing local belief maps bmk (i), robots exchange and fuse them to obtain a global belief. Since all robots share the same forward model and environmental information, their beliefs are treated equally. We adopt a PoE formulation [4]: 
+
+bk(i) = 
+
+> M
+
+Y
+
+> m=1
+
+bmk (i), (8) followed by normalization, that PNe 
+
+> i=1
+
+bk(i) = 1 . While this formulation assumes conditional independence between robot observations, it remains effective in practice and emphasizes consensus across robots. A location will only achieve high probability if it is consistently supported by multiple robots, improving robustness to individual noise or bias. 
+
+3.3 Informative Region Allocation and Path Planning 
+
+Based on the fused belief bk, robots plan trajectories to maximize collective information gain. Since measurements are collected continuously during motion, overlapping trajectories might bring limited additional information. Therefore, robots are encouraged to explore spatially distinct regions. At the same time, the rank-based feature requires each robot to sample a sufficiently diverse range of gas concentrations, creating a trade-off between global exploration and local exploitation. To address this, we design a coordination strategy that gradually guides the robot team from exploration to exploitation. 
+
+Region allocation method - The goal of region allocation is to spatially distribute robots to maximize coverage while prioritizing high-probability areas. To this end, the environment is partitioned into M spatially connected, non-overlapping regions, with each region assigned to one robot. We first identify Nactive active cells whose belief value satisfies bi > ϵ , where 
+
+ϵ is a threshold indicating sufficiently informative locations. From these, the top-
+
+M highest-probability cells are selected as seeds to initialize the regions. Each seed is assigned to the nearest robot. Regions are then expanded using a multi-seed breadth-first search on an 8-connected grid. To maintain balanced region sizes, expansion prioritizes smaller regions and enforces a soft size constraint: 
+
+|Cm| ≤ α · Nactive 
+
+M (9) where Cm is the set of cells assigned to robot m and α > 1 is a relaxation factor. A cell is assigned to a region only if it is not an obstacle and has not been previously assigned. This ensures spatial connectivity, balanced workload, and no overlap between regions. 8 W. Jin et al. 4 6 8 10 12 x (m) 0 m 4 m Robot 1 Individual Belief                        
+
+> Sensor output
+> 46810 12 x (m) 0 m 4 m Robot 2 Individual Belief
+> Sensor output
+> 46810 12 x (m) 0 m 4 m Robot 3 Individual Belief
+> Sensor output
+> 46810 12 x (m) 0 m 4 m Merged Belief Map
+> 46810 12 x (m) 0 m 4 m Region Allocation
+> True source Robot 1 next goal Robot 2 next goal Robot 3 next goal Robot 1 region Robot 2 region Robot 3 region Unassigned
+> Low High
+> Low High
+> Low High
+> Low High
+> (a) (d) (e) (c) (b)
+
+Fig. 3. One iteration of distributed estimation and coordination: (a)-(c) robot trajecto-ries, sensor outputs, and corresponding local beliefs; (d) global belief after PoE fusion; and (e) non-overlapping region allocation and information-weighted navigation goals. The star denotes the true source location. 
+
+Path planning within each region - Each robot plans its trajectory within its assigned region Cm. Instead of targeting a single cell, the robot moves toward an information-weighted centroid: 
+
+xm
+
+info =
+
+P
+
+xi∈Cm bk(i) xi
+
+P
+
+xi∈Cm bk(i) . (10) This centroid-based strategy provides a computationally efficient approximation of information-driven exploration, balancing coverage and exploitation. In early stages, when the belief distribution is diffuse, it promotes broad exploration. As the belief becomes more concentrated, the centroid shifts toward high-probability regions, encouraging focused exploitation. Fig. 3 illustrates one planning iteration. Panels (a)-(c) show the trajectory and sensor output of each robot together with the local belief map estimated from its own measurement history. Darker trajectory markers denote higher sensor outputs, while darker belief map cells denote higher source probabilities. Panel (d) shows the global belief obtained by PoE fusion. The fusion suppresses hypotheses that are not consistently supported across the local beliefs, thereby concentrating the belief on a smaller candidate region. Panel (e) shows the re-sulting allocation of the active cells to the robots. The diamond in each region denotes its weighted information centroid, which is used as the robot’s next navigation goal. 
+
+## 4 Experiments and Results 
+
+In this section, we introduce the experimental setup and the simulated heteroge-neous Metal OXide (MOX) sensors and benchmark the proposed method with a baseline STE algorithm. Distributed Multi-Robot Gas Source Localization with Uncalibrated Sensors 9
+
+4.1 Simulation Setup 
+
+We evaluate the proposed method in a high-fidelity simulation environment using Webots [11], integrated with a dedicated gas dispersion plugin [1]. A team of three Khepera IV robots, each equipped with a MOX gas sensor, navigate the environment and collect gas concentration measurements. An example of the simulation setup is shown in Fig. 1. The experiments are conducted in three indoor environments with different obstacle configurations, as illustrated in Fig. 4. These obstacles create complex airflow patterns that significantly affect gas dispersion. In all scenarios, a steady airflow is applied from the right (inlet) to the left (outlet). The gas source is placed near the inlet at a random location, while robots are initialized near the outlet with random starting positions. 3 6 9 12       
+
+> x [m]
+> 024
+> y [m]
+> Map 1
+> 36912
+> x [m]
+> Map 2
+> 36912
+> x [m]
+> Map 3
+> 0.000 0.427 0.853 1.280
+> |U| [m/s]
+
+Fig. 4. Experimental environments used for evaluation. Three indoor maps with dif-ferent obstacle configurations are shown, along with the corresponding wind fields. 
+
+Heterogeneous MOX sensor simulation - To realistically model sensor heterogeneity, we adopt the MOX sensor model from our previous work [7], incorporating the three following key aspects. 
+
+– Nonlinear response: the sensor output voltage is a nonlinear function of gas concentration, parameterized by a baseline resistance, which varies across sensors due to manufacturing differences, and is sensitive to the environ-mental conditions. 
+
+– Sensor noise: additive noise consists of a constant background component and a signal-dependent intermittency component, reflecting real gas sensing conditions. 
+
+– Slow dynamics: response and recovery behavior are modeled as a first-order dynamic system, with parameters calibrated with a real MOX sensor. To simulate heterogeneous sensing, a different baseline resistance (100 Ω, 500 Ω
+
+and 1500 Ω) is assigned to each robot, covering the typical variability range ob-served in real sensors. The overall data flow of the sensor simulation is illustrated in Fig. 5. For more details about sensor modeling, please refer to [7]. In our setting, the gas sensor samples at 1 Hz and the maximal robot speed is set to 0.27 m/s. Real gas plumes are inherently discontinuous and intermittent, 10 W. Jin et al. Sensor model Sensor dynamics Sensor noise Sensor output Vout Simulated gas concentration Gas Sensor Simulation  
+
+> Fig. 5. Data flow of the MOX sensor simulation. The ground-truth gas concentration is transformed through a nonlinear sensor model, followed by additive noise and dynamic response modeling, to generate realistic sensor outputs.
+
+resulting in rapidly fluctuating gas concentrations. During continuous sampling, the slow sensor dynamics effectively act as a low-pass filter, smoothing rapid concentration fluctuations. Therefore, we directly use the output of the sensor to extract rank-based features without further signal processing. 
+
+4.2 Performance Evaluation Benchmark method - We compare the proposed approach, referred to as Belief Sharing in the following, against a baseline algorithm, which we call Mea-surement Aggregation, that leverages the same STE framework but aggregates all measurements of the robots into a single dataset. In this baseline algorithm, each robot aggregate the gas measurements gathered by all the robots, and use the entire gas measurement dataset to compare with the model prediction to up-date the source belief. Unlike our method, the baseline algorithm assumes that sensor measurements are directly comparable across robots and does not account for the actual sensor heterogeneity and nonlinear response, which is a common assumption adopted in existing work. For the sake of benchmarking fairness, the same region allocation and path planning strategies are also adopted for the baseline algorithm. To benchmark the performance of Belief Sharing with that of Measurement Aggregation, we evaluate the algorithms under two different settings: 
+
+– Calibrated sensors: the gas sensors of the robots are all calibrated towards the gas plume model and can directly measure the ground truth gas concen-tration. 
+
+– Uncalibrated sensors: the gas sensors are not calibrated and are simulated with the model introduced in Sec. 4.1; the raw sensor output is directly used for the experiments. For each setting, we evaluate both algorithms under three maps. For each environment, 30 trials with randomized source and robot initial positions are conducted, resulting in a total of 360 simulation runs. 
+
+Evaluation metrics - The performance of the MRS is evaluated in terms of both localization accuracy and efficiency as follows. 
+
+– Localization accuracy: measured as the Euclidean distance between the esti-mated source location (MAP estimate) and the ground-truth source position. Distributed Multi-Robot Gas Source Localization with Uncalibrated Sensors 11 
+
+– Exploration efficiency: quantified by the total trajectory length traveled by the robot team until end of the task. 
+
+Results The performance comparison is shown in Fig. 6. The gray zones show the results with calibrated sensors and the zones with dashed bounding boxes are the results with uncalibrated sensors. With calibrated sensors, Belief Sharing and Measurement Aggregation achieve comparable localization accuracy and trajectory lengths, since measurements are consistent across robots. However, in the uncalibrated sensors settings, the base-line algorithm consistently fails to localize the source across all map configura-tions, yielding large estimation errors despite addition traveling (and therefore sampling). This is primarily due to the mismatch between predicted concentra-tions and raw sensor measurements, caused by sensor heterogeneity and non-linear responses. Without proper calibration, aggregating measurements across robots leads to inconsistent likelihood estimation and prevents convergence. Map 1 Map 2 Map 3     
+
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8Estimation error (m)
+> Source Localization Error
+> Map 1 Map 2 Map 3
+> 25
+> 50
+> 75
+> 100
+> 125
+> 150
+> 175
+> 200 Trajectory length (m)
+> Trajectory Length
+> Measurement Aggreation Belief Sharing
+> Calibrated sensors Uncalibrated sensors
+
+Fig. 6. Performance comparison between the Benchmark (measurement aggregation) and the proposed method (belief sharing) across three environments. 
+
+In contrast, the Belief Sharing algorithm successfully localizes the gas source in most cases across all environments regardless of calibrated or uncalibrated sensors. By using rank-based features, each robot estimates its local belief based on relative ordering of measurements rather than their absolute values, effectively removing the need for sensor calibration. The subsequent belief fusion reinforces consistent hypotheses across robots. In terms of efficiency, the proposed method achieves source localization with moderate trajectory lengths, demonstrating a good balance between exploration and exploitation. Overall, the results demonstrate that the proposed distributed estimation framework is robust to heterogeneous sensor responses and enables reliable GSL in complex environments. 12 W. Jin et al. 
+
+4.3 Scalability of the Proposed Method 
+
+In the current all-to-all communication architecture, each robot shares an Ne-dimensional belief map with the team at every planning iteration, resulting in a total communication cost of O(M 2Ne). Belief fusion at each robot requires 
+
+O(M N e) operations. The region allocation process scales approximately with the number of active cells, while the STE and IPP are performed locally and do not scale with the team size. Overall, the framework is suitable for small-to medium-sized robot teams, while more communication-efficient belief fusion strategies could further improve scalability. 
+
+## 5 Conclusion and Outlook 
+
+In this work, we presented a distributed estimation framework for GSL using a MRS equipped with uncalibrated gas sensors. The proposed approach enables each robot to independently estimate a local belief using rank-based gas features, which are invariant to sensor scaling and nonlinearities. These local beliefs are then fused to obtain a global estimate of the source location. To support efficient coordination, we introduce an informative region alloca-tion and path planning strategy that balances exploration and exploitation while reducing redundant observations. The framework allows robots to continuously collect measurements during motion and collaboratively refine their belief over the source location. Extensive simulations in a high-fidelity environment with realistic MOX sen-sor models demonstrate that the proposed method significantly outperforms a baseline algorithm that aggregates raw sensor measurements. In particular, our approach achieves reliable localization despite strong sensor heterogeneity, high-lighting the importance of calibration-free features in distributed estimation. Although this work focuses on GSL as a case study, the proposed framework is more general and can be applied to a broader class of distributed estimation problems in MRS. Future work will focus on improving communication efficiency by reducing the amount of data exchanged between robots, for example by trans-mitting only incremental updates of the belief map. Additionally, extending the framework to real-world experiments remains an important direction for further validation.    
+
+> Acknowledgments. This work is funded by the Swiss National Science Foundation under grants 200020_175809 and 10.001.747.
+> Further information. Additional information about the research can be found here: https://disal.epfl.ch/research/gassensingstructure/.
+> Disclosure of Interests. The authors declare no conflict of interest.
+
+Distributed Multi-Robot Gas Source Localization with Uncalibrated Sensors 13 
+
+## References 
+
+1. Webots Odor Simulation/Model - Wikibooks, open books for an open world, https://en.wikibooks.org/wiki/Webots_Odor_Simulation/Model 2. Bourne, J.R., Goodell, M.N., He, X., Steiner, J.A., Leang, K.K.: Decentralized Multi-agent information-theoretic control for target estimation and localization: finding gas leaks. The International Journal of Robotics Research 39 (13), 1525– 1548 (Nov 2020) 3. Ercolani, C., Deshmukh, S.M., Peeters, T.L., Martinoli, A.: Multi-robot 3d gas dis-tribution mapping: Coordination, information sharing and environmental knowl-edge. In: IEEE International Conference on Robotics and Automation. pp. 11418– 11424 (2023) 4. Hinton, G.E.: Training Products of Experts by Minimizing Contrastive Divergence. Neural Computation 14 (8), 1771–1800 (Aug 2002) 5. Holmes, N., Morawska, L.: A review of dispersion modelling and its application to the dispersion of particles: An overview of different dispersion models available. Atmospheric Environment 40 (30), 5902–5928 (Sep 2006) 6. Hutchinson, M., Oh, H., Chen, W.H.: A review of source term estimation methods for atmospheric dispersion events using static or mobile sensors. Information Fusion 
+
+36 , 130–148 (Jul 2017) 7. Jin, W., Duranceau, A., Erünsal, İ.K., Martinoli, A.: Calibration-free gas source localization with mobile robots: Source term estimation based on concentration measurement ranking. In: IEEE International Conference on Robotics and Au-tomation (Jun 2026) 8. Jin, W., Martinoli, A.: Sense in Motion with Belief Clustering: Efficient Gas Source Localization with Mobile Robots. In: IEEE International Conference on Robotics and Automation. pp. 14909–14916 (May 2024) 9. Jin, W., Rahbar, F., Ercolani, C., Martinoli, A.: Towards Efficient Gas Leak Detec-tion in Built Environments: Data-Driven Plume Modeling for Gas Sensing Robots. In: IEEE International Conference on Robotics and Automation. pp. 7749–7755 (May 2023) 10. Jung, B., Sukhatme, G.S.: Cooperative multi-robot target tracking. In: Distributed Autonomous Robotic Systems 7, pp. 81–90. Springer (2006) 11. Michel, O.: Cyberbotics Ltd. Webots™: professional mobile robot simulation. In-ternational Journal of Advanced Robotic Systems 1(1), 39–42 (2004) 12. Nanavati, R.V., Coombes, M.J., Liu, C.: Distributed multi-robot source term es-timation with coverage control and information theoretic based coordination. In-formation Fusion 111 , 102503 (Nov 2024) 13. Nanavati, R.V., Glover, T.J., Coombes, M.J., Liu, C.: Mr.MSTE: Multi-robot Multi-Source Term Estimation with Wind-Aware Coverage Control (Dec 2025) 14. Park, M., An, S., Jang, H., Oh, H.: Information-theoretic autonomous source search and estimation of mobile sensors. In: Control of Autonomous Aerial Vehicles: Ad-vances in Autopilot Design for Civilian UAVs, pp. 135–166. Springer (2023) 15. Park, M., Oh, H.: Cooperative information-driven source search and estimation for multiple agents. Information Fusion 54 , 72–84 (Feb 2020) 16. Rahbar, F., Martinoli, A.: A Distributed Source Term Estimation Algorithm for Multi-Robot Systems. In: IEEE International Conference on Robotics and Au-tomation. pp. 5604–5610 (May 2020) 17. Rascon, C., Meza, I.: Localization of sound sources in robotics: A review. Robotics and Autonomous Systems 96 , 184–210 (2017) 14 W. Jin et al. 18. Tian, Y., Chang, Y., Arias, F.H., Nieto-Granda, C., How, J.P., Carlone, L.: Kimera-multi: Robust, distributed, dense metric-semantic slam for multi-robot systems. IEEE Transactions on Robotics 38 (4) (2022) 19. Tzes, M., Bousias, N., Chatzipantazis, E., Pappas, G.J.: Graph Neural Networks for Multi-Robot Active Information Acquisition (Sep 2022) 20. Wang, M., Xin, B., Jing, M., Qu, Y.: A priority-based multi-robot search algo-rithm for indoor source searching. IEEE Transactions on Automation Science and Engineering 22 , 10457–10469 (2025) 21. Werner, M., Báča, T., Štibinger, P., Doubravová, D., Šolc, J., Rusňák, J., Saska, M.: Autonomous localization of multiple ionizing radiation sources using minia-ture single-layer compton cameras onboard a group of micro aerial vehicles. In: IEEE/RSJ International Conference on Intelligent Robots and Systems. pp. 5710– 5717 (Oct 2024) 22. Wiedemann, T., Shutin, D., Lilienthal, A.J.: Model-based gas source localization strategy for a cooperative multi-robot system—A probabilistic approach and ex-perimental validation incorporating physical knowledge and model uncertainties. Robotics and Autonomous Systems 118 , 66–79 (Aug 2019)

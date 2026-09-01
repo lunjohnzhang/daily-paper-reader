@@ -1,0 +1,773 @@
+Title: LUCID: An Agentic AI Framework on Digital-Twin in the Loop for QoS-Guaranteeing Robotic Control
+
+URL Source: https://arxiv.org/pdf/2608.28437v1
+
+Published Time: Mon, 31 Aug 2026 01:10:17 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# LUCID : An Agentic AI Framework on Digital-Twin in the Loop for QoS-Guaranteeing Robotic Control 
+
+Hyeonsu Lyu 1, Minwoo Kim 2, Sehyun Ryu 2, Hyun Jong Yang 1I want to deploy 10 robots in the scene. I have 3 APs and 80 MHz bandwidth ···. What is the highest achievable throughput? 
+
+> You can achieve 15 Mbps in the scene! Here is the expected throughput graph.
+
+1. Prepare and load DT scene 2. Simulate raytracing 3. Run DT in the loop to find the feasible TP & RRM solution 4. QoS-guaranteeing TP & RRM Mean throughput (Mbps)       
+
+> 510 15 25 20
+> Global time step
+> 010 20 30 40 50 60
+
+Fig. 1. Conceptual illustration of LUCID and automated agent. 
+
+Abstract —Cloud robotics relies on the timely uplink of high-volume sensing streams, yet dynamic environments continually shift the feasible combinations of trajectories, active-robot count, and per-robot QoS. Because existing approaches formulate tra-jectory planning (TP) and radio resource management (RRM) as a single fixed optimization problem, they cannot reconfigure these coupled decisions as conditions evolve, resulting in transient QoS violations. However, evolving operator intents change which quantities-such as the active-robot count and per-robot QoS-are fixed, optimized, or relaxed. Furthermore, the computational cost of evaluating trajectory-dependent wireless conflicts has made it difficult to build large-scale Digital-Twin-in-the-Loop (DITL) testbeds responsive enough for such dynamic orchestration. We present LUCID , an LLM-agent–orchestrated, uplink-aware cloud-robotics pipeline that moves TP–RRM from solving a fixed formulation to dynamically orchestrating optimization problem schemas within a DITL environment. Driven by the operator’s high-level intent, LUCID treats the TP–RRM formulation as a bounded template whose variables, objectives, and constraints are dynamically configured, while SimBridge enables repeated ray-tracing evaluation by converting large-scale robotics scenes into wireless-ready DTs. By integrating collision-free path planning with a spectral-radius RRM validator, LUCID identifies wireless bottlenecks and restructures the problem schema on the fly to ef-ficiently find the verified feasible state. Experiments confirm that 
+
+LUCID robustly adapts to changing intents, active-robot counts, and scenes, while a multimodal surrogate model, FastConfigNet, reduces planning latency. 
+
+Index Terms —Digital Twin, Agentic AI, Cloud Robotics, Multi-Agent Path Planning, Radio Resource Management 
+
+I. I NTRODUCTION 
+
+Cloud robotics increasingly relies on edge servers to process high-rate sensory streams from groups of autonomous mobile 
+
+> 1
+
+Hyeonsu Lyu and Hyun Jong Yang are with the Department of Electrical and Computer Engineering and the Institute of New Media and Communica-tions, Seoul National University, Seoul, Republic of Korea. 
+
+> 2
+
+Minwoo Kim and Sehyun Ryu are with Pohang University of Science and Technology (POSTECH), Pohang, Republic of Korea. 
+
+robots (AMRs) [1], [2]. In warehouse environments, this architecture enables centralized perception and coordinated trajectory planning (TP), but timely uplink delivery over a shared and spatially varying wireless network remains vul-nerable to transient blockages and multipath fading [3], [4]. Before deploying AMRs, an operator must therefore determine which combinations of the number of AMRs, per-AMR uplink quality-of-service (QoS), and TP are supportable under the available radio resources. The resulting challenge is to identify feasible operating points and, when a desired point is infeasi-ble, determine whether the AMR count, the QoS requirements, or TP should be adjusted. A fundamental difficulty is that TP and radio resource man-agement (RRM) cannot be performed independently [5]. As illustrated in Fig. 2(a), trajectories planned independently for individual AMRs may intersect in space and time, resulting in Type-I physical conflicts. Conventional centralized multi-agent path planning can resolve these geometric conflicts by jointly coordinating the AMR trajectories [6], [7]. However, because conventional planners do not account for the radio resources required along those trajectories, the resulting collision-free plan may concentrate multiple AMRs in a radio-limited region. Their simultaneous uplink QoS requirements may then become infeasible, resulting in the Type-II wireless conflict shown in Fig. 2(b). Thus, TP cannot be finalized before wireless feasibility is evaluated, and RRM cannot be applied merely as a subsequent step to fixed trajectories. Evaluating TP–RRM feasibility is itself challenging because wireless conditions evolve over both space and time [8]. Fig. 3 illustrates how wireless feasibility changes as multiple AMRs move and communicate concurrently in the NVIDIA PhysicalAI SimReady Warehouse-01 environment [9]. Their relative positions and simultaneous transmissions continually alter the interference pattern, while their motion changes arXiv:2608.28437v1 [eess.SY] 28 Aug 2026 blockage and multipath propagation along the trajectories [10]. These interactions can produce short-lived but severe channel degradations at specific locations and time slots; such transient events are particularly important in deadline-driven communication and control systems [11], [12]. Conventional stochastic channel models based primarily on large-scale sta-tistical properties may smooth out such localized events and thereby miss transient QoS violations [13]. Scene-specific electromagnetic (EM) simulation and ray tracing can instead provide location-dependent channel estimates along candidate trajectories [14], [15]. Accurately identifying the feasible operating region therefore requires a scene-specific wireless digital twin [16] that resolves the channel and interference conditions along the joint AMR trajectories and evaluates them with the corresponding RRM decisions [17], [18]. However, existing large-scale robotics scenes are not di-rectly usable as wireless digital twins. The robotics scene considered in this work, for example, is designed primarily for visual rendering and physical simulation [9]. Such scenes commonly lack EM material descriptions while retaining ge-ometric details that make repeated ray-tracing evaluation un-necessarily expensive. In contrast, contemporary wireless ray-tracing toolchains require meaningful material assignments [19] and computationally tractable scene representations. Di-rectly processing unmodified robotics scenes for repeated ray-tracing evaluation can therefore introduce substantial compu-tational overhead, preventing their use within a responsive feasibility-search loop [10]. A practical solution must trans-form large-scale robotics scenes into wireless-ready represen-tations while preserving the propagation features needed to evaluate trajectory-dependent QoS violations. Even with such an evaluation infrastructure, characterizing the feasible operating region remains computationally difficult. Each candidate operating point requires trajectory-dependent DT evaluation [13] and coupled TP–RRM optimization [5], making the search increasingly expensive as the number of AMRs grows. Moreover, the operator’s request does not merely change a numerical input to a fixed solver. Different priorities change which variables are fixed, which are opti-mized, and which constraints may be relaxed. Maximizing per-AMR QoS for a fixed number of AMRs, for example, requires a different optimization formulation from maximizing the supported number of AMRs under a fixed QoS requirement. When a requested point is infeasible, the formulation must (a) Type-I: Physical conflict (b) Type-II: Wireless conflict     
+
+> Fig. 2. Two possible conflict types in warehouse environments. SINR (dB)
+> Step 0 Step 1 Step 2 A warehouse DT scene in NVIDIA Isaacsim (Left) The same DT scene in Sionna RT (Right) Static UE Moving UE Step 2 Step 1 Step 0
+> Fig. 3. Uplink SINR map of two UEs over three steps. The heatmap shows the SINR of the red UE when the orange UEs act as interferers.
+
+further reflect whether the operator prefers rerouting AMRs, reducing sensing fidelity, or decreasing the number of active AMRs. Recent work has shown that LLMs can interface with structured networking inputs and tools [20], while also high-lighting the need for explicit safeguards that ensure validity and reliability. Feasibility search must therefore be conditioned on operator intent, with each search step translated into a structured and verifiable TP–RRM problem [21]. To address these challenges, we present LUCID , an LLM-assisted, uplink-aware cloud-robotics pipeline operating in a digital-twin-in-the-loop (DITL) environment for ware-house operations. LUCID incorporates an automated scene-processing module, which we call SimBridge, to transform large-scale robotics scenes into wireless-ready DTs suitable for repeated trajectory-dependent evaluation. The LLM com-ponent translates operator priorities into structured TP–RRM optimization problems within predefined formulation schemas and coordinates the relevant DT, TP, and RRM modules throughout the feasibility search. Moreover, LUCID stores previously evaluated intents, configurations, and feasibility outcomes in a data lake and uses them to train FastConfigNet, a multimodal surrogate model that rapidly screens candidate configurations before costly DT-based TP–RRM evaluation. Together, these components enable LUCID to identify feasible operating points defined by the number of AMRs and per-AMR QoS and to adapt the search efficiently to changing operator requirements. II. I NTENT -C ONDITIONED TP–RRM S YSTEM MODEL 
+
+Figure 4 shows the DITL workflow used to evaluate an operator request. The request is translated into a candidate operating-point configuration, which instantiates a TP–RRM problem template in the digital-twin (DT) environment. Data Lake Final TP & RRM       
+
+> Trajectories: { 1: {(-28, 20), (-28, 16), (-26, 14), ⋯}, 2: {(13, -13), (7, -13), (7, -10), ⋯},} BS association: { t1: {1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 3},} Freq. allocation: { t1: {16.7, 25, 25, 16.7, 25, 16.7, ⋯},} Tx power control (dBm): { t1: {-12.9, -25.2, -26.5, -10.7, ⋯},}
+> Digital-twin in the loop sandbox RRM & feasibility check PRB allocation & PC
+> UE1 UE2 UE3 UE4 UE5
+> User Association
+> Find the best At with F(At) via Algorithm 1
+> Trajectory planning Wireless CBS Create config
+> Start position: {1: (-10, 5), 2: ⋯} Goal position: {1: (15, 13), 2: ⋯ } Carrier frequency: 5.8 GHz Bandwidth: 80 MHz Uplink Tx power: 15 dBM Noise figure: 13 dB
+> ⋯
+> Operator request
+> I have 20 robots streaming video to a server. 3 APs are located at ..., I want to have at least 8 Mbps, though reduce the number of robots.
+> Reconfiguration request
+> Add type-II collision Feasibility check request
+
+Fig. 4. DITL workflow for intent-conditioned TP–RRM evaluation. 
+
+In the Create config stage, the agent maps the request to a candidate configuration. Together with the DT environ-ment, the configuration specifies one instance of the TP– RRM template. The trajectory planner and RRM validator then either return feasible trajectories and allocations or identify the failure that motivates the next configuration. The agent selects and revises configurations, while the planning and validation modules perform the corresponding feasibility evaluation. 
+
+Intent-Conditioned TP–RRM Problem Template . We de-note the DT environment used for evaluation as env . It com-bines the materialized and geometry-reduced scene produced by SimBridge with the deployment-specific BS layout and the ray-tracing results needed to query h(t)
+
+i,b along a candidate trajectory. For an operator request u, cfg (u) denotes the system parameters of the candidate operating point evaluated in this environment. The centralized edge server plans robot motion and uplink scheduling over discrete time slots. We index the I robots, BSs, obstacles, and time slots by I, B, K, and T , respectively, with slot duration ∆t. Robot i has position x(t)
+
+i ∈ R2, initial position x(0) 
+
+i , maximum speed vmax , and destination xgoal 
+
+i .The position of obstacle k at slot t is o(t)
+
+k . The configuration 
+
+cfg (u) collects the active sets I, B, K, and T ; the slot duration; robot start and goal positions; vmax and dmin ; the rate requirements {Ri}; the resource limits B and ρmax ; and the noise density N0. Robot motion must satisfy 
+
+∥x(t+1) 
+
+i − x(t)
+
+i ∥ ≤ vmax ∆t, x(T )
+
+i = xgoal 
+
+i , ∀i, (1) 
+
+∥x(t)
+
+i − x(t)
+
+j ∥, ∥x(t)
+
+i − o(t)
+
+k ∥ ≥ dmin , ∀i̸ = j, k. (2) For user i, let a(t)
+
+i,b ∈ { 0, 1} denote association with BS b,
+
+β(t)
+
+i,b the allocated bandwidth, ρ(t)
+
+i the transmit power spectral density (PSD), and h(t)
+
+i,b the uplink channel. With noise density 
+
+N0, throughput γ(t)
+
+i,b is given by 
+
+γ(t)
+
+i,b = β(t)
+
+i,b log 2
+
+
+
+1 + ρ(t)
+
+i ∥h(t)
+
+i,b ∥2
+
+X
+
+b′̸ =b
+
+X
+
+i′̸ =i
+
+a(t)
+
+i′,b ′ ρ(t)
+
+i′ ∥h(t)
+
+i′,b ∥2 + N0
+
+
+
+. (3) Every active robot associates with one BS and must meet its required uplink rate Ri:
+
+X
+
+b∈B 
+
+a(t)
+
+i,b = 1 , ∀i, t ; X
+
+b∈B 
+
+a(t)
+
+i,b γ(t)
+
+i,b ≥ Ri, ∀i, t. (4) The per-BS bandwidth and per-AMR PSD constraints are 
+
+X
+
+i∈I 
+
+β(t)
+
+i,b ≤ B, ∀b, t ; 0 ≤ ρ(t)
+
+i ≤ ρmax , ∀i, t. (5) We use the weighted sum of total travel distance and uplink transmit power as the objective. With a fixed slot duration and a constant motion cost per unit distance, this can be interpreted as energy minimization. Therefore, minimizing this objective favors short paths and low-power allocations and can extend battery-limited operating duration. The weight λ
+
+sets the tradeoff between the two energy terms. The QoS-constrained problem template is 
+
+P[env , cfg (u)] : min 
+
+X,A,B,P
+
+X
+
+i,t 
+
+∥x(t+1) 
+
+i − x(t)
+
+i ∥+λ X
+
+i,t 
+
+ρ(t)
+
+i (6a) s.t. (1) − (2) (TP Constr.) , (4) − (5) (RRM constr.) (6b) for X = {x(t)
+
+i }, A = {a(t)
+
+i,b }, B = {β(t)
+
+i,b }, and P = {ρ(t)
+
+i }.Problem (6) contains binary trajectory and association de-cisions as well as nonconvex rate constraints. The solver gen-erates candidate trajectories X and performs slot-wise RRM feasibility evaluation over (A, B, P). Section III describes the solver and its conflict feedback between these stages. 
+
+Operator Intent to Operating-Point Configuration . The operator intent determines which fields of cfg (u) are fixed and which one is varied across candidate operating points. For example, suppose an operator asks whether a fixed DT environment can provide a target per-robot rate to a requested number of AMRs. The agent begins by evaluating the re-quested AMR count; if that operating point is infeasible, it reduces the number of AMRs according to its relaxation priority and reevaluates the resulting configuration. In contrast, when the operator fixes the number of AMRs and instead seeks higher per-robot performance, the agent holds the AMR count fixed and searches for the largest supportable per-robot rate. Throughout this process, the search direction, bounds, and relaxation priority are maintained as orchestration state, separately from each feasibility evaluation. Each search point supplies a configuration admitted by the template. Within the DITL workflow of Fig. 4, wireless CBS submits candidate trajectories to the RRM & feasibility check block, which performs slot-wise RRM validation using the corresponding DT-derived channel gains. The RRM validator returns (X, A, B, P) for a feasible evaluation; otherwise, it returns a failure mode and the responsible robots or time slots for selecting the next candidate. Section III details the deterministic validation and wireless-CBS feedback loop that realizes this workflow, Section IV archives and screens evaluated instances, and Section V describes how SimBridge constructs the scene representation used by env .Other UE’s interference gain  
+
+> Type-II wireless Conflict matrix Vulnerability matrix Inter-cell interference matrix
+> Power required by UE to compensate for interference from UE SINR threshold UE’s channel gain Fig. 5. RRM coupling matrix for feasibility and conflict diagnosis.
+
+III. W IRELESS -A WARE TP–RRM S OLVER 
+
+Within the DITL sandbox shown in Fig. 4, the RRM validator is the RRM & feasibility check block for each 
+
+P[env , cfg (u)] instance. As the feasibility-testing module for wireless conflict-based search (CBS), it receives a candidate trajectory and the corresponding DT-derived channel gains, and tests whether its allocation procedure can find a feasible radio-resource allocation. If no such allocation is found, it returns conflict diagnostics to the trajectory planner. We first define its input, allocation procedure, and diagnosis, and then describe how the planner uses this feedback for path planning. 
+
+RRM Feasibility Validation . Given candidate trajectories 
+
+X, the robot positions and predicted channel gains are fixed at each time slot. The per-slot RRM validator solves 
+
+min 
+
+> A(t),B(t),P(t)
+
+X
+
+> i∈I
+
+ρ(t) 
+
+> i
+
+s.t. (RRM constr.) . (7) The validator couples power control and frequency allocation with local user-association updates. 
+
+Power control . For fixed A(t) and B(t), user i has a unique serving BS bi, where a(t) 
+
+> i,b i
+
+= 1 . We define the interference gain from user j to user i as σ(t) 
+
+> i,j
+
+:=  1 − a(t)
+
+> j,b i
+
+∥h(t) 
+
+> j,b i
+
+∥2,which vanishes when j shares i’s serving BS. With τ (t) 
+
+> i
+
+:= 2Ri/β (t) 
+
+> i,b i
+
+− 1, the rate constraints can be written as 
+
+ρ(t) ≽ T(t) S(t)ρ(t) + n, (8) where n is the thermal-noise vector and 
+
+T(t) := diag 
+
+ τ (t)1
+
+∥h(t)1,b 1 ∥2 , . . . , τ (t)
+
+> I
+
+∥h(t) 
+
+> I,b I
+
+∥2
+
+
+
+, S(t) := [ σ(t) 
+
+> i,j
+
+]i,j . (9) If ρ(T(t)S(t)) < 1, the inverse of I−T(t)S(t) is nonnegative because (I − T(t)S(t))−1 = P∞
+
+> k=0
+
+(T(t)S(t))k ⪰ 0. The componentwise least feasible power vector is therefore 
+
+ρ⋆(t) =  I − T(t)S(t)−1T(t)n, (10) which uniquely minimizes the sum-power objective for the fixed association and bandwidth allocation. The allocation is feasible only if ρ⋆(t) 
+
+> i
+
+≤ ρmax for every robot. 
+
+Frequency allocation and user association . For the current interference powers, define 
+
+q(t) 
+
+> i,b
+
+:= 
+
+X  
+
+> b′̸=b
+
+X 
+
+> i′̸=i
+
+a(t) 
+
+> i′,b ′
+
+ρ(t) 
+
+> i′
+
+∥h(t)
+
+> i′,b
+
+∥2 + N0
+
+
+
+/∥h(t) 
+
+> i,b
+
+∥2. (11) The rate constraint then lower-bounds the required power as 
+
+ρ(t) 
+
+> i
+
+≥ X
+
+> b∈B
+
+a(t) 
+
+> i,b
+
+q(t)
+
+> i,b
+
+ 2Ri/β (t) 
+
+> i,b
+
+− 1. (12) Plugging in (12) into problem (7) gives the subproblem: 
+
+min 
+
+> A(t),B(t)
+
+X
+
+> i,b
+
+a(t) 
+
+> i,b
+
+q(t)
+
+> i,b
+
+ 2Ri/β (t) 
+
+> i,b
+
+− 1 s.t. (RRM constr.) . (13) For fixed A(t) and {q(t) 
+
+> i,b
+
+}, the subproblem (13) is convex. The KKT stationarity condition for user association then yields 
+
+2ri/β (t) 
+
+> i,b
+
+q(t) 
+
+> i,b
+
+ri ln 2 /(β(t) 
+
+> i,b
+
+)2 = μ(t) 
+
+> b
+
+, (14) 
+
+β(t)⋆i,b (μ(t) 
+
+> b
+
+) = 
+
+
+
+Ri ln 2 2W0
+
+ q
+
+μ(t) 
+
+> b
+
+Ri ln 2 /q (t) 
+
+> i,b
+
+/2 , a(t) 
+
+> i,b
+
+= 1 ,
+
+0, a(t) 
+
+> i,b
+
+= 0 ,
+
+(15) where W0(·) is the principal branch of the Lambert W
+
+function. The total allocated bandwidth is monotone in μ(t) 
+
+> b
+
+,so a one-dimensional bisection selects the multiplier satisfying 
+
+P 
+
+> i
+
+a(t) 
+
+> i,b
+
+β(t)⋆i,b = B.Because (15) determines the bandwidth allocation for a fixed association and the current interference powers, the remaining discrete step is to choose which BS serves each user. This choice balances serving-link quality, per-BS bandwidth sharing, and inter-cell interference: associating a user with a stronger BS improves its desired link, but also changes the bandwidth available to other users at that BS and the interference observed across cells. We initialize the search with the strongest-link association bi = arg max b ∥h(t) 
+
+> i,b
+
+∥2 and 
+
+Kinit = 5 random-restart associations, and select the feasible seed with the smallest evaluated objective. The search then considers moving one user from its current BS to another BS. Because only the memberships of these two BSs change, their bandwidth allocations are recomputed using (15) before updat-ing the power vector and testing feasibility. A reassignment is accepted when it remains feasible and decreases 
+
+F (A(t)) := X
+
+> i,b
+
+a(t) 
+
+> i,b
+
+q(t)
+
+> i,b
+
+ 2Ri/β (t)⋆i,b − 1.
+
+Over at most Lmax updates, these moves refine the association toward a lower-power feasible configuration. 
+
+Feasibility diagnostics . Figure 5 interprets T(t)S(t) as the interference-coupling matrix: increasing one user’s power raises the compensating power required by other users. The validator distinguishes two failure modes. If ρ(T(t)S(t)) ≥ 1,no finite power vector satisfies the SINR constraints for the current association and bandwidth allocation; we call this an 
+
+interference burst . If the spectral-radius condition holds but some ρ⋆(t) 
+
+> i
+
+> ρ max , the allocation has a power-cap violation .Figure 6 shows how either failure is localized to a robot. For an interference burst, the nonnegative matrix T(t)S(t)
+
+has a nonnegative dominant right eigenvector v(t) satisfy-ing T(t)S(t)v(t) = ρ(T(t)S(t))v(t) [22]. We use v(t) 
+
+> i
+
+as a heuristic participation score and select the robot with the largest component. For a power-cap violation, the culprit is Score power violation Compute dominant eigenvector Test spectral radius Power optimization Test power cap No wireless conflict Test feasibility Compute contribution  
+
+> Yes Yes No Yes Robot 1 Robot 2 Robot I
+> Conflicts Fig. 6. Per-slot RRM feasibility evaluation and conflict localization.
+
+the robot with the largest normalized requirement ρ⋆(t) 
+
+> i
+
+/ρ max .We denote these ordered tests and localization rules by RRM CHECK (A(t), B(t)). It returns (ρ⋆, d ), with d = ∅ for a feasible allocation and d = ( failure mode , i ⋆) otherwise. The complete trajectory is solver-verified only when Alg. 1 returns a feasible allocation for every t ∈ T . Otherwise, the validator returns a failed slot, failure mode, and culprit robot to the trajectory planner. Algorithm 1 summarizes the per-slot allocation and validation procedure. 
+
+Algorithm 1 RRM validation for problem (7) 
+
+Require: {h(t) 
+
+> i,b
+
+}, {Ri}, B, ρmax , N0, Kinit , and Lmax 
+
+Ensure: Feasible (A(t), B(t), ρ(t)) or diagnostic d 
+
+> 1:
+
+S ← strongest-link seed and Kinit restarts  
+
+> 2:
+
+Run R RM CHECK for each seed after equal per-BS band-width initialization  
+
+> 3:
+
+return infeasible and a recorded d if every seed fails  
+
+> 4:
+
+Initialize (A(t), B(t), ρ(t)) with the lowest-objective fea-sible seed  
+
+> 5:
+
+for ℓ = 1 , . . . , L max do  
+
+> 6:
+
+Generate A(t)new by one-user reassignment  
+
+> 7:
+
+Update B(t)new at the two affected BSs using (15)  
+
+> 8:
+
+(ρ⋆
+
+> new
+
+, d new ) ← RRM CHECK (A(t)new , B(t)new ) 
+
+> 9:
+
+if dnew = ∅ and F (A(t)new ) < F (A(t)) then  
+
+> 10:
+
+(A(t), B(t), ρ(t)) ← (A(t)new , B(t)new , ρ⋆
+
+> new
+
+) 
+
+> 11:
+
+end if  
+
+> 12:
+
+end for  
+
+> 13:
+
+return feasible and (A(t), B(t), ρ(t))
+
+Wireless-Conflict-Aware Multi-Robot Planning . With the validator interface defined, we now describe how the planner generates and revises candidate trajectories. For an instantiated problem P[env , cfg (u)] , the geometric subproblem is 
+
+min 
+
+> X
+
+X
+
+> i,t
+
+∥x(t+1)  
+
+> i
+
+− x(t) 
+
+> i
+
+∥ s.t. (TP Constr.) . (16) Figure 7 summarizes the navigation-graph construction. The DT scene is rendered from above to obtain a depth map [23]; thresholding the elevations produces a binary navigable mask. Nodes are sampled with the clearance in (2), and candidate edges connect nodes reachable within the displacement bound in (1). Bresenham’s algorithm rejects edges that cross an obstacle [24], after which isolated nodes and disconnected components are removed. Create a height map via RT Mitsuba format digital-twin scene  
+
+> Obstacle masking Create collision-free graph
+> Fig. 7. Collision-free navigation-graph construction from the DT scene.
+
+Standard CBS generates joint trajectories on this graph by detecting Type-I physical collisions and branching on space–time constraints for the involved robots [6], [25], [26]. Physical collision handling alone cannot detect paths whose simultaneous uplinks violate the radio constraints [27], [28]. Wireless CBS therefore augments the CBS conflict test with the RRM validator from Section III-A. For each candidate joint trajectory X, the validator evaluates the induced channels over all slots. If every slot is feasible, wireless CBS returns X and the corresponding (A, B, P).Otherwise, it selects the earliest failed slot t⋆ and receives a culprit robot i⋆ from the interference-burst or power-cap diagnostic. The point (x(t⋆) 
+
+> i⋆
+
+, t ⋆) is added to the CBS tree as a robot-specific space–time constraint, forcing the next candidate to avoid the diagnosed wireless conflict. Thus, Type-I and Type-II conflicts are represented by the same constraint interface, closing the RRM–feasibility–replanning loop without changing the core CBS search logic. IV. D ATA LAKE AND FAST CONFIG NET 
+
+Because LUCID continuously orchestrates TP–RRM opti-mization schemas based on dynamic operator intents, repeated deterministic trajectory-dependent RRM validation becomes a major computational bottleneck. To support a responsive DITL loop, LUCID records solver evaluations in a data lake and uses FastConfigNet as a learning-based preconditioner. 
+
+Data Lake: Archiving Evaluated Configurations . Each solver call records the operator intent, the instantiated system configuration cfg (u), the DT environment env , the candidate trajectories, the optimized RRM variables, and the resulting solver outcome. For candidates rejected by the validator, the record also includes the failure mode and localized cul-prit, such as the robot responsible for an interference burst or power-cap violation. These records preserve the relation between intent, candidate operating point, scene-dependent channels, and solver outcomes, while providing training data for subsequent candidate screening. 
+
+FastConfigNet: A Feasibility Surrogate Model . FastCon-figNet estimates the validator outcome of a candidate configu-ration before deterministic TP–RRM evaluation. As illustrated in Fig. 8, its multimodal encoder supports a varying number of robots and heterogeneous spatial inputs. A DeepSets-based CNN maps the ray-tracing channel maps to a radio embedding that is invariant to the number of BSs [29]. In parallel, a Graph-SAGE encoder represents the navigation graph and robot start, goal, and shortest-path information [30]. These representations are combined with the global scene and system-configuration features in a multilayer prediction head. Graph Feasibility 
+
+> Robot info
+> Scene embedding
+> Start position: {1: (-10, 5), 2: ⋯} Goal position: {1: (15, 13), 2: ⋯ } Carrier frequency: 5.8 GHz Bandwidth: 80 MHz Uplink Tx power: 15 dBM Noise figure: 13 dB
+> ⋯
+> Scene config
+> Linear Linear Pooling MLP
+> Graph embedding
+> Pooling
+> Start Goal Shortest path
+> GraphSAGE
+> Node Mask ++
+> Radio embedding
+> Radio maps
+> Conv
+> Conv Conv
+> Pooling Linear Linear MLP Linear Linear MLP
+
+Fig. 8. Multimodal encoding architecture of FastConfigNet. 
+
+Model Training and Integration . The prediction head estimates the candidate failure probability. Training uses class-weighted binary cross-entropy to account for the predomi-nance of infeasible samples in congested settings, a stratified train–validation–test split, and early stopping based on valida-tion loss. During intent-driven operating-point search, FastConfigNet estimates each candidate’s feasibility probability to select a configuration that is likely to satisfy the operator’s request. For an operator who fixes 10 AMRs and seeks the highest supportable QoS, it forwards the highest-QoS configuration whose predicted feasibility probability exceeds a threshold to the TP–RRM solver. Once the RRM validator confirms that configuration as feasible, the search terminates, avoiding lower-priority solver evaluations and reducing computation. V. S IM BRIDGE : F ROM ROBOTICS SCENES TO 
+
+WIRELESS -R EADY DT S
+
+SimBridge addresses two scene-construction obstacles iden-tified in Sec. I by preparing a source robotics DT for trajectory-dependent propagation evaluation in LUCID . Isaac Sim as-sets contain visual and physical descriptions but lack the radio-material identifiers required by Sionna RT, while their rendering-oriented geometry makes repeated propagation eval-uation costly. SimBridge takes a scene containing geometry, asset instances, and visual or physical metadata, and produces a material-aware, geometry-reduced wireless-ready represen-tation for the propagation stage of the DITL environment. In our implementation, SimBridge processes Isaac Sim USD assets, preserves radio-material boundaries during polygonal reduction, and exports the resulting scene as Mitsuba XML with binary PLY geometry for Sionna RT. Figure 9 summarizes this processing flow. 
+
+VLM-Assisted EM Material Assignment . Robotics DT scenes are assembled by placing reusable assets, such as pallets, boxes, and racks, throughout the environment. The full-scale warehouse used in our evaluation is assembled from 756 asset files. To assign radio materials, SimBridge pairs textual metadata from each asset file, including its source path, with a 256 × 256 thumbnail. These complementary IsaacSim .usd file 
+
+> Nvidia Isaac
+> Polygon integration
+> Polygon decimator Sionna-ready .usd file
+> Nvidia Sionna TM RT
+> Material classifier
+> : Wood
+> : Metal
+
+Fig. 9. Scene adaptation pipeline from a source DT to a wireless-ready scene. 
+
+textual and visual cues describe both the asset’s semantic role and its appearance. SimBridge supplies this text–image pair for each asset to Qwen2-VL-7B-Instruct [31]. The prompt restricts the model to a predefined set of ITU electromagnetic material categories [32], and a canonicalization step converts the model response into the corresponding material identifier. The resulting radio material attribute is propagated to every scene prim and instance that references the corresponding asset, covering 17,130 prims in the evaluated warehouse. Props/general/SMV_ BlockPallet_C01_01_01/ SMV_BlockPallet_ C01_01_01_physics.usd A 3D product thumbnail (source path: <Asset_path>). Image: <IMAGE>. Task: classify the object's surface material ... 256×256 
+
+VLM module Material Mapping Raw VLM Response (Text) 
+
+> ‘It looks like wood’ ‘concrete floor’
+
+Canonicalized Response 
+
+> ‘itu-mat-wood’ ‘itu-mat-concrete’
+
+Input prompt Asset path Asset thumbnail 
+
+Fig. 10. VLM-assisted mapping from asset metadata and a thumbnail to an ITU electromagnetic material identifier. Voxelization Decimation 
+
+Area-weight average 
+
+Fig. 11. Material-preserving mesh simplification in SimBridge. 
+
+Material-Preserving Geometry Simplification . Mesh sim-plification can reduce the complexity of detailed rendering assets [33]. The geometry-reduction stage reduces the cost of repeated propagation evaluation while preserving material assignments and coarse surface geometry. SimBridge applies each instance’s world transform to its mesh and aggregates the transformed geometry by ITU material identifier. It then trian-gulates each mesh and merges vertices that fall within the same spatial voxel and quantized surface-normal bin, as illustrated Mesh ratio (%) Up to 87.73% decreased Mesh ratio (%) RMSE (dB) 20 10 40 60 80 100 20 10 40 60 80 100 1.5 1.2 0.9 0.6 0.3 0.0 Seconds (s) File size (MB) 50 40 30 20 10 01.1 1.0 0.9 0.8 0.7 0.6 
+
+> USD Format Mitsuba Format
+> Radiomap RMSE Radiomap solver time
+
+Fig. 12. Mesh-reduction trade-off on the controlled small-warehouse scene. 
+
+Left : USD and Mitsuba XML–PLY size. Right : path-gain RMSE relative to the 100% mesh and scene-load-plus-solver time. 
+
+in Fig. 11. Vertices are clustered using their original surface normals. After clustering, nonmanifold faces are removed and the final vertex normals are recomputed from area-weighted face normals. Area-weighted face normals matter because they let larger faces dominate the recomputed normal, preserving the true surface orientation after simplification — which in turn keeps ray incidence and reflection angles accurate. For the full-scale warehouse, the scene contains 68,314,408 vertices and 89,481,477 faces and occupies 1.3 GB. After the scene decimation, the resulting scene contains 12,196,481 vertices and 12,066,933 faces and occupies 350.6 MB. We separately quantify the fidelity–cost trade-off on the warehouse scene. We define the retained mesh ratio as the number of faces in the simplified mesh divided by that in the original mesh. We vary this ratio from 10% to 100% and use the path-gain map generated from the unsimplified 100% mesh as the reference. For each ratio, we conduct 50 trials at 5.8 GHz, varying the ray-sampling random seed across trials, with a 0.5 m radio-map cell size and 4 × 10 9 ray samples per transmitter. The reported runtime is measured from the start of scene loading until the EM propagation engine has produced and materialized the path-gain tensor. As shown in Fig. 12, lower retention mesh ratios reduce both representation size and end-to-end evaluation time, while increasing the path-gain error relative to the unsimplified mesh. At a 10% retention ratio, the RMSE is about 1.1 dB and the runtime is 0.64 s, compared with 1.07 s for the 100% reference. VI. N UMERICAL EXPERIMENTS 
+
+In this section, we evaluate the performance and scalability of LUCID as a dynamic schema orchestrator. Our experiments demonstrate how LUCID seamlessly unifies the active AMR count, QoS, and TP into a cohesive solution driven by evolving operator intent. First, we evaluate the reliability of the inter-face that maps operator requests to TP–RRM configuration schemas. We then test the end-to-end adaptability of the LLM-orchestrated framework in a multi-phase scenario, for which we deploy Gemini 3.6 Flash as the underlying LLM agent [34]. All experiments run on a server equipped with an AMD Ryzen Threadripper 7970X CPU and two NVIDIA RTX 6000 Ada Generation GPUs. The multi-phase experiment measures how the resulting pipeline adjusts operating points under these changes. We also compare the RRM associa-
+
+TABLE I RELIABILITY OF LLM BACKENDS FOR OPERATOR REQUESTS .Backend / Model Reliability and safety Stress categories Overall acc. ( ↑)Raw validator rejection ( ↓)Semantic escape ( ↓)Injection acc. ( ↑)Ambig./conflict acc. ( ↑)Claude Sonnet 5 94.0 0.0 6.0 95.0 80.0 
+
+Gemini 3.6 Flash 91.0 1.0 9.0 80.0 80.0 
+
+GPT-4.1 mini 83.0 1.0 16.0 50.0 72.0 GPT-4.1 nano 62.0 60.0 7.0 50.0 44.0 Llama 3.1 8B 39.0 72.0 15.0 35.0 80.0 
+
+tion search with a small-instance exhaustive oracle. Finally, we evaluate FastConfigNet in terms of predictive accuracy, trajectory generation speed, and few-shot adaptation to new propagation environments. 
+
+Intent-to-Configuration Reliability . We evaluate how re-liably different LLM backends map an operator’s natural-language request to the intended TP–RRM configuration schema. This requires more than extracting numerical param-eters: the model must determine which fields of cfg( u) are fixed, searched, or relaxed when a request is infeasible. As shown in Table I, Claude Sonnet 5 and Gemini 3.6 Flash achieve the highest overall schema-selection accuracy at 94% and 91%, followed by GPT-4.1 mini at 83%. GPT-4.1 nano and Llama 3.1 8B achieve 62% and 39%, showing a clear gap in mapping complex operator priorities and relaxation rules to the intended optimization schema. The detailed metrics further distinguish the reliability of the backends. The raw validator rejection rate remains at only 0–1% for Claude Sonnet 5, Gemini 3.6 Flash, and GPT-4.1 mini, but rises sharply to 60–72% for the smaller backends, indicating frequent structurally or physically invalid configurations. Semantic escape remains nonzero across all models, ranging from 6% to 16%, showing that structurally valid outputs can still misrepresent the intended schema. The stronger backends also perform more reliably under prompt injection and ambiguous or conflicting requests, although their accuracy is not perfect in these stress cases. Overall, stronger backends more consistently select the intended schema while producing fewer validator-rejected outputs. We next evaluate how this guarded intent-to-configuration interface supports end-to-end adaptation under changing operator requests. Global time step      
+
+> 050 100 150 200 250
+> Mean throughput (Mbps)  Human request
+> LUCID Separated TP/RRM Fixed UE/QoS QoS threshold
+> 0510 15 25 20
+> I added 5 more UEs. Find the feasible throughput ... Find the highest throughput to serve 10 robots. I want to increase throughput to 15 Mbps. Adjust the number of AMRs to guarantee ...
+
+Fig. 13. Performance of LUCID under changes in operator intent, active AMR count, and physical environment. Required rate (Mbps) 0.00 0.03 0.06 0.09 0.12 0.15 Mean total TX power (mW) Power Consumption (8 robots)                     
+
+> Required rate (Mbps) 025 50 75 Total travel distance (hops) Distance To Goal (8 robots)
+> Required rate (Mbps) 0.0 2.5 5.0 7.5 QoS × completed QoS-Weighted Job Throughput (8 robots)
+> Required rate (Mbps) 050 100 QoS x served robots / time  QoS-Weighted Service Throughput (8 robots)
+> Required rate (Mbps) 0.0 0.2 0.4 Deadlock rate Deadlock-Aware RRM Failure Rate (8 robots) LUCID Separated CBS + RRM
+> 36912 15 Required rate (Mbps) 024Mean total TX power (mW) Power Consumption (16 robots)
+> 36912 15 Required rate (Mbps) 050 100 150 Total travel distance (hops) Distance To Goal (16 robots)
+> 36912 15 Required rate (Mbps) 0510 15 QoS × completed QoS-Weighted Job Throughput (16 robots)
+> 36912 15 Required rate (Mbps) 025 50 75 QoS x served robots / time  QoS-Weighted Service Throughput (16 robots)
+> 36912 15 Required rate (Mbps) 0.0 0.2 0.4 0.6 0.8 1.0 Deadlock rate Deadlock-Aware RRM Failure Rate (16 robots)
+
+Fig. 14. End-to-end comparison of LUCID and Separated TP/RRM .
+
+Multi-phase scenarios . Figure 13 evaluates the end-to-end adaptability of LUCID under changes in operator intent, active AMR count, and physical environmental conditions. We evaluate LUCID against the two baseline approaches:  
+
+> •
+
+Separated TP/RRM performs RRM after executing avanilla CBS-based TP, adjusting the allocation to meet the required QoS throughput. The number of operating robots and the QoS throughput are assigned identically to those used by LUCID in each phase.  
+
+> •
+
+Fixed UE/QoS assumes a conventional static configuration and operates 10 robots with a fixed throughput requirement of 15 Mbps regardless of the phase. Below is the performance comparison across phases:  
+
+> •
+
+Phase I (Initial state) : The system begins with an oper-ator’s request to deploy 10 UEs with the highest possible throughput. All schemes successfully orchestrate trajectories and radio resources to maintain AMR uplink QoS above the threshold.  
+
+> •
+
+Phase II (Workload scaling) : The operator requests to add 5 more robots to the scene. As the environment is too congested to support 15 UEs at the previous QoS requirement of 15 Mbps, LUCID dynamically searches for a new feasible operating point. Prioritizing the active AMR count over individual data rates as requested, the agent seamlessly reconstructs the optimization schema to degrade the required throughput to a feasible 8 Mbps, allowing all 15 robots to operate safely.  
+
+> •
+
+Phase III (Environmental Change) : The physical envi-ronment changes through the removal of cargo boxes or changes in rack positions. SimBridge converts the changed scene into a Sionna-compatible representation, after which the DT runtime recomputes the ray-tracing channel maps before TP–RRM reevaluation. Baselines without a scene update capability fail to find solutions that satisfy the QoS requirements as the overall wireless propagation environ-ment degrades. In contrast, LUCID continues to serve the 15-AMR deployment by further lowering the QoS threshold.  
+
+> •
+
+Phase IV (QoS change) : The new request from the op-erator now prioritizes throughput over the number of UEs, requesting 15 Mbps of throughput while adjusting the active AMR count accordingly. Here, LUCID shifts the problem template to fix the QoS requirement and optimize the active AMR count. Both baselines fail to guarantee QoS in deep fading regions, whereas LUCID ensures QoS by adaptively adjusting the trajectories. Throughout the timeline, LUCID consistently satisfies the dynamically shifting QoS threshold. In contrast, the baseline methods experience severe performance drops and deadline misses because they treat TP and RRM as isolated, static problems. They cannot jointly adapt physical routing, the active AMR count, and wireless constraints to match the evolving operator intent. Figure 14 provides a detailed comparison of the end-to-end behavior of the two designs. Under moderate load (8 robots), 
+
+LUCID consistently outperforms Separated TP/RRM across all communication rates. The QoS-weighted job throughput is approximately 1.9 × higher throughout the evaluated range, and the QoS-weighted service throughput shows a similar improvement. While LUCID maintains a goal-reaching ratio of 1.0, Separated TP/RRM reaches only about half of the robots on average. By contrast, the average travel distance and transmit power remain nearly identical between the two methods, indicating that under moderate contention the im-provement comes from converting comparable resources into substantially more completed tasks. The difference becomes qualitatively stronger under heavy load (16 robots). LUCID preserves a goal-reaching ratio of 1.0 across all tested rates, whereas Separated TP/RRM drops to a near-zero completion regime. As a result, the QoS-weighted job throughput differs by more than one order of magnitude, and the QoS-weighted service throughput exhibits a similarly large separation. The deadlock-aware RRM failure rate combines observed RRM-infeasible slots with the penalty assigned to deadlocked trials; it ranges from 0.00 to 0.38 for 
+
+LUCID , compared with 0.88 to 0.95 for Separated TP/RRM across the evaluated requirements. These results indicate that wireless-aware joint planning prevents the low-completion operating regime that arises in the separated pipeline under high spatial contention. The power and distance results support the same interpreta-tion. For 8 robots, both methods consume comparable transmit power, showing that the gain of LUCID is not obtained by spending more power. For 16 robots, Separated TP/RRM can consume higher power without translating that expenditure into useful service. As the communication rate increases, the average travel distance of LUCID decreases, consistent with selectively committing to QoS-feasible robots and completing their tasks efficiently. 
+
+Performance of FastConfigNet . We evaluate FastConfigNet against four distinct pathfinding baselines: Wireless CBS, Wireless ECBS, vanilla CBS, and vanilla ECBS. 1 The com-parative results are detailed in Figs. 15 and 16. 800 1000 Wireless CBS Wireless ECBS CBS ECBS FastConfigNet     
+
+> 4812 16 20
+> Number of Users
+> 040 80 120
+> Mean runtime (s)
+
+Fig. 15. Mean compute runtime to determine the feasibility of TP. 4 8 12 16 20 
+
+> Number of Users
+> 0510 15 20 25 30
+> Mean success rate (Mbps)
+> Wireless CBS Wireless ECBS CBS ECBS FastConfigNet
+
+Fig. 16. Maximum achievable uplink QoS. 
+
+Figure 15 shows the average runtime needed to generate multi-robot trajectories as the number of AMRs increases from 4 to 20. Baseline geometric planners, CBS and ECBS, maintain low execution times in all scenarios because the search space only handles physical space-time conflicts. In contrast, the link-aware methods, Wireless {CBS, ECBS }, in-troduce significant computational overhead that grows rapidly as the environment becomes more crowded. As the AMR count grows, link-aware planners discard more paths that fail to satisfy throughput constraints. This reduces the effective search space and leads to shorter runtimes. FastConfigNet closes the performance gap by using fast feed-forward infer-ence to screen candidate trajectories before deterministic RRM validation. This screening reduces the number of expensive validator calls while retaining deterministic verification for the selected solution. Figure 16 shows the maximum achievable uplink throughput per robot as the AMR count increases. With 4 users, all algorithms reach nearly the maximum target data rate. As the number of robots grows, the environment becomes more congested, and the achievable throughput decreases for all methods. At the evaluated AMR counts, Wireless {CBS, ECBS } and FastConfigNet achieve higher per-robot through-put than the geometric planners, CBS and ECBS. This gap arises because CBS and ECBS do not account for wireless link capacity limits, which leads to Type-II wireless conflicts. In contrast, link-aware methods proactively route robots to avoid strong interference and power cap violations. FastConfigNet’s throughput trend indicates that its screening scores prioritize 
+
+> 1
+
+ECBS is a bounded-suboptimal variant of the standard CBS algorithm used for multi-agent pathfinding [7], which allows slightly longer paths in order to significantly reduce the number of nodes that must be explored. 
+
+wireless-feasible trajectories before the retained solution un-dergoes deterministic RRM validation. Radio map I Radio map II Radio map III         
+
+> Original model
+> 0.9905 0.9822 0.0415 Map change
+> Acc F1 Loss (b) F1 score
+> Number of training samples 0.85 0.89 0.93 0.77 0.81 50 0200 500 f1 score Number of training samples 50 0200 500
+> (a) Accuracy
+> Accuracy Number of training samples 0.90 0.92 0.94 0.96 0.86 0.88 50 0200 500
+> (c) Test loss
+> Loss Number of training samples 0.20 0.25 0.30 0.35 0.10 0.15 50 0200 500
+
+Fig. 17. Few-shot learning for scene adaptation. 
+
+Figure 17 illustrates how the proposed model adapts to scene changes using only a small number of additional training samples. When the propagation environment changes, the orig-inal model trained on the previous scene initially experiences a noticeable drop in accuracy and F1 score. However, by fine-tuning with a limited number of new samples, the model rapidly recovers its performance. As the number of adaptation samples increases, both accuracy and F1 score steadily im-prove while the test loss decreases, indicating effective learn-ing of the new environment. These results demonstrate that the model can quickly adapt to unseen propagation conditions through few-shot retraining, enabling practical deployment in dynamically changing scenes. VII. C ONCLUSION 
+
+This paper presented LUCID , an agentic AI framework that shifts cloud-robotics TP–RRM from solving fixed optimization instances to dynamically orchestrating optimization problem schemas. Rather than treating trajectory planning and radio resource management as isolated or rigid problems, LUCID 
+
+interprets their formulation as a predefined template and dy-namically configures its variables, objectives, and constraints according to evolving operator intent and scene context. The LLM orchestrates this schema-level configuration, while a deterministic wireless-aware planner and RRM solver perform the optimization and feasibility verification. To enable such orchestration at scale, SimBridge converts large-scale Isaac Sim scenes into material-aware, geometry-reduced wireless DTs suitable for repeated DITL evaluation, while the Data Lake records previous evaluations and FastConfigNet screens new candidate configurations before deterministic validation. The evaluated warehouse scenarios show how these compo-nents adapt feasible operating points as the requested AMR count, QoS priorities, and scene conditions change. Ultimately, the results demonstrate that dynamic, intent-driven TP–RRM schema orchestration is feasible in a large-scale DITL testbed, overcoming the fixed-formulation and testbed limitations that have constrained prior cloud-robotics research. REFERENCES [1] B. Kehoe, S. Patil, P. Abbeel, and K. Goldberg, “A survey of research on cloud robotics and automation,” IEEE Trans. Autom. Sci. Eng. , vol. 12, no. 2, pp. 398–409, 2015. [2] G. Mohanarajah, D. Hunziker, R. D’Andrea, and M. Waibel, “Rapyuta: A cloud robotics platform,” IEEE Trans. Autom. Sci. Eng. , vol. 12, no. 2, pp. 481–493, 2015. [3] P. Talli, F. Pase, F. Chiariotti, A. Zanella, and M. Zorzi, “Semantic and effective communication for remote control tasks with dynamic feature compression,” in Proc. IEEE INFOCOM Workshops . Hoboken, NJ, USA: IEEE, 2023, pp. 1–6. [4] H. Lyu, Z. Pang, K. Bhimavarapu, and G. Yang, “Impacts of wireless on robot control: The network hardware-in-the-loop simulation framework and real-life comparisons,” IEEE Trans. Ind. Informat. , vol. 19, no. 9, pp. 9255–9265, 2023. [5] H. Lyu, J. Jang, H. Lee, and H. Jong Yang, “Non-iterative optimization of trajectory and radio resource for aerial network,” IEEE Trans. Wireless Commun. , vol. 24, no. 2, pp. 1555–1567, 2025. [6] G. Sharon, R. Stern, A. Felner, and N. Sturtevant, “Conflict-based search for optimal multi-agent path finding,” in Proc. AAAI Conf. Artif. Intell. ,ser. AAAI’12. Palo Alto, California: AAAI Press, 2012, p. 563–569. [7] M. Barer, G. Sharon, R. Stern, and A. Felner, “Suboptimal variants of the conflict-based search algorithm for the multi-agent pathfinding problem,” Proc. Int. Symp. Combin. Search ,vol. 5, no. 1, pp. 19–27, Sep. 2021. [Online]. Available: https: //ojs.aaai.org/index.php/SOCS/article/view/18315 [8] M. Boban, J. Barros, and O. K. Tonguz, “Geometry-based vehicle-to-vehicle channel modeling for large-scale simulation,” IEEE Trans. Veh. Technol. , vol. 63, no. 9, pp. 4146–4164, 2014. [9] NVIDIA Corporation, “NVIDIA Physical AI SimReady Warehouse OpenUSD Dataset,” Hugging Face Datasets, May 2025, version 1.1.0 (May 18, 2025). License: CC-BY-4.0. Accessed: 2026-02-25. [Online]. Available: https://huggingface.co/datasets/nvidia/ PhysicalAI-SimReady-Warehouse-01 [10] A. Zubow, Y. Pilz, S. R¨ osler, and F. Dressler, “Ns3 meets sionna: Using realistic channels in network simulation,” 2024. [Online]. Available: https://arxiv.org/abs/2412.20524 [11] P. Popovski, C. Stefanovic, J. J. Nielsen, E. de Carvalho, M. Angjelichi-noski, K. F. Trillingsgaard, and A.-S. Bana, “Wireless access in ultra-reliable low-latency communication (URLLC),” IEEE Trans. Commun. ,vol. 67, no. 8, pp. 5783–5801, 2019. [12] T. M. Ho, K.-K. Nguyen, and M. Cheriet, “Energy efficiency deep rein-forcement learning for URLLC in 5G mission-critical swarm robotics,” 
+
+IEEE Trans. Netw. Service Manag. , vol. 21, no. 5, pp. 5018–5032, 2024. [13] T. Ropitault, M. Bordin, P. Testolina, M. Polese, P. Johari, N. Golmie, and T. Melodia, “Enabling site-specific cellular network simulation through ray-tracing-driven ns-3,” 2025. [Online]. Available: https://arxiv.org/abs/2508.04004 [14] A. Alkhateeb, “DeepMIMO: A generic deep learning dataset for mil-limeter wave and massive MIMO applications,” 2019. [15] A. E. G¨ unes ¸er, B. S ¸ ekero˘ glu, S. Kayraklık, E. Karakoca, ˙ I. H¨ okelek, S. Aldırmaz-C ¸ olak, and A. G¨ orc ¸in, “RIS optimization algorithms for urban wireless scenarios in sionna RT,” in Proc. IEEE Veh. Technol. Conf. (VTC-Spring) . Piscataway, NJ, USA: IEEE, 2025, pp. 1–6. [16] L. U. Khan, Z. Han, W. Saad, E. Hossain, M. Guizani, and C. S. Hong, “Digital twin of wireless systems: Overview, taxonomy, challenges, and opportunities,” IEEE Commun. Surveys Tuts. , vol. 24, no. 4, pp. 2230– 2254, 2022. [17] R. Pegurri, F. Linsalata, E. Moro, J. Hoydis, and U. Spagnolini, “Toward digital network twins: Integrating sionna RT in ns-3 for 6G multi-RAT networks simulations,” in Proc. IEEE INFOCOM Workshops .Piscataway, NJ, USA: IEEE, 2025, pp. 1–6. [18] NVIDIA NVLabs, “Sionna SYS meets sionna RT,” https://nvlabs. github.io/sionna/sys/tutorials/SYS Meets RT.html, 2025, sionna 1.2.0. Accessed: 2025-10-08 16:13 UTC. [Online]. Available: https://nvlabs. github.io/sionna/sys/tutorials/SYS Meets RT.html [19] L. Zhang, H. Sun, J. Sun, and R. Q. Hu, “WiSegRT: Dataset for site-specific indoor radio propagation modeling with 3D segmentation and differentiable ray-tracing,” in Proc. Int. Conf. Comput., Netw. Commun. (ICNC) . Piscataway, NJ, USA: IEEE, 2024, pp. 744–748. [20] D. Wu, X. Wang, Y. Qiao, Z. Wang, J. Jiang, S. Cui, and F. Wang, “NetLLM: Adapting large language models for networking,” in Proc. ACM SIGCOMM , ser. ACM SIGCOMM ’24. New York, NY, USA: Association for Computing Machinery, 2024, p. 661–678. [21] C. Wang, M. Scazzariello, A. Farshin, S. Ferlin, D. Kosti´ c, and M. Chiesa, “NetConfEval: Can LLMs facilitate network configuration?” 
+
+Proc. ACM Netw. , vol. 2, no. CoNEXT2, Jun. 2024. [22] R. A. Horn and C. R. Johnson, Matrix Analysis , 2nd ed. New York: Cambridge University Press, 2012. [23] M. Nimier-David, D. Vicini, T. Zeltner, and W. Jakob, “Mitsuba 2: a retargetable forward and inverse renderer,” ACM Trans. Graph. , vol. 38, no. 6, Nov. 2019. [24] J. E. Bresenham, “Algorithm for computer control of a digital plotter,” 
+
+IBM Syst. J. , vol. 4, no. 1, p. 25–30, Mar. 1965. [25] A. Tajbakhsh, L. T. Biegler, and A. M. Johnson, “Conflict-based model predictive control for scalable multi-robot motion planning,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) . Yokohama, Japan: IEEE, 2024, pp. 14 562–14 568. [26] A. Moldagalieva, J. Ortiz-Haro, M. Toussaint, and W. H¨ onig, “db-cbs: Discontinuity-bounded conflict-based search for multi-robot kin-odynamic motion planning,” pp. 14 569–14 575, 2024. [27] J. Kottinger, S. Almagor, and M. Lahijanian, “Conflict-based search for multi-robot motion planning with kinodynamic constraints,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS) . Kyoto, Japan: IEEE, 2022, pp. 13 494–13 499. [28] J. Jiang, R. Li, Y. Yang, Y. Chen, Y. Wang, S. Xu, and J. Wang, “CTS-CBS: A new approach for multiagent collaborative task sequencing and path finding,” IEEE Internet Things J. , vol. 13, no. 9, pp. 19 414–19 429, 2026. [29] M. Zaheer, S. Kottur, S. Ravanbhakhsh, B. P´ oczos, R. Salakhutdinov, and A. J. Smola, “Deep sets,” in Adv. Neural Inf. Process. Syst. , ser. NIPS’17. Red Hook, NY, USA: Curran Associates Inc., 2017, p. 3394–3404. [30] W. L. Hamilton, R. Ying, and J. Leskovec, “Inductive representation learning on large graphs,” in Adv. Neural Inf. Process. Syst. , ser. NIPS’17. Red Hook, NY, USA: Curran Associates Inc., 2017, p. 1025–1035. [31] P. Wang, S. Bai, S. Tan, S. Wang, Z. Fan, J. Bai, K. Chen, X. Liu, J. Wang, W. Ge, Y. Fan, K. Dang, M. Du, X. Ren, R. Men, D. Liu, C. Zhou, J. Zhou, and J. Lin, “Qwen2-VL: Enhancing vision-language model’s perception of the world at any resolution,” 2024. [Online]. Available: https://arxiv.org/abs/2409.12191 [32] ITU-R, “Effects of building materials and structures on radiowave propagation above about 100 MHz,” International Telecommunication Union, Recommendation ITU-R P.2040-3, 2023. [33] S. Oh, X. Yuan, X. Wei, R. Shi, F. Xiang, M. Liu, and H. Su, “PaMO: Parallel mesh optimization for intersection-free low-poly modeling on the GPU,” Comput. Graph. Forum , vol. 44, no. 7, p. e70267, 2025. [34] G. Team, “Gemini 2.5: Pushing the frontier with advanced reasoning, multimodality, long context, and next generation agentic capabilities,” 2025. [Online]. Available: https://arxiv.org/abs/2507.06261
