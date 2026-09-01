@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-31</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-01</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 10 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>4</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-01 00:32:35 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-01 22:40:40 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精读聚焦多臂系统协调运动规划与异构多机器人风险感知探索，均获9.0高分；速读覆盖世界模型、协作基准与Sim2Real迁移。最值得关注的是基于迭代LQ博弈的多臂协调和算法利他驱动的风险感知探索。若想入门，可从多机器人协作与仿真到现实迁移的结合入手。</p>
+<p>今日11篇报告中，多机器人协同与多智能体规划成焦点，两篇9分精读领跑。</p>
+<p>最值得看：分布式GNE算法摆脱乘子一致性约束，及扩散模型驱动的STL时序逻辑多智能体规划。</p>
+<p>下一步可优先消化安全分散MPC与无投影在线优化，其对受限感知场景更接地气。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Coordinated Motion Planning for Multi-Arm Systems via Iterative LQ Games">Coordinated Motion Planning for Multi-Arm Systems via Iterative LQ Games</span></li><li><span class="dpr-home-dashboard-paper-title" title="Cooperative Risk-Aware Exploration in Heterogeneous Multi-Robot Systems Using Algorithmic Altruism">Cooperative Risk-Aware Exploration in Heterogeneous Multi-Robot Systems Using Algorithmic Altruism</span></li><li><span class="dpr-home-dashboard-paper-title" title="WALL-SS: Scaling Long-horizon World Models via Next-Scale Autoregression">WALL-SS: Scaling Long-horizon World Models via Next-Scale Autoregression</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Fully Distributed GNE Algorithms for Multi-Robot Placement without Consensus on Multipliers">Fully Distributed GNE Algorithms for Multi-Robot Placement without Consensus on Multipliers</span></li><li><span class="dpr-home-dashboard-paper-title" title="Generalizable Multi-Agent Planning from Signal Temporal Logic Specifications via Diffusion">Generalizable Multi-Agent Planning from Signal Temporal Logic Specifications via Diffusion</span></li><li><span class="dpr-home-dashboard-paper-title" title="Trajectory-Initialized Neural Double Q-Routing for Large-Scale Overhead Hoist Transport Systems">Trajectory-Initialized Neural Double Q-Routing for Large-Scale Overhead Hoist Transport Systems</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Making Latent Evolution Explicit: Operator-Structured Transitions for World Action Models">Making Latent Evolution Explicit: Operator-Structured Transitions for World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="CoCoBench: A Cooperative Coordination Benchmark for Embodied Multi-Agent Task Planning">CoCoBench: A Cooperative Coordination Benchmark for Embodied Multi-Agent Task Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Enhancing Sim2Real Transfer for Torque-Controlled Robots through Real2Sim Dynamics Estimation and Reinforcement Learning">Enhancing Sim2Real Transfer for Torque-Controlled Robots through Real2Sim Dynamics Estimation and Reinforcement Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Projection-Free Bandit Online Optimization for Multi-Agent Systems with Dynamic Regret">Projection-Free Bandit Online Optimization for Multi-Agent Systems with Dynamic Regret</span></li><li><span class="dpr-home-dashboard-paper-title" title="Provably Safe Decentralized Contingency MPC under State-Only Information and Limited Sensing for Nonlinear Multi-agent Systems">Provably Safe Decentralized Contingency MPC under State-Only Information and Limited Sensing for Nonlinear Multi-agent Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Hydra: A Navigation World Action Model with Discrete Latent Planning and Continuous Flow-Matching Execution">Hydra: A Navigation World Action Model with Discrete Latent Planning and Continuous Flow-Matching Execution</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 </div>
 
