@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-01</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-02</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>0</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-01 22:40:40 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-02 23:04:20 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日11篇报告中，多机器人协同与多智能体规划成焦点，两篇9分精读领跑。</p>
-<p>最值得看：分布式GNE算法摆脱乘子一致性约束，及扩散模型驱动的STL时序逻辑多智能体规划。</p>
-<p>下一步可优先消化安全分散MPC与无投影在线优化，其对受限感知场景更接地气。</p>
+<p>今日精读2篇高分机器人论文，聚焦无通信群体架桥与室内动态场景理解。</p>
+<p>最值得看：分布式群体无需通信即可协同搭建桥梁（9.0），以及面向动态环境的3D场景图谱更新（8.0）。</p>
+<p>建议普通读者优先关注群体自组织方法，其去中心化思路对多机器人协作有启发。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Fully Distributed GNE Algorithms for Multi-Robot Placement without Consensus on Multipliers">Fully Distributed GNE Algorithms for Multi-Robot Placement without Consensus on Multipliers</span></li><li><span class="dpr-home-dashboard-paper-title" title="Generalizable Multi-Agent Planning from Signal Temporal Logic Specifications via Diffusion">Generalizable Multi-Agent Planning from Signal Temporal Logic Specifications via Diffusion</span></li><li><span class="dpr-home-dashboard-paper-title" title="Trajectory-Initialized Neural Double Q-Routing for Large-Scale Overhead Hoist Transport Systems">Trajectory-Initialized Neural Double Q-Routing for Large-Scale Overhead Hoist Transport Systems</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Autonomous robotic bridging using distributed swarm control without inter-agent communication">Autonomous robotic bridging using distributed swarm control without inter-agent communication</span></li><li><span class="dpr-home-dashboard-paper-title" title="DSG: Dynamic 3D Scene Graph Construction for Embodied Agents in Changing Indoor Environments">DSG: Dynamic 3D Scene Graph Construction for Embodied Agents in Changing Indoor Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="Connectivity-Aware Graph Extension for Decentralized Multi-Robot Exploration">Connectivity-Aware Graph Extension for Decentralized Multi-Robot Exploration</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">5 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Projection-Free Bandit Online Optimization for Multi-Agent Systems with Dynamic Regret">Projection-Free Bandit Online Optimization for Multi-Agent Systems with Dynamic Regret</span></li><li><span class="dpr-home-dashboard-paper-title" title="Provably Safe Decentralized Contingency MPC under State-Only Information and Limited Sensing for Nonlinear Multi-agent Systems">Provably Safe Decentralized Contingency MPC under State-Only Information and Limited Sensing for Nonlinear Multi-agent Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Hydra: A Navigation World Action Model with Discrete Latent Planning and Continuous Flow-Matching Execution">Hydra: A Navigation World Action Model with Discrete Latent Planning and Continuous Flow-Matching Execution</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
+
 </section>
 </div>
 
