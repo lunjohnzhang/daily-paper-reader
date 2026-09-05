@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-04</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-05</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-04 22:48:16 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-05 22:15:07 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读3篇论文，均聚焦世界模型与机器人规划，另含一篇动态语义映射研究。</p>
-<p>其中《PAVE》与《JEPA World Models》均获6分，可关注世界模型如何驱动具身智能决策。</p>
-<p>下一步建议先精读其中一篇，对比两类方法在目标条件规划中的建模差异。</p>
+<p>今日重点精读两篇多智能体控制论文（均8.0分），另速读三篇世界模型/机器人策略相关研究。</p>
+<p>最值得一看的是自适应分布式积分控制与多智能体编队能量控制，给出了分布式协同的新思路。</p>
+<p>普通读者建议先把握精读中的控制逻辑，再浏览世界模型论文了解跨具身泛化趋势。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Order-Adaptive Distributed Integral Control">Order-Adaptive Distributed Integral Control</span></li><li><span class="dpr-home-dashboard-paper-title" title="Formation Matrix and Energy-based Control of Multi-Agent Systems">Formation Matrix and Energy-based Control of Multi-Agent Systems</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PAVE: Predictive Alignment and Value-Guided Evolution for World-Action Policies">PAVE: Predictive Alignment and Value-Guided Evolution for World-Action Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="Toward Physically Grounded JEPA World Models for Goal-Conditioned Robotic Planning">Toward Physically Grounded JEPA World Models for Goal-Conditioned Robotic Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="A hybrid pipeline for dynamic ontology-based semantic mapping">A hybrid pipeline for dynamic ontology-based semantic mapping</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AnyWorld: Factorized Egocentric World Models for Cross-Embodiment Generalization">AnyWorld: Factorized Egocentric World Models for Cross-Embodiment Generalization</span></li><li><span class="dpr-home-dashboard-paper-title" title="AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies">AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="ZimaBlue: Evolving Generalizable World Action Models through Scalable Video Pre-training">ZimaBlue: Evolving Generalizable World Action Models through Scalable Video Pre-training</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
 </section>
 </div>
 
