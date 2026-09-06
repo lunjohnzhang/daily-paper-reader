@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-09-06 <!--dpr-date:20260906-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/06/2609.00878v1-doffotr-a-decentralized-objective-function-free-optimization-method-with-trust-region" data-sidebar-item="{&quot;title&quot;: &quot;DOFFO_TR: a Decentralized Objective Function-Free Optimization method with Trust-Region&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.00878v1-doffotr-a-decentralized-objective-function-free-optimization-method-with-trust-region&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;去中心化多智能体优化方法，可作为多机器人协调算法的基础&quot;}">DOFFO_TR: a Decentralized Objective Function-Free Optimization method with Trust-Region</a>
   * 2026-09-05 <!--dpr-date:20260905-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/05/2609.00688v1-order-adaptive-distributed-integral-control" data-sidebar-item="{&quot;title&quot;: &quot;Order-Adaptive Distributed Integral Control&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.00688v1-order-adaptive-distributed-integral-control&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;面向分布式多智能体/多机器人协同的阶数自适应积分控制&quot;}">Order-Adaptive Distributed Integral Control</a>
