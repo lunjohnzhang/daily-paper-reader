@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-06</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-07</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-06 20:59:56 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-07 23:19:50 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日仅速读1篇论文，聚焦去中心化优化方法。</p>
-<p>值得关注的方向：无需目标函数、结合信赖域的DOFFO_TR算法，评分6.0/10。</p>
-<p>建议普通读者可先了解其与传统优化方法的差异，再决定是否细读。</p>
+<p>今日推荐4篇论文，聚焦机器人策略学习、分布式风险优化与多智能体强化学习；最值得精读的是“Schema Bounded”语言模型，在不破坏局部稳定性的前提下优化机器人策略（8.0分）；速读可关注开放集3D场景图在野外机器人中的案例，其余两篇CVaR风险规避与在线变点检测适合顺带扫读。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="A Schema Bounded Language Model for Refining Robot Policies Without Destabilizing Local Learning">A Schema Bounded Language Model for Refining Robot Policies Without Destabilizing Local Learning</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DOFFO_TR: a Decentralized Objective Function-Free Optimization method with Trust-Region">DOFFO_TR: a Decentralized Objective Function-Free Optimization method with Trust-Region</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Distributed risk-averse optimization via CVaR">Distributed risk-averse optimization via CVaR</span></li><li><span class="dpr-home-dashboard-paper-title" title="Open-Set 3D Scene Graphs for Field Robotics: An Outdoor Case Study">Open-Set 3D Scene Graphs for Field Robotics: An Outdoor Case Study</span></li><li><span class="dpr-home-dashboard-paper-title" title="Online Change-point Detection for Cooperative Multi-Agent Reinforcement Learning">Online Change-point Detection for Cooperative Multi-Agent Reinforcement Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 </div>
 
