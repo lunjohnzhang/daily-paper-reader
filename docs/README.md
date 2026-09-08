@@ -41,7 +41,7 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-07</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-08</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 4 篇</strong>
@@ -51,7 +51,7 @@
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-07 23:19:50 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-08 22:50:05 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日推荐4篇论文，聚焦机器人策略学习、分布式风险优化与多智能体强化学习；最值得精读的是“Schema Bounded”语言模型，在不破坏局部稳定性的前提下优化机器人策略（8.0分）；速读可关注开放集3D场景图在野外机器人中的案例，其余两篇CVaR风险规避与在线变点检测适合顺带扫读。</p>
+<p>今日精读与速读共4篇论文，聚焦机器人控制、世界模型与表征学习的前沿进展。最值得关注的是《Coupled Control and Wireless World Models for Resilient Remote Robotic Control》（8.0分），探索远程机器人韧性与无线世界模型耦合；另可速览世界模型解码与统一机器人学习方向。建议普通读者优先精读高分论文，理解其核心思路后，再按兴趣拓展速读其余三篇即可。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -74,7 +74,7 @@
     <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="A Schema Bounded Language Model for Refining Robot Policies Without Destabilizing Local Learning">A Schema Bounded Language Model for Refining Robot Policies Without Destabilizing Local Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Coupled Control and Wireless World Models for Resilient Remote Robotic Control">Coupled Control and Wireless World Models for Resilient Remote Robotic Control</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
@@ -87,7 +87,7 @@
     <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Distributed risk-averse optimization via CVaR">Distributed risk-averse optimization via CVaR</span></li><li><span class="dpr-home-dashboard-paper-title" title="Open-Set 3D Scene Graphs for Field Robotics: An Outdoor Case Study">Open-Set 3D Scene Graphs for Field Robotics: An Outdoor Case Study</span></li><li><span class="dpr-home-dashboard-paper-title" title="Online Change-point Detection for Cooperative Multi-Agent Reinforcement Learning">Online Change-point Detection for Cooperative Multi-Agent Reinforcement Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="World-Coherent Decoding: Self-Verifying Test-Time Planning for World Action Models">World-Coherent Decoding: Self-Verifying Test-Time Planning for World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Toward Unified Robot Learning: Bridging Representation, Vision-Language-Action, and World Models">Toward Unified Robot Learning: Bridging Representation, Vision-Language-Action, and World Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="What Makes a Redundant Representation Remember? Lineage Isolation, Not Masking">What Makes a Redundant Representation Remember? Lineage Isolation, Not Masking</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
