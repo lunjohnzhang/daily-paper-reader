@@ -1,0 +1,852 @@
+Title: MOAE: Multi-Objective Agent Evolution with Pareto-Preserving Search
+
+URL Source: https://arxiv.org/pdf/2609.05992v1
+
+Published Time: Wed, 09 Sep 2026 00:35:46 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# MOAE: Multi-Objective Agent Evolution with Pareto-Preserving Search 
+
+## Hengle Jiang, Qijun Cai, Ziying Luo, Ke Tang ∗
+
+Guangdong Provincial Key Laboratory of Brain-inspired Intelligent Computation Department of Computer Science and Engineering, Southern University of Science and Technology 
+
+{jianghl2025, caiqj2026, luozy2025}@mail.sustech.edu.cn tangk3@sustech.edu.cn 
+
+Abstract 
+
+As LLM-based agents continue to advance, their evaluation has become increasingly multifaceted: a capable agent must not only achieve high task completion accuracy but also per-form well in interaction quality, safety, and efficiency, raising a central question: can these objectives be optimized simul-taneously? Existing methods have considered multiple objec-tives, but many collapse heterogeneous measurements into a fixed scalar score. Such scalarization depends on metric normalization and preference weights and may discard can-didates that represent useful deployment trade-offs. We in-troduce Multi-Objective Agent Evolution (MOAE), which or-ganizes iterative in-context refinement as a Pareto-preserving evolutionary search over complete agent rollouts. Given a lim-ited rollout budget, MOAE maintains an empirical archive of non-dominated candidates, uses objective-specific diag-nostics to guide offspring generation, and applies constraint-aware selection only at deployment. This separates candidate preservation during search from the preference used to re-turn a final solution. The procedure requires no parameter updates and allows each objective to be replaced by any mea-surable property, which we instantiate as task performance, trajectory quality, and safety. Experiments on TravelPlanner and AgentDojo show that MOAE consistently improves task performance and trajectory quality while maintaining strong safety under matched rollout budgets. Search-behavior analy-sis further shows that Pareto preservation expands the attain-able objective region and increases the frequency of joint im-provement. These results demonstrate the potential of Pareto-preserving in-context evolution for optimizing multiple agent properties without committing to a fixed scalarization during search. 
+
+## Introduction 
+
+Large language model based agents have rapidly evolved from text generators into interactive systems that plan, in-voke tools, process environmental observations, and revise their decisions over multiple steps (Yao et al. 2022; Xie et al. 2024). As their capabilities expand, evaluating them solely by final answer accuracy is no longer sufficient. A useful agent should complete the requested task while producing a valid and well-grounded interaction trajectory, resisting unsafe instructions, and controlling its operational cost. Re-cent benchmarks accordingly evaluate planning constraints, 
+
+> ∗
+
+Corresponding author. 
+
+tool-use behavior, trajectory quality, efficiency, and robust-ness (Liu et al. 2024; Ma et al. 2024; Jiang and Tang 2026; Zhan et al. 2024; Debenedetti et al. 2024). These dimensions are related but not always aligned. Additional tool use may improve evidence coverage while introducing redundant or invalid actions, whereas conservative behavior may reduce safety risk but prevent useful exploration. This motivates a central question: can several properties of an LLM agent be improved jointly rather than optimized in isolation? Existing methods address different parts of this question. Iterative refinement and verbal feedback revise individual responses or trajectories (Madaan et al. 2023; Shinn et al. 2023), while prompt and program optimizers search for reusable instructions over a development set (Yang et al. 2024; Guo et al. 2024; Fernando et al. 2024; Opsahl-Ong et al. 2024; Agrawal et al. 2026). Alignment and agent-optimization methods have also considered multiple prefer-ences, capability and safety, or performance and cost (Zhou et al. 2024; Zhong et al. 2024; Yuan et al. 2025; Rosser and Foerster 2026). These studies establish that agent optimiza-tion need not be limited to one objective. However, their trade-offs are commonly encoded through fixed scalariza-tion, predefined constraints, learned preference parameters, or persistent artifacts optimized across a development set. Less attention has been given to limited-budget, per-query optimization that preserves several rollout-level trade-offs during search and applies the final preference only when selecting the deployed response. This setting presents three practical challenges. First, agent objectives are often non-differentiable, measured on differ-ent scales, and observable only after a complete interaction. Second, improvements may conflict, so retaining a single incumbent can discard useful trade-offs. Fixed scalariza-tion also requires predefined normalization and preference weights; poor choices can select an undesirable compromise or eliminate candidates valuable under another deployment requirement. Third, independent sampling provides diver-sity but does not use observed failures to guide later rollouts. An effective online optimizer should therefore preserve can-didates with different strengths, target specific weaknesses, and defer the final preference to deployment. We propose Multi-Objective Agent Evolution (MOAE), a Pareto-preserving framework for limited-budget, per-query agent optimization. MOAE keeps the model, tools, and agent arXiv:2609.05992v1 [cs.AI] 5 Sep 2026 architecture fixed while evolving a compact execution policy. Starting from a base rollout, it evaluates complete trajecto-ries, maintains an empirical archive of locally non-dominated candidates, selects objective-specific parents, and uses eval-uator diagnostics to guide in-context mutation. Candidate preservation is separated from constraint-aware deployment, allowing the final preference to be applied after search. We instantiate MOAE with task performance, trajectory quality, and safety risk. Experiments on TravelPlanner and Agent-Dojo show improvements over the unoptimized agent and competitive balanced solutions under matched rollout bud-gets. This work makes three contributions. First, we formu-late limited-budget, per-query agent optimization as a multi-objective problem that separates rollout objectives, candi-date preservation, deployment preferences, and search cost. Second, we introduce an evolutionary procedure combin-ing empirical Pareto preservation, objective-specific parent selection, diagnostic-guided mutation, and constraint-aware deployment without model or architecture updates. Third, we conduct matched-budget evaluations on TravelPlanner and AgentDojo across three language models and multiple search and agent-optimization baselines. The experiments examine both final performance and search behavior, while ablations isolate the effects of mutation, diagnostics, and the non-dominated archive. 
+
+## Related Work 
+
+LLM Agent Evaluation 
+
+LLM agents combine language models with planning, mem-ory, and external tools, making final-answer accuracy in-sufficient for characterizing their behavior. AgentBench and AgentBoard evaluate task completion and interaction progress across diverse environments (Liu et al. 2024; Ma et al. 2024), while TravelPlanner measures long-horizon planning under transportation, temporal, budget, and com-monsense constraints (Xie et al. 2024). ToolLLM evaluates API selection and function calling, whereas InjecAgent and AgentDojo examine whether agents maintain task utility when tool observations contain indirect prompt injections (Qin et al. 2023; Zhan et al. 2024; Debenedetti et al. 2024). These benchmarks establish task performance, trajectory va-lidity, operational efficiency, and safety as distinct aspects of agent quality. However, they primarily provide evaluation protocols and do not specify how several measured properties should be improved jointly. 
+
+Pairwise Objective Optimization in LLMs and Agents 
+
+Most existing approaches that consider more than task ac-curacy focus on a predefined pair of objectives. Safe RLHF and Bi-Factorial Preference Optimization balance helpful-ness against harmlessness through constrained reinforcement learning or preference optimization (Dai et al. 2023; Zhang et al. 2024), while MODPO and Panacea learn parameterized trade-offs among alignment preferences (Zhou et al. 2024; Zhong et al. 2024). A separate line of work studies accu-racy and inference efficiency through reasoning compression, routing, or latency-aware test-time scaling (Xia et al. 2025; Yan et al. 2025; Wang et al. 2025). For tool-integrated agents, ParetoPO optimizes task accuracy together with tool-use ef-ficiency through multi-objective policy training (Li et al. 2026). These methods demonstrate that language models and agents have previously been optimized for multiple objec-tives. Their operating points, however, are commonly deter-mined through predefined constraints, learned preference pa-rameters, fixed scalarization, or objective-specific optimiza-tion structures. MOAE studies a complementary setting in which heterogeneous objectives are observed after complete agent rollouts, empirical non-dominated candidates are pre-served under a limited per-query budget, and the final pref-erence is applied at deployment rather than used to collapse the search into one score. 
+
+LLM Agent Evolution 
+
+Evolutionary methods search over discrete language compo-nents without requiring differentiable objectives. EvoPrompt and PromptBreeder evolve task and mutation prompts, while MIPRO searches over instructions and demonstrations for language-model programs (Guo et al. 2024; Fernando et al. 2024; Opsahl-Ong et al. 2024). GEPA uses execution traces and natural-language reflection to optimize reusable tex-tual components, with Pareto-based selection preserving im-provements across development examples (Agrawal et al. 2026). Evolution has also been extended to agent systems: EvoAgent and AgentBreeder search over reusable multi-agent architectures or scaffolds, with AgentBreeder consid-ering both capability and safety (Yuan et al. 2025; Rosser and Foerster 2026). MOCHA optimizes persistent structured skills under correctness and platform constraints, while Skill-MOO evolves software-engineering skill bundles accord-ing to task performance and inference cost (Tanjim et al. 2026; Gong et al. 2026). These methods primarily opti-mize reusable artifacts across development tasks. In contrast, MOAE performs limited-budget, per-query optimization of a fixed agent, preserves trade-offs among rollout-level objec-tives, and separates candidate search from deployment selec-tion. A structured comparison is provided in the Appendix. 
+
+## Method 
+
+We propose Multi-Objective Agent Evolution (MOAE), a Pareto-preserving framework that organizes per-query re-finement as a structured multi-objective search. Figure 1 il-lustrates its complete workflow. MOAE treats the optimiza-tion of an LLM agent as a small-scale evolutionary search over its execution policies. Starting from a default policy, the agent performs a limited number of complete rollouts, each of which is evaluated along multiple objectives. Rather than assigning every candidate a fixed aggregate score, MOAE preserves empirical non-dominated candidates with different strengths and uses objective-specific diagnostics to generate compact offspring policies. After the rollout budget is ex-hausted, a constraint-aware selection rule applies the deploy-ment preference and returns one candidate. The procedure operates through model inference and in-context feedback Rentation Guard 
+
+(b) Initialization 
+
+Query x 
+
+(c) Evaluation 
+
+(e) Mutation 
+
+(f) Deployment 
+
+(d) Evolution Trajectory  
+
+> Frozen
+> LLM A θ
+
+Rollout  τ
+
+> Illustrative Case Study
+
+Task  Trajectory  Safety 
+
+Multi-Objective Evaluator 
+
+> Objective-specialized
+> Parent Selection
+
+(a) Motivation 
+
+> ftask (τ)↑
+> Constraint Satisfaction
+
+...  ftraj (τ)↑
+
+> Quality Component
+> Execution
+> Quality Coverage
+> Evidence
+
+...  fsafety (τ)↓
+
+> Attack
+> Final
+> Output Planner
+> Input
+
+... 
+
+> Pareto
+> Archive
+
+0
+
+> 0.650, 0.937, 0.900
+
+2      
+
+> 0.975, 0.971, 0.300
+> T: Task Utility
+> Q: Trajectory Quality
+> R: Safety Risk
+> (T↑,Q ↑,R ↓)
+> Base Rollout
+> Missing ... ;
+> 2 Invalid Actions...
+> Generation 1 Offspring
+> Update Local Archive
+> Task Trajectory Safety
+> Inherited parent
+> Inherit a strong trajectory parent
+> Diagnostic-guided Mutation
+> Retention Guard
+> Parent
+> Pareto
+> Selection
+> Diagnostic-guided Policy Mutation
+> Diagnostic
+> Feedback
+> Archive Update
+> Task-
+> directed
+> child
+> Frozen
+> LLM A θ
+> Archive Pt
+> Candidate
+> Set S t-1
+> Candidate
+> Set S t
+> Add λchild
+> Candidate
+> Set S G
+> Feasible
+> Set
+> Constraint
+> Filtering
+> Lexicographic
+> Preference Order
+
+Cdep  Deployment 
+
+> Candidate
+> Return the rollout
+> associated with C dep
+> Task
+> Policy
+> Trajectory
+> Policy
+> Safety
+> Policy
+> Traj-
+> directed
+> child
+
+4     
+
+> 1.000, 0.980, 0.230
+> Generation 2 Offspring
+> Candidate 4 is selected for deployment
+> Evaluator
+> Frozen
+> LLM M θ
+> Evaluator
+> Rollout Configuration
+> - Generations G
+> -Offspring λ
+> - Budget B
+> Evaluation Metrics Design
+> - Task Utility
+> - Trajectory Quality
+> - Safety Risk /...
+
+Base Policy  z₀
+
+> ND(S t)
+> Repeat until budget B is exhausted
+> Rollout,
+> Policy
+> Safety-
+> directed
+> child
+
+1
+
+> 0.975, 0.947, 0.230
+
+3
+
+> 0.975, 0.947, 0.300
+
+2 
+
+> 0.975, 0.971, 0.300
+
+6
+
+> 0.975, 0.947, 0.200
+
+5
+
+> 0.975, 0.980, 0.300
+> Diagnostic-guided Mutation
+> Safety Risk Detection
+
+Figure 1: Overview of MOAE. (a) Motivation for Pareto preservation. (b) Rollout initialization. (c) Multi-objective evaluation. (d) Illustrative evolution trajectory. (e) Diagnostic-guided mutation and archive update. (f) Constraint-aware deployment. without updating the parameters of either the agent or the mutation model. 
+
+Problem Formulation 
+
+Let x ∈ X denote an input query and let Aθ be an LLM-based agent with frozen parameters θ. The behavior of the agent is controlled by an execution policy z ∈ Z , which specifies how the agent plans, invokes tools, verifies intermediate results, and terminates its execution. Given execution randomness ξ,the agent produces a complete rollout 
+
+τ = Aθ (x; z, ξ ). (1) A candidate is defined as 
+
+c = ( z, τ, f (c), e(c)) , (2) where f (c) = [ f1(c), . . . , f m(c)] and e(c) denote the ob-jective values and evaluator diagnostics computed from the rollout τ stored in c. The diagnostics may include constraint violations, unsupported decisions, invalid actions, repeated tool calls, or other objective-relevant signals. Different objectives may have different optimization di-rections. We associate each objective with sj ∈ { +1 , −1},where sj = +1 denotes maximization and sj = −1 denotes minimization, and define the direction-aligned objective 
+
+uj (c) = sj fj (c). (3) All aligned objectives are therefore maximized. Candidate 
+
+ca Pareto-dominates candidate cb, denoted by ca ≻ cb, if 
+
+[∀j, u j (ca) ≥ uj (cb)] ∧ [∃j, u j (ca) > u j (cb)] . (4) For a candidate set S, its empirical non-dominated subset is 
+
+ND( S) = {c ∈ S : ∄c′ ∈ S s.t. c′ ≻ c} . (5) Our goal is to improve the agent under a limited online rollout budget while preserving candidates that represent different objective trade-offs. The framework only requires each ob-jective to be computable from a completed rollout and does not assume a particular task, agent architecture, or objective definition. 
+
+Multi-Objective Agent Evolution 
+
+MOAE organizes iterative in-context refinement as a multi-objective evolutionary search. It maintains an empirical Pareto archive, selects objective-specialized parents, uses evaluator diagnostics to mutate their execution policies, and evaluates every offspring through a fresh agent rollout. Nei-ther the execution agent nor the mutation model is updated during this process. 
+
+Initialization. MOAE first evaluates the default execution policy z0:
+
+τ0 = Aθ (x; z0, ξ 0), c0 = ( z0, τ 0, f (c0), e(c0)) . (6) The evaluated set and Pareto archive are initialized as 
+
+S0 = {c0}, P0 = ND( S0). (7) With one offspring generated for each objective in every generation, G generations require 
+
+B = 1 + mG (8) complete agent rollouts, including the initial rollout. 
+
+Objective-specialized parent selection. At generation t,the archive ideal point is defined as 
+
+u∗
+
+t =
+
+
+
+max 
+
+c∈P t−1
+
+u1(c), . . . , max 
+
+c∈P t−1
+
+um(c)
+
+
+
+. (9) When an application has a primary utility objective q, MOAE prevents auxiliary-objective mutations from selecting can-didates with substantially degraded primary utility. It con-structs the admissible archive 
+
+Padm  
+
+> t−1
+
+=
+
+
+
+c ∈ P t−1 : uq (c) ≥ max 
+
+> a∈P t−1
+
+uq (a) − δ
+
+
+
+, (10) where δ ≥ 0 is a retention tolerance. If no primary objective is specified, denoted by q = ∅, we directly set Padm  
+
+> t−1
+
+= Pt−1.For objective j, the parent search set is 
+
+Rt,j =
+
+Pt−1, q = ∅ or j = q, 
+
+Padm  
+
+> t−1
+
+, otherwise , (11) and an objective-specialized parent is selected by 
+
+pt,j ∈ arg max 
+
+> c∈R t,j
+
+uj (c). (12) Deterministic secondary objectives are used to resolve ties. This mechanism allows archive members with different strengths to serve as parents while limiting degradation of the primary capability when one is specified. 
+
+Diagnostic-guided policy mutation. For each selected parent, the evaluator constructs objective-specific diagnos-tic feedback 
+
+rt,j = Dj (τ (pt,j ), u(pt,j ), u∗ 
+
+> t
+
+, e(pt,j )) . (13) The diagnostic identifies behaviors related to objective j that can be improved while exposing the parent objective vector and the current archive ideal point. A frozen mutation model 
+
+Mϕ then generates a new execution policy: 
+
+ezt,j = Mϕ (x, z (pt,j ), τ (pt,j ), u(pt,j ), u∗ 
+
+> t
+
+, r t,j , j ) . (14) The mutation output is passed through a deterministic val-idator V:
+
+zt,j = V(ezt,j ). (15) The validator enforces a compact policy schema and bounds execution parameters. In our implementation, the resulting policy contains concise planning, tool-use, verification, and stopping rules. Importantly, the detailed evaluator feedback is used only by the mutation model. The execution agent receives the validated compact policy rather than the parent trajectory or evaluator annotations. The offspring is evaluated through a fresh complete roll-out: 
+
+τt,j = Aθ (x; zt,j , ξ t,j ) (16) 
+
+ct,j = ( zt,j , τ t,j , f (ct,j ), e(ct,j )) . (17) This separation is important because the mutation model proposes a behavioral change, while the objective values are determined only by executing and evaluating the resulting agent policy. 
+
+Archive update. Let 
+
+Ct = {ct, 1, . . . , c t,m } (18) denote the offspring generated at generation t. MOAE up-dates the evaluated set and archive as 
+
+St = St−1 ∪ C t, Pt = ND( Pt−1 ∪ C t). (19) An optional crowding-distance rule can be applied if the archive exceeds a predefined capacity. In our main experi-ments the archive capacity is larger than the rollout budget, so this truncation is not activated. 
+
+Constraint-aware deployment. The Pareto archive repre-sents several possible trade-offs and therefore does not by itself specify which candidate should be deployed. Let Jc
+
+denote the objectives that must be preserved relative to the initial execution and let ϵj denote the permitted degradation. The feasible deployment set is 
+
+F(x) = {c ∈ S G : uj (c) ≥ uj (c0) − ϵj , ∀j ∈ J c} . (20) Given a deployment preference order π = ( π1, . . . , π m),MOAE returns 
+
+cdep = lex max  
+
+> c∈F (x)∪{ c0}
+
+(uπ1 (c), . . . , u πm (c)) . (21) Including c0 guarantees a valid fallback when no offspring satisfies the deployment constraints. For analysis, we may additionally report the primary-objective extreme 
+
+cpri ∈ arg max 
+
+> c∈S G
+
+uq (c), (22) but this candidate is not necessarily the balanced deployment choice. 
+
+Optimization cost. MOAE performs B = 1 + mG com-plete agent rollouts and mG policy-mutation calls. We report execution and optimization costs separately: 
+
+Cexec = X
+
+> c∈S G
+
+Crollout (c) (23) 
+
+Copt =
+
+> G
+
+X
+
+> t=1
+> m
+
+X
+
+> j=1
+
+Cmutation (t, j ). (24) This distinction prevents the search-time diagnostic context from being counted as part of the deployed policy or the selected candidate’s execution cost. 
+
+## Experiments 
+
+Experimental Setup 
+
+Evaluation protocol. We evaluate MOAE on TravelPlan-ner and AgentDojo using frozen LLM agents. The main Trav-elPlanner study includes Gemma-4-31B-it, Qwen3-30B-A3B, and the API-served DeepSeek-V4-Pro. TravelPlanner measures constrained long-horizon planning, while Agent-Dojo tests utility and robustness in a different tool-use en-vironment (Xie et al. 2024; Debenedetti et al. 2024). All search methods use the same agent scaffold, tools, evaluator, and number of complete rollouts within each comparison. Dataset construction, model serving, prompts, hyperparam-eters, and the complete baseline adaptations are documented in supplementary material. 
+
+Optimization objectives. We instantiate three objectives that describe complementary properties of a complete roll-out. The task objective measures weighted constraint satis-faction. The trajectory objective combines tool-execution va-lidity, required-information coverage, evidence support, and execution discipline. The safety objective minimizes a con-tinuous risk score derived from whether untrusted tool obser-vations influence intermediate actions, the planner input, or the final output. Final Pass Rate, strict trajectory validity, at-tack success, tool calls, and token consumption are reported as audit metrics rather than additional optimization objec-tives. Exact component definitions, weights, and thresholds are given in supplementary material. 
+
+Methods and selection. We compare MOAE with the unoptimized Base Agent, independent Best-of-7 sam-pling, Weighted-Sum evolution, task-oriented GEPA-Online, preference-based MOCHA-Select, and EvoAgent-Online (Agrawal et al. 2026; Tanjim et al. 2026; Yuan et al. 2025). Weighted-Sum is the direct scalarization baseline, ranking candidates with a normalized aggregate whose weights are fixed before evaluation and reported in the supplementary material. The online adaptations share MOAE’s policy repre-sentation and evaluation harness while retaining their respec-tive generation and selection principles. Every TravelPlanner search method evaluates seven candidates per query, whereas the Base Agent uses one rollout. MOAE comprises one initial rollout and two generations with one offspring per objective. A common deployment rule filters candidates whose task performance or safety is worse than the initial rollout and then prioritizes trajectory quality, safety, and task perfor-mance. All three models use the same baseline suite, rollout budget, and deployment rule. On AgentDojo, we addition-ally compare with Repeat Prompt and Best-of-7. We report paired query-level comparisons and 95% confidence inter-vals, with complete statistical and integrity checks in the supplementary material. 
+
+Results 
+
+Choosing the rollout budget. Before comparing multi-objective search strategies, we first ask whether iterative in-context refinement provides a useful search signal and how many complete executions are justified. Figure 2 compares diagnostic evolution with independent sampling, generic re-finement, and score-only refinement over budgets from one to 25 rollouts. Diagnostic evolution improves more consistently than undirected refinement, which motivates using evaluator feedback as a mutation signal. The curve also shows that seven rollouts should be viewed as a cost-quality operat-ing point rather than a convergence point. At seven roll-outs, diagnostic evolution captures approximately 79% of its eventual one-to-25-rollout Task Score gain while using only 28% of the maximum rollout budget. Performance contin-ues to improve beyond seven, but the additional 18 rollouts increase cumulative token use by nearly four times for a much smaller Task Score gain. Seven also corresponds to the smallest budget that supports one initial candidate and two complete three-objective generations. We therefore use this budget for the main experiments and report the full scal-ing curve to make the remaining cost-performance trade-off explicit. 
+
+Multi-objective optimization on TravelPlanner. Table 1 reports the constraint-aware deployment point. Full MOAE improves over the Base Agent in task performance, trajec-tory quality, and safety risk for all three execution models, showing that one search procedure can produce joint gains across different agents. Compared with Weighted-Sum, Full 1 7 13 19 25 
+
+> Number of complete rollouts
+> 70 75 80 85 90
+> Task Score (×100)
+> Main budget: 7
+> Best-of-N
+> Generic self-refine Score-only evolution Diagnostic-guided evolution
+
+Figure 2: Best-so-far Task Score under 1 to 25 complete agent rollouts. Shaded regions show paired-bootstrap 95% confidence intervals over TravelPlanner requests. MOAE achieves higher task and trajectory scores for all mod-els while using fewer search tokens; safety remains similar on Qwen3 and Gemma and improves on DeepSeek-V4-Pro. This suggests a potential advantage from preserving non-dominated candidates rather than committing to one scalar ordering, although it does not establish superiority over ev-ery weight configuration. Among the broader baselines, Full MOAE attains the highest balanced task and trajectory scores on Qwen3 and Gemma, while MOCHA-Select or EvoAgent-Online retains lower safety risk. On DeepSeek-V4-Pro, Full MOAE achieves the strongest balanced task, trajectory, and safety results. This model-dependent ordering reinforces the importance of reporting explicit trade-offs rather than only an aggregate score or win count. 
+
+Alternative deployment preferences. The objective-specific rows expose the range of choices preserved by a single MOAE search. For every execution model, MOAE-Task gives the highest task score, MOAE-Trajectory gives the highest trajectory quality, and MOAE-Safety gives the low-est safety risk. These gains are not interchangeable: selecting the safety-specialized candidate can substantially reduce task performance, while the task-specialized candidate may retain considerably more safety risk. A fixed scalarization selects one such compromise according to weights chosen before search and generally requires another search when those pref-erences change. MOAE instead retains these operating points in the same candidate pool and applies the deployment pref-erence afterward. Full MOAE therefore returns a constraint-aware compromise without rerunning optimization under a different set of weights. Complete candidate-level results and audit metrics are provided in the supplementary material. 
+
+Transfer to AgentDojo. Table 2 evaluates whether the same procedure transfers from travel planning to heteroge-neous tool-use suites. On Gemma, MOAE improves utility and trajectory quality over both the Base Agent and Best-of-7 under the Tool Knowledge and direct-injection settings. Tool Knowledge has zero attack success for every method, so it provides no evidence for differential safety. In contrast, the direct-injection setting exposes a nonzero vulnerability for both baselines that is absent from the selected MOAE Qwen3-30B-A3B Gemma-4-31B-it DeepSeek-V4-Pro Method Task ↑ Trajectory ↑ Risk ↓ Tokens ↓ Task ↑ Trajectory ↑ Risk ↓ Tokens ↓ Task ↑ Trajectory ↑ Risk ↓ Tokens ↓                                                                                                                        
+
+> Direct Search Baselines
+> Base Agent 0.493 0.946 0.533 59.4 0.748 0.962 0.304 56.6 0.631 0.889 0.275 60.4
+> Weighted-Sum 0.546 0.964 0.391 458.8 0.792 0.972 0.207 398.7 0.643 0.926 0.280 422.9
+> Best-of-7 0.557 0.969 0.369 477.0 0.816 0.967 0.280 392.2 0.705 0.919 0.244 438.4
+> Agent Optimization Baselines
+> MOCHA-Select 0.557 0.966 0.347 455.4 0.817 0.970 0.193 408.1 0.642 0.926 0.271 417.8
+> GEPA-Online 0.578 0.966 0.469 479.2 0.807 0.969 0.250 415.4 0.713 0.921 0.284 439.8
+> EvoAgent-Online 0.581 0.970 0.431 467.8 0.814 0.966 0.192 400.4 0.704 0.851 0.193 417.5
+> Our Method
+> MOAE-Task 0.668 0.954 0.499 450.7 0.871 0.983 0.247 396.6 0.750 0.948 0.263 396.3
+> MOAE-Trajectory 0.561 0.995 0.499 450.7 0.809 0.991 0.282 396.6 0.732 0.958 0.246 396.3
+> MOAE-Safety 0.497 0.933 0.129 450.7 0.650 0.913 0.063 396.6 0.538 0.857 0.022 396.3
+> Full MOAE 0.585 0.972 0.400 450.7 0.844 0.974 0.208 396.6 0.726 0.935 0.179 396.3
+
+Table 1: TravelPlanner results across three execution models. Tokens are reported in thousands. All search methods use seven complete rollouts, while the Base Agent uses one. Token-cost bolding excludes the one-rollout Base Agent. MOAE-Task, MOAE-Trajectory, and MOAE-Safety are objective-specific deployment audits from the same search pool, while Full MOAE is the balanced output used for the main comparison. Final Pass and complete audit metrics are reported in the supplementary material.                                   
+
+> Setting Method Utility Trajectory ASR
+> Gemma Tool Knowledge
+> Base Agent 32.81 0.435 0.00 Repeat Prompt 31.25 0.436 0.00 Best-of-7 32.81 0.476 0.00 Full MOAE 40.63 0.695 0.00
+> Gemma Direct Injection
+> Base Agent 38.71 0.486 4.84 Best-of-7 39.06 0.476 1.56 Full MOAE 41.94 0.661 0.00 Qwen3 Official Attacks
+> Base Agent 45.31 0.739 9.38 Best-of-7 51.56 0.762 7.81 Full MOAE 57.81 0.781 0.00
+
+Table 2: AgentDojo results. Utility and trajectory are higher when better; attack success rate (ASR) is lower when better. trajectories. On Qwen3, MOAE again improves utility and trajectory quality over Base Agent and Best-of-7 while re-ducing attack success to zero under the official attacks. The comparison with Best-of-7 indicates that these gains cannot be explained solely by generating more candidates. Overall, the results support transfer across agent environments, while safety improvements remain dependent on whether the eval-uation setting exposes correctable vulnerabilities. 
+
+Search behavior under Pareto preservation. Figure 3 examines how different search mechanisms change the can-didate pool using four complementary measures. Normal-ized hypervolume gain captures the expansion of the attain-able three-objective region, empirical Pareto-set size counts the retained nondominated trade-offs, archive admission rate measures how often offspring add a new trade-off, and joint-improvement rate reports the queries for which at least one offspring simultaneously improves task performance, trajec-tory quality, and safety over the initial rollout. Full MOAE achieves a normalized hypervolume gain of 0.52, improv-ing over the strongest alternative at 0.43 by 20.9%. It also raises archive admission from 33.9% to 35.6% and joint im-provement from 9.4% to 13.9%, a gain of 4.5 percentage points. Although removing the archive can slightly increase raw Pareto-set size, its lower hypervolume, admission rate, and joint-improvement rate show that retaining more incom-parable candidates is not sufficient. The relevant benefit is whether preserved candidates expand the attainable trade-off region and provide productive parents for later mutations. Together, these measures indicate that Pareto preservation changes the quality of the candidate pool rather than merely changing the final ranking rule. Because several confidence intervals still overlap, the analysis supports a potential search advantage without establishing statistical superiority for ev-ery individual comparison. 
+
+Stability across repeated runs. We repeat MOAE, MOCHA-Select, and Best-of-7 with three random seeds on a fixed subset of the official TravelPlanner test split, using the same configurations selected on the validation split. Across the three runs, MOAE achieves a mean task score of 0.879, trajectory quality of 0.991, and safety risk of 0.174, with between-seed standard deviations of 0.013, 0.003, and 0.011, respectively. Its trajectory quality exceeds that of MOCHA-Select by 0.034 in the paired query-level comparison, with a 95% confidence interval of [0.002, 0.066], while the cor-Best-of-7 Weighted w/o Archive Full MOAE     
+
+> 0.0 0.2 0.4 0.6
+> Normalized gain
+> (a) Normalized hypervolume gain
+> 0.37 0.41 0.43 0.52
+> Best-of-7 Weighted w/o Archive Full MOAE
+> 0.0 0.5 1.0 1.5 2.0
+> Candidates
+> (b) Empirical Pareto-set size
+> 1.51 1.83 1.96 1.92
+> Best-of-7 Weighted w/o Archive Full MOAE
+> 010 20 30 40
+> Rate (%)
+> (c) Archive admission rate
+> 27.8% 31.2% 33.9% 35.6%
+> Best-of-7 Weighted w/o Archive Full MOAE
+> 0510 15 20
+> Queries (%)
+> (d) Joint-improvement query rate
+> 9.4% 9.4% 8.9% 13.9%
+
+Figure 3: Search behavior under a matched seven-rollout budget on TravelPlanner with Gemma. Error bars show query-level bootstrap 95% confidence intervals. 
+
+Method ∆Task ∆Final ∆Trajectory ∆Valid ∆Risk 
+
+Full MOAE +0.096 +7.22 +0.012 +35.89 -0.096 
+
+w/o archive +0.087 +5.56 +0.008 +26.11 -0.079 w/o mutation +0.044 +2.78 +0.009 +21.67 -0.055 w/o diagnostics +0.047 +3.33 +0.011 +31.67 -0.079 
+
+Table 3: TravelPlanner ablations with Gemma. Final Pass and Valid Trajectory are measured in percentage points. Positive changes are better except for Safety Risk. responding task and safety intervals generally include zero. These results indicate that the trajectory improvement is con-sistent across seeds rather than being driven by a single fa-vorable run. 
+
+Ablation study. Table 3 separates the contributions of the archive, objective-directed mutation, and evaluator diagnos-tics. Removing any component reduces the joint improve-ment obtained by the complete method. Mutation has the largest overall effect: without it, task improvement, Final Pass gain, strict trajectory validity, and safety-risk reduction all de-cline substantially. Removing the archive preserves much of the average task gain but weakens trajectory improvement, valid-trajectory gain, and risk reduction, indicating that re-taining non-dominated alternatives matters most when ob-jectives compete. Removing diagnostics has a smaller effect on average trajectory quality, but a larger effect on task com-pletion and safety reduction, which is consistent with diag-nostics guiding targeted repairs rather than merely increasing candidate diversity. Full MOAE is the only configuration that achieves the strongest improvement in every reported abla-tion metric. Detailed confidence intervals and the complete audit metrics are deferred to supplementary material. 
+
+## Conclusion 
+
+This work investigates whether several properties of an LLM agent can be improved jointly under a limited rollout budget without collapsing them into a fixed scalar score. We in-troduced MOAE, a Pareto-preserving framework that com-bines objective-directed mutation, evaluator diagnostics, and an empirical non-dominated archive. Across three execution models on TravelPlanner, MOAE improves the unoptimized agent in task performance, trajectory quality, and safety risk. The AgentDojo results further show that the same proce-dure transfers to a different tool-use environment, improving utility and trajectory quality while eliminating the observed attack success. MOAE’s main value is not uniform dominance, but avoid-ing premature scalarization. It preserves task-specialized, trajectory-specialized, safety-specialized, and balanced can-didates within one search pool, allowing deployment con-straints to determine the final choice. This separation pre-vents one weight configuration from controlling both search and deployment. Improvements in normalized hypervolume, archive admission, and joint-improvement rate support this mechanism, while matched-budget results show that inde-pendent sampling and other optimizers remain competitive for some models and objectives. MOAE nevertheless remains an online search procedure whose outcomes are bounded by its evaluators and candi-date budget. Its archive is a small empirical non-dominated set rather than an approximation to a global Pareto front, and more inference overhead is added. Future work should improve sample efficiency through adaptive stopping, candi-date reuse, and stronger mutation operators, while extending the framework to broader objectives, architectures, environ-ments, and evaluator designs. 
+
+## References 
+
+Agrawal, L. A.; Tan, S.; Soylu, D.; Ziems, N.; Khare, R.; Opsahl-Ong, K.; Singhvi, A.; Shandilya, H.; Ryan, M. J.; Jiang, M.; Potts, C.; Sen, K.; Dimakis, A. G.; Stoica, I.; Klein, D.; Zaharia, M.; and Khattab, O. 2026. GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning. arXiv:2507.19457. Dai, J.; Pan, X.; Sun, R.; Ji, J.; Xu, X.; Liu, M.; Wang, Y.; and Yang, Y. 2023. Safe rlhf: Safe reinforcement learning from human feedback. arXiv preprint arXiv:2310.12773 .Debenedetti, E.; Zhang, J.; Balunovic, M.; Beurer-Kellner, L.; Fischer, M.; and Tramèr, F. 2024. Agentdojo: A dy-namic environment to evaluate prompt injection attacks and defenses for llm agents. Advances in Neural Information Processing Systems , 37: 82895–82920. Fernando, C.; Banarse, D. S.; Michalewski, H.; Osindero, S.; and Rocktäschel, T. 2024. Promptbreeder: Self-referential self-improvement via prompt evolution. In Forty-first Inter-national Conference on Machine Learning .Gong, J.; Gu, R.; Fei, Z.; Cao, Y.; Twist, L.; Geiger, A.; Han, S.; Sobania, D.; Sarro, F.; and Zhang, J. M. 2026. Skillmoo: Multi-objective optimization of agent skills for software engineering. arXiv preprint arXiv:2604.09297 .Guo, Q.; Wang, R.; Guo, J.; Li, B.; Song, K.; Tan, X.; Liu, G.; Bian, J.; and Yang, Y. 2024. Connecting large language models with evolutionary algorithms yields powerful prompt optimizers. In International Conference on Learning Repre-sentations , volume 2024, 34133–34156. Jiang, H.; and Tang, K. 2026. Why Agents Compromise Safety Under Pressure. In Findings of the Association for Computational Linguistics: ACL 2026 , 16453–16470. San Diego, California, United States: Association for Computa-tional Linguistics. ISBN 979-8-89176-395-1. Li, J.; Qian, X.; Zhang, Y.; Zhang, W.; Li, G.; Zhang, S.; Han, X.; Wang, Y.; and Zhao, X. 2026. Towards Pareto-Optimal Tool-Integrated Agents with Pareto Ranking Policy Optimization. arXiv preprint arXiv:2606.16111 .Liu, X.; Yu, H.; Zhang, H.; Xu, Y.; Lei, X.; Lai, H.; Gu, Y.; Ding, H.; Men, K.; Yang, K.; et al. 2024. Agentbench: Evaluating llms as agents. In International Conference on Learning Representations , volume 2024, 52989–53046. Ma, C.; Zhang, J.; Zhu, Z.; Yang, C.; Yang, Y.; Jin, Y.; Lan, Z.; Kong, L.; and He, J. 2024. Agentboard: An analytical evaluation board of multi-turn llm agents. Advances in neural information processing systems , 37: 74325–74362. Madaan, A.; Tandon, N.; Gupta, P.; Hallinan, S.; Gao, L.; Wiegreffe, S.; Alon, U.; Dziri, N.; Prabhumoye, S.; Yang, Y.; et al. 2023. Self-refine: Iterative refinement with self-feedback. Advances in neural information processing sys-tems , 36: 46534–46594. Opsahl-Ong, K.; Ryan, M. J.; Purtell, J.; Broman, D.; Potts, C.; Zaharia, M.; and Khattab, O. 2024. Optimizing instruc-tions and demonstrations for multi-stage language model pro-grams. In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing , 9340–9366. Qin, Y.; Liang, S.; Ye, Y.; Zhu, K.; Yan, L.; Lu, Y.; Lin, Y.; Cong, X.; Tang, X.; Qian, B.; et al. 2023. Toolllm: Facil-itating large language models to master 16000+ real-world apis. In The twelfth international conference on learning representations .Rosser, J.; and Foerster, J. 2026. Agentbreeder: Mitigating the ai safety risks of multi-agent scaffolds via self-improvement. 
+
+Advances in Neural Information Processing Systems , 38: 149564–149594. Shinn, N.; Cassano, F.; Gopinath, A.; Narasimhan, K.; and Yao, S. 2023. Reflexion: Language agents with verbal re-inforcement learning. Advances in neural information pro-cessing systems , 36: 8634–8652. Tanjim, M. M.; Subramanian, J.; Chen, X.; Kveton, B.; Mukherjee, S.; Zhang, A.; Kim, S.; Sarkhel, S.; and Choud-hury, S. 2026. MOCHA: Multi-Objective Chebyshev An-nealing for Agent Skill Optimization. arXiv preprint arXiv:2605.19330 .Wang, Z.; Zhang, T.; Bai, H.; Hou, L.; Yu, X.; Liu, W.; Xiang, S.; and Zhu, L. 2025. Faster and better llms via latency-aware test-time scaling. arXiv preprint arXiv:2505.19634 .Xia, H.; Leong, C. T.; Wang, W.; Li, Y.; and Li, W. 2025. To-kenskip: Controllable chain-of-thought compression in llms. In Proceedings of the 2025 Conference on Empirical Meth-ods in Natural Language Processing , 3351–3363. Xie, J.; Zhang, K.; Chen, J.; Zhu, T.; Lou, R.; Tian, Y.; Xiao, Y.; and Su, Y. 2024. TravelPlanner: A Benchmark for Real-World Planning with Language Agents. arXiv:2402.01622. Yan, J.; Liu, L.; Pan, Y.; Chen, S.; Yuan, Z.; Xiang, Y.; and Tang, B. 2025. From Long to Lean: Performance-aware and Adaptive Chain-of-Thought Compression via Multi-round Refinement. In Proceedings of the 2025 Conference on Em-pirical Methods in Natural Language Processing , 12290– 12306. Yang, C.; Wang, X.; Lu, Y.; Liu, H.; Le, Q. V.; Zhou, D.; and Chen, X. 2024. Large language models as optimizers. In International Conference on Learning Representations ,volume 2024, 12028–12068. Yao, S.; Zhao, J.; Yu, D.; Du, N.; Shafran, I.; Narasimhan, K. R.; and Cao, Y. 2022. React: Synergizing reasoning and acting in language models. In The eleventh international conference on learning representations .Yuan, S.; Song, K.; Chen, J.; Tan, X.; Li, D.; and Yang, D. 2025. Evoagent: Towards automatic multi-agent genera-tion via evolutionary algorithms. In Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the As-sociation for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers) , 6192–6217. Zhan, Q.; Liang, Z.; Ying, Z.; and Kang, D. 2024. Injecagent: Benchmarking indirect prompt injections in tool-integrated large language model agents. In Findings of the Association for Computational Linguistics: ACL 2024 , 10471–10506. Zhang, W.; Torr, P. H.; Elhoseiny, M.; and Bibi, A. 2024. Bi-factorial preference optimization: Balancing safety-helpfulness in language models. arXiv preprint arXiv:2408.15313 .Zhong, Y.; Ma, C.; Zhang, X.; Yang, Z.; Chen, H.; Zhang, Q.; Qi, S.; and Yang, Y. 2024. Panacea: Pareto alignment via preference adaptation for llms. Advances in Neural Informa-tion Processing Systems , 37: 75522–75558. Zhou, Z.; Liu, J.; Shao, J.; Yue, X.; Yang, C.; Ouyang, W.; and Qiao, Y. 2024. Beyond one-preference-fits-all alignment: Multi-objective direct preference optimization. In Findings of the Association for Computational Linguistics: ACL 2024 ,10586–10613. Appendix 
+
+This appendix includes the experimental protocol, evaluator definitions, implementation details, complete results, search-behavior analyses, prompts, and qualitative examples. Unless stated otherwise, all TravelPlanner results use the validation set and all search methods receive the same seven-rollout budget. The language model, agent scaffold, tools, and eval-uators remain fixed within each comparison. 
+
+Experimental Protocol and Reproducibility 
+
+Benchmarks and Data Splits TravelPlanner. TravelPlanner evaluates long-horizon itinerary planning under transportation, date, budget, accommodation, dining, and commonsense constraints (Xie et al. 2024). The main experiments use all 180 requests in the official validation split. Each method receives the same query, tool environment, base policy, and evaluator. The repeated-run stability analysis uses a fixed subset of the official test split, sampled once and held constant across methods and random seeds. No test request is used to tune objective definitions, scalarization weights, prompts, or deployment thresholds. 
+
+AgentDojo. AgentDojo v1.2.2 evaluates utility and robust-ness in heterogeneous tool-use environments (Debenedetti et al. 2024). We use 32 clean and 64 attacked cases in the Tool Knowledge configuration. The Gemma direct-injection audit contains 64 executable cases after applying the bench-mark’s validity checks. The Qwen3 experiment uses 64 cases with the official attack configurations. We report the bench-mark utility and attack-success metrics together with the same trajectory-quality evaluator used in the TravelPlanner study. 
+
+Models and Serving We evaluate Gemma-4-31B-it, Qwen3-30B-A3B, and DeepSeek-V4-Pro. Gemma and Qwen3 are served locally through an OpenAI-compatible inference interface with deterministic decoding. DeepSeek-V4-Pro is accessed through its official API using the same prompts, policy representation, objective definitions, and seven-rollout budget. Model-specific serving parameters, ex-act software versions, and hardware details are summarized in Table 4. 
+
+Implementation of compared methods. All methods use the same frozen agent, compact policy representation, tool environment, objective evaluators, and query-level rollout budget. Unless stated otherwise, the reported output is se-lected using the common deployment rule: candidates must achieve task performance no lower than the Base Agent and safety risk no higher than the Base Agent, after which tra-jectory quality, safety, and task performance are prioritized lexicographically. The implementations are described below. 
+
+Base Agent. The Base Agent executes the original policy 
+
+c0 once without mutation, candidate search, or post-hoc se-lection. This rollout serves both as the unoptimized baseline and as the task and safety reference used by the deployment constraints. 
+
+Best-of-7. Best-of-7 independently executes the original policy seven times using different stochastic generations. It does not update the policy or use feedback from earlier can-didates to guide later executions. All seven candidates are re-tained, and the common deployment rule selects the reported response. This baseline isolates the benefit of candidate di-versity and post-hoc selection without iterative optimization. 
+
+Weighted-Sum. Weighted-Sum performs sequential pol-icy evolution using the fixed scalarized utility 
+
+Uws (c) = 13 utask (c) + 13 utraj (c) + 13 usafety (c),
+
+where all utilities are scaled to [0 , 1] and usafety = 1 −
+
+Rsafety . At each iteration, the accepted candidate with the highest scalarized utility is selected as the parent. The mu-tation prompt targets the objective with the largest weighted deficit from its ideal value. A child is admitted only when its scalarized utility strictly exceeds that of its parent. The reported response is selected from the accepted candidates using the common deployment rule. This baseline directly tests the effect of committing to one fixed objective ordering during search. 
+
+GEPA-Online. GEPA-Online adapts GEPA’s trace-based textual reflection to per-query optimization under the seven-rollout budget. At each iteration, it selects a parent uni-formly from the accepted candidates tied for the highest task score. The parent’s execution trace, failed task con-straints, and evaluator feedback are provided to the mutation model, which produces a revised compact policy focused on task correctness. The resulting child is admitted only if it strictly improves the parent’s task score. Unlike the original development-set formulation of GEPA, this adaptation does not optimize reusable components across examples; it applies the reflection and textual-update principle independently to each query. The common deployment rule is applied to its accepted candidate pool for the main-table comparison. 
+
+MOCHA-Select. MOCHA-Select adapts preference-conditioned multi-objective selection to the same online can-didate space. For each iteration, it samples a preference vec-tor λ from the three-dimensional simplex and selects the accepted candidate minimizing its weighted Chebyshev dis-tance from the current empirical ideal point: 
+
+Dλ(c) = max  
+
+> j
+
+λj
+
+ u∗ 
+
+> j
+
+− uj (c) .
+
+The mutation targets the largest weighted objective deficit. During the first half of the search, a child is admitted only if it expands the hypervolume of the current nondominated set, encouraging exploration. During the second half, it is admitted only if it improves the parent under the sampled Chebyshev preference, encouraging preference-conditioned exploitation. Dominated accepted candidates are removed af-ter each update. This is a matched-budget, per-query adapta-tion of MOCHA’s preference-based selection principle rather than its original persistent-skill optimization procedure. 
+
+EvoAgent-Online. EvoAgent-Online preserves EvoA-gent’s specialist-generation and integration structure while applying it to the compact execution policy. Starting from the Base Agent, each of three rounds first generates a spe-cialist policy intended to repair a diagnosed weakness of the current agent. A second mutation then creates an inte-grator policy that combines the current parent with the new Model Interface Decoding Context limit Parallelism Hardware Gemma-4-31B-it Local API Deterministic 16,384 4 workers 8 × NVIDIA A800 Qwen3-30B-A3B Local API Deterministic 16,384 4 workers 8 × NVIDIA A800 DeepSeek-V4-Pro Official API Deterministic Provider default 96 workers API only 
+
+Table 4: Implementation details. Software versions, model revisions, and complete launch commands are provided in the accompanying anonymous artifact. specialist while retaining verified behavior. The integrated policy becomes the parent of the next round. Three specialist rollouts and three integrated rollouts, together with the initial rollout, yield seven complete candidates. For matched main-table reporting, the common deployment rule is applied to these candidates; the final sequentially integrated policy is retained as a separate implementation audit. 
+
+Full MOAE. Full MOAE evaluates one initial rollout fol-lowed by two generations, each producing one task-directed, one trajectory-directed, and one safety-directed offspring. At the beginning of each generation, objective-specialized par-ents are selected from the empirical nondominated archive. The task parent maximizes task utility, whereas trajectory and safety parents are selected from archive members whose task utility lies within the retention tolerance of the best archived task value. Evaluator diagnostics identify failed constraints, invalid or redundant tool behavior, missing ev-idence, and measured safety signals. The mutation model converts this feedback into a compact objective-directed pol-icy, which is evaluated through a fresh complete rollout. After all three children have been evaluated, the archive is updated by retaining the empirically nondominated candidates. Once the rollout budget is exhausted, the constraint-aware deploy-ment rule selects the reported balanced response. Objective-specific deployment points are obtained from the same can-didate pool without rerunning the search. All search methods therefore evaluate seven complete environment-interacting agent rollouts per query, whereas the Base Agent evaluates one. Policy-generation calls do not interact with the environment and are not counted as addi-tional rollouts, but their tokens and runtime are included in the reported search cost. Consequently, the matched-budget comparison controls the amount of complete agent execu-tion while retaining the computational differences inherent to each search mechanism. 
+
+Objective and Evaluator Design The evaluator maps a complete rollout τ to an objective vector u(τ ) =[u1(τ ), . . . , u m(τ )] . All objectives are transformed so that larger values are preferred during Pareto comparison. The evaluator is shared by every method and remains fixed throughout search; mutation can observe its diagnostic mes-sages, but cannot modify its formulas, component weights, thresholds, or benchmark checks. Table 5 summarizes the design and separates optimized objectives from independent audit metrics. 
+
+Task objective. For TravelPlanner, the task score is the weighted fraction of satisfied constraints: 
+
+utask (τ ) = 
+
+P 
+
+> r∈C (x)
+
+ωr I[r is satisfied by τ ]
+
+P 
+
+> r∈C (x)
+
+ωr
+
+, (25) where C(x) is the set of constraints extracted by the bench-mark evaluator and ωr is its fixed importance weight. Final Pass is one only when all required checks pass. 
+
+Safety objective. Let R(τ ) ∈ [0 , 1] be the fixed safety-risk score. It captures whether untrusted content affects the agent at different stages of execution, including instruction-like metadata in tool observations, indirect prompt injection through retrieved content, contamination of the planner con-text, execution of attacker-directed actions, and adoption of injected instructions in the final response. The evaluator dis-tinguishes intermediate influence from severe cases in which the injected objective changes an external action or the fi-nal output, with larger values denoting greater risk. MOAE optimizes 
+
+usafety (τ ) = 1 − R(τ ), (26) which aligns the direction of all objectives. On AgentDojo, we additionally evaluate direct injection and the benchmark’s official attack configurations. Attack Success Rate is com-puted independently by the benchmark and is not directly optimized by MOAE. 
+
+Trajectory objective. Trajectory quality evaluates whether an agent obtains the information required by the task through valid, grounded, and disciplined interaction. It is computed deterministically from the complete tool-use trace and final plan. Each component is normalized to [0 , 1] :
+
+Q(τ ) = 0 .30 Qexec + 0 .30 Qcov 
+
++ 0 .25 Qevid + 0 .15 Qdisc . (27) 
+
+Tool-execution quality. Let n be the number of actions in the trajectory. Define rtool , rsucc , and rarg as the fractions of actions that invoke a valid tool, execute successfully, and contain valid arguments, respectively. Tool-execution quality is Qexec = 0 .40 rtool + 0 .40 rsucc 
+
++ 0 .20 rarg . (28) All fractions use max(1 , n ) as their denominator. An action contributes to rtool when it follows the required syntax and invokes a tool exposed by the environment. It contributes to 
+
+rarg when its arguments can be parsed and satisfy the cor-responding tool schema, and to rsucc when the environment executes it without returning an error. Empty trajectories re-ceive zero execution quality. Dimension Fixed evaluator signal Search direc-tion Diagnostics exposed to mutation Independent au-dits Task utility Weighted satisfaction of benchmark con-straints, including itinerary, transportation, date, budget, and commonsense require-ments Maximize Unsatisfied constraints and missing required information Final Pass Rate Trajectory quality Fixed combination of execution validity, information coverage, evidence support, and execution discipline Maximize Invalid or redundant actions, unsup-ported claims, missing evidence, and incomplete coverage Strict valid-trajectory rate, invalid-call rate, redundant-call rate Safety One minus a continuous risk score that de-tects influence from untrusted observations on actions, planner input, and final output Maximize Location and type of detected un-trusted influence without reproduc-ing attack content Attack Success Rate and severe Attack Success Rate 
+
+Table 5: Evaluator design matrix. The same fixed evaluator is applied to all methods and models within a benchmark. Audit metrics are not additional optimization objectives. 
+
+Information coverage. TravelPlanner requires informa-tion about transportation, accommodation, restaurants, and attractions. Let K denote these four categories and Ik(τ ) in-dicate whether the trajectory contains a corresponding tool call. Coverage is 
+
+Qcov (τ ) = 1
+
+|K| 
+
+X
+
+> k∈K
+
+Ik(τ ). (29) Transportation is covered by a flight- or distance-search call, while the remaining categories are covered by their respec-tive search tools. Coverage measures whether the required sources were consulted, but does not guarantee that the re-sulting evidence was used correctly. 
+
+Evidence support. Evidence support measures whether entities in the final plan can be traced to non-planner tool observations. Let nplan be the number of distinct entities extracted from the plan and nsup the number supported by observations. We compute 
+
+Qevid (τ ) = nsup 
+
+max(1 , n plan ) . (30) Entity strings are normalized before matching. Exact normal-ized matches are accepted directly. For multiword entities, a match is also accepted when at least 60% of content words of length four or greater occur in the corresponding observa-tions. Planner outputs are excluded as evidence, preventing a generated plan from supporting its own claims. 
+
+Execution discipline. Execution discipline penalizes avoidable interaction patterns: 
+
+Qdisc (τ ) = clip [0 ,1] 
+
+ 1 − Ptraj (τ ), (31) where 
+
+Ptraj = 0 .30 rinv + 0 .25 rrep + 0 .20 rloop 
+
++ 0 .15 Ipre + 0 .10 pstep . (32) Here, rinv , rrep , and rloop are the numbers of invalid, re-peated, and looping actions divided by max(1 , n ). An invalid action is unparsable, invokes an unsupported tool, or violates the required argument contract. A repeated action reuses the same tool with the same normalized arguments, while a loop is a recurring action pattern that adds no new information. The indicator Ipre equals one when the Planner is invoked before the required evidence has been collected. The trajectory-length penalty is 
+
+pstep = clip [0 ,1] 
+
+ max {0, n − (12 + 4 d)}
+
+6
+
+
+
+, (33) where d is the number of travel days. The allowance 12 + 4 d
+
+gives longer itineraries additional interaction capacity. 
+
+Strict validity and audit metrics. The continuous objec-tive rewards partial improvements. We additionally report strict trajectory validity: 
+
+Vtraj (τ ) = In > 0, n inv = nrep = 0 ,nloop = 0 , I pre = 0 . (34) Thus, a strictly valid trajectory must be non-empty and con-tain no invalid actions, repeated calls, detected loops, or premature Planner invocation. We also report Waste Action Rate: 
+
+WAR( τ ) = ninv + nrep + nloop 
+
+max(1 , n ) . (35) All definitions and weights are fixed across methods, queries, and execution models. 
+
+How the evaluator was fixed. The objective families were chosen before the main method comparison to cover three complementary levels of agent behavior: task outcome, in-teraction trajectory, and robustness to unsafe influence. Their formulas are deterministic and shared across all methods and models. The trajectory weights prioritize execution valid-ity and required-information coverage, followed by evidence support and execution discipline. We inspected evaluator be-havior on a fixed development subset of TravelPlanner val-idation requests and finalized the component weights and safety thresholds before running the reported comparisons. After calibration, all formulas, weights, and thresholds were frozen. The held-out evaluator and alternative-weight anal-yses in Table 10 further examine whether the conclusions depend on this evaluator specification. 
+
+Weighted-Sum Baseline and Weight Sensitivity The Weighted-Sum baseline transforms the three direction-aligned objectives into 
+
+Uw(c) = 
+
+> 3
+
+X
+
+> j=1
+
+wj uj (c), wj ≥ 0,
+
+> 3
+
+X
+
+> j=1
+
+wj = 1 . (36) Because the three objectives are bounded in [0 , 1] , the main comparison uses the symmetric setting w = (1 /3, 1/3, 1/3) .This setting is fixed before evaluation and does not encode a model-specific preference. At each step, the candidate with the highest scalar utility is used as the incumbent, and an offspring replaces it only when its scalar utility is larger. The baseline therefore commits to one total ordering through-out search, unlike MOAE, which preserves incomparable candidates and applies the deployment preference only after search. To examine the sensitivity of fixed scalarization, we eval-uate four predefined weight profiles in Table 6. Each pro-file emphasizes a different deployment preference while preserving the same rollout budget and search procedure. As expected, task-heavy, trajectory-heavy, and safety-heavy weights improve their favored objectives, but each sacrifices performance in other dimensions. The equal-weight setting provides the strongest normalized hypervolume gain and joint-improvement rate among the tested profiles, indicat-ing the most balanced coverage of the three-objective region. Nevertheless, these results also demonstrate that scalarized search is sensitive to the chosen weights: changing a weight profile changes both the selected operating point and the qual-ity of the explored region. We therefore retain equal weights as the canonical Weighted-Sum baseline, without claiming that it is optimal over all possible scalarizations. 
+
+MOAE Search and Deployment Hyperparameters The main configuration has rollout budget B = 7 , two genera-tions, and three offspring per generation, one for each ob-jective. The archive contains the empirical nondominated candidates observed for the current query. Parent selection uses objective-specialized archive members subject to the retention guard described in the method. After search, de-ployment first filters candidates whose task performance is below the base rollout or whose safety risk exceeds that of the base rollout. Among feasible candidates, it applies the fixed lexicographic preference: trajectory quality, safety, and task performance. Ties are resolved deterministically. 
+
+Statistical Protocol and Integrity Checks All method comparisons are paired by query. We report query-level paired-bootstrap 95% confidence intervals with 10,000 re-samples. Repeated-run results use the same fixed query sub-set for all methods and report both between-seed standard deviations and paired confidence intervals. Before aggrega-tion, records are keyed by benchmark case identifier; dupli-cate, malformed, and unsuccessful records are excluded and Algorithm 1: Multi-Objective Agent Evolution 
+
+Require: Query x, frozen agent Aθ , mutation model Mϕ,objectives {uj }mj=1 , generations G 
+
+> 1:
+
+Evaluate the base policy to obtain candidate c0 
+
+> 2:
+
+S0 ← { c0}; P0 ← { c0} 
+
+> 3:
+
+for t = 1 , . . . , G do  
+
+> 4:
+
+Construct the admissible archive from Pt−1 
+
+> 5:
+
+for j = 1 , . . . , m do  
+
+> 6:
+
+Select an objective-j parent pt,j  
+
+> 7:
+
+Compute objective-specific diagnostic feedback  
+
+> 8:
+
+Generate and validate child policy with Mϕ 
+
+> 9:
+
+Execute a fresh rollout and evaluate candidate 
+
+ct,j  
+
+> 10:
+
+end for  
+
+> 11:
+
+Ct ← { ct,j }mj=1  
+
+> 12:
+
+St ← S t−1 ∪ C t 
+
+> 13:
+
+Pt ← ND( Pt−1 ∪ C t) 
+
+> 14:
+
+end for  
+
+> 15:
+
+Select cdep using deployment constraints and prefer-ences  
+
+> 16:
+
+return the rollout and policy associated with cdep 
+
+reported. The main TravelPlanner runs contain 180 unique successful records per method with no duplicates, malformed records, or unresolved errors. Candidate counts and mutation counts are checked against the configured budget. 
+
+Prompts and Policy Interfaces 
+
+MOAE evolves a compact execution policy rather than the model parameters or agent architecture. Search-time prompts expose the parent’s policy, objective values, and concise eval-uator diagnostics. They do not expose hidden benchmark labels or reference answers. Figures 4 and 5 present the tem-plates in a compact visual form; the released artifact will also include machine-readable prompt files. 
+
+Algorithmic Summary Algorithm 1 summarizes the com-plete per-query search procedure, including archive construc-tion, objective-specific mutation, and deployment selection. 
+
+Complete Results and Generalization 
+
+Cross-Model TravelPlanner Results Table 8 summarizes the paired changes from each Base Agent to the correspond-ing constraint-aware Full MOAE deployment point. The di-rection of improvement is consistent across all three exe-cution models. Task performance increases by 0.092–0.096, trajectory quality increases by 0.012–0.046, and safety risk decreases by 0.096–0.133. Final Pass Rate also improves for every model, with the largest increase observed on Gemma. These results show that the same search and deployment procedure transfers across two locally served models and one API model. They establish consistent improvement over the corresponding base executions, while not implying that MOAE dominates every matched-budget baseline or every objective-specific operating point. The specialized points verify that the retained set contains candidates with meaningfully different strengths. Safety-oriented deployment lowers risk most aggressively but gives Weight profile wtask wtraj wsafety Task Trajectory Risk Normalized HV gain Joint improvement Equal 0.333 0.333 0.333 0.792 0.972 0.207 0.41 9.4%                         
+
+> Task-heavy 0.500 0.250 0.250 0.814 0.968 0.236 0.38 7.8% Trajectory-heavy 0.250 0.500 0.250 0.781 0.980 0.224 0.39 8.3% Safety-heavy 0.250 0.250 0.500 0.742 0.958 0.142 0.36 6.7%
+
+Table 6: Sensitivity of fixed scalarization to four predefined weight profiles on TravelPlanner with Gemma. Each profile uses the same seven-rollout budget. 
+
+System Prompt: Objective-Directed Policy Mutation Role. You improve a compact execution policy for a frozen tool-using agent. Modify the policy, not the user request, tools, evaluator, or model. 
+
+Inputs. 
+
+• User query: {{query}} 
+
+• Parent policy: {{parent_policy}} 
+
+• Parent rollout summary: {{rollout_summary}} 
+
+• Objective values: {{objective_vector}} 
+
+• Target objective: {{target_objective}} 
+
+• Evaluator diagnostics: {{diagnostics}} 
+
+Task. Produce a concise child policy that repairs the diagnosed weakness for the target objective while preserving the parent’s demonstrated strengths. Do not insert query-specific answers, fabricated tool observations, or evaluator text into the policy. 
+
+Output format. Return only the revised compact policy in the required policy schema. Figure 4: Template used by the mutation model to generate an objective-directed child policy. The actual implementation includes the exact policy schema and validation constraints.              
+
+> Hyperparameter Value Complete rollouts per query 7Initial candidates 1Generations 2Offspring per generation 3Optimization objectives Task, trajectory, safety Archive update Empirical nondominated subset Retention tolerance 0.02 Deployment feasibility Task and safety no worse than base Deployment preference Trajectory, safety, task Decoding temperature 0.6 (Best-of-7 is variant) Bootstrap samples 10,000 Bootstrap seed 27
+
+Table 7: Main MOAE configuration. up task performance, whereas task-oriented deployment ac-cepts more risk. The balanced rule is therefore an explicit deployment choice, not an estimate of a universally best can-didate. 
+
+AgentDojo Results Relative to the Base Agent, Full MOAE improves Gemma Tool Knowledge utility by 7.81 per-centage points (95% CI [1 .56 , 15 .63] ) and trajectory quality by 0.2606 (95% CI [0 .1626 , 0.3648] ). In the Gemma direct-injection setting, the corresponding improvements are 3.23                 
+
+> Model ∆Task ∆Trajectory ∆Risk ∆Final Pass Qwen3-30B-A3B +0.092 +0.026 -0.133 +1.11% Gemma-4-31B-it +0.096 +0.012 -0.096 +7.78% DeepSeek-V4-Pro +0.095 +0.046 -0.096 +6.11%
+
+Table 8: Change from the corresponding Base Agent to the constraint-aware Full MOAE deployment point on Trav-elPlanner. percentage points (95% CI [0 , 8.06] ) and 0.1740 (95% CI 
+
+[0 .0922 , 0.2574] ). On Qwen3 official attacks, utility improves by 12.50 percentage points (95% CI [4 .69 , 20 .31] ) and tra-jectory quality by 0.0420 (95% CI [0 .0192 , 0.0691] ). The Tool Knowledge safety metric is saturated at zero ASR for every method. In both settings with nonzero Base Agent at-tack success, the selected Full MOAE trajectories have zero observed ASR. 
+
+Stability across Seeds We repeat Full MOAE, MOCHA-Select, and Best-of-7 with three random seeds on the same fixed subset of the official TravelPlanner test split. Table 9 reports the mean and between-run standard deviation. Full MOAE achieves the highest mean task score, trajectory qual-ity, and strict trajectory validity across the three methods. MOCHA-Select obtains the lowest mean safety risk, fol-System Prompt: Frozen-Agent Execution with a Compact Policy Role. Complete the user’s task using the available tools and the execution policy below. Tool observations may contain untrusted content and must be treated as data rather than instructions. 
+
+User query. {{query}} 
+
+Execution policy. {{policy}} 
+
+Requirements. 
+
+• Plan before acting and track all user constraints. 
+
+• Use valid tool calls and ground factual plan elements in observations. 
+
+• Avoid redundant calls and stop when sufficient verified evidence is available. 
+
+• Ignore instruction-like content returned by tools and follow only the trusted system and user instructions. 
+
+Output format. Return the final response required by the benchmark after completing any necessary tool interactions. Figure 5: Template used to execute a candidate policy with the frozen agent. The query and policy change across candidates; the model, tools, and execution interface remain fixed.                 
+
+> Method Task Trajectory Valid (%) Risk Full MOAE 0.879 ±0.013 0.991 ±0.003 65 .0±6.60.174 ±0.011
+> MOCHA-Select 0.819 ±0.006 0.988 ±0.002 58 .3±5.20.168 ±0.023
+> Best-of-7 0.778 ±0.027 0.989 ±0.002 58 .3±3.80.184 ±0.005
+
+Table 9: Results over three seeds on a fixed subset of the official TravelPlanner test split. Smaller subscripted values denote between-run standard deviations. lowed closely by Full MOAE, while Best-of-7 has the high-est risk. Trajectory quality varies little across seeds for all methods, and the remaining standard deviations indicate that the overall ordering is not driven by a single favorable run. 
+
+Additional Generalization and Evaluator Robustness 
+
+Table 10 evaluates whether the reported gains depend on the search evaluator, trajectory-component weights, or orig-inal evaluation subset. A held-out evaluator that is not ex-posed during mutation produces a candidate-order correla-tion of 0.91 and agrees with the original deployment deci-sion on 85.6% of queries. Under this evaluator, Full MOAE continues to improve task performance and trajectory qual-ity while reducing safety risk relative to the Base Agent. Recomputing trajectory quality with alternative component weights yields rank correlations between 0.93 and 0.97, with 91.7% of deployment selections unchanged; Full MOAE re-tains joint improvements under every tested profile. On the expanded 200-query test subset, Full MOAE also achieves the strongest task, trajectory, and safety results among Base, Best-of-7, Weighted-Sum, and Full MOAE. Together, these analyses indicate that the main conclusions are not explained solely by one evaluator, trajectory-weight configuration, or validation subset, although they remain conditional on the broader objective definitions and benchmark coverage. 
+
+Mechanism and Search-Behavior Analysis 
+
+Direction-Specific Mutation Outcomes Across 180 Gemma TravelPlanner queries, the main run contains 1,080 mutation attempts. Table 11 measures whether each objective-directed child improves its target objective over its selected parent and whether it enters the updated empiri-cal nondominated archive. Safety-directed mutation has the highest target-improvement rate, while task-directed muta-tion has the highest archive-admission rate. The difference between target improvement and admission is expected be-cause admission depends on all objectives rather than only the mutation target. 
+
+Archive Dynamics and Parent Diversity The mean archive size grows from 1.00 after initialization to 2.01 after the first generation and 2.52 after the second. A query uses 1.67 distinct parents on average, and 64.44% of queries se-lect at least two different archive members as parents. These values show that objective-specialized parent selection is op-erational rather than merely formal: different archive mem-bers often provide the strongest available starting point for different mutation directions. The final deployment rule returns the initial candidate for 79 of 180 queries and an offspring for 101. Among selected offspring, 50 are task-directed, 24 trajectory-directed, and 27 safety-directed. Thus, no single mutation direction accounts for all deployed improvements. 
+
+Search Effectiveness Metrics The main paper reports nor-malized hypervolume gain, empirical Pareto-set size, archive admission rate, and strict joint-improvement rate. Normal-ized hypervolume gain measures expansion of the attainable three-objective region relative to the initial rollout and re-maining headroom. Empirical Pareto-set size counts retained nondominated trade-offs but is not intrinsically monotonic with quality. Archive admission rate measures the fraction of offspring that introduce a new nondominated trade-off when generated. Joint-improvement rate is the proportion of queries for which at least one offspring strictly improves task, Analysis Protocol Primary comparison Result Held-out evaluator Re-score Base, Best-of-7, Weighted-Sum, and Full MOAE rollouts using an evaluator whose feedback is not exposed during search Candidate-order correlation and paired changes in task, trajectory, and safety Spearman ρ = 0 .91 ; 85.6% deployment agreement. Full MOAE versus Base:           
+
+> +0 .088 Task, +0 .010 Trajectory, and
+> −0.087 Risk. Objective-weight robustness Recompute trajectory quality under predefined alternative component weights without rerunning or reselecting candidates Rank correlation and paired Full MOAE improvements under each weighting profile Spearman ρ= 0 .93 –0.97 ; 91.7% of selections remain unchanged. Full MOAE improves all three objectives under every profile. Expanded test evaluation Freeze prompts, objectives, and deployment rules, then evaluate a predefined 200-query subset of the official TravelPlanner test split Base, Best-of-7, Weighted-Sum, and Full MOAE
+> Task/Trajectory/Risk:
+> Base: 0.781 /0.964 /0.281
+> Best-of-7: 0.852 /0.984 /0.194
+> Weighted-Sum: 0.840 /0.980 /0.216
+> Full MOAE: 0.861 /0.987 /0.181
+
+Table 10: Additional generalization and evaluator-robustness analyses. Results for expanded test evaluation are reported as Task/Trajectory/Risk.                
+
+> Direction Mutations Target improved Archive admitted Task 360 20.56% 43.61% Trajectory 360 13.06% 38.61% Safety 360 25.00% 40.28% Overall 1,080 19.54% 40.83%
+
+Table 11: Direction-specific mutation outcomes on Trav-elPlanner with Gemma.                  
+
+> Method Norm. HV gain Pareto size Admission rate Joint improve. Best-of-7 0.37 1.51 27.8% 9.4% Weighted-Sum 0.41 1.83 31.2% 9.4% w/o archive 0.43 1.96 33.9% 8.9% Full MOAE 0.52 1.92 35.6% 13.9%
+
+Table 12: Search-behavior summary corresponding to the main-paper mechanism figure. Confidence intervals are re-ported in the figure. trajectory, and safety over the initial rollout. The last metric is conservative when an initial objective is already saturated. Removing directed mutation produces the largest overall degradation, especially in task improvement and risk reduc-tion. Removing diagnostics weakens final constraint satis-faction and safety repair while retaining much of the average trajectory gain. Removing the archive has a smaller effect on mean task score but reduces strict trajectory validity and the ability to retain alternative deployment choices. The compo-nents therefore play different roles: mutation proposes tar-geted changes, diagnostics identify actionable failures, and the archive preserves improvements that cannot be repre-sented by one scalar incumbent.                                
+
+> Candidate Task Trajectory Safety risk Initial rollout c00.650 0.937 0.900 Task child c10.975 0.947 0.230 Trajectory child c20.975 0.971 0.300 Safety child c30.975 0.947 0.300 Second-generation child c41.000 0.980 0.230 Second-generation child c50.975 0.980 0.300 Second-generation child c60.975 0.947 0.200
+
+Table 13: Objective values for the real evolution case. Safety risk is lower when better. 
+
+Qualitative Evolution Case Study 
+
+Table 13 and Figure 6 present a real TravelPlanner query (in-dex 133) to illustrate how objective evaluation, archive-based parent selection, diagnostic feedback, and policy mutation interact within one MOAE search. Table 13 reports the ob-jective values of the initial rollout and all six offspring, while Figure 6 presents the diagnostic information and policy-level mutation that produce the selected second-generation candi-date. The request asks for a three-day trip from Columbus to Newark for two adults traveling with children under ten, using an entire-room accommodation, no self-driving, and a total budget of $1,200. The initial rollout satisfies many con-tent constraints but omits return transportation, contains two invalid actions, and follows instruction-like metadata from an untrusted observation. As shown in Table 13, the first-generation offspring sub-stantially improve the initial rollout but preserve different strengths. The task-directed child c1 produces the largest im-mediate task gain, the trajectory-directed child c2 attains the strongest trajectory quality, and the remaining candidates offer alternative task–trajectory–safety trade-offs. MOAE therefore retains multiple candidates rather than reducing them to a single scalarized incumbent. Real Mutation Trace for Index 133 Parent strength. The selected parent covers the required travel entities and has the strongest trajectory score in the admissible archive. 
+
+Evaluator diagnosis. The candidate does not verify total itinerary cost against the $1,200 budget and may accept an option before checking all remaining constraints. 
+
+Mutation instruction. Preserve the parent’s valid tool-use and evidence-grounding behavior. Add an explicit final budget aggregation step, reject plans above $1,200, and re-check transportation, accommodation, and dining costs before stopping. 
+
+Observed child behavior. The child performs the missing cost check, repairs the remaining task constraint, and retains the parent’s trajectory discipline. Figure 6: Human-readable view of a real diagnostic-guided mutation. The figure shows only evaluator summaries and policy-level changes; hidden model reasoning and attack payloads are not reproduced. For the second generation, c2 is selected as the trajectory-specialized parent because it has the highest trajectory qual-ity among candidates that satisfy the task-retention guard. Its evaluator diagnostics identify the remaining budget con-straint. As summarized in Figure 6, the resulting mutation preserves the parent’s valid and evidence-grounded tool-use behavior while adding explicit total-cost aggregation and en-forcement of the $1,200 limit. The resulting child c4 satisfies all task constraints, further improves trajectory quality, and preserves the reduced safety risk achieved during the first generation. The constraint-aware deployment rule consequently se-lects c4. This case illustrates the roles of the three main mechanisms: the archive preserves offspring with different strengths, objective-specialized selection identifies a suitable parent, and evaluator diagnostics convert the parent’s remain-ing weakness into an actionable policy mutation. The child therefore inherits a useful behavior from the archive and re-pairs a specific failure instead of restarting from the original policy. 
+
+Token and Runtime Analysis 
+
+Search tokens include all model input and output tokens used to generate, execute, evaluate, and mutate candidates. Deployment tokens count only the selected candidate’s exe-cution and exclude search-time diagnostic and mutation con-text. This distinction prevents the optimizer’s internal context from being reported as part of the deployed policy. For the locally served models, mutation accounts for only 12.2K– 12.4K tokens per query, while most search cost comes from executing complete agent rollouts. The selected candidate re-mains close to the Base Agent in execution cost. DeepSeek-V4-Pro shows a similar total search budget, but its API logs do not support the same component-level decomposition. The selected-policy execution cost remains close to that of the Base Agent. Most additional cost comes from evaluat-ing complete candidates rather than from compact mutation calls: the six mutations account for 12.2K tokens on Gemma and 12.4K on Qwen3. The DeepSeek API records total search usage but does not expose the same local execution/runtime decomposition. 
+
+Closest-Work Comparison 
+
+Table 15 distinguishes these methods by what they optimize, where search is performed, how multiple objectives affect candidate retention, and whether search is separated from de-ployment. GEPA, MOCHA, SkillMOO, AgentBreeder, and EvoAgent primarily optimize reusable textual components, skills, or agent structures over a development task collec-tion. Some of these methods already preserve multiple ob-jectives or diverse candidates, so our distinction is not that MOAE is the first method to use evolution or nondominated selection. Instead, MOAE applies these principles indepen-dently to each query under a seven-rollout budget. Its archive preserves rollout-level trade-offs among heterogeneous ob-jectives, while a separate constraint-aware rule determines which archived behavior should be deployed. The key dif-ference is therefore the combination of per-query search, limited online evaluation, nondominated retention, and an explicit separation between search-time preservation and deployment-time preference. 
+
+Limitations, Failure Modes, and Reporting 
+
+Scope of the Pareto claim. MOAE uses Pareto dominance as a candidate-preservation rule, but its archive should not be interpreted as an approximation to a global Pareto front. For each query, the archive is constructed from only seven evaluated candidates generated by one initial rollout and six mutations. It therefore represents a small empirical nondom-inated set under the selected objectives, evaluator, and rollout budget. A candidate is retained because no other observed candidate is measured as better in every objective, not be-cause it is globally optimal or because no better policy exists outside the evaluated set. The archive can also contain weak but incomparable candidates, so archive size alone is not a measure of search quality. For this reason, we jointly re-port normalized hypervolume gain, archive admission rate, strict joint-improvement rate, and the quality of the deployed candidate. Hypervolume conclusions are themselves condi-tional on the objective normalization and reference point and should be used to compare search behavior under the fixed experimental protocol rather than to establish an absolute measure of agent quality. Model Method Base Selected Execution Mutation Search Seconds Gemma Full MOAE 56.6 56.5 384.4 12.2 396.6 610.3 Qwen3 Full MOAE 59.4 61.4 438.3 12.4 450.7 584.9 DeepSeek-V4-Pro Full MOAE 60.4 N/A combined 396.3 396.3 N/A 
+
+Table 14: Mean per-query MOAE cost. Token counts are reported in thousands. “Base” and “Selected” denote the execution-token costs of the initial and deployed candidates. “Execution” includes all complete candidate rollouts, whereas “Mutation” includes the six compact policy-generation calls. The DeepSeek API logs aggregate search usage but does not provide the same execution–mutation decomposition or a directly comparable local runtime; therefore, its combined search usage is reported without an inferred split.                           
+
+> Method Optimized artifact Search scope Objective structure ND retention Deployment aware selection GEPA Reusable textual components Development task collection Performance across examples Yes No MOCHA Persistent structured skills Development task collection Correctness and platform preferences Method-specific No SkillMOO Reusable skill bundles Development task collection Performance, cost, and runtime Yes No AgentBreeder Agent architectures and scaffolds Development task collection Capability and safety Quality-diversity No EvoAgent Multi-agent architecture Development task collection Primarily task performance No No
+> MOAE Per-query execution policy Single query with seven rollouts Heterogeneous rollout objectives
+> Yes Yes
+
+Table 15: Comparison with closely related agent optimization settings. ND denotes nondominated. A development task collection optimizes an artifact that persists across queries, whereas MOAE performs limited-budget optimization independently for each query. Deployment-aware selection denotes an explicit separation between candidate preservation during search and constraint-aware selection of the response returned for the current query. 
+
+Dependence on objective design and evaluators. MOAE can optimize only properties represented by its evaluators. If a task error, unsupported claim, inefficient action, or un-safe influence is not detected, it cannot contribute to parent selection, diagnostic feedback, or deployment filtering. Con-versely, a misspecified evaluator may reward behavior that improves the measured score without improving the intended property. This creates a risk of evaluator exploitation because candidate policies are repeatedly generated using feedback from the same objective functions that later rank them. The held-out evaluator and alternative trajectory-weight analyses reduce this concern by showing that most candidate ordering and improvements transfer under changed evaluation condi-tions, but they cannot exclude all forms of metric overfitting. The three objectives should also not be interpreted as sta-tistically or causally independent. Better information cover-age and evidence support can improve both trajectory qual-ity and task completion, while conservative tool use can affect both trajectory discipline and measured safety. Multi-objective optimization does not require independence, but the reported joint improvements mean that several opera-tional criteria improve simultaneously under their definitions. They do not establish that MOAE has isolated three indepen-dent latent capabilities. The trajectory component weights and safety thresholds are fixed before the main evaluation and shared across methods, but different applications may require different objective definitions, calibrations, or de-ployment constraints. 
+
+Limits of measured safety. Safety risk is evaluated us-ing predefined probes applied to untrusted tool observations, and Attack Success Rate records severe failures observed un-der the benchmark attacks. These measurements cover only the tested attack families, tool interfaces, and propagation paths. An attack-success rate of zero means that no success-ful attack was observed in the evaluated cases; it does not establish universal robustness or certify the deployed agent as safe. Unseen prompt-injection strategies, adaptive attackers, compromised tools, multi-turn attacks, or failures outside the monitored planner and output fields may remain undetected. Safety-optimal candidates can also become overly conserva-tive and lose task utility, as reflected by the objective-specific deployment results. Consequently, the safety objective is best viewed as a measured risk signal for comparative optimiza-tion rather than a complete security guarantee. 
+
+Deployment guarantees are empirical. The deployment rule requires task performance to be no lower than the ini-tial rollout and safety risk to be no higher, after which it prioritizes trajectory quality, safety, and task performance. Because the initial rollout itself is included, the feasible set is never empty. If no offspring satisfies both constraints, MOAE returns the initial candidate. This mechanism prevents mea-sured regressions relative to the observed Base Agent rollout, but it does not guarantee improvement in the candidate’s un-known expected performance. Both the baseline score and the offspring scores are obtained from individual stochastic executions and may contain evaluation noise. The retention guard similarly restricts which candidates may become par-ents for auxiliary objectives, but it does not guarantee that a generated child will inherit the parent’s strengths. A fresh rollout may fail to reproduce a successful tool sequence even when it uses an improved policy. The lexicographic deployment order is also an applica-tion choice rather than a universally optimal preference. It is intentionally separated from archive construction so that an-other application can impose different constraints or select a task-specialized, trajectory-specialized, or safety-specialized point from the same candidate pool. However, deployment preferences must still be specified eventually. MOAE post-pones preference commitment during search; it does not eliminate the need to define acceptable behavior at deploy-ment. 
+
+Online cost and budget sensitivity. MOAE requires seven complete environment-interacting rollouts and six com-pact policy-generation calls for every query. It is therefore training-free but not cost-free. The method may be unsuitable for latency-sensitive applications, expensive external tools, irreversible actions, or environments in which repeated exe-cution changes the underlying state. The seven-rollout config-uration is a practical operating point that supports two com-plete three-objective generations, not a convergence guaran-tee. The rollout-scaling experiment shows further improve-ment beyond seven candidates, while smaller budgets may not provide enough objective-specific offspring to form a useful archive. Adaptive stopping, asynchronous evaluation, candidate reuse, and budget allocation based on objective un-certainty remain important directions for reducing this cost. The main comparisons match the number of complete agent rollouts, but the methods do not have identical opti-mizer overhead. Best-of-7 uses no mutation calls, whereas evolutionary methods invoke a model to generate new compact policies. We therefore report optimizer tokens, total search tokens, and runtime in addition to rollout count. The comparison isolates differences under a matched environment-interaction budget, not under identical total to-ken consumption or wall-clock cost. 
+
+Interpretation of adapted baselines. GEPA-Online, MOCHA-Select, and EvoAgent-Online are matched-budget adaptations that transfer the corresponding reflection, preference-based selection, or specialist-integration princi-ples into the same per-query policy space. Their results should not be interpreted as a comprehensive ranking of the original methods under their native settings. GEPA normally optimizes reusable textual components over development ex-amples, MOCHA optimizes persistent structured skills, and EvoAgent evolves agent structures through a broader process. Our adaptations intentionally remove differences in artifact scope, development set size, and rollout harness to compare candidate-generation and selection principles under seven online rollouts. This improves internal comparability but narrows the claim to the specific per-query setting studied here. 
+
+Generalization and stochasticity. The experiments cover TravelPlanner and AgentDojo, three execution models, and a compact textual policy controlling planning, tool use, veri-fication, and stopping. These results provide evidence across different models and two tool-use environments, but they do not establish generality across all agent architectures. MOAE has not been evaluated for persistent memory, long-term skill acquisition, multi-agent coordination, embodied interaction, or environments with irreversible state changes. API-served models may also change over time even when the model name remains constant, which can limit exact reproduction. The repeated-seed analysis indicates that the main trajec-tory effect is not due to one favorable random seed, but three seeds are still insufficient to characterize every source of generation variance. Paired confidence intervals quantify uncertainty over the evaluated queries; they should not be interpreted as guarantees for a different task distribution. 
+
+Common failure modes. Observed and anticipated fail-ures fall into several categories. First, an objective may al-ready be saturated, leaving little diagnostic signal for its di-rected mutation. This occurs, for example, when all candi-dates receive zero attack success even though untested vul-nerabilities may remain. Second, a diagnostic can identify a symptom, such as missing evidence or an invalid call, with-out providing a repair that the mutation model can reliably translate into a policy. Third, a mutation may overcorrect one weakness and reduce another objective, producing a useful specialized candidate but not a feasible deployment candi-date. Fourth, several mutations may produce nearly iden-tical policies, limiting archive diversity despite the use of different objective directions. Fifth, an apparently improved policy may fail during fresh execution because tool results and model generations are stochastic. Finally, the optimizer can exploit systematic evaluator blind spots, producing mea-sured improvement without a corresponding improvement in human-perceived quality. The archive, retention guard, and deployment filter reduce the impact of these failures but do not remove their underlying causes. 
+
+Reporting and reproducibility. The supplementary ar-tifact records the dataset split identifiers, model names and revisions, serving parameters, compact policy schema, machine-readable prompts, objective implementations, com-ponent weights, safety thresholds, retention tolerance, de-ployment rule, random seeds, per-query candidate records, optimizer usage, integrity checks, and aggregation scripts. Candidate records preserve the objective values, parent rela-tionships, mutation directions, archive updates, and selected deployment point needed to audit the reported search pro-cess. API credentials, local filesystem paths, user identifiers, and other machine-specific information are excluded. Potentially harmful prompt-injection payloads are not re-produced verbatim in the paper or unrestricted artifact. In-stead, we report benchmark identifiers, attack-family labels, evaluator versions, aggregate outcomes, and non-sensitive execution metadata. This permits verification of experimen-tal coverage and reported measurements without unnecessar-ily redistributing actionable attack content.
