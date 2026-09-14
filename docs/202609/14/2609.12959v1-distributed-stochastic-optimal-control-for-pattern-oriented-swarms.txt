@@ -1,0 +1,1573 @@
+Title: Distributed Stochastic Optimal Control for Pattern-Oriented Swarms
+
+URL Source: https://arxiv.org/pdf/2609.12959v1
+
+Published Time: Mon, 14 Sep 2026 01:24:31 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+> IEEE TRANSACTIONS ON ROBOTICS 1
+
+# Distributed Stochastic Optimal Control for Pattern-Oriented Swarms 
+
+Qingrui Zhang, Chenghao Yu, Feng Xue, and Xintong Wang 
+
+Abstract —While offering significant promise for diverse applica-tions, pattern-oriented swarms encounter multifaceted challenges in distributed geometric control, autonomous self-organization, and safe navigation through dynamic environments. In this paper, we present a Gibbs Random Field (GRF)-based stochastic optimal control framework to address these challenges within a unified probabilistic architecture. By extending the GRF into the temporal domain, the proposed framework casts collective coordination as a Bayesian inference task, enabling swarms to accommodate environmental uncertainty, satisfy non-convex constraints, and reconcile heterogeneous dynamics across diverse platforms. Within this framework, we develop an uncertainty- and safety-aware collision avoidance module for navigation in the presence of stochastic obstacle motion. The unscented transform is employed to propagate state uncertainty for both dynamic obstacles and neighboring agents, yielding principled confidence bounds for collision avoidance. In addition, a density-guided pattern control strategy is introduced, which encodes geometric patterns as implicit density fields using signed distance functions. This representation decouples pattern specification from explicit agent-to-target assignments, thereby facilitating intrinsic self-healing and elastic reconfiguration in a distributed manner. The proposed framework and its principal modules are extensively evaluated through Monte Carlo simulations across diverse scenarios. Its model-agnostic nature is demonstrated on both quadrotor and fixed-wing UAV swarms, highlighting its generalizability across platforms with heterogeneous dynamics. Finally, the efficacy and robustness of the proposed method are validated through indoor experiments with a 15-quadrotor swarm and outdoor deployments involving 4 custom-built autonomous quadrotors. These experiments substantiate the proposed framework’s capacity to maintain reliable geometric pattern transitions and safety-aware navigation within real-world environments. 
+
+Index Terms —Robot swarms, stochastic optimal control, Gibbs random field, pattern control, collision avoidance. 
+
+I. I NTRODUCTION 
+
+# ROBOT swarms have demonstrated significant potential across a wide range of application domains, including environmental monitoring, search and rescue, and cooperative transportation [1]–[4]. These missions inherently hinge on the coordinated pattern formation of robots, giving rise to 
+
+pattern-oriented swarms , defined as robot swarms that maintain coordinated spatial patterns to achieve mission objectives under dynamic and uncertain conditions. For example, environmental monitoring tasks typically benefit from grid or sweep patterns that provide consistent sensor coverage; search and rescue operations require robot swarms with dynamically adjustable formation patterns to enable efficient area exploration; and 
+
+All authors are with the School of Aeronautics and Astronautics, Shenzhen Campus of Sun Yat-sen University, Shenzhen 518107, P.R. China. Correspond-ing author: Qingrui Zhang (e-mail: zhangqr9@mail.sysu.edu.cn). 
+
+cooperative transportation relies on tight geometric configu-rations to effectively distribute loads among multiple robotic carriers. In many applications, the operating environments are dynamic and uncertain [5], often populated with diverse obstacles exhibiting unknown or partially observable motions, including other vehicles, humans, and moving objects. Conse-quently, a pattern-oriented swarm must simultaneously maintain desired geometric patterns for task execution while ensuring collision-free navigation and adapting to diverse environmental conditions [3], [6]. These demands pose fundamental challenges for the design of pattern-oriented swarm control systems. Beyond pattern maintenance and collision avoidance, pattern-oriented swarms must incorporate additional attributes to enhance system reliability, operational flexibility, and environ-mental adaptability. From a functional perspective, swarms must possess self-healing and self-organizing capabilities, analogous to those observed in biological systems, to ensure operational resilience against fluctuations in swarm population [2], [7], [8]. When individual robots experience failures, com-munication disruptions, or are deliberately removed from the swarm, the remaining robots should autonomously redistribute to maintain pattern integrity without requiring centralized replanning or predefined recovery protocols. Furthermore, when mission objectives change or environmental conditions require pattern adjustments, the swarm should demonstrate elastic reconfigurability that accommodates varying swarm sizes and enables transitions among diverse spatial patterns [9]. From a deployment perspective, real-world environments often present demanding conditions, characterized by dense dynamic obstacles with diverse motion modalities. These settings are inherently uncertain due to the presence of diverse moving entities—such as pedestrians, ground vehicles, and other autonomous agents—each exhibiting distinct, non-deterministic behaviors. Such environmental uncertainties are further amplified by limited sensing ranges, measurement noise, and the stochasticity of obstacle motions, which are difficult to capture within deterministic planning frameworks and thus pose a significant barrier to achieving provable safety guarantees [10]–[13]. Existing solutions for the coordination of pattern-oriented swarms can generally be categorized into non-learning and learning-based methods. Non-learning approaches are driven by either rule-based or optimization-based paradigms, which exhibit certain architectural limitations in addressing the aforementioned challenges. Rule-based methods are built upon predefined behavioral primitives, such as separation, alignment, and cohesion rules, which are manually combined to produce collective behaviors [14]–[16]. While computationally efficient, arXiv:2609.12959v1 [cs.RO] 11 Sep 2026 IEEE TRANSACTIONS ON ROBOTICS 2
+
+these methods lack formal guarantees regarding multiple swarm performance requirements and often struggle to adapt when operating conditions deviate from the underlying design assumptions. Optimization-based methods, including model predictive control [17]–[20], characterize swarm behavior via cost functions that encode multiple competing objectives. These frameworks typically formulate the global objective as a linear combination of decoupled cost terms–such as collision avoidance, pattern maintenance, or goal tracking. However, such modular compositions are often governed by heuristic weight tuning and lack a unified theoretical framework to characterize the swarm’s emergent collective behavior as a monolithic sys-tem. Consequently, the intrinsic correlations among competing objectives—specifically the adaptive coupling between pattern constraints and safety maneuvers, or the impact of stochastic propagation on cooperative behaviors—remain unmodeled, relegated instead to implicit balancing via empirical parameter adjustment. Learning-based techniques, specifically those leveraging deep reinforcement learning and imitation learning, have demon-strated remarkable efficacy in swarm coordination by directly learning control policies from data [21]–[25]. These methods effectively capture complex, non-linear interaction topologies that elude analytical modeling, offering promising scalability for multi-robot systems. However, their inherent black-box nature poses significant hurdles to deployment in safety-critical domains [26], [27]. This lack of transparency precludes formal safety guarantees and renders swarm behavior unpredictable in out-of-distribution scenarios. Furthermore, learning-based frameworks often struggle to achieve a principled balance within multi-objective regimes involving competing constraints [28], such as goal acquisition, collision avoidance, and pattern integrity. In highly dynamic environments, these deficiencies can lead to brittle or overly aggressive trajectories that prioritize task completion over safety margins, thereby exacerbating the risk of catastrophic constraint violations [12], [13]. Conse-quently, existing learning-based methods fail to effectively manage the interdependencies of competing objectives, which leads to inconsistent performance in the case of conflicting constraints in dynamic settings [29]. To address these limitations, this paper presents a Gibbs Ran-dom Field (GRF)-based stochastic optimal control framework for pattern-oriented swarms, providing a unified, sampling-based solution to bridge the gap between swarm collective behavior modeling and stochastic optimal control. The key insight of our framework is to reformulate swarm coordination as inference on a GRF. Specifically, we model the swarm as a probabilistic graphical model in which interactions among robots are represented by clique potentials. Under this represen-tation, optimizing swarm behavior corresponds to maximizing the joint probability distribution over the GRF, effectively trans-forming multi-objective swarm coordination into a probabilistic inference problem. This formulation naturally accommodates complex interactions and stochastic uncertainties, allowing us to encode various constraints such as collision avoidance, pattern maintenance, and cooperative objectives within the probabilistic framework. It provides a principled mechanism to explicitly model and regulate the interdependency between competing objectives [30], rather than treating them as independent additive components. Building on this theoretical foundation, we establish an equivalence between probability maximization and path integral control, enabling the employment of sampling-based methods– e.g. , Model Predictive Path Integral (MPPI) [31] or Cross-Entropy Methods (CEM) [32]–to solve the resulting stochastic optimal control problem. To mitigate the stochasticity inherent in dynamic operational environments, the proposed framework integrates unscented transform-based trajectory prediction with risk-aware optimization, providing formal probabilistic safety guarantees against non-deterministic obstacle motions. Furthermore, a density-guided pattern control strategy is developed, which characterizes geometric patterns as a continuous density field. This formulation facilitates self-healing and elastic reconfiguration by decoupling the collective manifold from explicit robot assignments, thereby obviating the need for centralized coordination. Collectively, these components constitute a theoretically unified architecture that simultaneously addresses the core challenges of modeling cohesive swarm behavior and ensuring safe, uncertainty-aware navigation. The main contributions are summarized as follows: 1) A unified GRF-based stochastic optimal control frame-work is proposed for the distributed pattern-oriented swarm. Within this architecture, a robot swarm is mod-eled as a GRF via probabilistic graphical models, where the optimal control is synthesized via the Maximum A Posteriori (MAP) estimation of the joint probability distribution. Rather than a single-step estimation, the control inference is performed via the MAP estimation of joint GRFs over a finite prediction horizon. This formula-tion establishes a principled bridge between probabilistic inference and path integral control, enabling the problem to be efficiently resolved using sampling-based methods such as MPPI. By extending the GRF into the temporal domain, the proposed framework offers a theoretically unified approach to managing collective coordination under stochastic conditions. The proposed framework inherently facilitates distributed optimization for swarm-level objectives, enabling robot swarms to accommodate environmental uncertainty, satisfy non-convex constraints, and reconcile heterogeneous dynamics across diverse platforms. 2) An uncertainty- and risk-aware collision avoidance ap-proach is developed for safe navigation in dynamic envi-ronments with stochastic obstacle motion. The unscented transform is employed to propagate state estimates for dynamic obstacles and neighboring agents, yielding time-indexed uncertainty distributions over the prediction horizon. We thereafter integrate a unified probability-based collision avoidance framework within the Gibbs energy formulation, facilitating two distinct representa-tions for handling uncertainty: (1) a chance-constrained formulation and (2) a risk-sensitive formulation lever-aging Conditional Value-at-Risk (CVaR). This approach provides formal probabilistic safety guarantees against non-deterministic motions. Simulation benchmarks across IEEE TRANSACTIONS ON ROBOTICS 3
+
+scenarios with varying obstacle densities demonstrate the efficacy of the proposed method in achieving superior survival rates and safety performance. 3) A density-guided pattern control method is proposed, endowing pattern-oriented swarms with self-healing capabilities and elastic reconfigurability. By representing geometric patterns as implicit density fields characterized by signed distance functions (SDFs), the approach fundamentally decouples pattern formation from explicit robot-to-target assignments. In the event of robot loss, the remaining individuals spontaneously redistribute to fill the vacated regions in a distributed manner, thereby achieving emergent self-organization behavior analogous to that observed in biological swarms. The pattern scale adapts autonomously to varying swarm populations, while arbitrary compositions enable fluid reconfigu-ration for dynamic mission requirements. Simulation benchmarks across diverse non-convex geometries and robot-loss scenarios validate the effectiveness of the method. Furthermore, indoor and outdoor experiments with quadrotors demonstrate the method’s capacity in successful pattern control, dynamic transitions, sponta-neous self-healing, and safe navigation in real-world deployment. II. R ELATED WORKS 
+
+A. Swarm Control Methods 
+
+Swarm robotic control has undergone significant develop-ment over the past decades through several distinct paradigms. Early methodologies were predominantly rule-based, drawing inspiration from biological collective behaviors, as exempli-fied by Reynolds’ Boids model [14]. This seminal work demonstrated that complex flocking phenomena can emerge from three simple local rules— e.g. , separation, alignment, and cohesion—thereby laying the foundation for decentralized swarm coordination without centralized planning. Subsequently, [15] formalized flocking control within a rigorous control-theoretic framework, providing stability guarantees through potential-based interactions. While rule-based methods offer simplicity and scalability, they are inherently myopic, lacking the capacity to opti-mize task-specific objectives or manage complex constraints. This limitation motivated the shift toward optimization-based paradigms. In particular, distributed MPC (DMPC) formulations have subsequently demonstrated significant efficacy in multi-robot coordination, as evidenced by the online trajectory generation in [17] and the large-scale differential dynamic programming in [19]. More recently, [20] proposed a scalable DMPC framework capable of coordinating up to ten thousand robots. However, these optimization-based approaches gener-ally necessitate high-fidelity system models and often face challenges regarding computational tractability when deployed in real-time, high-dimensional environments. The advent of deep learning has introduced a data-driven swarm control paradigm, with reinforcement learning (RL) emerging as a particularly promising approach for synthe-sizing complex collective behaviors. Deep RL methods have demonstrated remarkable efficacy in distilling sophisticated control policies directly from high-dimensional experience, enabling robots to address intricate interaction patterns that defy analytical modeling [21], [22]. In particular, multi-agent reinforcement learning (MARL) frameworks have further ad-vanced swarm coordination. Methods such as asymmetric self-play and curriculum learning have been developed to facilitate robust cooperation among heterogeneous robots [24]. Notably, recent work by [25] demonstrated that integrating Gibbs random fields with MARL can achieve impressive flocking control, with success rates approaching 99% in challenging environments at significantly lower computational cost than MPC methods. In addition, [33] proposed multi-fidelity reinforcement learning, which co-trains planning policies with reward estimators, thereby achieving real-time trajectory updates for time-optimal replanning. Despite these advances, learning-based methods face inherent limitations that hinder their deployment in safety-critical applications [26], [27]. Their black-box nature precludes formal safety guarantees, making it difficult to certify system behavior or predict performance in novel scenarios. The generalization capabilities of learned policies to out-of-distribution conditions remain fragile, while the sample inefficiency of training often necessitates extensive simulation prior to deployment in the real world. Model Predictive Path Integral (MPPI) control represents a compelling synthesis of optimization and learning paradigms that addresses several limitations of purely learning-based approaches. Originally developed from integral path control [34], [35], MPPI was introduced by [36], [37] as a sampling-based approach to aggressive autonomous driving. It iteratively samples control sequences, evaluates them using a cost function, and updates the control sequences based on Kullback–Leibler (KL) divergence and importance sampling [31]. Hence, MPPI can be interpreted as an online reinforcement learning method. [31] has demonstrated that MPPI can effectively perform model-based policy optimization in real-time, bridging the gap between model-free RL flexibility and model-based control predictability. [38] extended a similar path integral framework to constrained stochastic optimal control with learned impor-tance sampling, demonstrating real-time control on quadrupedal robots. In light of the sampling-based architecture, MPPI can natively accommodate non-convex cost landscapes without requiring gradient computation and leverage massive GPU par-allelization to ensure real-time performance in high-dimensional robotic systems. Recent extensions have applied MPPI to multi-agent scenarios with explicit uncertainty propagation [18], [39], demonstrating its potential for swarm coordination. [40] further advanced sampling-based MPC through products of experts, enabling more efficient exploration in constrained optimization problems. However, existing formulations do not fully exploit the spatial structure inherent in swarm coordination problems, treating inter-agent interactions as independent cost terms rather than as correlated random variables. Our proposed GRF-MPPI framework addresses this gap by encoding inter-agent spatial dependencies through GRFs, enabling more effective coordination in large-scale swarms while preserving the advantages of sampling-based control and providing a principled mechanism for uncertainty-aware decision making. IEEE TRANSACTIONS ON ROBOTICS 4
+
+B. Geometric Pattern Control 
+
+Geometric pattern control aims to coordinate multi-robot systems to achieve and maintain desired spatial configurations. Traditional approaches are primarily based on formation control paradigms, including leader–follower, virtual structure, and behavior-based methods [3]. The leader–follower approach formulates pattern control as a tracking problem, in which a designated leader governs the motion while the remaining robots maintain predefined relative positions or distances [41]. The virtual structure approaches, pioneered by [42], model the geometric pattern as a rigid entity, assigning each robot a specific and fixed position on that structure. [43] extended this concept to quadrotor swarms, enabling agile interleaved maneuvers through differential flatness-based control augmented with layered potential fields for collision avoidance. However, the aforementioned formation control methods are intrinsically based on predefined rigid structures with fixed geometries. This structural dependency necessitates explicit centralized re-indexing or assignment reconfiguration whenever swarm membership changes dynamically–a process that becomes computationally prohibitive as the system scales. [44] reported that collision-aware reconfiguration algorithms require substantial computational overhead, achieving only 49% time reduction compared to naive approaches. Similarly, [45] observed that adaptive reconfiguration in confined environments demands complex online replanning. Consequently, these methods exhibit limited resilience due to the absence of topological flexibility required for swarm self-organization, motivating the transition toward more flexible density-guided paradigms. In contrast, coverage control offers a fundamentally dif-ferent perspective on geometric pattern formation, providing significantly greater topological flexibility than conventional formation control approaches. [46] proposed a gradient-descent algorithm to coordinate robots into centroidal Voronoi configu-rations without requiring explicit agent-to-position assignments. Subsequent advancements by [47] addressed the coupled chal-lenges of formation stabilization and connectivity maintenance through navigation functions, while [48] leveraged nonsmooth control barrier functions to ensure continuous visual coverage and eliminate sensing gaps in aerial swarms. The mean-field approach by [49] established the theoretical foundations for density-based control via continuous-time Markov chains, a framework recently extended by [50] using Fokker-Planck equations to characterize the dynamic evolution of density. These methods have demonstrated impressive scalability, for example, [51] achieving formations with 1024 robots through local task swapping and [52] realizing complex formation assembly—including regeneration and cargo transportation. However, existing solutions typically assume quasi-static density functions and treat robots as independent entities, failing to capture the spatial correlations among neighboring robots. Furthermore, environmental stochasticity inherent in real-world deployments remains largely unaddressed in the state of the art methods. Our recent work [53] demonstrated that GRFs can facilitate geometric pattern control via mean-shift techniques, enabling dynamic formation in obstacle-dense environments. Build-ing upon this foundation, the GRF-based stochastic optimal control framework proposed in this paper addresses existing limitations through a unified probabilistic architecture. By encoding formation objectives as Gibbs energy functions, our approach explicitly captures spatial correlations between neighboring agents within a GRF, representing a fundamental departure from coverage-based methods that model robots as independent, uncorrelated entities. This formulation endows the swarm with intrinsic self-healing capability. The robot swarm autonomously reorganizes in response to fluctuating agent populations, without requiring the explicit and computationally intensive reconfiguration mandated by traditional graph-based methods. Consequently, our framework preserves permutation invariance, ensuring that the global objective remains satisfied regardless of individual robot identities or local membership changes. 
+
+C. Uncertainty-Aware Collision Avoidance 
+
+Conventional collision avoidance frameworks for robot swarms have achieved remarkable computational efficiency under idealized assumptions. Artificial potential field methods [54] synthesize repulsive forces to deflect robots away from obstacles, while velocity obstacle-based approaches [55], [56] leverage geometric reasoning in the velocity space to identify reachable, collision-free control inputs. Additionally, Control Barrier Functions (CBFs) [12], [57], [58] provide formal safety guarantees by encoding collision-free regions as forward invariant sets. However, these paradigms fundamentally rely on the assumption of deterministic motion and perfect state infor-mation, necessitating precise knowledge of positions, velocities, and future trajectories. In practice, these assumptions are frequently violated by sensor noise, communication latencies, stochastic obstacle motion, and non-cooperative behaviors. When deployed under such uncertainties, deterministic methods face a critical trade-off: they either fail to account for collisions arising from estimation errors or resort to overly conserva-tive safety margins, which significantly degrade navigation efficiency [59]. These fundamental limitations necessitate the development of probabilistic approaches that explicitly reason about uncertainty to maintain both safety and agility. To address the inherent uncertainty in real-world scenarios, uncertainty-aware collision avoidance methods have evolved along several complementary directions. Reactive approaches focus on the immediate response to moving obstacles with uncertain trajectories. [60] developed globally optimal velocity fields enabling navigation to arbitrary positions among moving obstacles, while [61] proposed topology-aware motion planning that accounts for both robot state uncertainty and obstacle motion estimates. Game-theoretic methods offer an alternative paradigm by modeling interactions between agents as strategic decision-making. [62] formulated crowd navigation as a mixed strategy Nash equilibrium, achieving human-level navigation performance through Bayesian recursive updates. Beyond these reactive and game-theoretic approaches, probabilistic constraint methods have emerged. Chance-Constrained (CC) optimization, originated from the seminal work of [63], bounds collision IEEE TRANSACTIONS ON ROBOTICS 5
+
+probability below a specified threshold. This framework was subsequently extended to nonlinear MPC [64], ADMM-based distributed optimization [65], and multi-agent stochastic games [66]. However, a fundamental limitation of CC methods is that they bound only the probability of violation, remaining indifferent to the severity of the collision. This ’tail-blindness’ makes them incapable of distinguishing between a marginal boundary crossing and a catastrophic failure. Conditional Value-at-Risk (CVaR) addresses this tail-risk insensitivity by optimizing against the expectation of worst-case outcomes. As demonstrated by [67], CVaR provides coherent risk measures capable of distinguishing between rare but catastrophic tail events, a capability further enhanced by distributionally robust approximations [68]. Building on these theoretical foundations, recent research has begun integrating these probabilistic for-mulations into sampling-based MPC frameworks to enhance robustness in high-dimensional state spaces. Belief-space stochastic MPPI [69] applies Monte Carlo sampling with CBF-inspired heuristics, while chance-constrained unscented MPPI [70] leverages unscented sampling for real-time navigation. Additional approaches combine Gaussian Process uncertainty quantification [71] and reactive chance-constrained MPC [72]. Despite these advances, existing planning frameworks typically treat collision avoidance as additive cost terms, lacking uni-fied integration of probabilistic safety guarantees within the importance sampling framework. In this paper, we present a unified framework that integrates probabilistic collision avoidance into a GRF-based stochastic optimal control architecture for pattern-oriented swarms. This unified approach generates uncertainty- and risk-aware behav-iors while overcoming the inherent limitations of conventional deterministic methods. Within the proposed framework, the GRF structure encodes safety constraints as potential functions. It allows collision probabilities to be seamlessly integrated as weighting factors within the importance sampling process. Simultaneously, the unscented transform is employed to propa-gate uncertainty through the nonlinear dynamics of both the robots and dynamic obstacles, providing principled covariance estimates that quantify collision risk over the prediction horizon. By synthesizing these techniques, our framework provides formal probabilistic safety guarantees for swarm navigation in highly uncertain and dynamic environments. III. P RELIMINARIES 
+
+A. Gibbs Random Field 
+
+A Gibbs Random Field (GRF) is defined as a collection of random variables whose joint probability distribution is characterized by local, undirected interactions, typically formu-lated through a scalar energy function. Under the Hammersley-Clifford theorem, a GRF is equivalent to a Markov Random Field (MRF), implying that the state of a discrete element is conditionally independent of all others given its immediate neighborhood [73]. In this framework, configurations of the field follow a Gibbs distribution, where the probability mass is concentrated in states of lower energy. Mathematically, a GRF is represented by an undirected graph G = ( V, E) where V is the set of nodes and E represents the set of edges denoting local interactions [73]. For a set of random variables X = {Xi}i∈V ,the joint distribution P (X) is a GRF if it factorizes according to the cliques of the graph, where a clique Vc ⊆ V is a subset of nodes where every pair is connected by an edge. The Gibbs distribution is denoted as 
+
+P (X1, . . . , Xn) = 1
+
+Z
+
+Y
+
+> c∈V c
+
+ϕc(Xc). (1) where Z = P
+
+> X1,..., Xn
+
+Q 
+
+> c∈V c
+
+ϕc(Xc) is a normalizing con-stant, and ϕc(Xc) > 0 is a positive clique potential function associated with the variables in clique Vc. The clique potential 
+
+ϕc(Xc) is represented by an unconstrained form using a real-value energy function ϕc(Xc) = exp {− ψc(Xc)/λ }, which ensures a positive probability and gives the joint an additive structure 
+
+P (X) = 1
+
+Z exp 
+
+
+
+− H(X)
+
+λ
+
+
+
+(2) where H(X) = P 
+
+> c∈V c
+
+ψc(Xc) is the free energy , hereinafter referred to as the Gibbs energy, and λ > 0 is the temperature parameter controlling the sharpness of the distribution. In the context of swarm robotics, the GRF framework facilitates the functional encoding of collective objectives– such as velocity alignment, collision avoidance, or pattern formation–into localized potential interactions, whereby the desired swarm behavior emerges as the minimizer of the global energy. This representation, therefore, recasts swarm coordination as a principled stochastic optimization problem, in which the system configuration evolves toward the aggregate objective through energy minimization. 
+
+B. Mean Field Approximation 
+
+The mean-field approximation serves as a variational infer-ence technique for approximating high-dimensional, coupled probability distributions through a tractable factorized distri-bution. By invoking the assumption of independence between variables, this method effectively decouples complex global dependencies by replacing the intricate inter-variable interac-tions with their respective aggregate expected effects, often referred to as the effective field. Mathematically, the mean-field approximation seeks an optimal variational distribution ˜P (X)
+
+that minimizes the Kullback-Leibler (KL) divergence from the true joint distribution P (X), denoted as DKL ( ˜P (X)|| P (X)) .To ensure computational tractability, ˜P (X) is restricted to the family of fully factorizable marginals ˜P (X) = Q 
+
+> i
+
+˜P (Xi),effectively assuming independence between variables. Within this variational framework, the optimal marginal ˜P (Xi) that minimizes the KL-divergence must satisfy the following self-consistency condition [73]. 
+
+˜P (Xi) = 1
+
+Zi
+
+exp {EX\i∼ ˜P\i [ln P (X)] } (3) where Zi is a local partition function and X\i denotes the set of states V \ { i}. Equation (3) implies that the optimal local distribution is determined by the expected log-likelihood of the conditional distribution under the variational beliefs of all other robots. This decoupling property provides a principled foundation for designing scalable, distributed swarm control methods. IEEE TRANSACTIONS ON ROBOTICS 6
+
+C. Stochastic Optimal Control 
+
+Consider a swarm of N homogeneous robots. The state evolution of each robot is governed by a stochastic discrete-time dynamics given by 
+
+xt+1 = f (xt, ut) (4) where xt ∈ Rnx denotes the system state at time t. The control input ut = ¯ ut + ωt is composed of the nominal control 
+
+¯ut and additive process noise ωt ∼ N (0, Σu). We define the state trajectory over a finite horizon T as xt:t+T −1 =[x⊤ 
+
+> t
+
+, . . . , x⊤ 
+
+> t+T−1
+
+]⊤ ∈ RnxT , with the corresponding control sequence denoted by ut:t+T −1 = [ u⊤ 
+
+> t
+
+, . . . , u⊤ 
+
+> t+T−1
+
+]⊤ ∈ RnuT .For the pattern-oriented swarm under consideration, our ob-jective is to develop a distributed, uncertainty-aware stochastic optimal control framework to coordinate robots to converge toward a prescribed geometric configuration in cluttered environments. Let g (xt, Co) be a distance measure to quantify the degree of safety violation, for example, g(x, Co) > 0
+
+denoting a collision with the occupied space Co. To account for the stochasticity of the robot states, a general safety constraint is defined by a risk measure R[·]. Hence, the constrained stochastic optimal control is formulated as 
+
+min  
+
+> u0: T−1
+
+E
+
+"
+
+ϕ(xT ) +  
+
+> T−1
+
+X
+
+> t=0
+
+ q(xt) + u⊤ 
+
+> t
+
+Rut
+
+#
+
+s.t. xt+1 = f (xt, ut)
+
+xt ∈ C x, ut ∈ C u, ∀t ∈ { 0, . . . , T − 1}R[g(xt, Co)] ≤ 0, ∀t ∈ { 0, . . . , T − 1}
+
+(5) where Cx and Cu are the state and input constraints, and Co
+
+denotes the occupied space. The risk measure R[·] serves as a unified safety functional that can be instantiated into specific risk-aware frameworks during deployment. In chance-constrained navigation, R[·] can be defined as a quantile-based mapping, where the constraint R[g] ≤ 0 is equivalent to enforcing a probability threshold Pr (g > 0) ≤ α with 
+
+α ∈ (0 , 1) serving as the allowable violation probability. In risk-sensitive settings, R[·] can be realized as a coherent risk measure, such as Conditional Value-at-Risk (CVaR), which quantifies the expected severity of violations in the tail of the distribution. 
+
+D. Unscented Transform 
+
+The unscented transformation is a deterministic sampling technique designed to propagate the mean and covariance of a random variable through non-linear transformations without the inaccuracies of first-order linearization. In this framework, the probability distribution is represented by a discrete set of sigma points, which are deterministically selected to capture the underlying statistical moments. These points are propagated through the non-linear function f (·), and the resulting point cloud is used to reconstruct the posterior mean and covariance in the transformed state space. For an n-dimensional state, a minimal set of 2n + 1 sigma points is sufficient to capture the true mean and covariance of a distribution. Given a state xt
+
+with mean ¯xt and covariance Σt, the sigma points χit at time 
+
+t are defined as 
+
+χ0 
+
+> t
+
+= ¯xt
+
+χit = ¯xt +
+
+p (nx + κ)Σt
+
+
+
+> i
+
+χi+nx 
+
+> t
+
+= ¯xt −
+
+p (nx + κ)Σt
+
+
+
+> i
+
+where κ is a scaling factor that determines the spread of the sigma points around the mean ¯xt, effectively controlling the higher-order moments of the approximation. The notation (·)i
+
+refers to the i-th row of the corresponding matrix square root. Following the deterministic sampling step, each sigma point χit
+
+is independently propagated through the non-linear transition mapping f (·) to generate the transformed set. 
+
+χit+1 = f  χit, ut
+
+ ∀i = 0 , 1, . . . , 2nx (6) This ensemble of propagated points is subsequently utilized to reconstruct the posterior mean and predictive covariance via a weighted summation. The predicted state distribution is constructed through a weighted summation of the propagated sigma points χit+1 , where the corresponding weights for the mean ( Wm) and covariance ( Wc) are defined as 
+
+W 0 
+
+> m
+
+= κnx + κ (7) 
+
+W 0 
+
+> c
+
+= κnx + κ + (1 − α2 + β) (8) 
+
+W n 
+
+> {m,c }
+
+= 12( nx + κ) (9) where α ∈ (0 , 1] determines the spread of the sigma points around x and β is used to incorporate prior knowledge of the distribution’s kurtosis (for Gaussian distributions, β = 2 
+
+is optimal). Finally, the posterior mean ¯xt+1 and predictive covariance Σt+1 are reconstructed as follows. 
+
+¯xt+1 =
+
+> 2nx
+
+X
+
+> n=0
+
+W nmχnt+1 (10) 
+
+Σt+1 =
+
+> 2nx
+
+X
+
+> n=0
+
+W nc (χnt+1 − ¯xt+1 )( χnt+1 − ¯xt+1 )⊤ (11) This unscented transformation ensures that the mean and covariance are captured with at least second-order accuracy, providing a more robust estimate of the robot’s state uncertainty than first-order linearization methods. In this work, the collective behavior of the pattern-oriented swarm is modeled as a GRF, where each node in the undirected graph G corresponds to an individual robot. We represent the state of the i-th robot at time-step t as a random variable following a Gaussian distribution, Xi,t ∼ N (¯ xi,t , Σi,t ).Accordingly, the ensemble state of the swarm is defined as the collection of random variables Xt = {Xi,t }i∈V . Let P (Xt)
+
+be the joint probability distribution of the ensemble. Following the Gibbs distribution defined in (1), P (Xt) can be factorized over the cliques of G. Hence, the following equation exists. 
+
+P (Xt) ∝ Y
+
+> i∈V
+
+ϕi(Xi,t ) Y
+
+> {i,j }∈E
+
+ϕi,j (Xi,t , Xj,t ) (12) IEEE TRANSACTIONS ON ROBOTICS 7
+
+where ϕi(Xi,t ) is the unary energy potential and 
+
+ϕi,j (Xi,t , Xj,t ) is the pairwise potential [74]. Specially, the unary energy ϕi(Xi,t ) incorporates metrics intrinsic to the individual robot, such as environmental interactions and trajectory smoothness. Conversely, the pairwise energy term 
+
+ϕi,j (Xi,t , Xj,t ) encodes the local interactions and coupling constraints between a robot and its immediate neighbors. The unary and pairwise energies collectively balance individual mission objectives with global coordination requirements. Equation (12) establishes the theoretical foundation for characterizing swarm coordination from a random field perspective. In accordance with the Gibbs distribution P (Xt),the swarm’s configuration naturally converges toward states with maximum likelihood, which correspond to the minimum aggregate energy of the field. While P (Xt) characterizes the swarm’s spatial configuration at a discrete time-step t, it does not account for the temporal evolution of the system. From the perspective of the stochastic optimal control framework introduced in (5), the objective is to determine an optimal control sequence that minimizes the expectation of the cumulative cost over a finite horizon. Consequently, we define the ensemble state trajectory over the horizon T as the temporal sequence X0: T = {Xt}Tt=0 .Furthermore, the realization of the state trajectory X0: T for a dynamic system is conditioned on its control sequence U0: T −1.By extending the spatial GRF into the temporal domain and incorporating this control dependence, the spatio-temporal joint distribution of the swarm trajectory is formulated via the Markov property as 
+
+P (X0: T |U0: T −1 ) = P (X0) 
+
+> T−1
+
+Y
+
+> t=0
+
+P (Xt+1 |Xt, Ut ) (13) Thus, the primary goal is to infer the optimal control sequence 
+
+U0: T −1 that maximizes the likelihood of the state trajectory, 
+
+P (X0: T |U0: T −1 ). Given a prior distribution PU (U0: T −1) for the control sequence, the posterior distribution is derived based on Bayes’ theorem as 
+
+PU |X (U0: T −1 |X0: T ) ∝ P (X0: T |U0: T −1 )PU (U0: T −1)
+
+The coordination task is thereby transformed into finding the maximum a posteriori (MAP) estimate of U0: T −1. According to (5) and (13), the stochastic optimal control problem for pattern-oriented swarms is eventually formulated as 
+
+max  
+
+> U0: T−1
+
+P (X0: T |U0: T −1 )PU (U0: T −1)
+
+s.t. Xt+1 = f (Xt, Ut)
+
+Xt ∈ C X , Ut ∈ C U , ∀t ∈ { 0, . . . , T − 1}R[g(Xt, Co)] ≤ 0, ∀t ∈ { 0, . . . , T − 1}
+
+(14) The remaining challenge lies in the development of a dis-tributed optimization framework for robot swarms to solve the prescribed stochastic optimal control problem. IV. M ETHODOLOGY 
+
+The overall architecture of the proposed GRF-MPPI frame-work is illustrated in Fig. 1. The GRF-MPPI framework consists of three interconnected modules: (1) a multi-robot system where individual robots interact with their immediate neighbors, (2) a GRF-based coordination layer that formalizes these interactions as clique potentials, thereby transposing the energy minimization task into a maximum a posteriori (MAP) estimation problem, and (3) a stochastic trajectory optimizer that leverages MPPI control for importance-weighted sampling, integrated with Unscented Kalman Filter (UKF) based uncer-tainty propagation to ensure robust collision avoidance for each robot. 
+
+A. Distributed Model Predictive Path Integral 1) Probabilistic Trajectory Modeling: The stochastic optimal control problem defined in Equation (14) requires maximizing the likelihood of the swarm trajectory, a task that becomes computationally intractable as the system scale increases. To mitigate this complexity, we develop a distributed op-timization framework by leveraging a mean-field approxi-mation in conjunction with Model Predictive Path Integral (MPPI) control. This approach factorizes the joint distribution 
+
+P (X0: T |U0: T −1 ) into the product of marginal densities Q 
+
+> i∈V
+
+˜Pi(Xi, 0: T |Ui, 0: T −1 ), thereby decoupling the global coordination objective into a set of localized subproblems. Consequently, each robot can independently solve its respective optimization task, significantly reducing the computational overhead while maintaining collective swarm behavior. Applying the mean-field self-consistency condition from Equation (3) to the Gibbs distribution defined in Equa-tion (2), the optimal variational distribution for robot i is derived. Substituting the Gibbs energy H(X) = P 
+
+> i
+
+ψi(Xi) + P 
+
+> {i,j }∈E
+
+ψij (Xi, Xj ) into the mean-field formula yields 
+
+˜Pi(Xi,t |Xi,t −1, Ui,t −1)= 1
+
+Zi
+
+exp 
+
+n
+
+EX\i∼ ˜P\i [ln P (Xt)] 
+
+o
+
+= 1
+
+Zi
+
+exp 
+
+− 1
+
+λ
+
+
+
+ψi(Xi,t ) + X
+
+> j∈N i
+
+E ˜Pj [ψij (Xi,t , Xj,t )] 
+
+
+
+= 1
+
+Zi
+
+exp 
+
+
+
+− Hi(Xi,t )
+
+λ
+
+
+
+(15) where ˜Pi(Xi,t |Xi,t −1, Ui,t −1) is used to indicate that the current state distribution is dependent on the last state and input, Ni denotes the set of neighboring robots of robot i, and 
+
+Hi(Xi,t ) is defined as 
+
+Hi(Xi,t ) = ψi(Xi,t ) + X
+
+> j∈N i
+
+E ˜Pj [ψij (Xi,t , Xj,t )] (16) where ψi(Xi,t ) denotes the unary potential capturing individual task-related costs, and the summation term aggregates the expected pairwise interaction costs with all neighboring robots. The expectation is taken over the variational distribution ˜Pj of each neighbor, which encapsulates the predicted state and asso-ciated uncertainty obtained through inter-robot communication. Consequently, although the expression involves neighboring distributions, Hi(Xi,t ) can be evaluated locally by robot i
+
+using the information received from its neighbors. IEEE TRANSACTIONS ON ROBOTICS 8 
+
+> Fig. 1. The GRF-based stochastic optimal control framework for pattern-oriented swarms. The multi-robot system is modeled as a Gibbs Random Field (GRF), where inter-robot interactions and spatial constraints are encoded through clique potentials. The associated Gibbs energy is mapped to a probability distribution, effectively casting the optimal swarm control problem as a Bayesian inference task. Environmental stochasticity is managed via Unscented Kalman Filter (UKF)-based trajectory prediction, where safety margins are dynamically derived from the propagated state covariance to ensure uncertainty- and risk-aware collision avoidance.
+
+The mean-field approximation facilitates the factorization of the joint posterior in (14) into decoupled local distributions, expressed as 
+
+P (X0: T |U0: T −1)PU (U0: T −1)
+
+≈ Y
+
+> i∈V
+
+˜Pi(Xi, 0: T |Ui, 0: T −1)Pi,U (Ui, 0: T −1) (17) Given that the single-step marginal ˜Pi(Xi,t ) follows the Gibbs form exp {− Hi(Xi,t )/λ } from (15), each independent local trajectory distribution is constructed by compounding these time-indexed marginals over the horizon T .
+
+˜Pi(Xi, 0: T |Ui, 0: T −1)Pi,U (Ui, 0: T −1)= 
+
+> T−1
+
+Y
+
+> t=0
+
+h ˜Pi(Xi,t +1 |Xi,t , Ui,t )Pi,U (Ui,t )
+
+i
+
+∝ exp 
+
+(
+
+−
+
+PTt=0 Hi(Xi,t )
+
+λ
+
+)
+
+Pi,U (Ui, 0: T −1)
+
+(18) The formulation in (18) transforms the centralized op-timization in (14) into a set of decoupled local subprob-lems. Consequently, the global swarm objective is reduced to the parallel maximization of each marginal distribution 
+
+˜Pi(Xi, 0: T |Ui, 0: T −1)Pi,U (Ui, 0: T −1). This factorized structure enables a fully distributed solution, where each robot indepen-dently optimizes its local trajectory probability to achieve the collective swarm objective. 
+
+2) Optimal Sampling Distribution: To enable sampling-based optimization, the control sequence Ui, 0: T −1 is param-eterized as the sum of a nominal control sequence ¯Ui, 0: T −1
+
+and a stochastic perturbation. 
+
+Ui, 0: T −1 = ¯Ui, 0: T −1 + ϵi, 0: T −1 (19) where ϵi, 0: T −1 ∼ N (0, ΣU ). Since the state trajectory Xi, 0: T
+
+is uniquely determined by the initial state Xi, 0 and the control sequence Ui, 0: T −1 through the system dynamics (4), the trajectory-level Gibbs energy can be expressed as a function of the control sequence. Hence, one has 
+
+Si(Ui, 0: T −1) = 
+
+> T
+
+X
+
+> t=0
+
+Hi(Xi,t ) (20) A straightforward approach to determining the optimal control sequence is minimizing the expected trajectory cost. 
+
+min 
+
+> Qi,U
+
+EQi,U [Si(Ui, 0: T −1)] (21) However, the optimal solution to this unconstrained problem degenerates to a point mass distribution concentrated at the single best trajectory U ∗  
+
+> i, 0: T−1
+
+= arg min Si, which precludes effective sampling-based optimization. To prevent this degeneracy, a KL-divergence regularization term is introduced to penalize deviations of the sampling distri-bution Qi,U (Ui, 0: T −1) from the control prior Pi,U (Ui, 0: T −1),yielding the regularized optimization: 
+
+min 
+
+> Qi,U
+
+n
+
+EQi,U [Si] + λD KL (Qi,U || Pi,U )
+
+o
+
+(22) where the temperature parameter λ governs the exploration-exploitation trade-off: larger λ encourages broader exploration by keeping Qi,U close to the prior Pi,U , while smaller λ
+
+produces more greedy distributions concentrated on low-cost trajectories. Applying calculus of variations to solve this optimization problem, we take the functional derivative with respect to Qi,U 
+
+and set it to zero. 
+
+δδQ i,U 
+
+
+
+EQi,U [Si] + λEQi,U 
+
+
+
+log Qi,U 
+
+Pi,U 
+
+ 
+
+= 0 (23) which yields the optimality condition. 
+
+Si + λ log Qi,U (Ui, 0: T −1)
+
+Pi,U (Ui, 0: T −1) + λ = 0 (24) IEEE TRANSACTIONS ON ROBOTICS 9
+
+The optimal sampling distribution Q∗ 
+
+> i,U
+
+is given by 
+
+Q∗ 
+
+> i,U
+
+(Ui, 0: T −1) = 1
+
+η Pi,U (Ui, 0: T −1) exp 
+
+
+
+− Si
+
+λ
+
+
+
+(25) where η = P  
+
+> Ui, 0: T−1
+
+Pi,U (Ui, 0: T −1) exp( −Si/λ ) is the nor-malization constant ensuring P  
+
+> Ui, 0: T−1
+
+Q∗ 
+
+> i,U
+
+(Ui, 0: T −1) = 1 .This result demonstrates that the optimal distribution Q∗
+
+> i,U
+
+reweights the base distribution Pi,U (Ui, 0: T −1) according to the negative log-likelihood of each trajectory, assigning higher probability to trajectories with lower costs. The temperature parameter λ controls the sharpness of this reweighting: smaller 
+
+λ produces distributions sharply concentrated on low-cost trajectories, while larger λ encourages broader exploration. While Equation (25) provides the theoretical form of the optimal distribution, direct sampling from Q∗ 
+
+> i,U
+
+is intractable. The following section develops an importance sampling scheme to efficiently compute the optimal control through Monte Carlo estimation. 
+
+3) Importance Sampling and Monte Carlo Estimation: 
+
+Following the path integral control framework, the optimal control input at each time step is obtained as the expectation under the optimal distribution Q∗ 
+
+> i,U
+
+.
+
+u∗ 
+
+> t
+
+= EQ∗ 
+
+> i,U
+
+[ut], t = 0 , 1, . . . , T − 1 (26) To evaluate this expectation without direct access to Q∗ 
+
+> i,U
+
+, an importance sampling scheme is employed. 
+
+EQ∗ 
+
+> i,U
+
+[ut] = X 
+
+> Ui, 0: T−1
+
+Q∗ 
+
+> i,U
+
+(Ui, 0: T −1)ut
+
+= X 
+
+> Ui, 0: T−1
+
+Q∗ 
+
+> i,U
+
+(Ui, 0: T −1)
+
+Qi,U (Ui, 0: T −1) Qi,U (Ui, 0: T −1)ut
+
+(27) where Ui, 0: T −1 = [ u⊤ 
+
+> 0
+
+, u⊤ 
+
+> 1
+
+, . . . , u⊤ 
+
+> T−1
+
+]⊤ represents the com-plete sequence of perturbed control inputs over the horizon. The summation in Equation (27) can be reformulated as an expectation under the sampling distribution Qi,U .
+
+EQi,U [w(Ui, 0: T −1)ut], w(Ui, 0: T −1) = Q∗ 
+
+> i,U
+
+(Ui, 0: T −1)
+
+Qi,U (Ui, 0: T −1)
+
+(28) where w(Ui, 0: T −1) is the importance sampling weight. This formulation enables the computation of expectations with respect to Q∗ 
+
+> i,U
+
+by sampling trajectories from the more tractable distribution Qi,U . The weighting term can be decomposed using the base distribution Pi,U (Ui, 0: T −1).
+
+w(Ui, 0: T −1) = 
+
+ Q∗ 
+
+> i,U
+
+(Ui, 0: T −1)
+
+Pi,U (Ui, 0: T −1)
+
+  Pi,U (Ui, 0: T −1)
+
+Qi,U (Ui, 0: T −1)
+
+
+
+(29) 
+
+= 1
+
+η exp 
+
+
+
+− Si
+
+λ
+
+  Pi,U (Ui, 0: T −1)
+
+Qi,U (Ui, 0: T −1)
+
+
+
+(30) where Si denotes the trajectory energy defined in Equation (20), 
+
+λ is the temperature parameter, and η is a normalization constant. When the sampling distribution coincides with the base distri-bution, i.e., Pi,U (Ui, 0: T −1) = Qi,U (Ui, 0: T −1), the importance weight simplifies to 
+
+w(Ui, 0: T −1) = 1
+
+η exp 
+
+
+
+− Si
+
+λ
+
+
+
+(31)      
+
+> Fig. 2. Illustration of the MPPI trajectory optimization process. K trajectory samples are generated from the control distribution Q, with covariance propagation capturing state uncertainty over the prediction horizon. Trajectories passing through dynamic obstacles receive low importance weights ˜w, while the optimal trajectory U∗is computed as the weighted combination of sampled control sequences.
+
+Consequently, the optimal control input is computed as the weighted average of sampled control perturbations: 
+
+u∗ 
+
+> t
+
+= EQi,U [w(Ui, 0: T −1)ut] (32) It should be noted that Equation (32) yields the globally optimal control under the assumption that the expectation can be evaluated exactly. In practice, a Monte Carlo approximation is employed, where K trajectory samples are drawn from Qi,U ,and the optimal control is estimated as 
+
+u∗ 
+
+> t
+
+≈
+
+> K
+
+X
+
+> k=1
+
+˜w(k)u(k) 
+
+> t
+
+, ˜w(k) = exp( −S(k) 
+
+> i
+
+/λ )
+
+PKk′=1 exp( −S(k′) 
+
+> i
+
+/λ ) (33) where ˜w(k) represents the normalized importance weight for the 
+
+k-th sampled trajectory, and S(k) 
+
+> i
+
+denotes the trajectory energy of the k-th sample. This formulation establishes the foundation for integrating the GRF model with the MPPI framework, enabling distributed and scalable swarm control. 
+
+B. Uncertainty-Aware Collision Avoidance 
+
+In real-world robotic navigation, obstacle states are inherently subject to uncertainty stemming from sensing noise and environmental stochasticity. Deterministic collision avoidance strategies, which assume perfect state information, often fail to provide sufficient safety margins in such non-deterministic regimes. To address this, we propose a unified uncertainty-aware collision avoidance framework integrated within the Gibbs energy formulation. This framework facilitates two distinct representations for handling collision constraints under uncertainty: (1) a chance-constrained formulation, which pro-vides explicit probabilistic safety guarantees through formal constraint specification; and (2) a risk-sensitive formulation based on Conditional Value-at-Risk (CVaR), which encodes the same safety principles via a risk-sensitive cost functional. The following sections detail the mathematical derivation of these two constraint types and their integration into the proposed GRF-MPPI framework. 
+
+1) Uncertainty Modeling and Propagation: The fundamen-tal premise of uncertainty-aware collision avoidance is the treatment of all collision-relevant entities as stochastic objects with uncertain future trajectories. This unified treatment enables IEEE TRANSACTIONS ON ROBOTICS 10 
+
+a consistent probabilistic framework for collision avoidance across all interaction types. Let o denote an entity, such as a neighboring robot or an obstacle. Its estimated position is given by ˆpo, with the associated spatial uncertainty modeled by a Gaussian distribution po ∼ N (ˆ po, Σo). Here, the covariance matrix 
+
+Σo encapsulates the cumulative uncertainty stemming from stochastic sensing noise and motion prediction inaccuracies. To evaluate collision risk across the planning horizon, it is imperative to generate predictive trajectories characterized by rigorous uncertainty quantification for all relevant entities. The Unscented Kalman Filter (UKF) is utilized to propagate these stochastic states, as it captures the mean and covariance of the nonlinear dynamics more accurately than first-order approximations, without the computational burden of explicit Jacobian derivations. For neighboring robots in the swarm, the predictive trajectory is obtained through a two-step process. First, the predicted trajectory ˆXj = {ˆxj,t }t=0 ,...,T −1 from the previous planning cycle is received via inter-robot communication. This trajectory represents neighbor j’s intended motion plan. Second, a single-step UKF prediction is performed to update the trajectory estimate and propagate the associated uncertainty. 
+
+(ˆ xj,t +1 , Σj,t +1 ) = UKF predict (ˆ xj,t , Σj,t , fj ) (34) where fj denotes the dynamics model of neighbor j, and 
+
+(ˆ xj,t , Σj,t ) represents the mean and covariance of the predicted state at time t. The single-step UKF prediction accounts for the temporal lag between communication cycles and captures the growth of uncertainty over the prediction horizon. For environmental obstacles, the complete predictive tra-jectory is generated using UKF-based state estimation and prediction. 
+
+(ˆ xo,t +1 , Σo,t +1 ) = UKF predict (ˆ xo,t , Σo,t , fo) (35) where fo represents the obstacle motion model, which may range from simple constant-velocity models to more sophisti-cated learned predictors depending on the application scenario. The UKF prediction step employs the unscented transform described in Section III. For a state estimate (ˆ x, Σ), sigma points {χi}2nx 
+
+> i=0
+
+are generated and propagated through the following dynamics. 
+
+χit+1 = f (χit), i = 0 , 1, . . . , 2nx (36) The predicted mean and covariance are then reconstructed from the propagated sigma points using the weighted combination defined in Section III. This unified UKF-based prediction frame-work ensures that all collision-relevant entities are represented with consistent uncertainty quantification over the planning horizon. 
+
+2) Risk Constraint Formulation: With predictive trajectories and associated uncertainties available for all entities, the collision avoidance problem can be formulated as a risk-constrained optimization. Following the unified framework established in Section III, the occupied space for robot i is defined as the union of all collision regions. 
+
+Co,i = [
+
+> o∈O∪N i
+
+Cio (37) 𝑟 ref  Constrain                         
+
+> Violation
+> 𝑑 safe
+> 𝑑 safe = 𝑟 ref + erf −1 (1 − 2𝛼) 2𝒂 𝑇 Σ𝑜 𝒂
+> High Risk
+> Low Risk
+> 𝑟 ref Covanraince
+> Ellipse
+> Monte Corlo
+> Sampling
+> Worst (1 -α)
+> samples
+> CVaR α𝑍 =𝔼 𝑍 𝑍 ≥ VaR α(𝑍)]
+> (a) Chance Constrain Method (b) Conditional Value at Risk Method
+> 𝒫 𝑟 𝑐𝑜𝑙𝑙𝑖𝑠𝑖𝑜𝑛 ≤ α
+> Fig. 3. Comparison of uncertainty-aware collision avoidance methods. (a) Chance Constraint method: the safety distance dsafe is expanded based on the uncertainty covariance to satisfy the probabilistic constraint Pr(collision )≤α.(b) CVaR method: Monte Carlo samples are drawn from the uncertainty distribution, and the expected cost conditioned on the worst (1 −α)samples is minimized, providing tail-risk sensitivity.
+
+where Cio := {xi | ∥ pi − po∥ ≤ rref } denotes the collision region between robot i and entity o, O is the set of environ-mental obstacles, Ni is the set of neighboring robots, and rref 
+
+is the reference radius. The pairwise safety violation measure between robot i and entity o is defined as 
+
+gio (xi, po) = rref − ∥ pi − po∥ (38) where gio > 0 indicates collision with entity o. Due to the stochastic nature of po, the collision event gio > 0 becomes a probabilistic event. Following Equation (5), the safety constraint is specified through the risk measure. 
+
+R[gio (xi, po)] ≤ 0, ∀o ∈ O ∪ N i (39) The risk measure R[·] can be instantiated in two ways, each offering distinct advantages for different application requirements. The conceptual comparison between these two approaches is illustrated in Fig. 3. The chance constraint method (left) computes an expanded safety distance dsafe 
+
+based on the uncertainty distribution to bound the collision probability below a specified threshold. The CVaR method (right) focuses on the worst (1 − α) fraction of Monte Carlo samples, optimizing against high-risk scenarios represented by the covariance ellipse. Within our framework, the risk constraint R[gio ] ≤ 0 is enforced through potential energy functions rather than explicit hard constraints. Trajectories violating the risk constraint receive higher potential energy, resulting in lower importance weights during the sampling-based optimization. The collision avoidance potential for robot i aggregates contributions from all collision-relevant entities. 
+
+ψcol  
+
+> i
+
+(Xi,t ) = X
+
+> j∈N i
+
+ψij (Xi,t , Xj,t ) + X
+
+> o∈O
+
+ψio (Xi,t , Xo,t )
+
+(40) where ψij and ψio represent the pairwise collision avoidance potentials. The specific functional form of these potentials depends on the choice of risk measure instantiation, as detailed in the following sections. IEEE TRANSACTIONS ON ROBOTICS 11 
+
+3) Chance Constraints: The first instantiation of the risk measure R[·] is the chance-constrained formulation, where safety is specified by bounding the probability of constraint violation. Following the unified framework in Equation (5), the risk measure is defined as 
+
+RCC [gio ] = Pr(gio > 0) − α (41) where α ∈ (0 , 1) represents the maximum allowable collision probability. The constraint RCC [gio ] ≤ 0 is equivalent to the explicit probabilistic specification. 
+
+Pr(xi /∈ C io ) ≥ 1 − α, ∀o ∈ O ∪ N i (42) This formulation directly controls the likelihood of safety violations, making it particularly suitable for applications with strict safety requirements. For Gaussian-distributed obstacle positions, the chance constraint can be reformulated into a deterministic equivalent. Consider a linear approximation of the collision constraint along the direction a = (ˆ po − pi)/∥ˆpo − pi∥. A tightened collision constraint set is defined as 
+
+˜Cio := {xi | aT (po − pi) ≤ rref } (43) Under the Gaussian assumption, the chance constraint can be transformed into 
+
+aT (ˆ po − pi) − rref ≥ erf −1(1 − 2α)p2aT Σoa (44) where erf −1(·) is the inverse Gaussian error function. The right-hand side of Equation (44) represents an uncertainty-dependent safety margin that expands with increasing position uncertainty 
+
+Σo and decreasing risk tolerance α.The chance constraint is incorporated into the Gibbs energy framework through a barrier-type potential function. 
+
+ψCC  
+
+> io
+
+(Xi,t , Xo,t ) = 
+
+(
+
+κcc ·  dCC safe − dio 
+
+2 , if dio < d CC safe 
+
+0, otherwise (45) where dio = ∥pi − ˆpo∥ is the distance to the estimated obstacle position, dCC safe = rref + erf −1(1 − 2α)p2aT Σoa is the chance-constraint-adjusted safety distance, and κcc is a penalty weight. 
+
+4) Conditional Value at Risk: The second instantiation of the risk measure R[·] is the CVaR-based formulation, which captures tail-risk sensitivity through a coherent risk measure. Following the unified framework in Equation (5), the risk measure is defined as 
+
+RCVaR [gio ] = CVaR α(gio ) − ϵ (46) where ϵ ≥ 0 is the admissible CVaR threshold. The constraint 
+
+RCVaR [gio ] ≤ 0 ensures that the expected severity of violations in the worst (1 − α) quantile does not exceed ϵ.For a random variable Z representing the collision cost and a confidence level α ∈ (0 , 1) , CVaR is defined as CVaR α(Z) = E[Z | Z ≥ VaR α(Z)] (47) where VaR α(Z) = inf {z : Pr(Z ≤ z) ≥ α} is the Value at Risk at level α. Intuitively, CVaR represents the expected cost conditioned on being in the (1 − α) worst-case quantile of outcomes. CVaR possesses several desirable properties for robotic motion planning: coherence that satisfies subadditivity and positive homogeneity, convexity enabling efficient optimization, and sensitivity to tail risks providing conservative behavior in dangerous scenarios. The distance violation with respect to the safety constraint is defined as 
+
+V (pi, po) = rref − ∥ pi − po∥ (48) where positive values indicate safety constraint violation. For Monte Carlo-based CVaR estimation, N obstacle positions are sampled from the uncertainty distribution p(k) 
+
+> o
+
+∼ N (ˆ po, Σo)
+
+for k = 1, . . . , N . The collision cost for each sample is computed as 
+
+c(k) =
+
+(
+
+κ1V (k) + κ2(V (k))2, if V (k) > 00, otherwise (49) where V (k) = V (pi, p(k) 
+
+> o
+
+), and κ1, κ2 are linear and quadratic cost weights respectively. The CVaR cost is then computed by averaging the top (1 −α)
+
+fraction of sampled costs. CVaR α = 1
+
+⌈N (1 − α)⌉ 
+
+> ⌈N(1 −α)⌉
+
+X
+
+> k=1
+
+c(k) (50) where c(1) ≥ c(2) ≥ · · · ≥ c(N ) are the sorted costs in descending order. The CVaR-based obstacle potential is directly incorporated into the Gibbs energy. 
+
+ψCVaR  
+
+> io
+
+(Xi,t , Xo,t ) = κcvar · CVaR α (V (pi, po)) (51) where κcvar is a scaling coefficient. 
+
+C. Density-Guided Swarm Pattern Control 
+
+Traditional pattern control methods, typically reliant on fixed target assignments or rigid geometric constraints, face significant challenges when navigating complex spatial topolo-gies, non-convex regions, or time-varying swarm populations. To overcome these limitations, we propose a density-guided approach formulated within the GRF framework established in Section III-A. By encoding desired spatial distributions as potential energy functions, the pattern objectives are seamlessly integrated into the global Gibbs energy H(X). This ensures that the geometric pattern behavior emerges as a consistent probabilistic inference of the swarm control. Recall that the Gibbs energy of the swarm consists of unary potentials ψi(Xi,t ) capturing individual agent costs and pairwise potentials ψi,j (Xi,t , Xj,t ) encoding inter-agent interactions. The density-guided pattern control introduces an additional potential energy term Hform (X) given by 
+
+Hform (X) = X
+
+> i∈V
+
+ψform  
+
+> i
+
+(Xi,t ) + X
+
+> {i,j }∈E
+
+ψform  
+
+> i,j
+
+(Xi,t , Xj,t ) (52) where ψform  
+
+> i
+
+represents the pattern-related unary potential for agent i, and ψform  
+
+> i,j
+
+denotes the pattern-related pairwise potential between neighboring agents i and j. This formulation ensures that the pattern control seamlessly integrates with the existing GRF-based MPPI framework. IEEE TRANSACTIONS ON ROBOTICS 12 (a) Out-of-Pattern Attraction (b) Neighbor Repulsion (c) Unoccupied Region Attraction               
+
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Normalized Density
+> Fig. 4. Visualization of three complementary density-guided mechanisms for swarm pattern control on an L-shaped target region. (a) Out-of-Pattern Attraction: when an agent (orange) lies outside the pattern, the boundary potential ϕb= max(0 ,Φ + ϵ)induces an attractive gradient that pulls the agent back toward the pattern region. (b) Neighbor Repulsion: the Mean Shift vector micomputed over neighboring robots (blue) drives the target agent (orange) away from crowded regions, where hdenotes the Gaussian kernel bandwidth. (c) Unoccupied Region Attraction: the Mean Shift vector aisteers the agent toward unoccupied grid points, where roccupy is the occupation radius used to classify unoccupied cells. Color intensity encodes normalized density and orange arrows indicate the resulting displacement direction.
+
+1) Signed Distance Function for Pattern Representation: 
+
+The target pattern region R is implicitly represented using a Signed Distance Function (SDF) given by 
+
+Φ( p) = 
+
+(
+
+−d(p, ∂ R), p ∈ R 
+
++d(p, ∂ R), p /∈ R (53) where d(p, ∂ R) = min q∈∂R ∥p − q∥ is the minimum distance to the boundary ∂R. We introduce the notation Φ to represent the signed distance field , thereby distinguishing it from the clique potential ϕc defined in Equation (1). For composite patterns consisting of multiple sub-regions 
+
+R1, . . . , Rm, the SDF is computed as 
+
+Φunion = min  
+
+> j
+
+Φj , Φintersection = max  
+
+> j
+
+Φj (54) 
+
+2) Boundary Potential Energy: The boundary potential energy penalizes agents located outside the target pattern. As illustrated in Fig. 4(a), it generates an attractive gradient that pulls out-of-pattern agents back into the pattern region. This is formulated as a unary potential since it depends solely on the individual agent’s position relative to the pattern boundary. 
+
+ψboundary  
+
+> i
+
+(Xi,t ) = κbϕ2 
+
+> b
+
++ λbϕb, ϕb = max(0 , Φ( pi) + ϵ)
+
+(55) where κb and λb are quadratic and linear penalty weights respectively, and ϵ is a small margin creating a soft transition zone near the boundary. The corresponding clique potential is 
+
+ϕboundary  
+
+> i
+
+= exp {− ψboundary  
+
+> i
+
+}, which assigns higher probability to states where the agent remains within the pattern region. 
+
+3) Density Potential Energy: Beyond confining robots within the pattern boundary, achieving uniform spatial distribution requires active density control. To this end, a Mean Shift-based mechanism is introduced that guides each robot based on local density gradients, as illustrated in Fig. 4(b,c). The core idea of Mean Shift is to compute a kernel-weighted displacement vector toward the centroid of a given set of reference points, where a Gaussian kernel K(u) = e−u2/2
+
+with bandwidth h is adopted. The magnitude of the resulting vector reflects the degree of spatial imbalance between the robot and the reference distribution. By selecting different reference point sets, this mechanism yields two complementary density control strategies. 
+
+Neighbor Repulsion.: The first strategy computes the Mean Shift vector over neighboring robot positions. For robot 
+
+i, the displacement vector is given by 
+
+mi =
+
+P 
+
+> j∈N i
+
+K
+
+ ∥pi−pj ∥
+
+> h
+
+
+
+pj
+
+P 
+
+> j∈N i
+
+K
+
+ ∥pi−pj ∥
+
+> h
+
+ − pi (56) points toward the local density maximum of neighboring robots. A small ∥mi∥ indicates that robot i is already near the density peak, i.e. , in a crowded region. Conversely, a large ∥mi∥
+
+suggests that the robot is far from the cluster center, occupying a relatively sparse area. The corresponding potential energy is defined as 
+
+ψrepul  
+
+> i
+
+(Xi,t ) = −γr ∥mi∥ (57) where γr > 0 is a weighting factor. Since larger ∥mi∥ yields lower energy, this potential favors spatially sparse configura-tions and penalizes crowded ones within the Gibbs distribution. As shown in Fig. 4(b), the density field concentrates around clustered robots, and the resulting Mean Shift vector drives the target agent away from the local density peak. 
+
+Unoccupied Region Attraction.: The second strategy computes the Mean Shift vector over unoccupied grid points within the target pattern, rather than over neighboring robots. Candidate points {gk} are first sampled within the pattern region where Φ( gk) < 0. A grid point gk is classified as unoccupied if no robot lies within an occupation radius roccupy :
+
+min  
+
+> j∈N
+
+∥gk − pj ∥ > r occupy (58) IEEE TRANSACTIONS ON ROBOTICS 13 
+
+The reference point set is then defined as S = {gk :
+
+gk is unoccupied }, and the corresponding Mean Shift vector becomes 
+
+ai =
+
+P 
+
+> k
+
+K(∥pi − gk∥/h ) · gk · ⊮unocc (gk)
+
+P 
+
+> k
+
+K(∥pi − gk∥/h ) · ⊮unocc (gk) − pi (59) which points toward the kernel-weighted centroid of nearby unoccupied regions. Unlike the neighbor repulsion strategy where the Mean Shift direction is undesirable, here ai directly indicates where the robot should move. The attraction potential energy is formulated as 
+
+ψattract  
+
+> i
+
+(Xi,t ) = γa∥ai∥ (60) where γa > 0 is a weighting factor. Since larger ∥ai∥ yields higher energy, this potential penalizes states where the robot is far from unoccupied regions, actively guiding it toward under-populated areas. This explicit spatial targeting makes the strategy particularly effective for complex non-convex geometries where passive repulsion alone may fail to achieve adequate coverage. As depicted in Fig. 4(c), the density field highlights unoccupied areas within the pattern and the resulting Mean Shift vector points toward the kernel-weighted centroid of these regions. 
+
+4) Total Pattern Potential Energy: The complete pattern-related Gibbs energy integrates the boundary potential with the selected density estimation strategy. The unary pattern potential for agent i takes the general form. 
+
+ψform  
+
+> i
+
+(Xi,t ) = wbψboundary  
+
+> i
+
++ ψdensity  
+
+> i
+
+(61) where ψdensity  
+
+> i
+
+represents the density-based potential from either the neighbor repulsion strategy (using ψrepul  
+
+> i
+
+) or the unoccupied region attraction strategy (using ψattract  
+
+> i
+
+), depending on the application requirements. The weighting coefficient wb balances the relative importance of boundary enforcement versus density uniformity. When the neighbor repulsion strategy is selected, an addi-tional pairwise pattern potential between neighboring agents may be included, which is given by 
+
+ψform  
+
+> i,j
+
+(Xi,t , Xj,t ) = wdψdensity  
+
+> i,j
+
+(62) The total Gibbs energy, including both the basic swarm potentials and the pattern potentials, is expressed as 
+
+H(X) = 
+
+> T
+
+X
+
+> t=0
+
+" X
+
+> i∈V
+
+
+
+ψi(Xi,t ) + ψform  
+
+> i
+
+(Xi,t )
+
+
+
++ X
+
+> {i,j }∈E
+
+
+
+ψi,j (Xi,t , Xj,t ) + ψform  
+
+> i,j
+
+(Xi,t , Xj,t )
+
+# (63) This unified energy function maintains the Gibbs distribution structure established in Equation (2), where lower total energy corresponds to higher probability configurations that simulta-neously achieve collision avoidance, velocity alignment, and pattern maintenance. 
+
+Algorithm 1 GRF-based Pattern-Oriented Swarm Control with Uncertainty-Aware Collision Avoidance  
+
+> 1:
+
+Input: Initial state ¯x0, covariance Σ0 
+
+> 2:
+
+Parameters: K samples, horizon T , risk tolerance α 
+
+> 3:
+
+(¯ x0, Σ0) ←StateEstimator()  
+
+> 4:
+
+▷ Receive and predict neighbor trajectories  
+
+> 5:
+
+Receive neighbors’ trajectory ˆXj = {ˆxj,t , Σj,t }t=0 ,...,T −1 
+
+> 6:
+
+for each neighbor j ∈ N i do  
+
+> 7:
+
+(ˆ xj,t , Σj,t ) ← UKF predict (ˆ xj,t −1, Σj,t −1, f j ) ▷ Single-step UKF  
+
+> 8:
+
+end for  
+
+> 9:
+
+▷ Predict obstacle trajectories via UKF  
+
+> 10:
+
+for each obstacle o ∈ O do  
+
+> 11:
+
+for t = 0 to T − 1 do  
+
+> 12:
+
+(ˆ xo,t +1 , Σo,t +1 ) ← UKF predict (ˆ xo,t , Σo,t , f o) 
+
+> 13:
+
+end for  
+
+> 14:
+
+end for  
+
+> 15:
+
+ComputeUnoccupiedRegions( Φ, {pj }) ▷ Grid sampling for pattern  
+
+> 16:
+
+for k ← 0 to K − 1 do  
+
+> 17:
+
+Sample noise sequence Yk = {γk 
+
+> 0
+
+, γ k 
+
+> 1
+
+, ..., γ kT −1} 
+
+> 18:
+
+Sk ← 0 ▷ Initialize trajectory cost  
+
+> 19:
+
+for t = 0 to T − 1 do  
+
+> 20:
+
+ut = ¯ ut + γkt 
+
+> 21:
+
+¯xt+1 = f (¯ xt, ut) 
+
+> 22:
+
+▷ Uncertainty-aware collision avoidance  
+
+> 23:
+
+ψcol  
+
+> i
+
+← ComputeCollisionPotential( ¯xt,
+
+{ˆxe,t , Σe,t }e∈N i∪O ) 
+
+> 24:
+
+▷ Density field pattern potentials  
+
+> 25:
+
+Φt ← ComputeSDF( ¯xt) 
+
+> 26:
+
+ψboundary  
+
+> i
+
+← Equation (55)  
+
+> 27:
+
+ψdensity  
+
+> i
+
+← ComputeDensityPotential( ¯xt, {pj }j∈N i ) 
+
+> 28:
+
+ψform  
+
+> i
+
+← wbψboundary  
+
+> i
+
++ ψdensity  
+
+> i
+> 29:
+
+Sk ← Sk + ψcol  
+
+> i
+
++ ψform  
+
+> i
+> 30:
+
+end for  
+
+> 31:
+
+end for  
+
+> 32:
+
+▷ Compute optimal control via importance sampling  
+
+> 33:
+
+wk ← exp( −Sk/λ )/ P 
+
+> k′
+
+exp( −Sk′
+
+/λ ) 
+
+> 34:
+
+u∗ 
+
+> t
+
+← P 
+
+> k
+
+wkγkt , ∀t 
+
+> 35:
+
+Return: {u∗ 
+
+> t
+
+}T −1
+
+> t=0
+
+5) Dynamic Pattern Adaptation: The density field frame-work naturally supports dynamic geometric patterns through time-varying SDF. 
+
+Φt(p) = Φ( p − ct − vf · t · ∆t) (64) where ct is the time-varying pattern center and vf is the pattern velocity. For adaptive sizing based on swarm population N , a scale factor s adjusts the geometric pattern. 
+
+Φs(p) = s · Φ( p/s ) (65) where s = pN/N ref maintains consistent robot density across different swarm sizes. IEEE TRANSACTIONS ON ROBOTICS 14 
+
+D. Performance Metrics 
+
+We introduce several metrics to evaluate pattern control performance. The pattern conformity score Spattern measures the proportion of robots located within the target pattern region. 
+
+Spattern = |{ i : Φ( pi) < 0}| 
+
+N (66) The uniformity score Sunif quantifies the evenness of robot distribution based on the coefficient of variation of nearest-neighbor distances. 
+
+Sunif = 11 + CV nn 
+
+(67) The coverage ratio Scover evaluates how well the robots cover the pattern region. 
+
+Scover = |{ gk ∈ G in : min i ∥gk − pi∥ < r cover }| |G in | (68) The composite formation score Sform combines all three metrics as a weighted sum. 
+
+Sform = αsSpattern + αuSunif + αcScover (69) where αs + αu + αc = 1 are weighting coefficients. V. N UMERICAL SIMULATIONS 
+
+To validate the proposed GRF-based stochastic optimal control framework, comprehensive simulation studies are con-ducted across diverse scenarios with progressively increasing complexity. The experimental design follows a systematic evaluation strategy that first validates individual algorithmic components in isolation, then examines their integrated perfor-mance under challenging conditions. To demonstrate the efficacy of the proposed methods, the simulation results are presented in two parts. The initial part (Sections V-A–V-B) evaluates the robustness of collision avoidance under state uncertainty, analyzing how different risk formulations influence safety margins. The subsequent part (Sections V-C–V-D) validates the versatility of density-guided pattern control, showcasing high-quality pattern for-mation and autonomous recovery from partial swarm failure. Following the component-level validations, we perform a comprehensive evaluation of the integrated framework in Sections V-E and V-F. Specifically, Section V-E examines the full framework’s performance during complex multi-formation transitions using quadrotor UAVs. Subsequently, Section V-F extends the evaluation to fixed-wing UAV platforms, thereby demonstrating the framework’s generalization capability and its platform-agnostic nature across disparate vehicle dynamics. The pattern-oriented swarm control performance is assessed based on metrics spanning safety protocols, formation fidelity, and efficiency measures, as detailed in Section IV-D. To ensure statistical significance, each experimental configuration is evalu-ated based on Monte Carlo simulation. The proposed framework is implemented using PyTorch to leverage GPU-accelerated parallel computation within the simulation environment. This architecture facilitates high-throughput evaluation and ensures the real-time-capable processing of complex swarm trajectories. Static Mixed Dynamic 90 92 94 96 98 100    
+
+> Survival Rate (%)
+> 100.0 99.8 99.6 100.0 98.9 98.1 99.4 98.8 96.4
+> CVaR-MPPI CC-MPPI Baseline
+> Fig. 5. Survival rate comparison across three methods and obstacle scenarios. CVaR-MPPI consistently achieves the highest survival rates, with the perfor-mance gap increasing as environmental uncertainty grows. Error bars indicate standard deviation over 50 trials.
+
+A. Collision Avoidance Performance Evaluation 
+
+Navigating environments with dynamic obstacles presents significant challenges due to the inherent stochasticity in obstacle motion. Deterministic collision avoidance methods, which rely primarily on instantaneous distance measurements, often fail to anticipate future obstacle states, resulting in reactive rather than proactive maneuvers. In this evaluation, we demonstrate the efficacy of explicit uncertainty modeling by comparing three distinct strategies: 1) CVaR-MPPI, which inte-grates UKF-based trajectory prediction with conditional value-at-risk optimization; 2) CC-MPPI, utilizing UKF prediction within a chance-constrained formulation; and 3) Baseline MPPI, a standard distance-based approach lacking both trajectory prediction and uncertainty quantification. 
+
+1) Simulation Setup: Three obstacle-rich scenarios with increasing dynamic complexity are designed to systemati-cally evaluate the collision avoidance performance of the proposed framework. The Static Environment contains 20 
+
+static obstacles randomly distributed in the operational arena, representing classical navigation with known obstacle positions. The Mixed Environment introduces environmental uncertainty by considering 10 static obstacles and 10 dynamic obstacles, where dynamic obstacles follow sinusoidal motion patterns with velocities ranging from 0.7 to 1.0 m/s. The Dynamic Environment represents the most challenging scenario, featur-ing 20 dynamic obstacles with sinusoidal motion and high environmental uncertainty. Dynamic obstacle trajectories are predicted using the Un-scented Kalman Filter as described in Section IV-B, which propagates state uncertainty over the prediction horizon. The CVaR method employs a confidence level of α = 0 .9, focusing on the worst 10 % of collision cost scenarios. Each configuration is evaluated over 50 Monte Carlo trials to ensure statistical significance. Performance is assessed using survival rate, inter-agent safety margin, control utilization, energy consumption, and path length. 
+
+2) Results and Analysis: Figure 5 presents the survival rate comparison across all methods and scenarios. Table I provides the comprehensive performance metrics. IEEE TRANSACTIONS ON ROBOTICS 15                                                                            
+
+> TABLE I COMPREHENSIVE PERFORMANCE COMPARISON OF COLLISION AVOIDANCE METHODS
+> Safety Metrics Efficiency Metrics Scenario Method Survival (%) Margin (m) Util. (%) Energy (J) Path (m)
+> Static CVaR-MPPI 100 .0±0.01.66 27.1 166.6 50.9 CC-MPPI 100 .0±0.01.68 25.0 149.7 50.0 Baseline 99 .4±2.41.72 20.3 105.0 49.5 Mixed CVaR-MPPI 99 .8±1.41.65 29.1 197.1 52.4 CC-MPPI 98 .9±3.31.69 26.2 166.1 50.5 Baseline 98 .8±3.21.74 21.2 109.2 49.8 Dynamic CVaR-MPPI 99 .6±2.01.65 29.7 213.3 51.8 CC-MPPI 98 .1±4.31.68 25.9 168.2 50.4 Baseline 96 .4±4.81.73 21.9 120.3 50.1
+> Margin: Inter-agent Safety Margin; Util.: Control Utilization. Bold values indicate best performance in each scenario.
+
+CVaR-MPPI achieves superior safety performance. In the most challenging Dynamic Environment, CVaR-MPPI achieves 99.6% survival rate, outperforming CC-MPPI by 1.5% and the baseline by 3.2%. This advantage persists across all scenarios, with CVaR-MPPI achieving 99.8% survival in the Mixed Environment and 100% in the Static Environment. 
+
+Performance gap increases with environmental uncer-tainty. The survival rate difference between CVaR-MPPI and other methods increases as dynamic obstacle proportion increases. In the Static Environment, all methods achieve near-perfect survival of 99 .4 to 100 %. As uncertainty grows in the Dynamic Environment, the gap expands to 1.5% over CC-MPPI and 3.2% over the baseline. This scaling behavior validates the effectiveness of CVaR-based uncertainty modeling for handling complex dynamic environments. 
+
+CC-MPPI linearization introduces approximation errors. 
+
+Despite employing UKF-based prediction, CC-MPPI exhibits lower survival rates than expected in highly dynamic scenar-ios. This degradation stems from the linear approximation required for deriving the deterministic equivalent of chance constraints as formulated in Equation (44). In contrast, CVaR-MPPI Monte Carlo sampling approach accurately captures the nonlinear uncertainty distribution, enabling more precise collision probability estimation. 
+
+3) Summary: The experimental results reveal distinct char-acteristics of the three collision avoidance approaches. CVaR-MPPI demonstrates superior robustness by explicitly optimizing against tail-risk scenarios through Monte Carlo sampling, natu-rally capturing the nonlinear nature of collision probability dis-tributions without linearization assumptions. CC-MPPI provides computationally efficient collision avoidance through its closed-form deterministic equivalent, but the linear approximation degrades accuracy when obstacle motion exhibits significant nonlinearity. Baseline MPPI, relying solely on instantaneous distance measurements without uncertainty modeling, exhibits the lowest survival rates across all scenarios, with performance degradation becoming more pronounced as environmental uncertainty increases. Specifically, Baseline MPPI achieves only 96.4% survival in the Dynamic Environment compared to 98 .1% for CC-MPPI and 99 .6% for CVaR-MPPI. From an energy efficiency perspective, CVaR-MPPI employs approxi-mately 35 % higher control utilization at 29 .7% compared to the baseline at 21 .9%, with energy consumption of 213 .3 Jcompared to 120 .3 J representing a 77 % increase. This energy overhead reflects the proactive avoidance maneuvers enabled by uncertainty-aware planning. For safety-critical applications, CVaR-MPPI can, therefore, provides the most reliable results. 
+
+B. CVaR Parameter Sensitivity Analysis 
+
+The CVaR confidence level α directly controls the risk sen-sitivity of the collision avoidance behavior. As demonstrated in Section V-A, CVaR-MPPI achieves superior safety performance compared to alternative formulations. However, the choice of α
+
+involves a fundamental trade-off between safety conservatism and control efficiency. This experiment systematically inves-tigates how α affects collision avoidance performance across varying obstacle densities, providing guidance for parameter selection in different operational scenarios. 
+
+1) Simulation Setup: The experiment systematically varies both the CVaR confidence level α ∈ { 0.1, 0.3, 0.5, 0.7, 0.9}
+
+and the number of dynamic obstacles Nd ∈ { 15 , 20 , 25 , 30 , 35 },resulting in a complete 5 × 5 experimental grid with 25 pa-rameter combinations. For each configuration, 50 Monte Carlo trials are executed to ensure statistical significance, yielding a total of 1,250 individual simulation runs. Performance is evaluated using survival rate, control energy consumption, and control utilization metrics. 
+
+2) Results and Analysis: Figure 6 presents the survival rate heatmap across all parameter combinations. The survival rate quantifies the proportion of UAVs that successfully navigate through the obstacle field without collision. 
+
+Optimal α configuration for survival rate. The survival rate exhibits a non-trivial dependence on α. Lower α values approach risk-neutral behavior, with α = 0 .1 achieving survival rates from 97.6% at 15 obstacles to 92.2% at 35 obstacles. Higher α values improve survival in sparse environments but show similar degradation in dense scenarios. Neither extreme yields the best overall performance: extremely high α values result in overly conservative maneuvers that limit escape options, while extremely low α values fail to account for worst-case scenarios. The α = 0 .7 configuration achieves the optimal balance, maintaining survival rates from 99.2% at IEEE TRANSACTIONS ON ROBOTICS 16 15 20 25 30 35 
+
+Number of Dynamic Obstacles 
+
+0.9 0.7 0.5 0.3 0.1                       
+
+> CVaR Parameter
+> 0.990 0.992 0.972 0.974 0.950 0.992 0.986 0.974 0.976 0.944 0.988 0.982 0.978 0.950 0.926 0.982 0.972 0.966 0.956 0.922 0.976 0.964 0.946 0.934 0.922 0.90 0.92 0.94 0.96 0.98 1.00 Survival Rate
+
+Fig. 6. Survival rate heatmap showing the effect of CVaR parameter α and number of dynamic obstacles on navigation safety. Darker shading indicates higher survival rates. 15 20 25 30 35 
+
+Number of Dynamic Obstacles 
+
+0.9 0.7 0.5 0.3 0.1                       
+
+> CVaR Parameter
+> 175 213 236 257 281 135 162 191 213 233 121 147 172 184 201 108 130 154 170 189 96 120 138 154 170 80 100 120 140 160 180 200 Control Energy (J)
+
+Fig. 7. Control energy heatmap showing energy consumption under different CVaR parameter α and obstacle configurations. Lighter shading indicates lower energy consumption. Higher α values result in more aggressive avoidance maneuvers, leading to increased energy expenditure. 
+
+15 obstacles to 94.4% at 35 obstacles with the most stable performance across varying obstacle densities. Figures 7 and 8 present the control energy consumption and utilization analysis respectively. 
+
+Safety-efficiency trade-off. The energy analysis reveals a clear trade-off between risk sensitivity and efficiency. Higher α
+
+values consistently result in increased energy consumption due to more conservative collision avoidance maneuvers. Averaging across all scenarios, α = 0 .1 consumes approximately 136 J while α = 0 .9 requires 232 J, representing a 71% increase. The α = 0.7 configuration exhibits intermediate energy consumption of 187 J, achieving a favorable balance between 15 20 25 30 35 
+
+Number of Dynamic Obstacles 
+
+0.9 0.7 0.5 0.3 0.1                       
+
+> CVaR Parameter
+> 0.26 0.30 0.32 0.33 0.35 0.23 0.25 0.28 0.30 0.32 0.22 0.24 0.26 0.28 0.29 0.20 0.23 0.25 0.27 0.28 0.19 0.22 0.24 0.25 0.27 0.15 0.20 0.25 0.30 0.35 0.40 Control Utilization
+
+Fig. 8. Control utilization heatmap showing the fraction of maximum control authority used under different parameter configurations. Lighter shading indicates lower utilization. The α = 0 .7 configuration achieves moderate utilization of 23 to 32% across all obstacle densities. TABLE II THE IMPACT OF α ACROSS DIFFERENT OBSTACLE SCENARIOS 
+
+α Avg. Avg. Min Composite Score Surv. Energy Surv. 50:50 70:30 90:10 0.1 94.8 136 92.2 0.582 0.500 0.418 0.3 96.0 150 92.2 0.623 0.589 0.554 0.5 96.5 165 92.6 0.620 0.616 0.613 0.7 97.4 187 94.4 0.629 0.677 0.725 
+
+0.9 97.6 232 95.0 0.514 0.615 0.715            
+
+> Surv.: Survival rate (%). Energy: Control energy (J). Composite score
+> S=ws·¯s+we·¯ewith weight ratio ws:we(safety:efficiency). Bold values denote the best performance in each category.
+
+the risk-neutral α = 0 .1 approach and the risk-averse α = 0 .9
+
+strategy. 
+
+Comprehensive evaluation. To identify the optimal α
+
+configuration, Table II presents average performance metrics and normalized composite scores across the complete parameter grid. The composite score S = ws · ¯s + we · ¯e combines normalized survival rate ¯s and energy efficiency ¯e with weight ratio ws:we. While α = 0 .9 achieves the highest average survival rate of 97.6% and best worst-case performance of 95.0%, its high energy consumption severely penalizes the efficiency term, resulting in the lowest composite score at equal weighting. In contrast, α = 0 .7 consistently attains the highest composite score across all weight combinations, achieving 97.4% average survival while consuming 20% less energy than α = 0 .9.
+
+3) Summary: The experimental results demonstrate that 
+
+α = 0 .7 is the recommended default configuration, achiev-ing the highest composite performance across all weighting schemes while maintaining near-optimal safety with 20% lower energy consumption compared to α = 0 .9. For applications requiring maximum safety guarantees, α = 0.9 provides the highest worst-case survival rate of 95.0% at the cost of IEEE TRANSACTIONS ON ROBOTICS 17 
+
+increased energy expenditure. The comparative experiments in Section V-A employ α = 0 .9 to establish an upper bound on achievable safety performance. 
+
+C. Density-Guided Pattern Control Validation 
+
+This experiment evaluates the effectiveness of density based pattern control methods proposed in Section IV-C, focusing on the ability of different mean shift variants to guide swarm agents into prescribed geometric formations while achieving high spatial coverage and uniform distribution. 
+
+1) Simulation Setup: Three pattern control strategies are compared in this evaluation. Neighbor repulsion employs the traditional mean shift approach where agents are pushed away from densely occupied regions through neighbor-based repulsive forces. The proposed Unoccupied Attraction method actively guides agents toward unoccupied regions within the target formation boundary using attractive density gradients. The Baseline configuration operates without additional density-guided control terms. The experiments are conducted across five target pattern formations arranged in order of increasing geometric com-plexity: Circle represents the simplest convex pattern; Square introduces corner discontinuities; Star presents a non-convex boundary with pointed vertices; A-pattern features an internal void creating a complex topology; and 8-pattern contains multiple connected non-convex regions representing the most challenging configuration. Simulations are conducted within a 12 × 12 m2 workspace populated by a 30 -agent swarm. To ensure statistical robustness, each configuration is evaluated over 10 independent trials, with agent positions initialized via a uniform spatial distribution. Each trial spans 100 discrete time steps; performance metrics are averaged over the final 5 steps to characterize steady-state convergence. The system is evaluated via two primary metrics: coverage ratio, denoting the occupied fraction of the target formation area, and uniformity score, quantifying the spatial distribution variance within the synthesized pattern. 
+
+2) Results and Analysis: Table III presents the quantitative comparison across all five geometric patterns. 
+
+Superior coverage in complex non-convex formations. 
+
+The proposed Unoccupied Attraction method demonstrates significant advantages in coverage ratio across all pattern formations, with the performance gap widening as geometric complexity increases. In the 8-shape configuration, which rep-resents the most challenging non-convex geometry, Unoccupied Attraction achieves 98.3% coverage compared to 92.3% for Neighbor Repulsion and 92.9% for the Baseline, representing a 6.0% and 5.4% improvement respectively. Similarly, in the A-shape formation with its internal void topology, Unoccupied Attraction attains 97.7% coverage while other methods remain below 92%. This substantial improvement stems from the active guidance mechanism that directs agents toward unoccupied regions rather than merely repelling them from crowded areas. 
+
+Enhanced uniformity distribution. Beyond coverage im-provements, Unoccupied Attraction also achieves superior uniformity scores in complex formations. The 8-shape con-figuration exhibits the most pronounced difference, with Unoccupied Attraction reaching 77.5% uniformity compared to 69.0% for Neighbor Repulsion and 74.2% for the Baseline. This 8.5% improvement over Neighbor Repulsion indicates that the proposed method not only fills the formation area more completely but also distributes agents more evenly throughout the region. The A-shape results further corroborate this finding, where Unoccupied Attraction achieves 74.3% uniformity versus 68.9% for Neighbor Repulsion. 
+
+Favorable convergence-performance trade-off. While Un-occupied Attraction requires slightly longer convergence times compared to other methods, the additional time investment yields substantially improved formation quality. In the most complex 8-shape configuration, the proposed method converges in 32.5 steps compared to 30.0 steps for other methods, representing merely an 8% increase in convergence time while achieving 6% higher coverage and 8.5% higher uniformity. Even in the A-shape configuration where the convergence time difference is more pronounced at 23%, the resulting 8.3% coverage improvement and 5.4% uniformity improvement demonstrate a highly favorable trade-off. 
+
+3) Summary: The proposed Unoccupied Attraction method exhibits superior scalability with respect to shape complexity. From the simplest Circle to the most challenging 8-shape, the proposed method maintains coverage consistently above 91.9% across all configurations, whereas Neighbor Repulsion exhibits greater variability ranging from 84.7% to 92.3%. This robust performance across the entire complexity spectrum, combined with the efficient convergence-to-quality ratio, makes Unoccupied Attraction particularly suitable for applications re-quiring reliable pattern control in diverse non-convex geometric environments. 
+
+D. Self-Healing Evaluation Under Agent Loss 
+
+This experiment evaluates the self-healing capability of density based pattern control methods when subjected to sudden agent losses. This scenario is critical for swarm robustness, as real-world deployments frequently encounter agent failures due to hardware malfunctions, communication disruptions, or environmental hazards. 
+
+1) Simulation Setup: Three pattern control strategies are compared under identical agent loss conditions: Neighbor Repulsion, the proposed Unoccupied Attraction method, and the Baseline configuration without density-guided control. The experiments employ the A-shape formation, which was previously demonstrated to be a challenging non-convex geometry. A swarm of 30 agents is initialized at random positions within a 12 × 12 m2 operational area and allowed to converge to the target formation. At 6 seconds into the simulation, after all methods have achieved stable formations as established in Section V-C, a specified percentage of agents is randomly removed to simulate sudden failures. Three agent loss rates are investigated: 10%, 20%, and 50%, corresponding to the removal of 3, 6, and 15 agents respectively. Each experimental configuration is repeated for 10 independent trials with different random initial positions and loss patterns to ensure statistical robustness. The simulation continues for an additional 60 time steps after the loss event, IEEE TRANSACTIONS ON ROBOTICS 18 
+
+TABLE III DENSITY FIELD FORMATION CONTROL PERFORMANCE COMPARISON 
+
+pattern Method Coverage Ratio (%) Uniformity Score (%) Convergence Steps 
+
+Circle Unoccupied Attraction 91 .9 ± 0.9 70 .8 ± 4.3 31.0 Neighbor Repulsion 84 .7 ± 2.3 65 .5 ± 3.6 26.5 
+
+Baseline 85 .9 ± 2.2 69 .4 ± 3.2 26.5 Square Unoccupied Attraction 87 .3 ± 1.9 66 .7 ± 2.7 49.5 Neighbor Repulsion 78 .8 ± 2.2 61 .6 ± 2.8 46.5 
+
+Baseline 78 .0 ± 1.9 64 .7 ± 2.8 46.0 Star Unoccupied Attraction 95 .2 ± 0.8 67 .5 ± 3.8 34.5 Neighbor Repulsion 86 .1 ± 2.1 64 .2 ± 1.8 33.5 
+
+Baseline 86 .4 ± 2.3 67 .7 ± 2.3 33.5 A-pattern Unoccupied Attraction 97 .7 ± 0.5 74 .3 ± 3.3 39.5 Neighbor Repulsion 89 .4 ± 1.4 68 .9 ± 1.6 32.0 
+
+Baseline 91 .1 ± 1.2 72 .8 ± 1.9 34.0 8-pattern Unoccupied Attraction 98 .3 ± 0.3 77 .5 ± 4.0 32.5 Neighbor Repulsion 92 .3 ± 0.9 69 .0 ± 2.2 30.0 
+
+Baseline 92 .9 ± 1.1 74 .2 ± 1.2 30.0 
+
+Bold values indicate best performance in each pattern configuration. Results averaged over 10 trials. TABLE IV FORMATION SELF -H EALING PERFORMANCE COMPARISON UNDER DIFFERENT AGENT LOSS RATES 
+
+Loss Rate Method Coverage (%) Uniformity (%) 
+
+Pre-Loss Final Pre-Loss Final 10% Unoccupied Attraction 97 .5 ± 0.8 97 .1 ± 0.5 73 .8 ± 1.6 73 .7 ± 1.9
+
+Neighbor Repulsion 89 .9 ± 1.3 89 .2 ± 1.1 69 .5 ± 2.2 69 .6 ± 1.6
+
+Baseline 90 .7 ± 1.4 91 .9 ± 1.3 72 .2 ± 1.4 73 .7 ± 2.6
+
+20% Unoccupied Attraction 97 .5 ± 0.8 96 .5 ± 0.4 73 .8 ± 1.6 72 .4 ± 3.0
+
+Neighbor Repulsion 89 .9 ± 1.3 88 .5 ± 1.7 69 .5 ± 2.2 67 .7 ± 3.3
+
+Baseline 90 .7 ± 1.4 90 .6 ± 1.6 72 .2 ± 1.4 73 .0 ± 3.0
+
+50% Unoccupied Attraction 97 .5 ± 0.8 93 .9 ± 1.5 73 .8 ± 1.6 75 .7 ± 3.3
+
+Neighbor Repulsion 89 .9 ± 1.3 83 .3 ± 2.1 69 .5 ± 2.2 67 .9 ± 4.7
+
+Baseline 90 .7 ± 1.4 83 .1 ± 2.1 72 .2 ± 1.4 70 .6 ± 3.6
+
+Bold values indicate best performance at each loss rate. Results averaged over 10 trials. 
+
+allowing assessment of formation recovery dynamics and final steady-state performance. Performance is evaluated using pre-loss and post-recovery coverage ratio and uniformity score metrics. 
+
+2) Results and Analysis: Table IV presents the quantitative comparison across all methods and loss rates. Figure 9visualizes the final coverage and uniformity metrics after the recovery period. 
+
+Superior coverage maintenance under agent loss. The proposed Unoccupied Attraction method demonstrates excep-tional ability to maintain high coverage ratios even after significant agent losses. At the most challenging 50% loss rate, Unoccupied Attraction achieves 93.9% final coverage, substantially outperforming both Neighbor Repulsion at 83.3% and Baseline at 83.1%. This 10.8% advantage represents a critical improvement for maintaining formation integrity under severe degradation conditions. The performance gap persists across all loss rates, with Unoccupied Attraction maintaining 5.2% to 8.0% higher coverage than competing methods at 10% and 20% loss rates respectively. 
+
+Enhanced uniformity recovery in high-loss scenarios. 
+
+At the 50% loss rate, Unoccupied Attraction achieves the 10% 20% 50%             
+
+> Agent Loss Rate (%)
+> 020 40 60 80 100
+> Final Coverage (%)  89.2 88.5 83.3 97.1 96.5 93.9 91.9 90.6 83.1
+> (a) Final Coverage After Recovery
+> Neighbor Repulsion Unoccupied Attraction Baseline 10% 20% 50%
+> Agent Loss Rate (%)
+> 020 40 60 80 100
+> Final Uniformity (%)
+> 69.6 67.7 67.9 73.7 72.4 75.7 73.7 73.0 70.6
+> (b) Final Uniformity After Recovery
+> Neighbor Repulsion Unoccupied Attraction Baseline
+
+Fig. 9. Final formation performance after self-healing under different agent loss rates. The proposed Unoccupied Attraction method maintains substantially higher coverage across all loss conditions, with advantages becoming more pronounced at higher loss rates. 
+
+highest final uniformity of 75.7%, which notably exceeds even its pre-loss uniformity of 73.8%. This counterintuitive improvement demonstrates that the proposed method actively redistributes remaining agents to fill gaps created by lost agents, rather than simply maintaining their pre-loss positions. In contrast, Neighbor Repulsion and Baseline exhibit uniformity degradation from 69.5% and 72.2% to 67.9% and 70.6% respectively, indicating their passive response to agent losses. IEEE TRANSACTIONS ON ROBOTICS 19 20 40 60 80 100  
+
+> X (m)
+> 10
+> 5
+> 0510
+> Y (m)
+> Quadrotor Static obstacle Agent trajectory Formation boundary
+> Fig. 10. Panoramic view of the 30-agent swarm executing the S-Y-S-U formation sequence.
+
+Robustness to loss magnitude. The coverage degradation rate with increasing loss percentage reveals the inherent robustness of each method. From 10% to 50% loss, Unoccupied Attraction experiences only 3.2% coverage reduction, from 97.1% to 93.9%. In comparison, Neighbor Repulsion and Baseline both suffer approximately 7% degradation, from 89.2% and 91.9% to 83.3% and 83.1% respectively. This more than twofold difference in degradation rate demonstrates the superior resilience of the Unoccupied Attraction approach, which actively guides surviving agents toward newly unoccupied regions rather than relying solely on local repulsion dynamics. 
+
+3) Summary: The self-healing results validate that the density gradient-based attraction mechanism provides not only superior static formation quality but also enhanced dynamic reconfiguration capability. By continuously identifying and attracting agents toward unoccupied regions within the target boundary, the proposed method enables rapid and effective compensation for agent losses, making it particularly suitable for safety-critical swarm applications where formation integrity must be maintained despite partial system failures. 
+
+E. Comprehensive Evaluation of the Swarm Pattern Control 
+
+Based on the superior performance demonstrated in Sec-tions V-C and V-D, where Unoccupied Attraction consistently achieved the highest coverage and uniformity across diverse pattern formations and maintained robust self-healing capability, this final experiment employs the Unoccupied Attraction method to demonstrate the integrated capabilities of the proposed proposed framework in a comprehensive mission scenario. The demonstration features a swarm of 30 agents navigating through an obstacle environment containing 15 static obstacles while executing a sequence of formation transitions. The operational area spans 120 × 20 m2. During navigation, the swarm sequentially transitions through four complex non-convex target formations: S-shape, Y-shape, S-shape, and U-shape, representing diverse geometric complexities including curved boundaries, branching structures, and enclosed regions. Formation transitions are triggered at predetermined waypoints along the navigation path. Figure 10 presents a panoramic overview of the entire mission, displaying the complete swarm trajectories across the operational area with formation snapshots captured at the end of each phase. The demonstration successfully showcases three key capa-bilities of the proposed framework. First, scalability to larger swarm sizes is validated as the 30-agent swarm maintains high coverage ratios across all formation configurations, achieving 98.6% in the first S-shape, 97.0% in the Y-shape, 96.9% in the second S-shape, and 99.8% in the U-shape. Second, smooth transitions between complex non-convex formations are achieved, with the swarm rapidly reconfiguring from curved geometries to branching structures and enclosed regions while maintaining formation quality. Third, collision-free navigation in obstacle environments is maintained throughout the entire 1050-step simulation, with all 30 agents achieving 100% survival rate while simultaneously executing formation transitions. These results confirm that the proposed framework provides a unified solution for pattern-oriented swarm control in uncertain environments, successfully integrating density based pattern control with CVaR-based uncertainty-aware collision avoidance within a single theoretical framework. 
+
+F. Generalization to Fixed-Wing UAVs 
+
+To validate the generality of the proposed planning frame-work across different dynamical systems, this experiment extends the evaluation to fixed-wing unmanned aerial vehicles. Fixed-wing aircraft impose fundamentally different constraints compared to multirotor platforms: they cannot hover, operate at higher cruising speeds, need larger inter-agent spacing for safety, and exhibit non-holonomic motion characteristics. This demonstration evaluates whether the framework can seamlessly adapt to these constraints while maintaining pattern control and collision avoidance capabilities. The fixed-wing test scenario features 8 UAVs executing a complex multi-phase mission. The swarm operates at an average cruising speed of 9.78 m/s with a minimum velocity constraint of 1.5 m/s to prevent stall conditions. The inter-agent spacing is configured with a 3.0 m minimum safety distance and 4.0 m ideal spacing, significantly larger than the multirotor configurations. The mission consists of seven distinct phases: (1) initial V-formation establishment, (2) formation transition from V-shape to line formation, (3) narrow channel crossing requiring the swarm to reconfigure into a compact line, (4) straight-line flight after channel exit, (5) coordinated U-turn IEEE TRANSACTIONS ON ROBOTICS 20 0 50 100 150 200  
+
+> X (m)
+> 80
+> 60
+> 40
+> 20
+> 020
+> Y (m)
+> Fixed-wing UAV Channel wall Dynamic obstacle Static obstacle
+> 810 12 14 16 18 20
+> v (m/s)
+> Fig. 11. Fixed-wing UAV swarm executing a multi-phase mission demonstrating framework adaptability to non-holonomic dynamics. (a) Initial V-formation with 8 fixed-wing agents. (b) Formation transition from V-shape to line configuration. (c) Narrow channel crossing with adaptive line formation. (d) Coordinated U-turn maneuver. (e) Dynamic obstacle field avoidance. The swarm maintains collision-free operation throughout all phases while respecting minimum velocity constraints.
+
+maneuver, (6) dynamic obstacle field traversal, and (7) return path navigation. Figure 11 presents key snapshots from the mission, illus-trating the swarm’s behavior across different phases. The formation transition phase demonstrates the framework’s ability to smoothly reconfigure the swarm from a V-formation opti-mized for aerodynamic efficiency to a compact line formation suitable for narrow channel traversal. During channel crossing, the swarm successfully maintains the line formation while navigating through a 12 m wide passage. The U-turn maneuver showcases coordinated turning behavior that respects the turn rate constraints (maximum 0.5 rad/s) inherent to fixed-wing dynamics. Throughout the dynamic obstacle avoidance phase, all 8 agents successfully navigate around moving obstacles while maintaining safe inter-agent distances. The quantitative results demonstrate robust performance across all mission phases. The swarm achieved an average inter-agent spacing of 6.90 m, well above the 3.0 m safety threshold, with a minimum observed spacing of 1.40 m occurring during tight maneuvering. Zero inter-agent collisions were recorded throughout the entire 420-step simulation, with only 2 near-miss events where spacing temporarily approached the warning threshold. The average formation score of 0.403 reflects the challenging nature of maintaining precise formations with non-holonomic constraints, while the average inside ratio of 0.304 indicates successful boundary adherence during formation phases. These results demonstrate the framework’s inherent gen-eralization capability, demonstrating its seamless extension to fixed-wing UAV dynamics without structural algorithmic modifications. The integrated density-guided coordination and risk-averse CVaR-based avoidance mechanisms remain robust to the significant kinematic heterogeneity—specifically the non-holonomic constraints, increased operational velocities, and expanded spatial requirements—characteristic of fixed-wing platforms. This cross-platform adaptability validates the frame-work’s utility for heterogeneous swarm synthesis, providing a unified control architecture capable of synchronizing disparate agent dynamics within a shared operational field. VI. R EAL -W ORLD EXPERIMENTS 
+
+To validate the practical applicability of the proposed frame-work, we conducted a series of empirical evaluations using quadrotor platforms in both indoor and outdoor environments. The indoor experiments are performed using a swarm of 15 Crazyflie nano-quadrotors, with high-fidelity state estimation provided by a motion capture system operating at a 120 Hz update frequency. The outdoor experiments are conducted using a swarm of four custom-built quadrotors equipped with onboard computation and LiDAR-based localization, operating in unstructured environments without external positioning equipment. 
+
+A. Experimental Platform 
+
+The physical experiments are conducted using a swarm of Crazyflie 2.1 nano quadrotors, as shown in Figure 12(a). The Crazyflie 2.1 is a versatile open-source micro aerial vehicle platform developed by Bitcraze, featuring a compact form factor with a diagonal motor-to-motor distance of approximately 92 mm and a total weight of only 27 g. Its lightweight design and open-source architecture make it well-suited for multi-robot research. For swarm coordination, the Crazyswarm framework is employed, which provides high-level trajectory planning and real-time position feedback through an external motion capture system. This experimental setup allows for the validation of the proposed GRF-based control algorithms in real-world IEEE TRANSACTIONS ON ROBOTICS 21 
+
+conditions with actual sensing noise, communication delays, and aerodynamic disturbances. (a) (b)  
+
+> Fig. 12. Experimental platforms. (a) Crazyflie 2.1 nano quadrotor for indoor experiments. (b) Custom-built Q250 quadrotor for outdoor experiments.
+
+The outdoor experiments employ four quadrotors based on the Q250 airframe. Each vehicle is equipped with a Pixhawk 6C flight controller and an Intel NUC11 onboard computer for real-time execution of the proposed algorithm. State estimation is provided by a LiDAR-Inertial Odometry using a Livox Mid-360 LiDAR. Within the swarm, neighboring robots share their predicted trajectories via wireless communication, providing cooperative state information for distributed planning. Dynamic obstacles are introduced by additional quadrotors external to the swarm. For these obstacle agents, only position and velocity estimates are available to the swarm, emulating the limited observability of onboard perception in real-world deployments. Unlike the GPU-accelerated simulation workstation, the NUC11 onboard computer lacks CUDA support, which restricts the number of Monte Carlo rollouts that can be evaluated within each control cycle and therefore requires a more compact MPPI sampling configuration during outdoor flight. 
+
+B. Formation Transition Experiment 
+
+The first experiment evaluates the swarm’s ability to se-quentially form multiple complex letter patterns. Starting from circle initial positions, the 15-agent swarm was commanded to transition through four distinct target formations: ”A”, ”E”, ”R”, and ”O”, representing diverse non-convex geometries with varying complexity levels. Each formation transition was triggered after the previous formation achieved stable convergence. Figure 13 presents snapshots of the swarm at each formation phase. The results demonstrate successful formation of all four letter patterns, with agents consistently distributed along the target boundaries. The O-pattern, featuring an enclosed circular geometry, and the R-pattern with its combination of straight and curved segments, present particular challenges that the unoccupied attraction method successfully addresses through its density gradient-based guidance. 
+
+C. Self-Healing Experiment 
+
+The second experiment validates the self-healing capability under real-world conditions. The 15-agent swarm first con-verges to an A formation. At t = 7 .5 s, four agents are commanded to land, simulating sudden agent failures. The remaining 11 agents must autonomously redistribute to maintain formation coverage. Figure 14 illustrates the self-healing process. Before the loss event, all 15 agents achieve stable A formation with high coverage ratio and 77.0% uniformity score. Immediately after the loss, coverage temporarily decreases as gaps appear in the formation. However, the Unoccupied Attraction mechanism actively guides surviving agents toward the newly unoccupied regions. After the recovery period, the final formation maintains comparable coverage ratio and uniformity, demonstrating ef-fective self-healing behavior consistent with simulation results. 
+
+D. Swarm Crossing Experiment 
+
+The third experiment evaluates the collision avoidance capability when two independent swarms navigate through each other without inter-swarm communication. This scenario represents a challenging real-world situation where multiple robot groups must safely coordinate in shared workspaces while treating each other as dynamic obstacles. The experimental setup consists of 12 Crazyflie quadrotors divided into two groups of 6 agents each, designated as Red Group and Blue Group, operating within a 5 × 5 m2 arena. The two swarms start from opposite corners and are commanded to cross through each other to reach the opposite side. Critically, no communication link exists between the two groups. Each swarm perceives the other group’s agents as dynamic obstacles with uncertain motion patterns, relying solely on the proposed CVaR-based uncertainty-aware collision avoidance mechanism. Figure 15 presents the temporal evolution of the crossing maneuver through position snapshots and distance metrics. The top row shows swarm configurations at t = 0 s for initial positions, t = 3 .0 s for approaching phase, t = 6 .0 s for crossing completion, and t = 10 .0 s for final positions. The bottom panel displays three distance metrics throughout the experiment: the minimum pairwise distance among all 12 agents in yellow, the average intra-group distance for Red Group in red and Blue Group in blue, and the 0.4 m collision threshold as gray dashed line. The distance metrics reveal the effectiveness of the proposed collision avoidance mechanism. Throughout the entire crossing maneuver, the minimum pairwise distance among all 12 agents consistently remains above the 0.4 m safety threshold, with the closest encounter of 0.498 m occurring at the initial moment. During the most critical phase from t = 3 to 6 s when the two swarms interpenetrate, the minimum distance fluctuates between 0.5 to 0.7 m, indicating that agents successfully maintain safe separations even in this congested scenario. The intra-group distance curves further illustrate how each swarm temporarily expands its formation to approximately 2.1 m to accommodate the passing maneuver, then naturally contracts back to around 1.5 m after the crossing completes. This coordinated expansion-contraction behavior, observed symmetrically in both groups, demonstrates that the CVaR-based approach ena bles agents to balance collision avoidance with group cohesion. The experiment concludes with a 100% survival rate and zero collision events, validating the algorithm’s capability to handle dynamic obstacles with unknown motion patterns. IEEE TRANSACTIONS ON ROBOTICS 22   
+
+> Fig. 13. Indoor formation transition experiment with 15 Crazyflie UAVs, demonstrating successful pattern control across diverse non-convex geometries.
+> Fig. 14. Indoor self-healing experiment demonstrating formation recovery after agent loss.
+
+These indoor experiments validate that the proposed planning framework successfully transfers from simulation to real-world deployment, maintaining its pattern control, self-healing, and collision avoidance capabilities when implemented on physical platforms. 
+
+E. Outdoor Swarm Navigation Experiment 
+
+To further evaluate the framework under realistic outdoor conditions, we conducted a navigation experiment using four custom-built quadrotors forming a triangular pattern with a desired inter-agent spacing of 2 m. The experiment is designed to test simultaneous pattern maintenance and collision avoidance with both static and dynamic obstacles in an unstructured environment. Because the onboard Intel NUC11 does not provide CUDA acceleration, the MPPI sampler cannot exploit the massively parallel GPU rollouts used in simulation. To meet the real-time constraint of the embedded hardware, the sampling configuration is therefore scaled down from K=10000 rollouts with time step ∆t=0 .1 s and horizon H=15 in simulation to K=2000 , ∆t=0 .2 s and H=7 onboard. This reduction in rollout density and prediction resolution inevitably narrows the distribution of sampled control candidates and weakens the stochastic optimality of the solver, which manifests as more conservative maneuvers, smoother but less aggressive avoidance, and slightly degraded formation quality compared with the simulation results. The core safety and pattern-control capabilities of the proposed framework, however, remain intact, as discussed below. The experimental scenario consists of a static gate con-structed from square pillars with a clearance of 5 m. Dynamic obstacles, introduced by additional quadrotors external to the swarm, traverse back and forth parallel to the gate on both the entry and exit sides. The swarm is commanded to fly in a straight line through the gate while maintaining the triangular formation. Throughout the traversal, each agent must avoid IEEE TRANSACTIONS ON ROBOTICS 23    
+
+> Fig. 15. Indoor swarm crossing experiment with 12 Crazyflie quadrotors in two groups of 6. Top: Position snapshots at t= 0 , 3.0, 6.0, and 10.0 s showing the crossing maneuver. Bottom: Distance metrics over time, including minimum distance among all agents in yellow, average intra-group distances for Red and Blue groups, and the 0.4 m collision threshold as gray dashed line. The minimum distance remains above the safety threshold throughout the crossing.
+
+collisions with both neighboring swarm members and the surrounding static and dynamic obstacles. Figure 16 presents the outdoor experiment. The results demonstrate that the swarm successfully navigates through the gate while preserving the triangular pattern. During the gate crossing, agents adjust their trajectories in response to the dy-namic obstacles maintaining safe separations without breaking the formation. The experiment validates the framework’s ability to handle simultaneous pattern control and uncertainty-aware collision avoidance under onboard LiDAR-based localization, confirming its applicability to real-world deployments where external positioning infrastructure is unavailable. Quantitatively, the outdoor metrics exhibit a measurable gap with respect to their simulation counterparts, which is consistent with the reduced MPPI sampling budget imposed by the CUDA-free onboard platform. The triangular formation is preserved throughout the traversal with a zero collision rate and a 100% 
+
+survival rate, confirming that the CVaR-based risk-constrained module remains effective under limited rollouts. At the same time, the pattern-level metrics, including the inter-agent spacing error and formation uniformity, show larger fluctuations around the gate-crossing phase than in the simulation benchmark, and the resulting trajectories are noticeably smoother but less responsive to rapid obstacle motions. These observations indicate that the degradation is dominated by the compact sampling configuration rather than by a failure of the underlying formulation: even with an order-of-magnitude fewer rollouts, a doubled time step and a shorter prediction horizon, the framework still guarantees safe, collision-free navigation and successful pattern maintenance on computationally constrained embedded hardware. VII. C ONCLUSIONS 
+
+This paper presented a Gibbs Random Field-based stochastic optimal control framework for distributed pattern-oriented swarms, providing a unified, sampling-based solution that bridges collective behavior modeling and stochastic optimal control. By modeling the robot swarm as a probabilistic graphical model, we reformulated multi-objective swarm co-ordination as probabilistic inference on a GRF, where the optimal control is synthesized via the maximum a posteriori estimation of the joint probability distribution over a finite prediction horizon. Through mean-field approximation, the intractable joint optimization was decomposed into decoupled local subproblems, enabling fully distributed computation. The equivalence between probability maximization and path integral control was established, allowing the resulting stochastic optimal control problem to be efficiently solved using model predictive path integral methods. For uncertainty-aware collision avoidance, the framework integrated unscented transform-based trajectory prediction with risk-constrained optimization. The risk constraint module supports flexible instantiation, including chance constraints and Conditional Value-at-Risk. In simulation, the CVaR-based formulation achieved a survival rate of 99.6% in fully dynamic obstacle environments, improving by 3.2% over the baseline without uncertainty modeling. Furthermore, a density-guided pattern control method was developed, which encodes geomet-ric patterns as potentials within the GRF, enabling implicit pattern representation and optimization through the unified framework. This formulation decouples pattern control from explicit robot-to-position assignments, enabling self-healing against robot loss and elastic reconfiguration. Evaluations across diverse non-convex geometries demonstrated coverage ratios consistently above 91% and autonomous recovery from up to 50% agent loss. REFERENCES [1] S.-J. Chung, A. A. Paranjape, P. Dames, S. Shen, and V. Kumar, “A survey on aerial swarm robotics,” IEEE Transactions on Robotics , vol. 34, no. 4, pp. 837–855, 2018. [2] M. Brambilla, E. Ferrante, M. Birattari, and M. Dorigo, “Swarm robotics: A review from the swarm engineering perspective,” Swarm Intelligence ,vol. 7, no. 1, pp. 1–41, 2013. IEEE TRANSACTIONS ON ROBOTICS 24 
+
+Fig. 16. Outdoor swarm navigation experiment with four quadrotors. The swarm maintains a triangular formation while traversing a 5 m static gate with dynamic obstacles moving parallel to the gate on both sides. [3] K.-K. Oh, M.-C. Park, and H.-S. Ahn, “A survey of multi-agent formation control,” Automatica , vol. 53, pp. 424–440, 2015. [4] L. Quan, L. Yin, T. Zhang, M. Wang, R. Wang, S. Zhong, X. Zhou, Y. Cao, C. Xu, and F. Gao, “Robust and Efficient Trajectory Planning for Formation Flight in Dense Environments,” IEEE Transactions on Robotics , vol. 39, no. 6, pp. 4785–4804, Dec. 2023. [Online]. Available: https://ieeexplore.ieee.org/document/10219410/ [5] C. Toumieh and D. Floreano, “High-Speed Motion Planning for Aerial Swarms in Unknown and Cluttered Environments,” IEEE Transactions on Robotics , vol. 40, pp. 3642–3656, 2024. [Online]. Available: https://ieeexplore.ieee.org/document/10599811/ [6] J. Park, Y. Lee, I. Jang, and H. J. Kim, “Decentralized trajectory planning for quadrotor swarm in cluttered environments with goal convergence guarantee,” The International Journal of Robotics Research ,Feb. 2025. [Online]. Available: https://journals.sagepub.com/doi/10.1177/ 02783649241312352 [7] G. Liang, D. Wu, Y. Tu, and T. L. Lam, “Decoding modular reconfigurable robots: A survey on mechanisms and design,” The International Journal of Robotics Research , vol. 44, no. 5, pp. 740–767, Apr. 2025. [Online]. Available: https://journals.sagepub.com/doi/10.1177/02783649241283847 IEEE TRANSACTIONS ON ROBOTICS 25 
+
+[8] R. K. Ramachandran, P. Pierpaoli, M. Egerstedt, and G. S. Sukhatme, “Resilient Monitoring in Heterogeneous Multi-Robot Systems Through Network Reconfiguration,” IEEE Transactions on Robotics , vol. 38, no. 1, pp. 126–138, Feb. 2022. [Online]. Available: https://ieeexplore.ieee.org/document/9653143/ [9] G. Notomista, S. Mayya, Y. Emam, C. Kroninger, A. Bohannon, S. Hutchinson, and M. Egerstedt, “A Resilient and Energy-Aware Task Allocation Framework for Heterogeneous Multirobot Systems,” IEEE Transactions on Robotics , vol. 38, no. 1, pp. 159–179, Feb. 2022. [Online]. Available: https://ieeexplore.ieee.org/document/9531464/ [10] L. Blackmore, M. Ono, and B. C. Williams, “Chance-constrained optimal path planning with obstacles,” IEEE Transactions on Robotics , vol. 27, no. 6, pp. 1080–1094, 2011. [11] H. Hu, D. Isele, S. Bae, and J. F. Fisac, “Active uncertainty reduction for safe and efficient interaction planning: A shielding-aware dual control approach,” The International Journal of Robotics Research ,vol. 43, no. 9, pp. 1382–1408, Aug. 2024. [Online]. Available: https://journals.sagepub.com/doi/10.1177/02783649231215371 [12] S. Zhang, O. So, K. Garg, and C. Fan, “GCBF+: A Neural Graph Control Barrier Function Framework for Distributed Safe Multiagent Control,” IEEE Transactions on Robotics , vol. 41, pp. 1533–1552, 2025. [Online]. Available: https://ieeexplore.ieee.org/document/10842511/ [13] S. Safaoui, A. P. Vinod, A. Chakrabarty, R. Quirynen, N. Yoshikawa, and S. D. Cairano, “Safe Multiagent Motion Planning Under Uncertainty for Drones Using Filtered Reinforcement Learning,” IEEE Transactions on Robotics , vol. 40, pp. 2529–2542, 2024. [Online]. Available: https://ieeexplore.ieee.org/document/10496239/ [14] C. W. Reynolds, “Flocks, herds and schools: A distributed behavioral model,” in Proceedings of the 14th Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH) . ACM, 1987, pp. 25–34. [15] R. Olfati-Saber, “Flocking for multi-agent dynamic systems: Algorithms and theory,” IEEE Transactions on Automatic Control , vol. 51, no. 3, pp. 401–420, 2006. [16] G. V´ as´ arhelyi, C. Vir´ agh, G. Somorjai, T. Nepusz, A. E. Eiben, and T. Vicsek, “Optimized flocking of autonomous drones in confined environments,” Science Robotics , vol. 3, no. 20, p. eaat3536, 2018. [Online]. Available: https://www.science.org/doi/abs/10.1126/scirobotics. aat3536 [17] C. E. Luis, M. Vukosavljev, and A. P. Schoellig, “Online trajectory generation with distributed model predictive control for multi-robot motion planning,” IEEE Robotics and Automation Letters , vol. 5, no. 2, pp. 604–611, 2020. [18] E. Soria, F. Schiano, and D. Floreano, “Predictive control of aerial swarms in cluttered environments,” Nature Machine Intelligence , vol. 3, no. 6, pp. 545–554, 2021. [19] A. D. Saravanos, Y. Aoyama, H. Zhu, and E. A. Theodorou, “Distributed Differential Dynamic Programming Architectures for Large-Scale Multiagent Control,” IEEE Transactions on Robotics ,vol. 39, no. 6, pp. 4387–4407, Dec. 2023. [Online]. Available: https://ieeexplore.ieee.org/document/10288223/ [20] X. Zhang, W. Pan, C. Li, X. Xu, X. Wang, R. Zhang, and D. Hu, “Toward Scalable Multirobot Control: Fast Policy Learning in Distributed MPC,” IEEE Transactions on Robotics , vol. 41, pp. 1491–1512, 2025. [Online]. Available: https://ieeexplore.ieee.org/document/10847886/ [21] E. Tolstaya, F. Gama, J. Paulos, G. Pappas, V. Kumar, and A. Ribeiro, “Learning decentralized controllers for robot swarms with graph neural networks,” in Conference on Robot Learning (CoRL) . PMLR, 2020, pp. 671–682. [22] T. Fan, P. Long, W. Liu, and J. Pan, “Distributed multi-robot collision avoidance via deep reinforcement learning for navigation in complex scenarios,” The International Journal of Robotics Research ,vol. 39, no. 7, pp. 856–892, Jun. 2020. [Online]. Available: https://journals.sagepub.com/doi/10.1177/0278364920916531 [23] G. Shi, W. H¨ onig, X. Shi, Y. Yue, and S.-J. Chung, “Neural-Swarm2: Planning and Control of Heterogeneous Multirotor Swarms Using Learned Interactions,” IEEE Transactions on Robotics , vol. 38, no. 2, pp. 1063–1079, Apr. 2022. [Online]. Available: https: //ieeexplore.ieee.org/document/9508420/ [24] Y. Gao, J. Chen, X. Chen, C. Wang, J. Hu, F. Deng, and T. L. Lam, “Asymmetric Self-Play-Enabled Intelligent Heterogeneous Multirobot Catching System Using Deep Multiagent Reinforcement Learning,” IEEE Transactions on Robotics , vol. 39, no. 4, pp. 2603–2622, Aug. 2023. [Online]. Available: https://ieeexplore.ieee.org/document/10101687/ [25] D. Zhang, C. Yu, F. Xue, and Q. Zhang, “Learning Efficient Flocking Control Based on Gibbs Random Fields,” IEEE Robotics and Automation Letters , vol. 10, no. 4, pp. 3478–3485, Apr. 2025. [Online]. Available: https://ieeexplore.ieee.org/abstract/document/10884932 [26] L. Brunke, M. Greeff, A. W. Hall, Z. Yuan, S. Zhou, J. Panerati, and A. P. Schoellig, “Safe learning in robotics: From learning-based control to safe reinforcement learning,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 5, pp. 411–444, 2022. [27] J. Garc´ ıa and F. Fern´ andez, “A comprehensive survey on safe reinforce-ment learning,” Journal of Machine Learning Research , vol. 16, no. 1, pp. 1437–1480, 2015. [28] J. Achiam, D. Held, A. Tamar, and P. Abbeel, “Constrained policy optimization,” in International Conference on Machine Learning (ICML) .PMLR, 2017, pp. 22–31. [29] J. Grover, C. Liu, and K. Sycara, “The Before, During, and After of Multi-robot Deadlock,” The International Journal of Robotics Research , vol. 42, no. 6, pp. 317–336, May 2023. [Online]. Available: https://journals.sagepub.com/doi/10.1177/02783649221074718 [30] D. J. Ornia, P. J. Zufiria, and M. M. Jr, “Mean Field Behavior of Collaborative Multiagent Foragers,” IEEE Transactions on Robotics ,vol. 38, no. 4, pp. 2151–2165, Aug. 2022. [Online]. Available: https://ieeexplore.ieee.org/document/9729570/ [31] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic MPC for model-based reinforcement learning,” IEEE Transactions on Robotics , vol. 34, no. 6, pp. 1603–1618, 2018. [32] M. Kobilarov, “Cross-entropy motion planning,” The International Journal of Robotics Research , vol. 31, no. 7, pp. 855–871, 2012. [Online]. Available: https://doi.org/10.1177/0278364912444543 [33] G. Ryou, G. Wang, and S. Karaman, “Multi-fidelity reinforcement learn-ing for time-optimal quadrotor re-planning,” The International Journal of Robotics Research , p. 02783649251364393, Aug. 2025. [Online]. Available: https://journals.sagepub.com/doi/10.1177/02783649251364393 [34] H. J. Kappen, “Linear theory for control of nonlinear stochastic systems,” 
+
+Phys. Rev. Lett. , vol. 95, p. 200201, Nov 2005. [Online]. Available: https://link.aps.org/doi/10.1103/PhysRevLett.95.200201 [35] E. Todorov, “Efficient computation of optimal actions,” Proceedings of the National Academy of Sciences , vol. 106, no. 28, pp. 11 478–11 483, 2009. [Online]. Available: https://www.pnas.org/doi/abs/10.1073/pnas. 0710743106 [36] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Aggressive driving with model predictive path integral control,” in IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2016, pp. 1433–1440. [37] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics , vol. 40, no. 2, pp. 344–357, 2017. [38] J. Carius, R. Ranftl, F. Farshidian, and M. Hutter, “Constrained stochastic optimal control with learned importance sampling: Apath integral approach,” The International Journal of Robotics Research , vol. 41, no. 2, pp. 189–209, Feb. 2022. [Online]. Available: https://journals.sagepub.com/doi/10.1177/02783649211047890 [39] S. Dergachev and K. Yakovlev, “Decentralized uncertainty-aware multi-agent collision avoidance with model predictive path integral,” in 
+
+IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2025, arXiv:2507.20293. [40] A. Razmjoo, T. Xue, S. Shetty, and S. Calinon, “Sampling-based constrained motion planning with products of experts,” The International Journal of Robotics Research , p. 02783649251404955, Jan. 2026. [Online]. Available: https://journals.sagepub.com/doi/10.1177/ 02783649251404955 [41] Q. Zhang and H. H. T. Liu, “Robust nonlinear close formation control of multiple fixed-wing aircraft,” Journal of Guidance, Control, and Dynamics , vol. 44, no. 3, pp. 572–586, 2021. [Online]. Available: https://doi.org/10.2514/1.G004592 [42] M. A. Lewis and K.-H. Tan, “High Precision Formation Control of Mobile Robots Using Virtual Structures,” Autonomous Robots , vol. 4, no. 4, pp. 387–403, Oct. 1997, company: Springer Distributor: Springer Institution: Springer Label: Springer Publisher: Kluwer Academic Publishers. [Online]. Available: https://link.springer.com/article/10.1023/ A:1008814708459 [43] D. Zhou, Z. Wang, and M. Schwager, “Agile Coordination and Assistive Collision Avoidance for Quadrotor Swarms Using Virtual Structures,” 
+
+IEEE Transactions on Robotics , vol. 34, no. 4, pp. 916–923, Aug. 2018. [Online]. Available: https://ieeexplore.ieee.org/abstract/document/ 8429106 [44] V. Kratky, R. Penicka, J. Horyna, P. Stibinger, T. Baca, M. Petrlik, P. Stepan, and M. Saska, “CAT-ORA: Collision-Aware Time-Optimal Formation Reshaping for Efficient Robot Coordination in 3-D IEEE TRANSACTIONS ON ROBOTICS 26 
+
+Environments,” IEEE Transactions on Robotics , vol. 41, pp. 2950–2969, 2025. [Online]. Available: https://ieeexplore.ieee.org/document/10912745/ [45] J. Li, Y. Xu, X. Shi, and L. Li, “DEFORM: Adaptive Formation Reconfiguration of Multi-Robot Systems in Confined Environments,” 
+
+IEEE Robotics and Automation Letters , vol. 10, no. 5, pp. 4706–4713, May 2025. [Online]. Available: https://ieeexplore.ieee.org/document/ 10933518 [46] J. Cort´ es, S. Mart´ ınez, T. Karatas, and F. Bullo, “Coverage control for mobile sensing networks,” IEEE Transactions on Robotics and Automation , vol. 20, no. 2, pp. 243–255, 2004. [47] Z. Kan, A. P. Dani, J. M. Shea, and W. E. Dixon, “Network Connectivity Preserving Formation Stabilization and Obstacle Avoidance via a Decentralized Controller,” IEEE Transactions on Automatic Control , vol. 57, no. 7, pp. 1827–1832, Jul. 2012. [Online]. Available: https://ieeexplore.ieee.org/abstract/document/6097027 [48] R. Funada, M. Santos, R. Maniwa, J. Yamauchi, M. Fujita, M. Sampei, and M. Egerstedt, “Distributed Coverage Hole Prevention for Visual Environmental Monitoring With Quadcopters Via Nonsmooth Control Barrier Functions,” IEEE Transactions on Robotics , vol. 40, pp. 1546– 1565, 2024. [Online]. Available: https://ieeexplore.ieee.org/document/ 10374239 [49] K. Elamvazhuthi, Z. Kakish, A. Shirsat, and S. Berman, “Controllability and Stabilization for Herding a Robotic Swarm Using a Leader: A Mean-Field Approach,” IEEE Transactions on Robotics , vol. 37, no. 2, pp. 418–432, Apr. 2021. [Online]. Available: https://ieeexplore.ieee.org/ document/9241729/ [50] R. Lin, S. Kim, and M. Egerstedt, “Heterogeneous Collaborative Pursuit via Coverage Control Driven by Fokker-Planck Equations,” 
+
+IEEE Transactions on Robotics , pp. 1–20, 2025. [Online]. Available: https://ieeexplore.ieee.org/document/10959315/ [51] H. Wang and M. Rubenstein, “Shape Formation in Homogeneous Swarms Using Local Task Swapping,” IEEE Transactions on Robotics ,vol. 36, no. 3, pp. 597–612, Jun. 2020. [Online]. Available: https://ieeexplore.ieee.org/document/9000788/ [52] G. Sun, R. Zhou, Z. Ma, Y. Li, R. Groß, Z. Chen, and S. Zhao, “Mean-shift exploration in shape assembly of robot swarms,” Nature Communications , vol. 14, no. 1, p. 3476, Jun. 2023, publisher: Nature Publishing Group. [Online]. Available: https://www.nature.com/articles/s41467-023-39251-5 [53] C. Yu, D. Zhang, and Q. Zhang, “GRF-based Predictive Flocking Control with Dynamic Pattern Formation,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) , May 2024, pp. 16 788–16 794. [Online]. Available: https://ieeexplore.ieee.org/document/10610337 [54] O. Khatib, “Real-time obstacle avoidance for manipulators and mobile robots,” The International Journal of Robotics Research , vol. 5, no. 1, pp. 90–98, 1986. [55] J. Van Den Berg, M. Lin, and D. Manocha, “Reciprocal velocity obstacles for real-time multi-agent navigation,” in IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2008, pp. 1928–1935. [56] J. Van Den Berg, S. J. Guy, M. Lin, and D. Manocha, “Reciprocal n-body collision avoidance,” Robotics Research , pp. 3–19, 2011. [57] P. Pierpaoli, A. Li, M. Srinivasan, X. Cai, S. Coogan, and M. Egerstedt, “A Sequential Composition Framework for Coordinating Multirobot Behaviors,” IEEE Transactions on Robotics , vol. 37, no. 3, pp. 864–876, Jun. 2021. [Online]. Available: https://ieeexplore.ieee.org/document/ 9277918/ [58] M. Cavorsi, L. Sabattini, and S. Gil, “Multirobot Adversarial Resilience Using Control Barrier Functions,” IEEE Transactions on Robotics , vol. 40, pp. 797–815, 2024. [Online]. Available: https://ieeexplore.ieee.org/document/10354416/ [59] K. Long, Y. Yi, Z. Dai, S. Herbert, J. Cort´ es, and N. Atanasov, “Sensor-based distributionally robust control for safe robot navigation in dynamic environments,” The International Journal of Robotics Research , vol. 45, no. 2, pp. 328–351, Feb. 2026. [Online]. Available: https://journals.sagepub.com/doi/10.1177/02783649251352000 [60] P. Rousseas, C. Bechlioulis, and K. Kyriakopoulos, “Reactive optimal motion planning to anywhere in the presence of moving obstacles,” The International Journal of Robotics Research , vol. 43, no. 13, pp. 2027–2048, Nov. 2024. [Online]. Available: https: //journals.sagepub.com/doi/10.1177/02783649241245729 [61] P. Rousseas, D. Panagou, and K. J. Kyriakopoulos, “Robust and topology-aware motion planning with moving obstacles,” The International Journal of Robotics Research , vol. 44, no. 12, pp. 2044–2072, Oct. 2025. [Online]. Available: https://journals.sagepub.com/doi/10.1177/02783649251324554 [62] M. Muchen Sun, F. Baldini, K. Hughes, P. Trautman, and T. Murphey, “Mixed strategy Nash equilibrium for crowd navigation,” The International Journal of Robotics Research , vol. 44, no. 7, pp. 1156–1185, Jun. 2025. [Online]. Available: https://journals.sagepub.com/ doi/10.1177/02783649241302342 [63] L. Blackmore, M. Ono, and B. C. Williams, “Chance-Constrained Optimal Path Planning With Obstacles,” IEEE Transactions on Robotics ,vol. 27, no. 6, pp. 1080–1094, Dec. 2011. [Online]. Available: https://ieeexplore.ieee.org/abstract/document/5970128 [64] H. Zhu and J. Alonso-Mora, “Chance-Constrained Collision Avoidance for MAVs in Dynamic Environments,” IEEE Robotics and Automation Letters , vol. 4, no. 2, pp. 776–783, Apr. 2019. [Online]. Available: https://ieeexplore.ieee.org/document/8613928 [65] Z. Lei, W. Wang, Z. Zhu, J. Ma, and S. S. Ge, “Safe Motion Planning for Multi-Vehicle Autonomous Driving in Uncertain Environment,” IEEE Robotics and Automation Letters , vol. 10, no. 3, pp. 2199–2206, Mar. 2025. [Online]. Available: https://ieeexplore.ieee.org/document/10838711/ [66] H. Zhong, Y. Shimizu, and J. Chen, “Chance-Constrained Iterative Linear-Quadratic Stochastic Games,” IEEE Robotics and Automation Letters , vol. 8, no. 1, pp. 440–447, Jan. 2023. [Online]. Available: https://ieeexplore.ieee.org/document/9976201/ [67] A. Hakobyan, G. C. Kim, and I. Yang, “Risk-Aware Motion Planning and Control Using CVaR-Constrained Optimization,” IEEE Robotics and Automation Letters , vol. 4, no. 4, pp. 3924–3931, Oct. 2019. [Online]. Available: https://ieeexplore.ieee.org/abstract/document/8767973 [68] K. Ryu and N. Mehr, “Integrating Predictive Motion Uncertainties with Distributionally Robust Risk-Aware Control for Safe Robot Navigation in Crowds,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) , May 2024, pp. 2410–2417. [Online]. Available: https://ieeexplore.ieee.org/abstract/document/10610404 [69] J. Yin, P. Tsiotras, and K. Berntorp, “Chance-Constrained Information-Theoretic Stochastic Model Predictive Control with Safety Shielding,” in 
+
+2024 IEEE 63rd Conference on Decision and Control (CDC) , Dec. 2024, pp. 653–658. [Online]. Available: https://ieeexplore.ieee.org/document/ 10885840/?arnumber=10885840 [70] I. S. Mohamed, M. Ali, and L. Liu, “Chance-Constrained Sampling-Based MPC for Collision Avoidance in Uncertain Dynamic Environments,” 
+
+IEEE Robotics and Automation Letters , vol. 10, no. 7, pp. 7492–7499, Jul. 2025. [Online]. Available: https://ieeexplore.ieee.org/document/11021391 [71] A. Trivedi, S. Prajapati, A. Shirgaonkar, M. Zolotas, and T. Padır, “Data-Driven Sampling Based Stochastic MPC for Skid-Steer Mobile Robot Navigation,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025, pp. 16 619–16 625. [Online]. Available: https://ieeexplore.ieee.org/document/11127456 [72] Z. Xu, D. Deng, Y. Dong, and K. Shimada, “DPMPC-Planner: A real-time UAV trajectory planning framework for complex static environments with dynamic obstacles,” in 2022 International Conference on Robotics and Automation (ICRA) , May 2022, pp. 250–256. [Online]. Available: https://ieeexplore.ieee.org/document/9811886/ [73] D. Koller and N. Friedman, Probabilistic Graphical Models: Principles and Techniques . MIT Press, 2009. [74] G. Zhu, Q. Zhang, B. Zhu, and T. Hu, “Heuristic predictive control for multirobot flocking in congested environments,” IEEE/ASME Transac-tions on Mechatronics , vol. 30, no. 2, pp. 1435–1446, 2025.

@@ -41,7 +41,7 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-13</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-14</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 2 篇</strong>
@@ -51,7 +51,7 @@
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-13 21:59:18 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-14 22:40:50 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今天速读2篇空中多智能体强化学习与无人机集群平台论文，均获6.0分。值得关注空战分层角色图MARL和开源软硬件集群快速敏捷方向。普通读者可先看SwarmNxt了解开源集群平台，再按需深入DRG-MAPPO。</p>
+<p>今日共生成 2 篇推荐（精读 0 篇，速读 2 篇）</p>
+<p>速读：《Communication-Constrained Multi-Robot Exploration With Adaptive Communication Windows》（7.0/10）, 《Distributed Stochastic Optimal Control for Pattern-Oriented Swarms》（7.0/10）</p>
+<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -87,7 +89,7 @@
     <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DRG-MAPPO: Hierarchical Dynamic Role-Graph Multi-Agent Reinforcement Learning for Cooperative Air Combat">DRG-MAPPO: Hierarchical Dynamic Role-Graph Multi-Agent Reinforcement Learning for Cooperative Air Combat</span></li><li><span class="dpr-home-dashboard-paper-title" title="SwarmNxt: Open-source Software-Hardware Platform for Fast and Agile Aerial Swarms">SwarmNxt: Open-source Software-Hardware Platform for Fast and Agile Aerial Swarms</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Communication-Constrained Multi-Robot Exploration With Adaptive Communication Windows">Communication-Constrained Multi-Robot Exploration With Adaptive Communication Windows</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed Stochastic Optimal Control for Pattern-Oriented Swarms">Distributed Stochastic Optimal Control for Pattern-Oriented Swarms</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
