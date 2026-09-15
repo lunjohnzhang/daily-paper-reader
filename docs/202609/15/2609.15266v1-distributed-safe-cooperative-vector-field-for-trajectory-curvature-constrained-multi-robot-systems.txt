@@ -1,0 +1,749 @@
+Distributed Safe Cooperative Vector Field for
+Trajectory Curvature Constrained Multi-Robot
+Systems
+Zhouru Xiao1, Tao Teng1, Weijia Yao1, Hui Zhang1, Xiangke Wang2, and
+Yaonan Wang1
+1 School of Artificial Intelligence and Robotics, Hunan University, Changsha 410082,
+China
+2 College of Intelligence Science and Technology, National University of Defense
+Technology, Changsha 410082, China
+Abstract. Trajectory curvature constraints are inherent in practical
+multi-robot systems due to the limited turning capabilities of the robots.
+Without properly accounting for these constraints, robots may fail to ac-
+complish assigned tasks, and their trajectories may diverge from the in-
+tended paths. This paper proposes a distributed safe cooperative vector
+field approach for multi-robot systems subject to trajectory curvature
+constraints. The proposed approach is composed of a cooperative vector
+field and a safety-oriented collision avoidance vector field, aiming to ad-
+dress the problems of cooperative motion and safe collision avoidance in
+multi-robot path-following tasks. A safety-oriented collision avoidance
+vector field with adaptively adjustable reactive boundary is developed
+to accommodate the kinematic curvature constraints of robots, thereby
+ensuring the physical feasibility of collision avoidance maneuvers. The
+proposed vector field requires only a single virtual variable from each
+neighboring robot to achieve cooperative motion and ensure both obsta-
+cle avoidance and inter-robot collision avoidance. The effectiveness of the
+proposed approach is validated through both simulations and real-world
+experiments on an actual multi-robot platform.
+Keywords: vector field, curvature constraint, multi-robot
+1
+Introduction
+Distributed cooperative control is an important research area for enabling multi-
+robot systems (MRS) to efficiently perform tasks in complex environments, in-
+cluding ocean exploration [1], smart agriculture [2], and disaster response [3]. To
+This work was supported in part by the National Natural Science Foundation of
+China under Grant 62573182, and in part by the State Key Laboratory of Digital-
+Intelligent Modeling and Simulation.
+Weijia Yao is the corresponding author.
+Zhouru Xiao and Tao Teng contributed equally to this work.
+arXiv:2609.15266v1  [cs.RO]  14 Sep 2026
+
+
+2
+Zhouru Xiao et al.
+achieve multi-robot cooperative control, a variety of distributed control strate-
+gies have been developed. The comprehensive surveys [4, 5] provide an overview
+of the state-of-the-art and emerging trends in distributed cooperative control
+for multi-robot systems, encompassing consensus, distributed formation control,
+distributed optimization, distributed task allocation, and distributed estimation
+and control. Among these methods, the Distributed Vector Field (DVF) ap-
+proach [13] has attracted considerable attention due to its scalability, inherent
+distributed computation capability and strong resilience to communication in-
+terruptions. The DVF method achieves coordinated motion by treating the path
+parameter as an additional virtual coordinate within the guiding vector field and
+sharing this virtual coordinate among neighboring robots.
+Despite notable advances, the application of Distributed Vector Field (DVF)
+approaches to heterogeneous multi-robot systems, including ground vehicles,
+fixed-wing UAVs, and other platforms, reveals limitations that are often over-
+looked. In particular, existing methods[6, 7] rarely account for the intrinsic kine-
+matic constraints of individual robots, such as minimum turning radii. Conven-
+tional vector field designs primarily aim to achieve cooperative objectives, such
+as formation maintenance, coverage, or obstacle avoidance, while often assum-
+ing idealized robots with unconstrained mobility, for example, omnidirectional
+motion. In practice, robotic platforms are subject to physical and dynamic lim-
+itations and cannot instantaneously change their motion direction. When the
+rate of change of the vector field’s guidance exceeds a robot’s maximum curva-
+ture, the resulting trajectories may be dynamically infeasible because the robot
+cannot follow the commanded direction and speed within its operational lim-
+its. Such infeasibility can induce tracking errors, compromise system stability,
+and increase the risk of inter-robot and robot-obstacle collisions, particularly
+in dense or tightly coordinated scenarios. Although curvature-constrained path
+planning and trajectory tracking for single robots have been extensively studied
+[9–11], systematically and distributively integrating these constraints into multi-
+robot cooperative vector field design, while ensuring dynamic feasibility under
+strict collision and obstacle avoidance requirements, remains a significant open
+challenge.
+To address the challenges discussed above, this paper proposes a distributed
+safe cooperative control algorithm for trajectory curvature-constrained hetero-
+geneous multi-robot systems. Building upon previous work on distributed coop-
+erative vector fields [13] and composite collision avoidance vector fields [8], we
+propose a novel Distributed Safe Cooperative Vector Field (DSCVF), specifi-
+cally designed for heterogeneous multi-robot systems operating in planar envi-
+ronments under curvature constraints. The central contribution of this work is
+the explicit integration of kinematic curvature constraints into the vector field
+design, ensuring that each robot’s motion control inputs during cooperative ma-
+neuvers remain within its physical maneuvering capabilities (i.e., respecting the
+minimum turning radius) and can be stably tracked. Additional contributions
+of this paper include:
+1) Design of a safety-oriented collision avoidance vector field with an adap-
+tively adjustable reactive boundary. The level set values of the vector field’s
+
+
+Hamiltonian Mechanics
+3
+reactive boundary can be adaptively adjusted online based on each robot’s pose
+and the location of neighboring obstacles, enabling reliable and efficient collision
+avoidance.
+2) Construction of a distributed safe cooperative vector field for curvature-
+constrained heterogeneous robots. By composing cooperative vector fields with
+the safety-oriented collision avoidance vector field, the proposed DSCVF retains
+the scalability and low communication load of classical DVF approaches while
+offering potential extensions to more complex scenarios, such as motion planning
+in higher-dimensional spaces.
+Notations: Let the integer set be denoted by Zj
+i := {m ∈Z : i ≤m ≤j},
+where i, j ∈Z and i ≤j. Boldface letters denote vectors v ∈Rn in the n-
+dimensional Euclidean space, with the i-th component denoted as vi, where i ∈
+Zn
+1. ˆ(·) denotes the normalization operator, i.e., for any nonzero vector v ∈Rn,
+ˆv =
+v
+∥v∥. The distance between a point p0 and a nonempty set S is defined
+as dist(p0, S) = inf{d(p, p0) : p ∈S}, where d(p, p0) = ∥p −p0∥2 denotes the
+Euclidean distance.
+Graphs: The set of nodes V := {1, . . . , n} represents the set of robots, and
+the edge set E ⊆(V × V) encodes the communication links. The neighbor set
+of robot i is defined as Ni := {j ∈V : (i, j) ∈E}. This paper considers only
+undirected graphs; that is, if (i, j) ∈E, robots i and j can exchange information
+bidirectionally. For an introduction to graph theory, see [15].
+2
+Problem Formulation
+Consider n robots with unicycle kinematics operating in an environment W.
+These robots communicate in a distributed manner over a graph G = (V, E).
+The environment contains m static obstacles. The kinematic model of the i-th
+robot for i ∈Zn
+1 is given by:
+˙xi = vi cos θi,
+˙yi = vi sin θi,
+˙θi = ui,
+(1)
+where ζi = [ξi, θi]⊤∈R2 ×S1 denotes the configuration vector of the i-th robot,
+consisting of the position ξi = [xi, yi]⊤∈R2 and the heading angle θi ∈S1
+with respect to the global Cartesian coordinate frame. The linear velocity vi is
+constant, and the angular velocity ui ∈[−¯ui, ¯ui] serves as the control input.
+The curvature of the trajectory of the i-th robot is κi =
+ ui
+vi
+ ≤¯κi, where ¯κi is
+the maximum allowable curvature for the i-th robot. Accordingly, the minimum
+turning radius of the i-th robot is defined as
+ρi = 1
+¯κi
+= vi
+¯ui
+.
+(2)
+Therefore, since the angular velocity constraints and maximal allowable curva-
+ture constraints are different, the multi-robot system is heterogeneous in this
+sense.
+Each robot is modeled as a closed disk with radius rc. Each static obstacle
+Oi for i ∈Zm
+1 is represented by a closed disk centered at ξo
+i = [xoi, yoi]⊤with
+
+
+4
+Zhouru Xiao et al.
+radius ri, i.e., Oi :=
+
+ξ ∈R2 | φi = ∥ξ −ξo
+i ∥2
+2 −r2
+i = 0
+	
+, where φj : R2 →R
+is a twice continuously differentiable function. The i-th robot is required to
+follow a path Pi in R2, parameterized by two scalar functions xi1 = fi1(wi)
+and xi2 = fi2(wi), where xij denotes the j-th coordinate, fij ∈C2 is the j-th
+parametric function of the i-th robot and wi ∈R is the path parameter, for i ∈
+Zn
+1, j ∈Z2
+1. Accordingly, the desired path (in a higher dimensional space) can be
+expressed as Pi := {¯ξi ∈R3 | ϕij(ξ) = 0, j ∈Z2
+1}, where ¯ξi = (xi1, xi2, wi) ∈R3
+represents the generalized coordinate, and the surface functions are defined by
+ϕij := xij −fij(wi) for j ∈Z2
+1[12]. We require two mild standing assumptions
+that are reasonable in practical applications:
+Assumption 1. The communication graph G = (V, E) is connected.
+Assumption 2. For each i̸ = j ∈Zm
+1 , dist(ξo
+i , ξo
+j) > ri + rj + 2rc.
+Given the desired paths Pi, starting from a specific reference configuration
+w∗= (w∗
+1, . . . , w∗
+n)⊤, the desired relative states ∆ij are constructed by calcu-
+lating the difference between relevant reference variables. Namely, the stacked
+vector ∆∗= D⊤w∗collects all ∆ij for edges (i, j) ∈E, where D ∈Rn×|E|
+is the incidence matrix of the graph, which encodes the communication topol-
+ogy among robots. The primary objective is to design the angular control input
+u = [u1, u2, . . . , un]⊤in (1), subject to the minimum turning radius constraint
+(2), such that cooperative motion, obstacle avoidance and inter-robot collision
+avoidance can be achieved. Namely:
+1) Cooperative motion: In the absence of obstacles, for any (i, j) ∈E, it
+holds that limt→∞(ωi(t) −ωj(t) −∆ij) = 0.
+2) Obstacle avoidance: For any i ∈Zn
+1, j ∈Zm
+1 , and t > 0, it holds that
+∥ξi(t) −ξo
+j∥> rc + rj.
+3) Inter-robot collision avoidance: For any distinct i, j ∈Zn
+1, it holds
+that ∥ξi(t) −ξj(t)∥> 2rc.
+3
+Design of Safe Cooperative Vector Field
+3.1
+Distributed Cooperative Vector Field
+Distributed cooperative vector fields were initially proposed in [16] to achieve
+path following and motion coordination of multiple robots on general one-dimensional
+manifolds. According to [12], the high-dimensional guiding vector field for the
+i-th robot, Xi : R3 →R3, is designed as follows:
+Xi(¯ξi) = ×
+ ∇ϕi1, ∇ϕi2
+
+−
+2
+X
+j=1
+kjϕij∇ϕij,
+(3)
+where kij > 0, ∇ϕij ∈R3 denotes the gradient of the function ϕij with respect
+to the generalized coordinate ¯ξi, and ×(·) denotes the vector cross product. The
+physical meaning of this vector field is as follows: the first term ×(∇ϕi1, ∇ϕi2) is
+orthogonal to all gradient vectors and provides a tangential propagation direction
+
+
+Hamiltonian Mechanics
+5
+along the desired path; the second term −P2
+j=1 kjϕij∇ϕij is a weighted sum
+of the gradients used to attract the robot trajectory toward the intersection of
+the surfaces, i.e., the desired path. Consequently, the explicit form of the path-
+following guiding vector field for the i-th robot, pfXi : R3 →R3, is given by:
+pfXi(¯ξi) =
+
+
+f ′
+i1(wi) −ki1ϕi1(¯ξi)
+f ′
+i2(wi) −ki2ϕi2(¯ξi)
+1 + P2
+j=1 kijϕij(¯ξi)f ′
+ij(wi)
+
+,
+(4)
+where f ′
+ij denotes the derivative of fij with respect to its argument wi.
+To achieve coordination of wi, thereby indirectly realizing position coordi-
+nation among multiple robots, a coordination component for the i-th robot,
+coXi : Rn →R3, is introduced as:
+coXi(w) =
+ 0, 0, ci(w)⊤,
+(5)
+where w = (w1, . . . , wn)⊤, and ci : Rn →R is a coordination function enabling
+local interaction through neighboring virtual coordinates wj (j ∈Ni). Specif-
+ically, the difference wi(t) −wj(t) is driven to converge to the desired relative
+state ∆ij ∈R for each edge (i, j) ∈E. The design of ci is detailed below.
+First, we adopt the following consensus control algorithm:
+ci = −
+X
+j∈Ni
+(wi −wj −∆ij),
+∀i ∈Zn
+1.
+(6)
+Equation (6) can be written in a compact form as
+c(w) = −L(w −w∗) = −L ˜w,
+(7)
+where c(w) = (c1(w), . . . , cn(w))⊤, L = L(G) is the Laplacian matrix of the
+graph G, and ˜w = w −w∗. Then, the coordination vector field for the i-th
+robot, XPi : Rn+2 →R3 is designed as the weighted sum of the path-following
+vector field pfXi and the coordination component coXi, given by:
+XPi(¯ξi, w) = pfXi(¯ξi) + kc
+coXi(w),
+(8)
+where kc > 0 is a weighting parameter that adjusts the relative contribution of
+each component to coXi. A larger kc results in faster coordination among the
+robots.
+3.2
+Safe Collision Avoidance Vector Field
+For the i-th robot with configuration ζi(t) = [ξi, θi]⊤, and subject to a minimum
+turning radius constraint ρi, a limit circle is defined as one of the circles that
+is tangent to the heading direction θi, with a radius equal to ρi, and passing
+the current position point ξi. It corresponds to the robot’s trajectory with the
+achievable maximum curvature ¯κi = 1/ρi. The limit circles can be expressed as
+(see red circle in Fig. 1):
+Ci
+±(t) =
+
+p ∈R2 : dist(p, ξi ± ρin) = ρi
+	
+,
+n = [−sin θi, cos θi]⊤
+(9)
+
+
+6
+Zhouru Xiao et al.
+(a)
+(b)
+(c)
+(d)
+Fig. 1. Illustration of obstacle avoidance with an adaptively adjustable reactive bound-
+ary. (a) The limit circle is separated from the obstacle the obstacles, i.e., δ[i,j]
++
+> 0,
+δ[i,j]
+−
+> 0, and γj(ζi) = 0; (b) The right limit circle intersects (or is tangent to) the
+obstacles while the left limit circle remains separated from the obstacle, i.e., δ[i,j]
++
+> 0,
+δ[i,j]
+−
+≤0, and γj(ζi) = 0; (c) The right limit circle intersects the obstacles and the
+left limit circle is tangent to (or intersects) the obstacles, i.e., δ[i,j]
++
+≤0, δ[i,j]
+−
+≤0, and
+γj(ζi) = φj(ξi), while δ[i,j]
++
+> δ[i,j]
+−
+, indicating that the vector field guides the robot to
+avoid the obstacles by steering it laterally toward the left side relative to its motion
+direction; (d) The ideal process of successful obstacle avoidance is shown, during which
+the reactive boundary continuously adapts dynamically.
+where Ci
++(t) and Ci
+−(t) denote the left and right limit circles of the i-th robot,
+i ∈Zn
+1, respectively.
+We define δ[i,j]
++
+(t) and δ[i,j]
+−
+(t) to characterize the positional relations between
+the left(right) limit circles of the i-th robot and the obstacle Oj, j ∈Zm
+1 at time
+t, as follows:
+δ[i,j]
++
+(t) = dist(ξo
+j, Ci
++) −rj,
+(10)
+δ[i,j]
+−
+(t) = dist(ξo
+j, Ci
+−) −rj.
+(11)
+For notational convenience, the explicit dependence on time t is henceforth omit-
+ted for all time-varying variables. When δ[i,j]
+±
+< 0, the corresponding limit circle
+intersects the obstacle; when δ[i,j]
+±
+= 0, it is tangent; and when δ[i,j]
+±
+> 0, it
+is disjoint. Under fixed velocity constraints, if the robot starts with δ[i,j]
+±
+< 0,
+collision is unavoidable regardless of the control input (see Fig. 1). Hence, the
+following assumption is imposed.
+Assumption 3. The initial state satisfies δ[i,j]
+±
+(0) ≥0 for any i ∈Zn
+1, j ∈Zm
+1 .
+The desired path Pi ⊂R2 is defined as the zero level set of a twice continu-
+ously differentiable function ϕi : R2 →R:
+Pi = {p ∈R2 : ϕi(p) = 0}.
+(12)
+We assume that ϕi is properly chosen such that Pi is a one-dimensional connected
+submanifold in R2[12]. If Pi is compact, it is homeomorphic to a circle; otherwise,
+it is homeomorphic to a real line interval [18, Theorem 5.27].
+For the i-th robot and the j-th obstacle, where i ∈Zn
+1 and j ∈Zm
+1 , we define
+a function γj : R3 →R that computes the level set of the obstacle’s reactive
+boundary based on the robot’s pose. It is defined as
+
+
+Hamiltonian Mechanics
+7
+(a)
+(b)
+(c)
+Fig. 2. Illustration of region partitioning. (a) Desired path Pi, reactive boundary Rj,
+repulsive boundary Qj, and actual obstacles (red area); (b) Rin
+j (shaded area) and
+Rex
+j
+= R2 \ Rin
+j ; (c) Qin
+j (shaded area) and Qex
+j
+= R2 \ Qin
+j . The gray area represents
+the obstacle.
+γj(t) =
+(
+0,
+if σ(δ[i,j]
++
+)σ(δ[i,j]
+−
+) = 0,
+φj(ξi),
+if σ(δ[i,j]
++
+)σ(δ[i,j]
+−
+) = 1,
+(13)
+where the characteristic function σ : R →R by σ(x) = 0 for x ∈(0, +∞)
+and σ(x) = 1 for x ∈(−∞, 0]. Furthermore, the repulsive boundary of the j-th
+obstacle is specified by a safety margin sij > 0. Accordingly, two boundaries
+are defined surrounding the obstacle contour: the reactive boundary Rj and the
+repulsive boundary Qj (see Fig. 2), which are defined as
+Rj = {p ∈R2 : φj(p) = γj(t)},
+Qj = {p ∈R2 : φj(p) = sij}.
+(14)
+where Rj and Qj are one-dimensional compact connected submanifolds in R2. By
+the Jordan Curve Theorem [17], Rj partitions the plane R2 into a bounded open
+subset Rin
+j (interior) and an unbounded open subset Rex
+j
+(exterior), satisfying
+Rj = ∂Rin
+j = ∂Rex
+j , where ∂(·) denotes the boundary operator. Similarly, Qj
+partitions the plane into Qin
+j and Qex
+j
+with Qj = ∂Qin
+j = ∂Qex
+j , as illustrated in
+Fig. 2. Note that the boundaries defined here are specific to the i-th robot.
+For the adaptively adjustable reactive boundary Rj defined in Eq. (14), the
+reactive vector field of the i-th robot, XRj : R3 →R2 is defined as:
+XRj(ζ) =
+
+2σ(δ[i,j]
++
+−δ[i,j]
+−
+) −1
+
+E∇φj(ξ) −krjφj(ξ)∇φj(ξ),
+(15)
+where the matrix E =
+0 −1
+1 0
+
+represents a 90◦rotation, krj > 0 is a positive
+gain, and ∇(·) denotes the gradient with respect to ξ. It is noteworthy that the
+term 2σ(δ[i,j]
++
+−δ[i,j]
+−
+) provides a tunable mechanism to regulate the direction of
+the j-th obstacle avoidance for the i-th robot.
+Remark 1. Under Assumption 1, suppose that at a certain time instant t∗the
+condition σ(δ[i,j]
++
+)σ(δ[i,j]
+−
+) = 1 holds. Without loss of generality, assume that
+δ[i,j]
++
+≥δ[i,j]
+−
+. At this moment, starting from t∗, the direction of vector field (15)
+is given by E
+ξo
+j −ξi
+∥ξo
+j −ξi∥, which forces the robot to turn left. If the controller is
+
+
+8
+Zhouru Xiao et al.
+designed such that the robot can maneuver with the minimum turning radius,
+it can precisely avoid the obstacle.
+For inter-robot collision avoidance, robots are treated as moving obstacles
+to implement collision avoidance among them. Namely, for robots indexed by
+i1 and i2 with 1 ≤i1 < i2 ≤n, robot i2 regards robot i1 as an obstacle and
+defines a corresponding reactive boundary Ri1 and a repulsive boundary Qi1 for
+collision avoidance control.
+Furthermore, for any reactive boundary Rj and repulsive boundary Qj, j ∈
+Zm+n
+1
+, we design smooth zero-in and zero-out bump functions ⊔Qj, ⊓Rj : R2 →
+[0, ∞) as follows:
+⊔Qj(ξ) =
+(
+0,
+ξ ∈Qin
+j ,
+aj(ξ),
+ξ ∈Qex
+j ,
+⊓Rj (ξ) =
+(
+0,
+ξ ∈Rex
+j ,
+bj(ξ),
+ξ ∈Rin
+j ,
+(16)
+where aj : Qex
+j
+→(0, ∞) and bj : Rin
+j →(0, ∞) are bounded. These functions
+are used to smoothly ”blend” vector fields in different areas as shown later.
+After introducing the aforementioned vector fields and bump functions, the
+final safety cooperative vector field for the i-th robot, Xi : Rn+3 →R3, is defined
+by combining equations (8), (15), and (16) as follows:
+Xi(¯ξi, ζi, w) =
+Y
+j∈Zm+n
+1
+⊔Qj(ξi) ˆX Pi(¯ξi) +
+X
+j∈Zm+n
+1
+⊓Rj(ξi) ˆX Rj(ζi)
+(17)
+Remark 2. Although Equation (17) shares a structural resemblance to the vector
+field formulation in [8], its functional role is fundamentally different. In Equation
+(17), the path-tracking mechanism is reformulated by substituting the original
+guiding vector field with a cooperative vector field, thereby enabling coordinated
+motion. Moreover, by introducing adaptively adjustable reactive boundary, the
+collision-avoidance vector field is systematically extended to accommodate multi-
+robot scenarios while preserving physical feasibility. Last but not least, the vector
+field in [8] does not consider the robot trajectory curvature constraints, while
+our proposed vector field (17) can deal with these constraints.
+3.3
+Control Law Design
+The detailed control design is as follows. First, we define the saturation function
+Satb
+a : R →R by Satb
+a(x) = x for x ∈[a, b], Satb
+a(x) = a for x ∈(−∞, a) and
+Satb
+a(x) = b for x ∈(b, ∞), where a, b ∈R, a < b are some constants. The
+saturation function Satb
+a is Lipschitz continuous. To ensure that the heading
+direction of the robot is aligned with that of the vector field, we define
+θd
+i = arctan Xi2
+Xi1
+,
+(18)
+where Xi1 and Xi2 denote the components of the desired vector field at the
+i-th robot’s position. For any nonsingular point of the vector field, the angular
+velocity control input of the i-th robot is given by
+
+
+Hamiltonian Mechanics
+9
+˙θi = ωi = Satb
+a
+ kθ
+ θd
+i −θi
+
+,
+(19)
+where kθ > 0 is a constant gain, and a = −¯ui, b = ¯ui.
+Remark 3. If aj →0, bj →1, and kθ is sufficiently large, the robot can achieve
+obstacle avoidance and path following under vector field (17) and controller
+(19). The control law (19) is rather coarse, in future work, we will present a
+more detailed control strategy (similar to [12, eq. (24a)]).
+4
+Simulation and Experiment
+We adopt a ring graph as the communication topology, such that each robot
+is only allowed to communicate with its two immediate neighbors. This simple
+communication graph significantly reduces both communication and computa-
+tional burden.
+4.1
+Simulation
+In the simulation experiment, we let n = 4 heterogeneou robots move along a
+circular trajectory. As shown in Fig. 3, all robots successfully follow the circu-
+lar path while maintaining the desired relative positions and successfully avoid
+obstacles on the path. The speeds of the four robots are set to v = 1, with
+maximum angular velocities of 1, 2, 3, and 4 respectively.
+Remark 4. Since obstacles affect coordination among robots and the path-following
+performance, the adaptive reaction boundary γi, the path-tracking error, and the
+motion coordination error all exhibit approximately periodic fluctuations. Under
+the influence of the adaptive reactive boundary, the robots neither collide with
+obstacles due to an excessively small γi nor generate redundant detours due to
+an excessively large γi, but instead achieve better obstacle avoidance behavior.
+4.2
+Multi-Robot Platform Experiment
+We deployed our vector field algorithm on a multi-robot experimental platform
+to test the formation maintenance and safe obstacle avoidance performance of
+multiple robots along a closed trajectory. The experimental setup is as follows:
+The desired path is a Lissajous curve parameterized by xi1 = 0.6 sin(nxwi1) + 1
+and xi2 = 0.6 sin(nywi1) + 1. Here, the coefficients are set as nx = 3 and ny = 2.
+Since the ratio nx/ny is rational, the curve forms a closed path. The parameters
+of the cooperative guidance vector field are set as ki1 = ki2 = 1, kc = 1, for
+i ∈Zn
+1. The desired parameter differences ∆ij are constructed based on the
+reference trajectory w∗
+i (t) = 0.5i for i ∈Zn
+1. The parameters for the composite
+vector field are given by kp = 1, kr = 1, kθ = 5, ai(ξ) = 0.1, bi(ξ) = 0.9,
+and ks = 1.25, which represents the ratio of the repulsive boundary radius to
+the actual obstacle radius. The implicit functions for the repulsion boundaries
+
+
+10
+Zhouru Xiao et al.
+(a)
+(b)
+(c)
+(d)
+(e)
+(f)
+Fig. 3. Simulation results with the desired path parameterized as xi1 = 5 sin(ωi) and
+xi2 = 5 cos(ωi), using gains ki1 = ki2 = 1 and coordination gain kc = 10, for i ∈
+Zn
+1 . The desired parameter offsets ∆ij are defined based on the reference trajectories
+ω∗
+i (t) = 0.5 i, i ∈Zn
+1 . Additional parameters are set as kri = 1, kθ = 100, ai(ξ) = 0.1,
+bi(ξ) = 0.9 for i ∈Zn
+1 . The implicit function for the repulsive boundary is given by
+φ1 = (x −5)2 + y2 −1. (a) Adaptive reactive boundary; (b) γi ≡1; (c) γi ≡2:
+robot trajectories are shown, black dashed curves represent repulsive boundaries and
+desire path; (d) Temporal evolution of the adaptive reactive boundary γi, i ∈Zn
+1 ;
+(e) Path tracking errors
+p
+ϕ2
+i1 + ϕ2
+i2, i ∈Zn
+1 ; (f) Coordination errors ωi −ωj −∆ij for
+i, j ∈Zn
+1 , i < j.
+are φ1 = (x −1)2 + (y −1.6)2 −0.01 and φ2 = (x −1)2 + (y −0.7)2 −0.04.
+We selected n = 4 robots for the experiment. The experiment duration was
+200 seconds, with a linear velocity v = 0.1m/s, a maximum angular velocity
+ωmax = 3rad/s, and a minimum turning radius rmin = 0.033m. It is noteworthy
+that in this experiment, the robots are treated as dynamic obstacles for collision
+avoidance among different robots.
+The experimental results shown in Fig. 4 indicate that all robots are able
+to cooperatively move in the prescribed serial formation, successfully avoiding
+obstacles and other robots according to the designed obstacle avoidance strategy.
+Experimental video: https://www.bilibili.com/video/BV1EXbLzPE3X/.
+5
+Conclusion
+This paper proposes a distributed safe cooperative vector field that effectively
+addresses the challenges of cooperative motion and safe collision avoidance in
+
+
+Hamiltonian Mechanics
+11
+(a) t = 0s
+(b) t = 54.75s
+(c)
+(d) t = 129.14s
+(e) t = 177.95s
+(f)
+Fig. 4. (a)(b)(d)(e) Snapshots from the physical experiment. The left subfigures illus-
+trate the experimental trajectories at the corresponding time instants, while the right
+subfigures show simultaneous images of the real system captured by cameras. Small
+circles denote the current positions of the robots, small squares denote their initial
+positions, black arrows indicate the current heading directions, curves with different
+colors represent the trajectories of the robots, black dashed circles indicate the actual
+obstacles, and pink solid circles indicate the repulsive boundaries. (c)(f) Experimen-
+tal data from the physical platform. The left figure shows the path-following errors
+p
+ϕ2
+i1 + ϕ2
+i2, i ∈Zn
+1 ; the right figure shows the coordination errors ωi −ωj −∆ij for
+i, j ∈Zn
+1 , i < j.
+path-following tasks for trajectory curvature constrained multi-robot systems.
+By designing a safety-oriented collision avoidance vector field with adaptively ad-
+justable reactive boundaries, the traditional fixed boundaries are replaced with
+real-time varying boundaries based on limit circles, thereby ensuring the phys-
+ical feasibility of the collision avoidance behavior. The proposed vector field is
+composed of a cooperative motion vector field and a safety-oriented collision
+avoidance vector field, and relies solely on the virtual coordinates of neighbor-
+ing robots to achieve cooperative motion, and ensure both obstacle avoidance
+and inter-robot collision avoidance. Experimental validation on a multi-robot
+platform demonstrates that the approach performs well in closed-path tracking,
+static obstacle avoidance, and inter-robot collision avoidance, while maintain-
+ing the effectiveness of cooperation. This approach provides a safety-guaranteed
+control solution for curvature-constrained multi-robot cooperation in complex
+environments.
+References
+1. Ye, X., Chen, B., Li, P., Jing, L., Zeng, G.: A simulation-based multi-agent particle
+swarm optimization approach for supporting dynamic decision making in marine
+oil spill responses. Ocean Coast. Manag. 172, 128–136 (2019).
+
+
+12
+Zhouru Xiao et al.
+2. Din, A., Ismail, M.Y., Shah, B., Babar, M., Ali, F., Baig, S.U.: A deep reinforce-
+ment learning based multi-agent area coverage control for smart agriculture. Com-
+put. Electr. Eng. 101, 108089 (2022).
+3. Drew, D.S.: Multi-agent systems for search and rescue applications. Curr. Robot.
+Rep. 2, 189–200 (2021).
+4. Cao, Y., Yu, W., Ren, W., Chen, G.: An overview of recent progress in the study of
+distributed multi-agent coordination. IEEE Trans. Ind. Inf. 9(1), 427–438 (2012).
+5. Wang, X., Zeng, Z., Cong, Y.: Multi-agent distributed coordination control: Devel-
+opments and directions via graph viewpoint. Neurocomputing 199, 204–218 (2016).
+6. Goncalves, V.M., Pimenta, L.C.A., Maia, C.A., Dutra, B.C.O., Pereira, G.A.S.:
+Vector fields for robot navigation along time-varying curves in n-dimensions. IEEE
+Trans. Robot. 26(4), 647–659 (2010).
+7. Rezende, A.M.C., Goncalves, V.M., Pimenta, L.C.A.: Constructive time-varying
+vector fields for robot navigation. IEEE Trans. Robot. 38(2), 852–867 (2022).
+8. Yao, W., Lin, B., Anderson, B.D.O., Cao, M.: Guiding vector fields for following
+occluded paths. IEEE Trans. Autom. Control 67(8), 4091–4106 (2022).
+9. Lau, D., Eden, J., Oetomo, D.: Fluid motion planner for nonholonomic 3-D mobile
+robots with kinematic constraints. IEEE Trans. Robot. 31(6), 1537–1547 (2015).
+10. Shivam, A., Ratnoo, A.: Curvature-constrained vector field for path following guid-
+ance. In: Proc. 2021 Int. Conf. Unmanned Aircraft Syst. (ICUAS), pp. 853–857,
+IEEE (2021).
+11. Shen, Z., Wilson, J.P., Gupta, S.: An online coverage path planning algorithm
+for curvature-constrained AUVs. In: Proc. OCEANS 2019 MTS/IEEE Seattle, pp.
+1–5, IEEE (2019).
+12. Yao, W., de Marina, H.G., Lin, B., Cao, M.: Singularity-free guiding vector field
+for robot navigation. IEEE Trans. Robot. 37(4), 1206–1221 (2021).
+13. Yao, W., de Marina, H.G., Sun, Z., Cao, M.: Guiding vector fields for the dis-
+tributed motion coordination of mobile robots. IEEE Trans. Robot. 39(2), 1119–
+1135 (2023).
+14. Yao, W., Lin, B., Cao, M.: Integrated path following and collision avoidance using
+a composite vector field. In: Proc. 2019 IEEE 58th Conf. Decision Control (CDC),
+pp. 250–255, IEEE (2019).
+15. Mesbahi, M., Egerstedt, M.: Graph Theoretic Methods in Multiagent Networks.
+Princeton Univ. Press, Princeton, NJ, USA (2010).
+16. Yao, W., Garcia de Marina, H., Sun, Z., Cao, M.: Distributed coordinated path
+following using guiding vector fields. In: Proc. 2021 IEEE Int. Conf. Robot. Autom.
+(ICRA), pp. 10030–10037, IEEE (2021).
+17. Gowers, T., Barrow-Green, J., Leader, I.: The Princeton Companion to Mathe-
+matics. Princeton Univ. Press, Princeton, NJ, USA (2010).
+18. Lee, J.: Introduction to Topological Manifolds, vol. 202. Springer, New York, NY,
+USA (2010).

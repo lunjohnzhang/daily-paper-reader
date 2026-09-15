@@ -1,0 +1,1114 @@
+From Vision to Harvest: Benchmarking Vision-Language Models for Multi-Arm
+Robotic Fruit Harvesting
+Vrishan Inukollu*1, Adyan Zaman*1, Anvi Kudaraya*1, Carlos Lazcano1, Yuankai Zhu2,
+Stavros Vougioukas2, Xiaofan Yu1
+(∗Equal contribution)
+1 University of California, Merced, 2 University of California, Davis
+{vinukollu, azaman7, akudaraya, clazcano, xiaofanyu}@ucmerced.edu
+{ykzhu, svougioukas}@ucdavis.edu
+Abstract
+Multi-arm robotic harvesting offers a promising path to im-
+prove harvesting efficiency and reduce reliance on manual
+labor.
+However, practical deployment remains challeng-
+ing because the system must generalize across diverse en-
+vironments while efficiently coordinating multiple arms in
+a shared workspace. Existing methods often require sub-
+stantial data collection in target environments or rely on
+simplifying assumptions that limit planning quality. In this
+work, we introduce the first comprehensive benchmark for
+evaluating pretrained Vision-Language Models (VLMs) on
+zero-shot multi-arm fruit harvesting planning. Our bench-
+mark uses real-world apple and citrus orchard images and
+compares a VLM-based planning pipeline with a traditional
+perception-and-planning pipeline.
+The VLM pipeline di-
+rectly generates harvesting sequences and waypoints for
+each arm, while a lightweight trajectory verifier checks for
+collisions. Our results show that frontier VLMs can gen-
+erate effective multi-arm harvesting plans zero-shot, but a
+practical deployment remains limited by accurate 3D way-
+point generation and collision-aware coordination. These
+results highlight both the promise and current limitations of
+pretrained VLMs for multi-arm robotic harvesting.
+1. Introduction
+Agricultural automation has become increasingly important
+as growers face persistent labor shortages and rising la-
+bor costs, particularly in labor-intensive specialty crop pro-
+duction. In the United States, labor accounts for approx-
+imately 40% of production expenses for fruit and tree-nut
+farms [30]. Fruit harvesting is especially labor-intensive
+and time-sensitive, as delays can lead to unharvested fruit,
+reduced quality, and direct economic losses. Robotic har-
+vesting therefore offers a promising solution to reduce re-
+Figure 1. Overview of our benchmark for evaluating zero-shot
+VLMs in multi-arm robotic fruit harvesting. An oracle planner
+provides an upper-bound reference for assessing VLMs as a gener-
+alizable and efficient alternative to intractable multi-arm planning.
+liance on seasonal manual labor and improve harvesting ef-
+ficiency. In particular, compared with single-arm systems,
+multi-arm robotic harvesting systems can increase through-
+put by picking fruits concurrently, providing a scalable path
+toward efficient and autonomous orchard production.
+However, building a practical multi-arm robotic har-
+vester that picks reliably, safely, and efficiently remains
+challenging. First, the system must generalize across crops
+and environments without extensive data collection and re-
+training. Traditional approaches rely on vision detectors
+such as YOLO [26], whose performance can degrade un-
+der changes in lighting, occlusion, and environmental con-
+ditions [3, 31]. Second, coordinating multiple arms in a
+shared workspace is computationally hard: each additional
+arm expands the trajectory-planning space, and the under-
+lying harvest scheduling problem is NP-hard [11]. Con-
+ventional optimization and heuristic methods manage this
+through simplifying assumptions, such as partitioning the
+workspace among arms [6, 39], which can reduce planning
+1
+arXiv:2609.13606v1  [cs.RO]  11 Sep 2026
+
+
+quality and harvesting throughput. Together, these chal-
+lenges call for a more generalizable and efficient approach
+to multi-arm robotic harvesting.
+Motivation. Rather than solving the NP-hard harvest-
+ing problem optimally, human workers make effective de-
+cisions through visual understanding and reasoning under
+limited time and resources. Given an orchard scene such as
+the top-left of Fig. 1, a worker can quickly infer the spatial
+relationships among fruits (e.g., which are in front or be-
+hind) and determine a practical harvesting sequence. This
+motivates us to explore Vision-Language Models (VLMs),
+which exhibit aspects of the same human-like understand-
+ing and reasoning that can support complex planning tasks.
+Recent findings further suggest that VLMs are more effec-
+tive at high-level task planning than precise low-level trajec-
+tory generation [36], making them particularly well suited
+for generating harvesting sequences. Their prior knowledge
+and semantic reasoning may therefore enable a generaliz-
+able and efficient approach to multi-arm robotic harvesting,
+generating harvesting sequences for multiple arms within
+manageable computational resources. Despite this poten-
+tial, to the best of our knowledge, no prior work has sys-
+tematically evaluated the feasibility and limitations of pre-
+trained VLMs for zero-shot multi-arm harvesting planning.
+In this paper, we introduce the first comprehensive
+benchmark of VLMs for multi-arm robotic fruit harvest-
+ing planning. As shown in Fig. 1, our benchmark takes
+real-world orchard images as input and evaluates planning
+outputs on a representative multi-arm Cartesian harvester,
+whose simple kinematics and parallel operation enable effi-
+cient picking in structured orchards [38]. As an oracle ref-
+erence, we construct a traditional pipeline with separate 3D
+perception and planning stages, following state-of-the-art
+approaches [37, 38]. We then evaluate a zero-shot VLM
+pipeline that directly generates harvesting sequences and
+waypoints. We further introduce a lightweight trajectory
+verifier to measure collisions in VLM-generated plans, a
+critical safety requirement.
+Extending the benchmark to
+vision-language-action models and other embodiments is
+left for future work.
+In summary, our contributions are as follows:
+• We present the first comprehensive benchmark for evalu-
+ating pretrained VLMs on zero-shot multi-arm fruit har-
+vesting planning. The benchmark covers two real-world
+crops, apple and citrus, and evaluates a broad set of recent
+closed-source and open-source VLMs.
+• We develop a VLM-based planning pipeline that gener-
+ates multi-arm harvesting waypoints directly from raw or-
+chard RGB-D images, together with a lightweight trajec-
+tory verifier for collision evaluation.
+• Our results show that frontier VLMs can generate effec-
+tive zero-shot multi-arm harvesting plans when provided
+with physical-scale and workspace priors, although per-
+formance varies substantially across models, datasets, and
+scene complexity. Accurate 3D waypoint generation and
+collision-aware coordination remain key challenges.
+• We will open-source the benchmark upon the publication
+of this paper to facilitate future research in this direction.
+2. Related Work
+Multi-Arm Robotic Fruit Harvesting.
+Existing ap-
+proaches to multi-arm robotic fruit harvesting primarily rely
+on combinatorial optimization and heuristic algorithms [21,
+29, 38, 39], or learning-based methods such as reinforce-
+ment learning [17, 18]. Many existing systems partition the
+canopy into separate regions for individual arms, simplify-
+ing coordination but limiting harvesting throughput [6, 39].
+Recent heuristic schedulers improve efficiency for Carte-
+sian multi-arm systems [38], but rely on hand-crafted geo-
+metric assumptions that may not generalize to more flexible
+robotic embodiments.
+These approaches also depend heavily on a separate per-
+ception pipeline. Their performance can degrade when fruit
+detection is affected by occlusion, poor illumination, or
+other environmental variations, directly reducing harvest-
+ing efficiency. Moreover, training robust fruit detectors typ-
+ically requires substantial data collected from the target en-
+vironment [3, 31]. Together, these limitations make existing
+multi-arm harvesting systems difficult to generalize and in-
+efficient to deploy at scale.
+VLM and VLA Benchmarks for Agriculture Robotics
+Tasks. Benchmarks are a key first step in foundation model
+development, providing a standardized and fair evaluation
+platform. Recent work has introduced VLM benchmarks
+for agricultural tasks such as crop and disease recogni-
+tion [4, 7, 12, 16, 27, 28, 33]. However, these efforts fo-
+cus on perception and reasoning, with limited connection to
+downstream robotic actions. In parallel, large-scale bench-
+marks for vision-language-action models [13, 19, 32, 35]
+and world action models [15, 34] have begun to incorporate
+action. Yet, these methods are typically developed in con-
+trolled indoor settings using single-arm or bimanual plat-
+forms. In contrast, we focus on real-world fruit harvesting
+in unstructured orchard environments, where more than two
+arms are often needed to achieve high throughput.
+3. Problem Definition
+We consider multi-arm robotic fruit harvesting with a sta-
+tionary harvesting vehicle equipped with M Cartesian arms,
+following the representative system in [38].
+Arms are
+mounted on a shared frame with uniform spacing d and
+operate within an overlapping workspace in front of the
+canopy.
+A vehicle-mounted RGB-D camera captures a
+single-shot observation of the canopy and fruits within the
+reachable workspace before harvest begins. The planner,
+2
+
+
+Figure 2. The three-stage oracle pipeline, consisting of open-vocabulary detection and segmentation, 3D target localization and task
+allocation, and multi-arm trajectory optimization. Each stage is implemented using state-of-the-art works for the corresponding task.
+either traditional or VLM-based, generates a harvesting se-
+quence and trajectory for each arm based on the observa-
+tion and robot configuration. Each arm follows the Carte-
+sian harvesting mechanism in [38]: it first moves laterally in
+the x-z plane with the y-axis retracted to avoid interference
+with the canopy, then extends along the y-axis to approach
+and detach the target fruit after reaching its x-z position.
+Our benchmark evaluates the planner’s ability to gener-
+ate effective and collision-free multi-arm harvesting plans
+from this initial canopy observation. In practice, additional
+cameras or sensors mounted on individual end effectors can
+provide closed-loop feedback and refine trajectories as the
+arms approach the fruits. We leave such online perception
+and replanning to future work. While our benchmark uses
+Cartesian arms as a representative embodiment, the formu-
+lation can be extended to other multi-arm robotic platforms.
+4. Benchmark Setup
+In this section, we describe the setup of our VLM bench-
+mark for multi-arm robotic fruit harvesting. As shown in
+Fig. 1, the benchmark consists of three key components: an
+oracle perception and planning pipeline (Sec. 4.1), a zero-
+shot VLM planning pipeline (Sec. 4.2), and a trajectory
+safety verifier (Sec. 4.3).
+4.1. Oracle Perception and Planning Pipeline
+To establish a strong and reproducible benchmark refer-
+ence, we design the oracle pipeline following state-of-the-
+art perception and planning methods used in robotic fruit
+harvesting [37, 38]. As shown in Fig. 2, the pipeline con-
+verts a single RGB-D orchard image into collision-free
+multi-arm harvesting trajectories in three stages.
+Stage 1: Open-Vocabulary Detection and Segmentation.
+We adopt the perception pipeline from Zhu et al. [37].
+Given an RGB image, GroundingDINO [20] detects fruits
+from natural-language queries (e.g., “ripe apples”) and re-
+turns their bounding boxes. We apply non-maximum sup-
+pression (NMS) with an IoU threshold τIoU and remove
+detections below a confidence threshold τconf. For each re-
+maining bounding box, SAM2 [25] generates a pixel-level
+fruit mask, separating the target fruit from the surrounding
+foliage and background. The corresponding depth pixels
+are then extracted for 3D localization.
+Stage 2: 3D Target Localization.
+We project the seg-
+mented depth pixels into 3D camera coordinates using the
+pinhole camera model:
+X = (u −cx)
+f
+Z,
+Y = (v −cy)
+f
+Z,
+Z = d(u, v), (1)
+where (u, v) denotes the pixel coordinate, f is the fo-
+cal length, (cx, cy) is the principal point, and d(u, v) is
+the measured depth. Depth values outside the valid range
+[dmin, dmax] are discarded to reduce measurement noise.
+We then apply DBSCAN [9] to group the projected
+points into individual fruit instances. With neighborhood
+radius ϵ and minimum density threshold nmin, it suppresses
+sparse depth noise and recovers compact clusters, whose
+centers give the estimated 3D fruit positions (x, y, z). Each
+fruit is also assigned a detach time, the time an arm needs to
+detach it from the branch. Finally, we define the robotic
+workspace by padding the spatial extent of the detected
+fruits by a fixed γ.
+Stage 3: Task Allocation and Multi-Arm Trajectory Op-
+timization.
+The estimated 3D fruit positions are passed
+to the state-of-the-art bi-level mixed-integer programming
+(MIP) framework in [38], which jointly addresses task allo-
+cation and trajectory planning. At a high level, the frame-
+work first assigns fruits to individual arms and then gener-
+ates synchronized, collision-free trajectories for all arms.
+4.2. Zero-Shot VLM Planning Pipeline
+Our goal is to evaluate whether pretrained VLMs can gen-
+eralize multi-arm harvesting planning across crops and or-
+chard environments without retraining. Therefore, the key
+design choice in this pipeline is the prompt: it must provide
+sufficient physical and robotic context for planning while
+relying on the VLM’s pretrained visual understanding and
+reasoning capabilities. We use the same prompt structure
+across all VLMs to ensure a fair comparison.
+Prompt Design. Fig. 3 shows the prompt template used
+across all VLMs.
+The VLM receives the raw orchard
+image together with basic information about the robotic
+workspace and physical constraints. Rather than provid-
+ing pre-detected fruit coordinates, we ask the VLM to vi-
+3
+
+
+VLM Prompt
+ROLE: You are an expert Agricultural Robotics Vision System specialized in 3D
+fruit localization and path planning. Your goal is to identify ripe fruit and
+generate collision-free robotic picking waypoints with millimeter-level
+precision.
+### PHYSICAL SCALE REFERENCE:
+- A ripe {FRUIT} in this image is 6-10 cm (0.06-0.10 m) wide.
+- Use this to calibrate the workspace (likely 1.0m to 5.0m).
+### COORDINATE ALIGNMENT:
+- CAMERA CENTER is (0.0, 0.0, 0.0).
+- Coordinates X (Horizontal) and Z (Vertical) are relative to center 0.0.
+- Depth (Y) is absolute meters from camera (approx 2.5m-3.5m).
+{DEPTH}
+### ROBOT: {N} Cartesian arms on a shared rail, ordered left to right along X.
+Arms cannot pass each other: every fruit on Arm_k must have a smaller X than
+every fruit on Arm_k+1, or they collide.
+### TASK:
+1. Define "Harvesting Zone" boundaries based on visible {FRUIT}.
+2. {ZONE}
+3. Generate picking waypoints [x, y, z] in METERS for each assigned volume.
+Output ONLY a JSON object:
+{
+"workspace_metadata": { "detected_width_m": float, "num_arms": {N} },
+"picking_order": { "Arm_1": [], ..., "Arm_{N}": [] },
+"trajectory_steps_meters": { "Arm_1": [[x,y,z]], ..., "Arm_{N}": [] },
+"reasoning": "Explain the scaling and partitioning logic."
+}
+Figure 3. Prompt template used for zero-shot VLM-based multi-arm harvesting planning. The placeholders {FRUIT}, {N}, {DEPTH},
+and {ZONE} are instantiated according to the crop, robot configuration, and experimental setting.
+sually identify the fruits, reason about their spatial relation-
+ships, and directly generate a harvesting sequence and way-
+points for each arm. The prompt also specifies the reach-
+able workspace of each arm to guide task allocation and
+reduce infeasible assignments. Finally, we require a struc-
+tured JSON output that can be automatically parsed and
+evaluated by our benchmark.
+For each run, four prompt placeholders are instantiated
+to specify the crop, robot configuration, and information
+provided to the model, while keeping the overall prompt
+structure fixed, as shown in Fig. 3:
+– FRUIT specifies the target crop, either apple or citrus.
+The same crop definition is used in the oracle pipeline,
+ensuring a consistent target across both pipelines.
+– N specifies the number of Cartesian arms and is varied
+to evaluate scalability as multi-arm coordination becomes
+more challenging.
+– DEPTH specifies whether depth information is provided
+alongside the RGB image, allowing us to evaluate the
+contribution of explicit depth cues.
+– ZONE specifies how the workspace is partitioned among
+the arms. We consider four strategies: (i) no partition-
+ing, (ii) equal segments along the x-axis, (iii) equal bands
+along the z-axis, and (iv) a grid over both axes. These
+settings allow us to evaluate how workspace partitioning
+affects fruit allocation and planning quality. By default,
+we use no partitioning to give the planner maximum flex-
+ibility in coordinating the arms.
+Our prompt further incorporates three key design elements:
+– Physical Scale: We provide a physical reference to help
+the VLM map image observations to real-world coordi-
+nates. The prompt specifies a fruit diameter range of 6–10
+cm rather than a single value, covering a broader range of
+crops without implying unrealistic precision from a single
+view. This allows the model to estimate scale and gener-
+ate waypoints in metric units.
+– Workspace Constraints: We provide the dimensions of
+the robotic workspace and the reachable region of each
+arm, together with the ordering constraint imposed by the
+shared frame. This information guides the VLM in as-
+signing fruits to feasible arms and generating trajectories
+within the physical workspace.
+4
+
+
+Table 1. VLMs evaluated in our benchmark.
+Category
+Models
+Closed-source
+GPT-4o
+[23],
+GPT-5.5-Pro
+[24],
+Gemini 3 Flash [8], Claude Sonnet 3.5 [1],
+Claude Opus 4.7 [1]
+Open-source
+Qwen2-VL-7B [5], GLM 4.6 [10]
+– Structured Output: We require all VLMs to follow a
+fixed JSON schema containing the harvesting order and
+waypoints for each arm. We also request a brief explana-
+tion of the model’s spatial and scaling reasoning for fail-
+ure analysis. This format enables automatic parsing and
+consistent evaluation across models.
+4.3. Trajectory Verification and Safety Evaluation
+Collisions are a critical safety concern in multi-arm har-
+vesting, where several arms operate simultaneously within
+a shared workspace. A harvesting plan is therefore only
+useful if the arms can execute it without collision. Verify-
+ing this is challenging because the VLM outputs waypoints
+but no timing information: we know the order in which
+each arm visits its assigned fruits, but not when it arrives.
+Rather than searching over all possible schedules, we ex-
+ploit the kinematic structure of the Cartesian harvester to
+derive a timing-independent feasibility check. The M arms
+are mounted on a shared frame and remain ordered along
+the x-axis, so arm i cannot pass arm i+1. Let Ai denote
+the fruits assigned to arm i.
+If there exist p ∈Ai and
+q ∈Ai + 1 such that xp > xq, the two arms would need
+to exchange their relative order during execution, which is
+mechanically infeasible. We refer to this condition as an or-
+der violation. The verifier only checks the generated plan
+and does not modify or repair it. In our benchmark, plans
+containing an order violation are recorded as collisions, and
+we report the collision ratio as the percentage of evaluated
+scenes containing at least one such violation.
+5. Results
+5.1. Experimental Setup
+Datasets. We evaluate on two real-world orchard datasets.
+For apples we use a curated version of the Fuji RGB-D
+dataset [40], which provides registered RGB and depth im-
+ages with manually annotated fruit instances. For citrus we
+use [14], comprising 432 RGB images with depth maps and
+fruit annotations. From each dataset we hold out a bench-
+mark set of scenes spanning a range of fruit counts, lighting
+conditions, and occlusion levels. All VLMs are evaluated
+on the identical scene set per crop.
+Models.
+We evaluate five closed-source and two open-
+source VLMs, listed in Table 1. All models receive the same
+instantiated prompt for a given condition and are queried
+zero-shot, without fine-tuning.
+Metrics. We evaluate each VLM using five metrics span-
+ning harvesting performance, safety, and efficiency. The de-
+tection ratio measures the percentage of ground-truth fruits
+identified by the model within a loose spatial threshold,
+indicating whether the model successfully recognizes and
+locates each fruit. The harvested ratio measures the per-
+centage of ground-truth fruits for which the generated way-
+point lies within the selected distance threshold, indicating
+whether the arm is guided sufficiently close to the fruit for
+harvesting. The collision ratio measures the percentage of
+scenes containing an infeasible arm assignment, as defined
+in Sec. 4.3. For efficiency, we report the total trajectory dis-
+tance traveled by all arms and the average number of tokens
+used per scene. We experiment on a workstation equipped
+with three NVIDIA RTX PRO 6000 GPUs [22].
+Oracle pipeline Parameters.
+We follow the perception
+protocol of Zhu et al. [37], with NMS IoU threshold τIoU =
+0.789 and detection confidence τconf = 0.3. DBSCAN
+uses a neighborhood radius ϵ = 0.04 m, set to half a stan-
+dard fruit diameter so that adjacent fruits are not merged
+into a single instance, with minimum density nmin = 10.
+5.2. Qualitative Results
+Figure 4 compares VLM-generated harvesting trajectories
+with the oracle baseline on a representative 6-apple orchard
+scene using a 3-arm robot.
+Most frontier VLMs generate complete harvesting
+plans. The oracle baseline includes all six fruits in its plan.
+Claude Opus 4.7, Claude Sonnet 3.5, Gemini 3 Flash, GLM,
+and GPT-4o similarly achieve full target coverage. In con-
+trast, Qwen2.5-VL-7B omits several fruits, shown as gray
+markers, resulting in an incomplete plan. This highlights
+a clear gap in plan completeness between stronger frontier
+models and the smaller open-source model.
+Trajectory efficiency varies substantially across models.
+Despite receiving the same scene and robot configuration,
+the models produce markedly different path lengths. Claude
+Sonnet 3.5 (9.7 m), Gemini 3 Flash (10.0 m), and GPT-4o
+(10.4 m) generate shorter trajectories than the oracle base-
+line (14.2 m), while GLM produces a considerably longer
+path of 20.0 m. These results show that successful fruit cov-
+erage does not necessarily imply efficient motion planning.
+Spatial allocation remains an important source of vari-
+ation.
+The models must distribute fruits across the
+three arm workspaces while maintaining feasible trajec-
+tories.
+Stronger models generally produce compact and
+well-structured routes, whereas less effective models incur
+unnecessary travel when assigning fruits near workspace
+boundaries.
+Overall, the qualitative results suggest that
+frontier VLMs can generate complete and efficient multi-
+arm plans, but their performance remains sensitive to fruit
+allocation and waypoint selection.
+5
+
+
+Figure 4. Qualitative comparison of VLM-generated trajectories against the oracle pipeline on a representative 6-fruit orchard scene using
+a 3-arm robot. (a) Input RGB orchard image. (b) 3D fruit localization from the oracle pipeline. (c) Oracle trajectory, reported with
+rectilinear trajectory distance. (d–i) VLM-generated trajectories for Claude Opus 4.7, Claude Sonnet 3.5, Gemini 3 Flash, GLM, GPT-4o,
+and Qwen2.5-VL-7B, respectively. Each panel reports its rectilinear trajectory distance. Red and grey fruit markers denote fruit included
+and not included, respectively, in the model’s harvesting plan.
+5.3. Quantitative Results
+Table 2 summarizes the quantitative performance of all
+evaluated VLMs. Trajectory accuracy is evaluated at three
+spatial thresholds, δ ∈{1.0m, 0.5m, 0.25m}, where δ de-
+notes the maximum Euclidean distance between a VLM-
+generated waypoint and the corresponding ground-truth
+fruit location.
+Performance Analysis.
+Performance varies substantially
+across models, datasets, and spatial thresholds. On Apple,
+GPT-5.5-Pro achieves the highest closed-source accuracy
+at δ = 0.5 m (85.7%), while GLM performs best at the
+strictest threshold of δ = 0.25 m (64.5%). On Citrus, GLM
+achieves the strongest performance at both δ = 0.5 m and
+δ = 0.25 m, reaching 89.6% and 88.9%, respectively.
+High accuracy at a loose threshold, however, does not
+necessarily translate to precise and safe harvesting. On Cit-
+rus, GPT-5.5-Pro achieves 99.3% harvested ratio at δ = 1.0
+m but only 6.7% at δ = 0.25 m. Similarly, Claude Sonnet
+3.5 achieves the highest Apple harvested ratio at δ = 1.0m
+(98.2%) but also exhibits the highest collision ratios on Ap-
+ple (86.4%) and Citrus (82.8%). These results show that
+coarse fruit localization alone is insufficient for reliable
+multi-arm harvesting.
+Sensitivity to Spatial Granularity. Performance generally
+decreases as the spatial threshold becomes stricter, although
+the degree of degradation varies considerably across models
+and datasets. GPT-4o degrades sharply at tighter thresholds,
+while GPT-5.5-Pro exhibits a particularly large gap between
+coarse and precise localization on Citrus. In contrast, GLM
+remains comparatively robust at stricter thresholds, espe-
+6
+
+
+Table 2. Comprehensive performance comparison of VLM backends for multi-arm fruit-harvesting planning on the Apple and Citrus
+datasets. Metrics include Harvested Ratio across three spatial thresholds (δ), collision ratio, trajectory distance, and average token usage.
+Results are benchmarked against the optimal planner. Best reported VLM result in each column is shown in Red text for apples and Orange
+text for citrus.
+Model
+Dataset
+Harvested Ratio (%)↑
+Detected
+Collision
+Traj.
+Avg.
+δ = 1.0m
+δ = 0.5m
+δ = 0.25m
+Ratio (%)↑
+Ratio (%)↓
+Dist. (m)↓
+Tokens↓
+Optimal Planner∗
+Apple
+100.0
+100.0
+100.0
+100.0
+100.0
+0
+12.4
+Citrus
+100.0
+100.0
+100.0
+100.0
+100.0
+0
+5.5
+Closed-source VLMs
+GPT-5.5-Pro [24]
+Apple
+93.8
+85.7
+42.4
+93.8
+42.2
+12.8
+6364
+Citrus
+99.3
+60.7
+6.7
+89.8
+37.4
+13.7
+8175
+Gemini 3 Flash [8]
+Apple
+79.2
+41.2
+89.8
+98.2
+48.6
+14.3
+1150
+Citrus
+65.9
+31.7
+97.6
+97.6
+35.5
+7.9
+7104
+Claude Sonnet 3.5 [1]
+Apple
+98.2
+65.3
+21.8
+81.0
+86.4
+20.5
+1200
+Citrus
+90.3
+67.7
+41.9
+90.3
+82.8
+11.8
+3088
+Claude Opus 4.7 [2]
+Apple
+81.0
+69.5
+27.4
+81.0
+38.1
+12.7
+1527
+Citrus
+98.8
+53.7
+8.5
+98.8
+31.3
+8.4
+2113
+GPT-4o [23]
+Apple
+41.9
+20.4
+2.1
+41.9
+12.1
+11.1
+1314
+Citrus
+60.5
+20.9
+9.3
+60.5
+4.3
+6.2
+2103
+Open-source VLMs
+Qwen2.5-VL-7B [5]
+Apple
+60.5
+60.5
+37.7
+60.5
+11.9
+10.9
+9553
+Citrus
+98.7
+87.7
+36.1
+98.7
+31.8
+2.3
+8226
+GLM [10]
+Apple
+86.9
+85.0
+64.5
+86.9
+17.9
+11.8
+2454
+Citrus
+90.3
+89.6
+88.9
+82.9
+25.0
+2.8
+2564
+∗The optimal planner assumes oracle knowledge of the exact 3D positions of all fruits. It therefore serves as an upper-bound reference and achieves a
+100% harvested ratio by considering all reachable fruits for harvesting. Collision ratio was not recorded for the current VLM evaluations; ‘–‘ denotes
+an unmeasured value. The Apple Qwen row uses 48 common test scenes and the Citrus Qwen row uses 44 scenes; both are direct RGB-only waypoint
+predictions. Citrus backend rows use the available static-planner evaluations and therefore do not all have identical scene counts.
+cially on Citrus. Overall, the results highlight the impor-
+tance of precise metric localization beyond simply identify-
+ing the approximate location of each fruit.
+Inference Efficiency.
+Strong planning performance can
+also come at substantial computational cost. GPT-5.5-Pro
+averages 6,364 tokens per Apple scene and 8,175 tokens per
+Citrus scene, considerably more than several alternatives.
+This overhead may limit its practicality for large-scale or
+real-time deployment and highlights the importance of bal-
+ancing planning quality with inference efficiency.
+5.4. Failure Case Analysis
+We further analyze VLM outputs against the oracle fruit lo-
+cations and multi-arm plans. The dominant failure modes
+arise from incomplete fruit detection, inaccurate metric lo-
+calization, and infeasible multi-arm coordination.
+Perception Failures. Dense foliage, occlusion, and over-
+lapping fruits can cause VLMs to miss instances, resulting
+in incomplete harvesting plans. Such failures occur more
+frequently in crowded scenes and near image boundaries.
+Spatial Localization Failures. VLMs can often estimate
+approximate fruit locations, but precise metric localization
+directly from RGB images remains challenging.
+Errors
+are particularly pronounced along the depth (Y ) direction,
+where metric distance is difficult to infer from monocular
+visual cues. Consequently, some models perform well at
+δ = 1.0 m but degrade substantially at δ = 0.5 m and
+δ = 0.25 m.
+Multi-Arm Planning Failures. Even when fruits are cor-
+rectly detected, a VLM may assign them to unsuitable arms
+or generate trajectories that violate safety constraints. Such
+coordination failures become more frequent as the number
+of arms increases, highlighting the additional difficulty of
+scaling from perception to multi-arm planning.
+5.5. Prompt Choice Analysis
+To analyze prompt component sensitivity, we evaluate six
+ablation variants across all models by systematically remov-
+ing elements from the full prompt (V1):
+• V1 Full: Role framing, physical scale reference, coordi-
+nate frame, and structured JSON output.
+• V2 w/o Scale: V1 without the 8 cm apple size prior.
+• V3 w/o Role: V1 without expert agricultural robotics role
+assignment.
+• V4 Minimal: Task description and JSON schema only.
+• V5 w/o Depth:
+V1 without the expert agricultural
+robotics role assignment.
+• V6 Zone Splitting: V1 without the expert agricultural
+robotics role assignment.
+Table 3 reports mean and standard deviation across mod-
+7
+
+
+Table 3. Prompt ablation summary, averaged across all five VLMs
+(mean ± std). Each variant removes one component from the full
+prompt (V1). Best results are shown in bold.
+Prompt
+Harvested Ratio (%)
+Detected Ratio
+δ=1.0m
+δ=0.5m
+δ=0.25m
+(%)
+V1 – Full
+93.3 ± 14.9 73.5 ± 22.4 36.9 ± 14.9
+84.4 ± 8.4
+V2 – w/o Scale
+74.7 ± 35.4 47.9 ± 44.9 22.3 ± 24.8
+80.8 ± 14.9
+V3 – w/o Role
+75.7 ± 33.6 43.2 ± 32.5 16.2 ± 16.4
+75.9 ± 18.0
+V4 – Minimal
+0.0 ± 0.0
+0.0 ± 0.0
+0.0 ± 0.0
+45.3 ± 33.3
+V5 – w/o Depth
+96.9 ± 5.4
+86.5 ± 23.4 49.0 ± 44.2
+96.9 ± 5.4
+V6 – w/o Zone
+98.7 ± 0.8
+94.7 ± 1.1
+89.3 ± 1.6
+89.3 ± 1.6
+els to isolate prompt component effects.
+Physical scale is critical.
+Removing the 8 cm size prior
+(V2) causes the largest drop in localization accuracy, reduc-
+ing mean harvested ratio at δ = 0.5 m from 73.5% to 47.9%
+and at δ = 0.25 m from 36.9% to 22.3%. Target detection
+remains high (80.8%), showing that scale is necessary for
+precise 3D waypoint placement rather than fruit recogni-
+tion.
+Scale and role priors buy precision, not recall.
+Remov-
+ing either the fruit-size prior (V2) or the expert role (V3)
+leaves detection close to the full prompt while harvested ra-
+tio falls by roughly a third at every threshold. Both help
+a model place fruit accurately rather than find it, and their
+wide variance shows some models carry these priors inter-
+nally while others depend on the prompt.
+Structured grounding is the one component nothing sur-
+vives without.
+The minimal prompt (V4) harvests noth-
+ing at any threshold while still detecting nearly half the fruit.
+The models see the orchard but cannot express it as some-
+thing a planner can execute. No other ablation fails categor-
+ically like this.
+Depth anchoring splits the models; zone splitting is re-
+dundant.
+Removing the depth statement (V5) produces
+the widest variance in the study, so its mean hides two popu-
+lations: models that recover metric depth unaided and mod-
+els that fail outright. Removing zone splitting (V6) barely
+registers, and its performance holds as the threshold tight-
+ens while every other variant loses close to half. Models
+reconstruct the workspace partition on their own.
+5.6. Scalability Analysis
+Impact of the Number of Fruits. Table 4 shows the re-
+sults of GPT-5.5-Pro under a fixed 2-arm configuration us-
+ing scenes grouped by fruit density (< 5, 5–10, and > 10
+Table 4. Impact of fruit count on GPT-5.5-Pro performance with
+2 arms fixed. n denotes the number of evaluated scenes in each
+group.
+Apple performance decreases as scene complexity in-
+creases, whereas Citrus detection remains near-perfect and har-
+vested ratio varies across count groups.
+Dataset
+Fruit Count
+n (scenes)
+Detection Ratio (%)
+Harvested Ratio (%)
+Apple
+< 5 apples
+43
+40.1
+60.1
+5–10 apples
+86
+38.1
+53.5
+> 10 apples
+5
+23.8
+42.8
+Citrus
+< 5 fruits
+46
+100.0
+47.0
+5–10 fruits
+56
+99.2
+62.7
+> 10 fruits
+2
+100.0
+52.2
+Table 5. Impact of arm count on GPT-5.5-Pro performance for
+scenes containing 5–10 apples. n denotes the number of evaluated
+scenes per configuration. Both detection and harvested ratios de-
+crease as the number of arms increases.
+Dataset
+Arm Count
+n (scenes)
+Detection Ratio (%)
+Harvested Ratio (%)
+Apple
+2 arms
+50
+52.1
+57.1
+3 arms
+50
+34.2
+55.7
+4 arms
+34
+23.8
+51.8
+Citrus
+2 arms
+45
+44.3
+53.8
+3 arms
+45
+36.5
+51.0
+4 arms
+45
+23.6
+48.6
+fruits per image). On Apple, harvesting accuracy drops sig-
+nificantly as fruit count increases, falling from 60.1% to
+42.8%. This confirms that denser, higher-complexity scenes
+negatively affect both spatial localization and target resolu-
+tion. For Citrus, harvesting accuracy remains bounded be-
+low 62.7% across all fruit density groups.
+Impact of the Number of Arms. Table 5 shows the re-
+sult of GPT-5.5-Pro across 2-, 3-, and 4-arm configurations
+while maintaining a fixed scene complexity of 5–10 fruits
+per image. As the arm count increases, overall harvesting
+success degrades from 52.1% down to 23.8% on Apple and
+from 44.3% down to 23.6% on Citrus, representing relative
+performance drops of 54% and 47%, respectively.
+Scaling the number of arms expands the spatial coordina-
+tion search space, making collision-free trajectory planning
+and dynamic zone partition significantly more challenging
+even when fruit count remains constant.
+6. Conclusion
+Multi-arm robotic fruit harvesting has the potential to im-
+prove harvesting efficiency, but practical deployment re-
+mains challenging due to the need for robust perception
+and coordinated planning in unstructured orchard environ-
+ments. Existing methods often rely on task-specific per-
+ception pipelines or simplifying planning assumptions, lim-
+iting their generalizability.
+In this work, we introduced
+the first comprehensive benchmark for evaluating pretrained
+VLMs on zero-shot multi-arm fruit harvesting planning us-
+ing real-world apple and citrus orchard images. Our results
+8
+
+
+show that frontier VLMs can generate effective multi-arm
+harvesting plans without task-specific training, particularly
+when provided with physical-scale and workspace priors.
+However, accurate 3D waypoint generation and collision-
+aware coordination remain key challenges for practical de-
+ployment.
+We hope this benchmark provides a founda-
+tion for future research on generalizable and efficient VLM-
+based planning for multi-arm agricultural robotics.
+Acknowledgements
+This research was supported by the Academic Senate Fac-
+ulty Research Grant and the startup funds at University
+of California Merced.
+V. Inukollu and A. Zaman are
+supported by the Workforce Innovation Program (WIP)
+at the Center for Information Technology Research in
+the Interest of Society and the Banatao Institute (CIT-
+RIS).
+References
+[1] Anthropic. Model card and technical overview: Claude 3.5
+sonnet. Technical report, Anthropic, 2024. 5, 7
+[2] Anthropic. Claude 4.7 opus: Frontier capabilities in complex
+task automation. Technical report, Anthropic, 2025. 7
+[3] Rajkishan Arikapudi, Stavros G Vougioukas, Francisco
+Jim´enez-Jim´enez, and Farangis Khosro Anjom. Estimation
+of fruit locations in orchard tree canopies using radio signal
+ranging and trilateration. Computers and electronics in agri-
+culture, 125:160–172, 2016. 1, 2
+[4] Muhammad Arbab Arshad, Talukder Zaki Jubery, Tirtho
+Roy, Rim Nassiri, Asheesh K Singh, Arti Singh, Chinmay
+Hegde, Baskar Ganapathysubramanian, Aditya Balu, Adarsh
+Krishnamurthy, et al. Leveraging vision language models
+for specialized agricultural tasks. In 2025 IEEE/CVF Win-
+ter Conference on Applications of Computer Vision (WACV),
+pages 6320–6329. IEEE, 2025. 2
+[5] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+Ge, Sibo Song, Kai Dang, Peng Wang, et al. Qwen2.5-vl
+technical report. arXiv preprint arXiv:2502.13923, 2025. 5,
+7
+[6] Josh Barnett, Mike Duke, Chi Kit Au, and Shen Him Lim.
+Work distribution of multiple cartesian robot arms for ki-
+wifruit harvesting. Computers and electronics in agriculture,
+169:105202, 2020. 1, 2
+[7] Abderrahmene Boudiaf, Irfan Hussain, and Sajid Javed.
+Agrichat: A multimodal large language model for agricul-
+ture image understanding. arXiv preprint arXiv:2603.16934,
+2026. 2
+[8] Google DeepMind. Gemini 3: Next-generation multimodal
+models with enhanced efficiency. Technical report, Google,
+2025. 5, 7
+[9] Martin Ester, Hans-Peter Kriegel, J¨org Sander, and Xiaowei
+Xu. A density-based algorithm for discovering clusters in
+large spatial databases with noise. In Proceedings of the Sec-
+ond International Conference on Knowledge Discovery and
+Data Mining (KDD), pages 226–231, 1996. 3
+[10] GLM-V Team et al. Glm-4.1v-thinking and glm-4.5v: To-
+wards versatile multimodal reasoning with scalable rein-
+forcement learning. arXiv preprint arXiv:2507.01006, 2025.
+5, 7
+[11] Caelan Reed Garrett, Rohan Chitnis, Rachel Holladay,
+Beomjoon Kim, Tom Silver, Leslie Pack Kaelbling, and
+Tom´as Lozano-P´erez. Integrated task and motion planning.
+Annual review of control, robotics, and autonomous systems,
+4(1):265–293, 2021. 1
+[12] Aruna Gauba, Irene Pi, Yunze Man, Ziqi Pang, Vikram S
+Adve, and Yu-Xiong Wang.
+Agmmu: A comprehensive
+agricultural multimodal understanding benchmark.
+arXiv
+preprint arXiv:2504.10568, 2025. 2
+[13] Pranav Guruprasad, Harshvardhan Sikka, Jaewoo Song,
+Yangyue Wang, and Paul Pu Liang. Benchmarking vision,
+language, & action models on robotic learning tasks. arXiv
+preprint arXiv:2411.05821, 2024. 2
+[14] C. Hou, X. Zhang, Y. Tang, J. Zhuang, Z. Tan, H. Huang, W.
+Chen, S. Wei, Y. He, and S. Luo. Detection and localization
+of citrus fruit based on improved you only look once v5s and
+binocular vision in the orchard. Frontiers in Plant Science,
+13:972445, 2022. 5
+[15] Lin Li, Qihang Zhang, Yiming Luo, Shuai Yang, Ruilin
+Wang, Fei Han, Mingrui Yu, Zelin Gao, Nan Xue, Xing
+Zhu, et al. Causal world modeling for robot control. arXiv
+preprint arXiv:2601.21998, 2026. 2
+[16] Qingmei Li, Yang Zhang, Zurong Mai, Yuhang Chen, Shuo-
+hong Lou, Henglian Huang, Jiarui Zhang, Zhiwei Zhang,
+Yibin Wen, Weijia Li, et al. Can large multimodal models un-
+derstand agricultural scenes? benchmarking with agromind.
+arXiv preprint arXiv:2505.12207, 2025. 2
+[17] Tao Li, Feng Xie, Quan Qiu, and Qingchun Feng. Multi-
+arm robot task planning for fruit harvesting using multi-
+agent reinforcement learning. In 2023 IEEE/RSJ Interna-
+tional Conference on Intelligent Robots and Systems (IROS),
+pages 4176–4183. IEEE, 2023. 2
+[18] Yajun Li, Qingchun Feng, Yifan Zhang, Chuanlang Peng,
+and Chunjiang Zhao. Intermittent stop-move motion plan-
+ning for dual-arm tomato harvesting robot in greenhouse
+based on deep reinforcement learning. Biomimetics, 9(2):
+105, 2024. 2
+[19] Hanqing Liu, Shouwei Ruan, Jiahuan Long, Junqi Wu, Ji-
+acheng Hou, Huili Tang, Tingsong Jiang, Weien Zhou, and
+Wen Yao. Eva-vla: Evaluating vision-language-action mod-
+els’ robustness under real-world physical variations. arXiv
+preprint arXiv:2509.18953, 2025. 2
+[20] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao
+Zhang, Jie Yang, Chunyuan Li, Jianwei Yang, Hang Su, Jun
+Zhu, and Lei Zhang. Grounding dino: Marrying dino with
+grounded pre-training for open-set object detection. arXiv
+preprint arXiv:2303.05499, 2023. 3
+[21] Moshe P Mann, Boaz Zion, Itzhak Shmulevich, Dror Rubin-
+stein, and Raphael Linker. Combinatorial optimization and
+performance analysis of a multi-arm cartesian robotic fruit
+harvester—extensions of graph coloring. Journal of Intelli-
+gent & Robotic Systems, 82(3):399–411, 2016. 2
+[22] NVIDIA.
+NVIDIA RTX 6000 Ada Generation Graphics
+9
+
+
+Card. NVIDIA Corporation, 2022. Accessed: 2026-05-03.
+5
+[23] OpenAI. Gpt-4o: The omni model for real-time multimodal
+interaction. Technical report, OpenAI, 2024. 5, 7
+[24] OpenAI. Gpt-5.5 technical report: Advancements in multi-
+modal reasoning and spatial grounding.
+Technical report,
+OpenAI, 2025. 5, 7
+[25] Nikhila Ravi, Valentin Grigorev, Aaditya Pant, Travis
+Gunn, Xiaoqing Ma, Henganeh Tufvesson, Mahaveer Azhar,
+Huizhong Ravi, Jeremy Reizenstein, Animesh Shekhawat,
+et al. Sam 2: Segment anything in images and videos. arXiv
+preprint arXiv:2408.00714, 2024. 3
+[26] Joseph Redmon, Santosh Divvala, Ross Girshick, and Ali
+Farhadi. You only look once: Unified, real-time object de-
+tection. In Proceedings of the IEEE Conference on Com-
+puter Vision and Pattern Recognition (CVPR), pages 779–
+788, 2016. 1
+[27] Ranjan Sapkota,
+Rizwan Qureshi,
+Muhammad Usman
+Hadi, Syed Zohaib Hassan, Ferhat Sadak, Maged Shoman,
+Muhammad Sajjad, Fayaz Ali Dharejo, Achyut Paudel, Jia-
+jia Li, et al. Multi-modal llms in agriculture: A comprehen-
+sive review. IEEE Transactions on Automation Science and
+Engineering, 2025. 2
+[28] Risa Shinoda, Nakamasa Inoue, Hirokatsu Kataoka, Masaki
+Onishi, and Yoshitaka Ushiku. Agrobench: Vision-language
+model benchmark in agriculture.
+In Proceedings of the
+IEEE/CVF International Conference on Computer Vision,
+pages 7634–7644, 2025. 2
+[29] Natalie C Pueyo Svoboda. Improving Fruit Harvesting Speed
+with Multi-Armed Robots. PhD thesis, University of Califor-
+nia, Davis, 2024. 2
+[30] U.S. Department of Agriculture, Economic Research Ser-
+vice.
+Farm labor.
+https://www.ers.usda.gov/
+topics/farm-economy/farm-labor, 2026. 1
+[31] Juan Villacr´es, Michelle Viscaino, Jos´e Delpiano, Stavros
+Vougioukas, and Fernando Auat Cheein. Apple orchard pro-
+duction estimation using deep learning strategies: A com-
+parison of tracking-by-detection algorithms. Computers and
+Electronics in Agriculture, 204:107513, 2023. 1, 2
+[32] Yi Ru Wang, Carter Ung, Grant Tannert, Jiafei Duan,
+Josephine Li, Amy Le, Rishabh Oswal, Markus Grotz,
+Wilbert Pumacay, Yuquan Deng, et al. Roboeval: Where
+robotic manipulation meets structured and scalable evalua-
+tion. arXiv preprint arXiv:2507.00435, 2025. 2
+[33] Bo Yang, Yunkui Chen, Lanfei Feng, Yu Zhang, Xiao
+Xu,
+Jianyu Zhang,
+Nueraili Aierken,
+Runhe Huang,
+Hongjian Lin, Yibin Ying, et al.
+Agrigpt-vl:
+Agricul-
+tural vision-language understanding suite.
+arXiv preprint
+arXiv:2510.04002, 2025. 2
+[34] Seonghyeon Ye, Yunhao Ge, Kaiyuan Zheng, Shenyuan
+Gao,
+Sihyun
+Yu,
+George
+Kurian,
+Suneel
+Indupuru,
+You Liang Tan, Chuning Zhu, Jiannan Xiang, et al. World
+action models are zero-shot policies.
+arXiv preprint
+arXiv:2602.15922, 2026. 2
+[35] Shiduo Zhang, Zhe Xu, Peiju Liu, Xiaopeng Yu, Yuan Li,
+Qinghui Gao, Zhaoye Fei, Zhangyue Yin, Zuxuan Wu, Yu-
+Gang Jiang, et al.
+Vlabench: A large-scale benchmark
+for language-conditioned robotics manipulation with long-
+horizon reasoning tasks. In Proceedings of the IEEE/CVF
+International Conference on Computer Vision, pages 11142–
+11152, 2025. 2
+[36] Enyu Zhao, Vedant Raval, Hejia Zhang, Jiageng Mao,
+Zeyu Shangguan, Stefanos Nikolaidis, Yue Wang, and
+Daniel Seita. Manipbench: Benchmarking vision-language
+models for low-level robot manipulation.
+arXiv preprint
+arXiv:2505.09698, 2025. 2
+[37] Keyi Zhu, Jiajia Li, Kaixiang Zhang, Chaaran Arunachalam,
+Siddhartha Bhattacharya, Renfu Lu, and Zhaojian Li. Foun-
+dation model-based apple ripeness and size estimation for
+selective harvesting. Computers and Electronics in Agricul-
+ture, 236:110407, 2025. 2, 3, 5
+[38] Yuankai Zhu and Stavros G Vougioukas. Fast scheduling and
+trajectory planning for robotic fruit harvesters with multiple
+cartesian arms. IEEE Robotics and Automation Letters, 11
+(2):1562–1569, 2025. 2, 3
+[39] Yuankai Zhu, Wenwu Lu, Guoqiang Ren, Haiming Gao,
+Stavros Vougioukas, Yibin Ying, and Chen Peng. Optimal
+scheduling of a dual-arm robot for efficient strawberry har-
+vesting in plant factories. In 2025 IEEE/RSJ International
+Conference on Intelligent Robots and Systems (IROS), pages
+1231–1238, 2025. 1, 2
+[40] Z. Zhukeyi, Y. Wang, X. Chen, J. Liu, and S. Tanaka. Es-
+timation of branch geometry and hierarchy in orchard trees
+for robotic pruning. Journal of Robotics and Mechatronics,
+38(2):412–425, 2026. 5
+10

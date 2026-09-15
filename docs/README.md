@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-14</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-15</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 8 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-14 22:40:50 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-15 22:06:18 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共生成 2 篇推荐（精读 0 篇，速读 2 篇）</p>
-<p>速读：《Communication-Constrained Multi-Robot Exploration With Adaptive Communication Windows》（7.0/10）, 《Distributed Stochastic Optimal Control for Pattern-Oriented Swarms》（7.0/10）</p>
-<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
+<p>今天筛出8篇机器人前沿论文，精读4篇、速读4篇，重点锁定多机器人任务分配与多智能体协同。</p>
+<p>最值得看的是两篇9分精读：退化通信下的去中心化任务分配基准，以及从仿真走向真实机器人的多智能体任务分配与导航。</p>
+<p>普通读者可先读这两篇9分精读，再按兴趣速览生成式避碰、CBF安全过滤和视觉语言模型采摘。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Decentralized Multi-Robot Task Allocation Under Degraded Communication: A Benchmark of Performance, Reliability, and Computation">Decentralized Multi-Robot Task Allocation Under Degraded Communication: A Benchmark of Performance, Reliability, and Computation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Multi-Agent Task Assignment and Navigation in the Factory: from Simulation to Real Robots">Learning Multi-Agent Task Assignment and Navigation in the Factory: from Simulation to Real Robots</span></li><li><span class="dpr-home-dashboard-paper-title" title="Mobile Multi-Robot Navigation under Runtime Uncertainty via Koopman Operator Learning and Nonlinear Model Predictive Control">Mobile Multi-Robot Navigation under Runtime Uncertainty via Koopman Operator Learning and Nonlinear Model Predictive Control</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Communication-Constrained Multi-Robot Exploration With Adaptive Communication Windows">Communication-Constrained Multi-Robot Exploration With Adaptive Communication Windows</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed Stochastic Optimal Control for Pattern-Oriented Swarms">Distributed Stochastic Optimal Control for Pattern-Oriented Swarms</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Learning Communication-Conditioned Generative Policies for Decentralized Multi-Agent Collision Avoidance">Learning Communication-Conditioned Generative Policies for Decentralized Multi-Agent Collision Avoidance</span></li><li><span class="dpr-home-dashboard-paper-title" title="Exact Feasibility Certification and Optimal Responsibility Allocation for Multi-Robot CBF Safety Filters">Exact Feasibility Certification and Optimal Responsibility Allocation for Multi-Robot CBF Safety Filters</span></li><li><span class="dpr-home-dashboard-paper-title" title="From Vision to Harvest: Benchmarking Vision-Language Models for Multi-Arm Robotic Fruit Harvesting">From Vision to Harvest: Benchmarking Vision-Language Models for Multi-Arm Robotic Fruit Harvesting</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
 </section>
 </div>
 
