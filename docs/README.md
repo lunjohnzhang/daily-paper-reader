@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-16</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-17</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 10 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-16 21:39:19 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-17 22:27:36 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,10 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>9月16日仅速读1篇《Forty Shades of Blue: Quality-Diversity Alignment via Mode-Conditioned Reinforcement Learning》，无精读，日报轻量收官。</p>
-<p>唯一可看方向是“用模式条件强化学习做质量-多样性对齐”，但6.0/10的评分提示其结论与实验价值仍需核验。</p>
-<p>普通读者可先看摘要、方法和实验部分，再判断它是否适合作为质量-多样性优化的入门参考。</p>
+<p>今日共生成 10 篇推荐（精读 5 篇，速读 5 篇）</p>
+<p>精读：《AssemblyGrid v1: A Benchmark for Multi-Robot Production with Temporary Coalitions, Local Information, and Geometric Constraints》（9.0/10）, 《Routing Multiple Agents Below the Sum of Distances》（9.0/10）</p>
+<p>速读：《CoAdapt: An LLM-based Framework for Adaptive Collaborative Perception in IIoT Robotic Swarms》（7.0/10）, 《Exact Fusion and Coordinated Exploration in Multi-Robot Active Inference》（7.0/10）, 《Learning Multi-Humanoid Pickup and Transport via Decentralized Object-Centric Control》（7.0/10）</p>
+<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +74,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AssemblyGrid v1: A Benchmark for Multi-Robot Production with Temporary Coalitions, Local Information, and Geometric Constraints">AssemblyGrid v1: A Benchmark for Multi-Robot Production with Temporary Coalitions, Local Information, and Geometric Constraints</span></li><li><span class="dpr-home-dashboard-paper-title" title="Routing Multiple Agents Below the Sum of Distances">Routing Multiple Agents Below the Sum of Distances</span></li><li><span class="dpr-home-dashboard-paper-title" title="TRACER: Adaptive Multi-Robot Social Navigation via Joint Human-Response Prediction and Interaction-Aware Replanning">TRACER: Adaptive Multi-Robot Social Navigation via Joint Human-Response Prediction and Interaction-Aware Replanning</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +87,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Forty Shades of Blue: Quality-Diversity Alignment via Mode-Conditioned Reinforcement Learning">Forty Shades of Blue: Quality-Diversity Alignment via Mode-Conditioned Reinforcement Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CoAdapt: An LLM-based Framework for Adaptive Collaborative Perception in IIoT Robotic Swarms">CoAdapt: An LLM-based Framework for Adaptive Collaborative Perception in IIoT Robotic Swarms</span></li><li><span class="dpr-home-dashboard-paper-title" title="Exact Fusion and Coordinated Exploration in Multi-Robot Active Inference">Exact Fusion and Coordinated Exploration in Multi-Robot Active Inference</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Multi-Humanoid Pickup and Transport via Decentralized Object-Centric Control">Learning Multi-Humanoid Pickup and Transport via Decentralized Object-Centric Control</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 </div>
 
