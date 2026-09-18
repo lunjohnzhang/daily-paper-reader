@@ -1,0 +1,970 @@
+Title: Motion planning in high dimensional spaces hybridizing RRT and HAR via position-direction decoupling
+
+URL Source: https://arxiv.org/pdf/2609.16810v1
+
+Published Time: Wed, 16 Sep 2026 00:52:29 GMT
+
+Number of Pages: 30
+
+Markdown Content:
+# Motion planning in high dimensional spaces hybridizing RRT and HAR via position-direction decoupling 
+
+## Frédéric Cazals ∗ and Nelson Feyeux †
+
+## September 16, 2026 
+
+Abstract 
+
+The exploration of high-dimensional spaces remains a challenging problem, in particular in the presence of narrow passages and small clearances. We propose novel sampling-based path-planning methods for high-dimensional spaces combining Rapidly-exploring Random Trees (RRT) and Hit-and-Run (HAR) random walks by decoupling the point being extended from the direction of extension. We also show that RRT and HAR appear as special cases of a generic algorithm coupling the biases used for the point and direction extension, respectively. We further study a sparse-move strategy in which only a fraction pr of the robots is moved at each step, helping both RRT and the proposed HAR algorithms handle cluttered instances. Tests are presented for two families of models: classical 
+
+piano mover problems in 3D, and complex molecular systems involving tens of rigid domains moving relatively to one another – the latter viewed as independent robots exploring the motion space SE (3) N . Within seconds on a standard laptop, our algorithms solve instances with up to 64 robots and 384 degrees of freedom. We conclude by suggesting one of our methods, HARF, as the method of choice for complex multi-robot planning problems, being up to two orders of magnitude faster than the classical RRT moving all robots at each step–when it succeeds at all–, and still up to 2.4 fold faster on most instances when both use their best pr .
+
+Keywords: motion planning, multi-robot planning, high dimensional spaces, rapidly exploring random trees, hit-and-run, molecular motions. 
+
+# 1 Introduction 
+
+## 1.1 Previous work 
+
+Path planning, exact versus randomized methods. Path planning is concerned with the problem of planning robot admissible moves to perform prescribed tasks, in natural or designed environments. Given the configuration space C of the robot(s), the objective is to compute one or several paths in the free space , i.e. the subset of C
+
+that is free of obstacles and collisions. From an algorithmic perspective, it is useful to distinguish between different classes of motion planning algorithms and their associated guarantees [1, 2, 3]. At a high level, when robots and their environments (i.e., obstacles) are modeled as geometric entities, one can differentiate between exact and randomized methods. Exact approaches provide certified, complete solutions but typically suffer from poor scalability. In contrast, randomized methods rely on sampling techniques and generally offer only asymptotic guarantees; nevertheless, they often perform remarkably well in practice. Although a comprehensive survey of these approaches is beyond the scope of this work, several of their key components are directly relevant to our study. In the realm of randomized algorithms, two landmarks are Probabilistic Roadmaps (PRM) [4, 5] and Rapidly-exploring Random Trees (RRT) [6, 7] – see also Section 2.2 for a review of recent developments. The fundamental idea of PRM is to build a graph in the free space, and to use it to perform queries between pairs of start and goal points. The difficulty is naturally to provide a comprehensive coverage of the free space, discovering in particular narrow passages and unexplored regions. In the spirit of tabu search , the rapidly-exploring random trees (RRT) method uses the Voronoi bias to extend as a priority nodes having few neighbors and large Voronoi regions. While maintaining the Voronoi diagram in a high dimensional space is practically infeasible, RRT solely requires a dynamic data structure for nearest neighbor queries. The node extension requires the knowledge of all the samples already produced, so that the exploration algorithm is not a Markov chain. 
+
+> ∗Centre Inria at Université Côte d’Azur, France; email: Frederic.Cazals@inria.fr
+> †Centre Inria at Université Côte d’Azur, France. Email: Nelson.a.Feyeux@inria.fr
+
+1arXiv:2609.16810v1 [cs.RO] 15 Sep 2026 In the realm of exact algorithms, of particular interest for our work are visibility-based methods. Given a region containing convex obstacles, the visibility complex decomposes free rays ( i.e. rays lying in the complement of obstacles) into a set of cells [8]. Free rays are of importance in the context of planning as they encode far-reaching rather than local connections. While the maintenance of such partitions is also beyond reach in high dimensional spaces, difficulties have been partially overcome by combining visibility maps and PRM [9]. In our work, visibility is actually connected to Hit-and-Run random walks, which we review now. 
+
+Random walks and Markov chains to compute the volume of convex bodies. There is a remarkable connection between algorithms used in robotics and those used to compute volumes in high dimensional spaces, and the volume of polytopes in particular. While there is no fast deterministic algorithm to compute the volume of a convex body reliably [10], randomized algorithms based on Markov chains have been developed and gradually optimized. A key step in this realm has been the invention of the Hit-and-Run (HAR) algorithm to identify redundant constraints in linear programs [12]. As the name suggests, given a point in a polytope, one samples a random direction, finds the nearest polytope hyperplane in that direction, generates a sample on that segment, and iterates. This generative process defines a Markov chain whose mixing time characterizes the speed at which the samples approximate a target distribution, typically a log-concave distribution, and the samples generated can be used to estimate volumes [13, 14, 15]. Other random walks, sampling points in a ball [16] or using jump processes have also been studied [17]. Finally, we also note that HAR has been used to sample and explore non-convex spaces [18]. 
+
+Applications in structural biology. An important application of planning algorithms is structural bioinformatics. The function of proteins is determined by their structure and dynamics [19]. While AlphaFold2 provided definitive progress for the prediction of static structures [20], understanding the dynamics remains the overarching goal, in two settings. The first is to characterize subtle entropic phenomena as dictated by statistical physics [21], to delineate thermodynamics and kinetics [22]. The second is to chart the conformational space of a molecule, ideally bridging the gap to free-energy calculations. Algorithms using the aforementioned random walks proved highly effective in this context. One may cite the combination of RRT with a Metropolis-like test to explore (potential) energy landscapes [23], and the application of HAR in suitable angular spaces to sample conformations of long backbone loops [24]. In fact, the current work is motivated by the exploration of the relative motions of rigid protein domains, under the guidance of flexible linkers [25]. We call such models molecular cradles , in reference to Newton’s cradles. Phrased differently, planning a cradle is akin to planning the relative motion of rigid robots, each enjoying six degrees of freedom. While physical models have been proposed for a single protein [26], we are not aware of any attempt to collectively move a large cohort of rigid domains. In this work, we forget about linkers whose conformations can be sampled by combining HAR and loop closure techniques – see [27, 24] and references therein. Abusing terminology, we simply refer to the domains as individual molecules. 
+
+Multi-robot path planning. Planning the collective motion of protein domains is an instance of multi-robot path planning. Multi-robot planning is notoriously challenging [28, 29] and three main families of approaches have been developed, namely decoupled techniques, centralized approaches, and sampling-based approaches, see [30] and references therein. A common paradigm consists in first planning robot motions independently using individual roadmaps, and subsequently handling inter-robot collisions through search in the Cartesian product of the resulting roadmaps [31, 32]. A specific order based on prioritization may be used [33]. The MAPF (multi-agent path finding) and especially CBS (conflict-based search) [34] are different graph algorithms for multi-robot path planning, also constructing independent individual paths prior to considering different branching scenarios to handle collisions. In general, the combinatorial complexity of the product space is prohibitive, which motivated the exploitation of an implicit encoding of its structure [30]. The complexity of the initial space also motivated the design of dimensionality-reduction-based planners. In a nutshell, the recent fiber bundle -based approach stratifies the search space, solves a simpler planning problem, and tackles the full problem by searching near the planned low-dimensional path [35]. We also note that generative AI methods have recently been proposed for planning [36]. 
+
+## 1.2 Contributions 
+
+As illustrated by recent previous work, there are two orthogonal and actually complementary ways to tackle complex planning problems: by exploiting decompositions of the configuration space–what the fiber bundle approach does, or by designing more powerful planners able to cope with the full space. Our work falls into the latter category and exploits a fundamental difference in how RRT and HAR work: HAR defines a Markov chain, whereas RRT exploits the whole sampling history through its Voronoi bias . Our starting 2point is that the two methods are complementary: RRT determines which node to extend, while HAR determines the direction in which to extend it. Decoupling these two decisions yields a single family of planners. • An RRT algorithm using HAR for the extension step. We construct a family of RRT algorithms, denoted HARG (for global), HARL (for local) and HARF (for fixed distance steering), that differ in the choice of the new point qnew added to the tree at each step, and allow more flexibility in regions with low clearance. Moreover, RRT and HAR can be viewed as special cases of a more generic algorithm coupling the positional and directional samplings via a von Mises–Fisher distribution (Section 2.4). • Joint multi-robot planning without product structure. We instantiate the framework on SE (3) and 
+
+SE (3) N and plan N robots jointly in the product configuration space, without building or searching any ex-plicit product of individual roadmaps. We introduce two modes termed mass start and rolling start tuning the concomitance of robots moves. On multi-robot problems, our methods solve instances with up to 64 robots (384 degrees of freedom) within seconds on a standard laptop. 
+
+## 1.3 Notations 
+
+The bounding box of R2 or R3 containing a model is denoted R. The unit sphere in dimension d is denoted Sd−1, and a scaled version of it, that is, a sphere of radius ρ, is denoted ρ S d−1. The special Euclidean (resp. rotation) group is denoted SE (3) (resp. SO (3) ), and the associated Lie algebras are denoted se (3) (resp. so (3) ). 
+
+# 2 Motion planning with Hit-and-Run sampling 
+
+## 2.1 General setup 
+
+We consider sampling-based planners that require simple operations on the configuration space C:1. sampling configurations; 2. ranking neighbors of a sample using a distance metric; 3. defining a continuous path between two samples and a function returning intermediate configurations; 4. checking collisions on a continuous path. 
+
+Free space and segments. The free space Cfree ⊂ C corresponds to configurations where the robots do not self-intersect nor intersect obstacles. For practical reasons, physical boundaries are added to Cfree to restrain the space in which the robots move. For a configuration q ∈ C free , the clearance is defined as the minimum distance from q to the boundary of Cfree .Without any further assumption, we connect two points q0 and q1 in C by the curved segment , denoted [q0, q 1],connecting them. We may see this segment as a parameterized curve q(t) with t ∈ [0 , 1] , with q(0) = q0 and q(1) = q1.Naturally, the practical analytical expression of q(t) depends on the nature of C and the interpolation scheme selected. When considering a set of N independent robots, the joint configuration space is C = C1 × . . . × C N .
+
+Collision detection. Robots and obstacles are generally described by a collection of simple primitives, triangles or balls for instance. A collision predicate is a function stating whether [q0, q 1] is collision-free. Such predicates are evaluated using collision detection algorithms [37, 38] which decompose the [0 , 1] time interval into smaller subintervals until they are all proven to be collision-free, or until a collision is found. In this work, such predicates are based on distance calculations, and two primitives are declared in collision if their distance is less than a small threshold dcol. 
+
+(e.g. ∼ 1% of the robot size). The common method to speed-up the collision detection is to represent the bodies as a Bounding Volume Hierarchy [39]. For multiple robots, collision detection can be performed efficiently by prioritizing the pairs of nodes in the different Bounding Volume Hierarchies that are more likely to collide [40]. 
+
+Planning problems. Consider initial and final configurations q0 and q∞ in Cfree . A planning problem consists in finding a path connecting q0 and q∞ in Cfree . A valid path is typically defined by a sequence of points (q0, q 1, . . . , q ∞),such that each curved segment [qi, q i+1 ] is collision-free. The existence of paths raises two algorithmic problems of interest in this work: 
+
+Problem. 1 (Geometric path) . Find any path connecting q0 and q∞.
+
+Problem. 2 (Shortest geometric path) . Find a/the shortest path connecting q0 and q∞.
+
+32.2 The RRT planning algorithm 
+
+The Rapidly exploring Random Tree (RRT) algorithm [6, 7] connects two points q0 and q∞ in Cfree by creating a tree such that (i) each node is a random sample in Cfree , and (ii) each edge is a collision-free path. At every iteration, a new random point qsampled in C is passed to the steering procedure defining qnew : if 
+
+qsampled ∈ B(qfrom , δ ), qnew is qsampled ; else qnew is the projection of qsampled onto the sphere S(qfrom , δ ). Then if the curved segment [qfrom , q new ] is collision-free, the node qnew and the edge [qfrom , q new ] are added to the tree. The iteration is repeated until a path is found, or it is continued to refine the already found path. Many heuristics exist and can be used to improve the algorithm. The Connect heuristic [6, 7], denoted RRT-C , uses two trees anchored at q0 and q∞ to connect faster. The Star and Quick algorithms, denoted RRT ∗ and RRT Q, rewire the tree [41, 42] using two procedures called BestParent and Rewire . This rewiring shortens paths. The Star-Connect 
+
+and Quick-Connect methods, denoted RRT ∗-C and RRT Q-C , combine the previous ones [43] by rewiring the two trees. Finally, the Informed heuristic [44] prunes samples that are too far to improve the current found path: if L is the length of the currently found path, it discards any sample not in EL = {q ∈ C : Dist (q, q 0) + Dist (q, q ∞) ≤ L}.
+
+Path shortening. After the algorithm is stopped, the path found (if any) is optimized by repeatedly running the following two methods within a fixed wall-clock time budget. The first uses simple short-cutting: two points are drawn at random on the path and the sub-path is replaced by the direct connection if collision-free. The second is the more effective procedure partial shortcutting [45] which shortcuts the path of one random robot at a time. These procedures greatly reduce the total length of the path while conserving a valid path. 
+
+## 2.3 Decoupling positions and directions in RRT with HAR 
+
+RRT and HAR differ in two fundamental ways. First, while HAR defines a Markov chain, RRT does not since the entire history of the sampling process is used. Second, RRT places the focus on the point being extended – the direction of the extension being fixed upon identifying qfrom , while HAR uses randomness on directions. It is therefore natural to hybridize these two methods by leaving the choice of the point extended to RRT, and that of the direction to HAR. In doing so, a rapidly-exploring random tree is built as follows: • (RRT feature) The Voronoi bias is used to select the point extended while promoting unexplored regions. • (HAR feature) The direction θ of the candidate new node is chosen at random, which offers three steering strategies :
+
+– Globally (HARG): the segment stemming from qfrom in the direction θ is traced until the first collision point, or until it leaves the domain. The new node qnew is randomly drawn on this segment. 
+
+– Locally (HARL): the new node qnew is chosen randomly on the segment of length δ stemming from qfrom ,in the direction θ. A boundary check and a collision check are performed afterwards to discard the new node in case of a positive result. 
+
+– Fixed (HARF): the new node qnew is chosen at distance exactly δ of qfrom in the random direction θ. Aboundary check and a collision check are performed afterwards to discard the new node in case of a positive result. We generically denote the resulting algorithms HARG, HARL and HARF (Algorithm 1). Beyond these steering procedures, the algorithms match RRT. After a new sample qnew is correctly drawn, it is stored in a tree which is used to connect q0 and q∞.
+
+Decoupling the position and direction helps near obstacles. The benefits of position-direction decoupling are best understood by inspecting the situation in low clearance regions (Fig. 1). RRT pulls a far-away sample onto the sphere S(qfrom , δ ); only the portion of that sphere lying in Cfree is productive, so that as soon as δ exceeds the local clearance most samples are rejected. In particular, in high dimensional spaces, mass concentration phenomena [46] are such that qsampled is far away from qfrom , so that in the presence of obstacles, steering steps are likely to be unproductive. HARG instead traces a maximal-clearance ray along a random direction: every direction yields a productive segment, and qnew may land arbitrarily far from qfrom . HARL restricts that ray to length δ: its productive region coincides with that of RRT, but a collision-free qnew is more likely because the whole segment and not only its endpoint (as in RRT) is available. HARF places qnew at the fixed distance δ, recovering RRT’s step length while keeping HAR’s random direction. The challenge posed by collisions is further exacerbated by the dimensionality of 4Algorithm 1 Generic sampler yielding RRT , HARG , HARL and HARF . The four algorithms differ in the way qnew 
+
+is sampled (line 6): RRT steers a far-away sample onto S(qfrom , δ ); HARG draws uniformly on the ray up to the first collision point; HARL draws uniformly on a ray of length δ; HARF jumps a fixed step δ along a random direction. vMF refers to a von Mises-Fisher distribution on the unit sphere Sd−1. The vector ˆuRRT is the normalized vector qfrom to 
+
+qsampled .
+
+Require: Input: q0, q ∞ ∈ C free 
+
+Require: Hyper-parameters: δ > 0, κ ≥ 0, p r ∈ (0 , 1]  
+
+> 1:
+
+procedure RRT / HARL / HARF / HARG  
+
+> 2:
+
+T .Init (q0) 
+
+> 3:
+
+while True do  
+
+> 4:
+
+qsampled ← randomConfig()  
+
+> 5:
+
+qfrom ← T .nearest (qsampled ) 
+
+> 6:
+
+qnew ← ⟨ variant-specific step, see right ⟩ 
+
+> 7:
+
+//Rolling start mode: immobilization of a robot  
+
+> 8:
+
+for each robot i do  
+
+> 9:
+
+With probability 1 − pr : qi 
+
+> new
+
+← qi 
+
+> from
+> 10:
+
+end for  
+
+> 11:
+
+if [qfrom , q new ] not in Cfree then  
+
+> 12:
+
+continue  
+
+> 13:
+
+end if  
+
+> 14:
+
+T .addVertex (qnew ) 
+
+> 15:
+
+T .addEdge (qfrom → qnew ) 
+
+> 16:
+
+if CollisionFree (qnew , q ∞) then  
+
+> 17:
+
+T .addEdge (qnew → q∞) 
+
+> 18:
+
+end if  
+
+> 19:
+
+end while  
+
+> 20:
+
+end procedure 
+
+RRT , HARG , HARL and HARF match the template algorithm on the left and differ only in line 6, the sampling of qnew , which becomes, with ˆuRRT the direction from qfrom to qsampled :
+
+RRT : 
+
+> 1:
+
+qnew ← Steer (qfrom , q sampled , δ )
+
+HARG : 
+
+> 1:
+
+θ ∼ U (Sd−1) if κ = 0 else θ ∼ vMF ˆuRRT ,κ  
+
+> 2:
+
+tcol. ← TimeOfCollision (qfrom , θ ) 
+
+> 3:
+
+qnew ∼ U ([ qfrom , q from + tcol. θ]) 
+
+HARL : 
+
+> 1:
+
+θ ∼ U (Sd−1) if κ = 0 else θ ∼ vMF ˆuRRT ,κ  
+
+> 2:
+
+qnew ∼ U ([ qfrom , q from + δθ ]) 
+
+HARF : 
+
+> 1:
+
+θ ∼ U (Sd−1) if κ = 0 else θ ∼ vMF ˆuRRT ,κ  
+
+> 2:
+
+qnew ← qfrom + δθ 
+
+the problem, since a sampled configuration of N robots is considered to be in collision even if a single pair of robots collides. As shown in Experiments and consistent with the previous description, the HAR-derived methods manage to sample the free configuration space with small clearance more easily than the RRT algorithms. 
+
+## 2.4 Recovering RRT and HAR strategies by biasing the extension direction 
+
+HAR draws a random extension direction while RRT forces the move into the normalized direction ˆuRRT of qfrom to 
+
+qsampled . These strategies have pros and cons: if the space is clear, moving forward as in RRT is beneficial; but in case of small clearance, moving backward might be compulsory and the randomization in HAR helps. Both strategies are actually recovered by biasing the choice of the direction to be close to the vector ˆuRRT . This is achieved by sampling the direction on the unit sphere Sd−1 using a von Mises-Fisher distribution vMF ˆuRRT ,κ whose density reads–with κ ≥ 0 the concentration coefficient: vMF ˆuRRT ,κ (u) ∝ exp( κ u TˆuRRT ). (1) The larger κ, the more concentrated the distribution around ˆuRRT . For κ = 0 , one recovers a uniform distribution. Sampling the direction with the von Mises-Fisher distribution also yields an interesting coupling between the positional and directional biases: the former depends on the Voronoi bias, the latter depends on the former via the concentration parameter. 
+
+## 2.5 RRT improvements to HAR algorithms 
+
+Since HAR samplers just modify the way qnew is sampled, the usual improvements brought to RRT seen in Section 2.2 also apply. The Star and Quick heuristics with the BestParent and Rewire procedures yield RRT ∗ and RRT Q, and they also work for HARG , HARL and HARF , yielding for instance HARG ∗ or HARF Q. The Connect heuristic operating on two trees instead of one also works, yielding HARG-C , HARL-C and HARF-C . Combining both the Connect and Star /Quick 
+
+heuristics is possible, yielding for instance HARG ∗-C or HARL Q-C .5qnew qsampled δqfrom XXXXqsampled qnew qsampled qnew qsampled = qnew XXδS d−1Sd−1qfrom RRT Hit-and-Run global (HARG) δXXXXqfrom δS d−1Sd−1δXXXXqfrom sSd−1
+
+Hit-and-Run local (HARL) Hit-and-Run fixed (HARF) Figure 1: Steering procedures near obstacles: RRT vs HARG vs HARL vs HARF. (RRT) Only those samples qsampled in the blue region or projecting into the blue circle arcs (complementary of the orange and red ones) are productive. (Hit-and-Run global, HARG) In any direction, the ray centered at qfrom yields a productive (blue) segment on which a productive sample qnew can be obtained. (Hit-and-Run local, HARL) The ray centered at qfrom of length δ on which qnew is sampled also has a productive region identical to that of RRT. However, the likelihood to obtain a point in this region is higher than that of RRT. (Hit-and-Run fixed, HARF) The new node 
+
+qnew is chosen at distance exactly δ of qfrom in the random direction θ.Finally, the Informed heuristic ensuring that samples belong to the ellipsoidal region EL also applies. 
+
+## 2.6 Coordinating the robots: the moving fraction pr
+
+Planning N robots over C = C1 × · · · × C N requires deciding, at each extension, which robots actually move. The difficulty of a planning problem can be toned down by striking a balance between the time trial mode where robots move sequentially, and the mass start mode where all robots move concomitantly. To do so, we introduce a rolling start mode, where at each step, a robot moves with a probability pr ∈ (0 , 1] . A non-moving robot becomes a static obstacle. We note that this adjustment is in the spirit of dimensionality-reduction planners which aim at solving simpler problems first [35, 33]. In all cases every tree edge is collision-free by construction, so the final tree encodes valid joint paths. We study the impact of pr on the RRT and HAR algorithms in the experiments. 63 Instantiations: planning in SE (3) and SE (3) N
+
+We detail the primitives required to plan a system whose conformational space is a product of SE (3) .
+
+## 3.1 Rigid motions in SE (3) 
+
+Given a single rigid object, the piano mover problem consists in finding a sequence of valid rigid SE (3) transformations (translation/rotation) from a source location to a target location while avoiding obstacles [1, 2, 3]. 
+
+Configuration space. The configuration space is the space of rigid transformations C = SE (3) limited to the configurations confined in a bounding box R.For the von Mises-Fisher bias in Eq. 1, we need an inner product in the tangent space se 3 of SE (3) . Let’s recall that the tangent space is composed of couples (ω, v ) where ω is the rotation vector and v is a velocity vector. We set 
+
+⟨(ω1, v 1), (ω2, v 2)⟩se (3) := v1 · v2 + r2ω1 · ω2.
+
+Distance. Let θ the angle of q1 relative to q0 and r the radius of a characteristic object. We use the following distance [47]: 
+
+Dist (q0, q 1) = p∥T1 − T0∥2 + r2θ2. (2) In the sequel, the value r is set to 1. 
+
+Continuous path between two samples. We connect two samples q0 and q1 by interpolating the translation ( R3)and rotation ( SO (3) ) parts independently. This geodesic will be used for planning algorithms to link points. Besides, planning algorithms are looking for collision-free geodesics. The formulas for the geodesics are: 
+
+[q0, q 1] = {q(t) = ( R(t), T (t)) | t ∈ [0 , 1] } , (3) with (
+
+R(t) = Exp SO (3) (tLog SO (3) (R1R−10 )) R0,T (t) = T0 + t(T1 − T0). (4) 
+
+Remark 1. Alternatively, one may use the L1 distance Dist (q0, q 1) = ∥T1 − T0∥ + rθ , as in [48, 49]. 
+
+RRT and HAR algorithms: sampling qsampled in C. A random transformation qsampled ∈ C is needed to identify the point extended qfrom . To do so, we simply draw qsampled = ( R, T ) with R ∼ U (SO (3)) and T ∼ U (R).
+
+HAR algorithms: sampling a random direction θ. The different versions of HAR need a random direction 
+
+θ = ( ω, v ) ∈ se 3 from qfrom to define the new point added to the tree. Direction θ involves the rotation vector ω whose norm is uniform in [0 , π ] and whose direction is uniform in S2, and the vector v drawn uniformly at random in δS 2.The radius δ balances the magnitudes of both parts: in the direction θ, the robot rotates by π/ 2 on average as it moves a distance δ.Then, from qfrom and in the direction θ:• the local HARL samples a new point qnew at a random distance between 0 and δ;• the HARF samples qnew at a distance δ;• the global HARG first extends the ray to the domain boundary or to a collision point and then samples on this curved segment. 
+
+## 3.2 Rigid motions in SE (3) N
+
+Configuration space. Planning N independent robots, each parameterized on SE (3) , results in a configuration space C = SE (3) N . For a point q ∈ C , the i-th component qi represents the position and orientation of the i-th robot. The inner product on the tangent spaces of SE (3) N , composed of couples (ωi, v i)i∈{ 1,...,N }, reads as 
+
+⟨(ω1, v 1), (ω2, v 2)⟩se (3) N := X
+
+> i
+
+vi 
+
+> 1
+
+· vi 
+
+> 2
+
++ r2 ωi 
+
+> 1
+
+· ωi
+
+> 2
+
+.
+
+7Distance. The distance between q0 and q1 is defined as the quadratic average over all of their components: 
+
+Dist (q0, q 1) = 
+
+vuut 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+∥T i 
+
+> 1
+
+− T i 
+
+> 0
+
+∥2 + r2 θ2 
+
+> i
+
+. (5) with θi the angle between the two rotations Ri 
+
+> 0
+
+and Ri
+
+> 1
+
+.
+
+Continuous path between two samples. The curved segment between q0 ∈ C and q1 ∈ C is computed component-wise using the same formula as (3). 
+
+RRT and HAR algorithms: sampling qsampled in C. RRT and HAR algorithms need to sample points and directions in SE (3) N .To construct qsampled , the SE (3) procedure is applied independently to each of the N robots and for all i, the rotation of qi 
+
+> sampled
+
+is drawn from U(SO (3)) and its translation from U(R). Note in particular that the N translations are drawn independently. 
+
+HAR algorithms: sampling a random direction θ. As in the SE (3) case, the direction θ = (( ω1, v 1), . . . , (ωN , v N )) 
+
+from qfrom must be randomly drawn. All the ω are independently drawn as in the SE (3) case; the (vi) are drawn dependently within the sphere ρ S 3N −1 in dimension 3N , with ρ specified in the following Lemma 1–proof in Section S3: 
+
+Lemma. 1. Consider a random sample (T1, . . . , T N ) ∼ U (ρ S 3N −1), with ρ =
+
+q 3π
+
+> 8
+
+√N δ . One has 
+
+E [∥Ti∥] → δ when N → ∞ (6) 
+
+# 4 Experiments 
+
+## 4.1 Setup 
+
+Contenders. We compare the classical RRT variants to our algorithms HARG, HARL and HARF on several models. Our assessment is based on the two problems discussed in the Introduction, namely finding a path (Pb. 1) and finding a good/optimal path (Pb. 2). The Connect algorithms are usually a good choice for the former problem, with the latter benefiting from Quick and Informed heuristics. We discarded the Star variants which consistently showed inferior performance in terms of final path quality. All algorithms depend on the steering range value δ, and all Quick variants depend on a local range – we use the 
+
+kRRT = 50 nearest neighbors. These choices yield the final list of contenders (Table 1). Each contender is run Nr = 50 times on each model, with a fixed time limit. We also run path shortening methods for Ts = 30 s. Name Explanation 
+
+RRT-C RRT using Connect heuristic (C) 
+
+RRT Q-C RRT using Quick (Q) and Connect heuristics 
+
+HARG-C HARG algorithm using the Connect heuristic 
+
+HARG Q-C HARG using Quick and Connect heuristics 
+
+HARL-C HARL algorithm using the Connect heuristic 
+
+HARL Q-C HARL using Quick and Connect heuristics 
+
+HARF-C HARF algorithm using the Connect heuristic 
+
+HARF Q-C HARF using Quick and Connect heuristics Table 1: Contenders compared in this study. A contender is run in the mass start mode ( pr = 1 ) or rolling start mode ( pr < 1). All the algorithms also use the Informed heuristic. 8Statistics. The following statistics are reported: • The time to find the first path and the length of the final path; • The number of successful point creations per iteration. Note that this ratio is < 1 in general. If collisions were checked with infinite precision (Rmk 2), this ratio would be one for HARG. In practice, a collision detection is triggered when the segment length is < d col. , whence a value < 1 as well. • The success rate i.e. the percentage of runs that succeeded in % (NB: no number means all runs succeeded); 
+
+## 4.2 Implementation 
+
+The code is written in generic C++ and is currently being integrated into the Structural Bioinformatics Library (https://sbl.inria.fr and [50]). Instantiating this code for any configuration space requires assembling a so-called traits class providing routines for the operations mentioned in Sec. 2.1, in particular sampling configurations. See Section 3 for configuration spaces products of SE (3) .Calculations were run on a DELL precision 5480 equipped with 20 logical cores of type Intel(R) Core(TM) i9-13900H, 32 GB of RAM, and running Fedora 42. Result videos are available on https://sbl.inria.fr/data/molecular-motion-planning/ .
+
+Remark 2. As noted in Section 2.1, collision predicates compare pairwise distances between primitives against a fixed threshold dcol. . In theory, exact predicates require assumptions on the number types (rational, algebraic, etc) coding the geometry of primitives and the operations carried out [51]. Our instantiations involve rotations whence trigonometric functions–see Sec. 3. Robustness on these can be achieved using multiprecision and/or interval number types–such as MPFR or MPFI [52]. Practically, in using a dcol. much larger than numeric precision, we did not face robustness issues using double floating point number types. 
+
+## 4.3 Hyper-parameter tuning 
+
+Steering range δ. To get the best for all algorithms, we first tune the steering range δ. The Connect versions of all algorithms ( RRT-C , HARF-C , HARL-C and HARG-C , with κ = 0 ) are run Nr = 50 times for equally spaced values of δ
+
+and for each algorithm, the value of δ yielding the lowest mean time to obtain the first path is retained (Fig. 2). 
+
+Figure 2: Hyper-parameter tuning: computation time to find a path for RRT-C (right axis) and for 
+
+HARL-C (left axis), averaged over Nr = 50 runs, with respect to δ. Model used Cradle-25-coarse . For these runs, the minimum value is 1.1 seconds ( δ = 30 ) for RRT-C and 0.5 second ( δ = 40 ) for HARL-C .9The hybrid interpolating between HAR and RRT with κ. We have seen that RRT and HAR strategies are obtained as limit cases of a generic method biasing the direction of the extension (Section 2.4). This behavior is observed in practice using HARF-C with a von Mises-Fisher distribution on directions, with κ = 0 (resp. κ = ∞) giving HAR (resp. RRT) (Fig. 3). To delineate the intrinsic merits of RRT and HAR, we simply set κ = 0 in the sequel. 0 0.1 1 10 100 1000 10000 100000 ∞
+
+κ (kappa) 0.20.40.60.81.01.21.4mean time first connection (s)  HARF-C with κ
+
+HARF-C (κ = 0) 
+
+RRT-C 
+
+Figure 3: Incidence of the bias on directions κ on the time of first connection. Runs on Cradle-25-coarse 
+
+averaged over Nr = 50 repetitions. When κ → ∞ , HARF recovers RRT’s behavior. 
+
+## 4.4 Models 
+
+Our experiments are primarily focused on configuration spaces which are products of SE (3) , for which we selected/de-signed challenging cases with large number of degrees of freedom. 
+
+Models from the OMPL library. We chose the challenging model Cubicles from the OMPL library [53] to test all algorithms (Fig. 4 - row 1). In this 6-dof scenario, which corresponds to C = SE (3) , an object moves through obstacles and corridors to reach its final destination. 
+
+2D models. We design 2D planning problems by requiring N = 10 circular robots with varying radii to move in a square. With R the bounding box, this 2N -dof = 20 -dof model corresponds to C = RN . Robots must reach their final destination while avoiding the other robots and a rectangular obstacle. We consider two scenarios named 
+
+2D-small-obstacle and 2D-big-obstacle respectively with a small and large central obstacle. (Fig. 4 - rows 2 and 3). 
+
+Multi-molecular cradle models. We define a molecular cradle as a set of N rigid molecules/domains moving independently. These are 6N -dof models with configuration space C = SE (3) N . To explore a vast array of situations, we generate cradles at random using polycubes , namely a connected random domain of n cubes on the regular cubic lattice (Fig. S3). We generate such random domains in a greedy fashion. The polycube is initialized with a unit cube at the origin. A face of a cube c is termed free if c does not have a neighboring cube sharing that face. We maintain a list of cubes with free faces. Choosing at random a cube and a free face of it, we extend the polycube by adding a cube sharing that face. The process stops when n cubes have been generated. We then convert the polycube into a pseudo-molecule by replacing each cube by a ball of random radius. In practice, we create four models of increasing complexity: Cradle-9 – 54 -dof, Cradle-25-coarse – 150 -dof, 
+
+Cradle-25-tight – 150 -dof, (Fig. 5) and Cradle-64 (Fig. 7 - row 3) – 384 -dof. 10 4.5 RRT versus HAR in mass start mode 
+
+We run contenders in mass start mode ( pr = 1 ) and report results using scatter plots (Fig. 4, detailed in Fig. S4). 
+
+Piano mover and the Cubicles model. The fastest method to report a path is RRT-C (0.85 s, against 3.5–7.7 s for the HAR variants), and final path lengths are on par (e.g. 1696 for HARF Q-C , the shortest, versus 1711 for RRT Q-C ). On this example and other one-robot cases (data not shown), RRT’s fixed-δ steering is very efficient, and the move 
+
+forward strategy associated with the fixed direction ˆuRRT from qfrom towards qsampled pays off. 
+
+2D disk models. The picture reverses as soon as several robots move jointly (Fig. 4 detailed in rows 2 and 3 of Fig. S4 ). On the easier 2D-small-obstacle scenario, HARF-C finds a first path in 0.017 s against 0.51 s for RRT-C 
+
+(∼ 30 times faster) and on the harder 2D-big-obstacle scenario in 0.40 s against 42 .8 s for RRT ( ∼ 100 times faster), with consistently shorter paths. All HAR variants, by contrast, run with 100% success, exploring the space efficiently as seen with the many nodes generated by HARG and HARL. A second observation is the sensitivity of the methods to the size of the obstacle. Increasing this size results in a loss in running time (24 fold for HARF-C , 84 fold for RRT-C ), a consequence of the collision inherent to the steering procedures (Fig. 1). 
+
+Molecular cradles. The three molecular cradle models (Fig.5 detailed in rows 1 to 3 of Fig. S5) are of increasing difficulty and reveal a transition. On the easy Cradle-9 (54 -dof), all robots are moved at once: HARF-C is fastest to connect ( 0.037 s) with RRT-C coming second ( 0.049 s), path lengths being slightly shorter for HARL Q-C algorithm. On the medium Cradle-25-coarse (150 -dof), the gap opens: HARF-C reaches a path in 0.4 s against 1.13 s for RRT-C ,with also shorter paths. The tight Cradle-25-tight (150 -dof) is starting to be problematic for all methods: RRT and HARF do not find any path, and HARL and HARG, while still succeeding on every run, become slow ( 62 –179 s) within the 5 minutes wall clock budget. No algorithm was able to solve the Cradle-64 model in the mass start mode within a 10 minutes wall clock constraint, which calls for experiments in rolling start mode. 
+
+## 4.6 RRT versus HAR in rolling start mode 
+
+The dimensionality reduction/projection methods discussed in Introduction aim at lowering the dimensionality of the search space for complex planning problems. A simple measure to do so is to make a robot move with probability 
+
+pr ∈ (0 , 1] at each step, with fixed robots acting as obstacles. Experiments with the complex cases Cradle-25-coarse 
+
+and Cradle-25-tight are conducted to assess the role of pr (Fig. 6). These show that there is an optimal value of pr ,which may be equal to one for easy/tame problems. We observe that this optimal value is smaller for RRT than for HARL. Indeed, the move forward strategy associated with the direction ˆuRRT from qfrom towards qsampled is getting detrimental when crowding increases, hence the help of a lower value pr . Whereas HAR has more steps backward and can afford a larger number of moving molecules/robots. 
+
+Results with the optimal pr . Each algorithm on each model is now run with the best pr value obtained via exhaustive search (Fig. 6). Algorithms’ performances improve with pr < 1 when cluttered-ness increases, namely in 2D-big-obstacle ,
+
+Cradle-25-tight and Cradle-64 (Fig. 7). For Cradle-25-tight , a low value of pr benefits RRT and HARF which solve the Cradle-25-tight in 3.4s for 
+
+HARF-C and 5.2s for RRT-C . HARL-C and HARG-C are also an order of magnitude faster with their optimal pr value identified, as they go from a ∼ 1 − 2 minutes to ∼ 7 − 30 seconds. For the massive Cradle-64 model, HARF-C can now find a path in 17.3s with pr = 0 .35 and RRT-C in 41.6s with 
+
+pr = 0 .1. The HARL-C and HARG-C algorithms were not able to solve Cradle-64 within five minutes. Since tuning pr benefits every algorithm, the comparison at tuned pr is fair. In doing so, HARF-C remains ahead of RRT-C on all multi-robot models but Cradle-25-coarse , by a factor 1.2 to 2.4, the margin being largest on the largest instance. The decisive advantage of the HAR-based samplers is therefore one of robustness rather than of raw speed: they keep finding paths in regimes where the fixed-step steering of RRT-C collapses. 11 4.7 Observations irrespective of the start mode 
+
+This battery of tests, with pr = 1 and pr < 1, which uses models of increasing complexity, reveals a precise picture: • For single-robot problems (e.g. the OMPL Cubicles ), RRT-C performs best to find path quickly, and all variants are equally good in producing a short one. • For multi-robot problems, all algorithms can solve difficult problems, which may require tuning the fraction of moving robots pr . RRT-C at pr = 1 is rarely ideal, struggling to find a path, a consequence of mass concentration in high dimensions and of the aforementioned forward mode. HARL-C and HARG-C are the most resilient at pr = 1 ,since by construction they can take arbitrarily small productive steps and benefit from backward steps. For large instances ( 25 to 64 molecules), tuning pr pays off, and RRT-C and HARF-C then solve these hard problems quickly. In terms of general performances, HARF-C with low pr yields very quick results. As a contender, RRT-C with a suitable value of pr (generally lower than that of HARF-C ) shows satisfactory (albeit worse) performances. HARL-C 
+
+and then HARG-C with a tuned pr are slightly longer to find a path. • The Quick heuristic makes every algorithm slower but shortens the final path; the gain is significant mostly in the presence of obstacles. Otherwise, simple path-shortening routines suffice to obtain high quality paths. • The successful steering rate, which measures the probability of a steering step to generate a new sample, reflects the ability of each sampling rule to populate the free space. Algorithm HARG has the most productive iterations (it always places a node along the drawn direction, setting aside collisions for distances less than the threshold 
+
+dcol. ), HARL is very efficient as well, whereas HARF and RRT, which fix the step as d(qfrom , q new ) ≈ δ, produce fewer samples. 
+
+## 4.8 Comparison against recent contenders 
+
+While our work focuses on the benefits of decoupling positions and directions to improve RRT-like algorithms, com-ments are in order with respect to very recent work. The fiber bundle -based approach from [35] stratifies the search space into a certain number of levels to obtain lower-dimensional problems. On the pro side, the method handles complex cases, the largest ones being the single robot hypercube (100-dof; 98 levels), eight flying drones (48-dof; 8 levels), and a complex manipulator (72-dof; 3 levels). For the flying drones scenario, we compare the original results against our RRT and HAR algorithms. The original paper plans in 0.14 second (0.59 second with RRT-C ) [35]. In mass start mode, our RRT-C yields a path in 0.17 second and HARF-C requires 0.21 second. In rolling start mode, the numbers fall to 0.062 second and 0.14 second respectively. These results are comparable in the mass start mode, and better in the rolling start mode. In addition, our methods do not require any complex operation on the configuration space. The recent diffusion based approach [36] reports experiments on multi-robot systems with up to 20 robots and 
+
+40 -dof. Running times are of the order of tens of seconds. For comparable systems, our methods are one order of magnitude faster (Fig. 7). 
+
+## 4.9 Steering in high dimensional spaces: different behaviors on rotations 
+
+The difficulties faced by RRT algorithms in the mass start mode stem from the steering procedure and the value of δ.We illustrate this difficulty for our conformational spaces involving rotations. By the classical mass concentration properties in high dimensional spaces [46], the new sample qsampled is outside the ball B(qfrom , δ ) with high probability, so that qnew is retracted onto the associated sphere S(qfrom , δ ) (Fig. 1). If δ
+
+is large and the clearance low, the collision probability is high. On the other hand, if δ is small, the rotational shift is small. As an example consider an illustrative run of RRT-C for Cradle-25-tight with δ = 2 . After a 1-minute run and 217k iterations, a mere 551 nodes have been created (despite the small δ value), and all of their rotational components lie near the rotational component of the start or goal node/pose (Fig. 8). This is due to the fact that the global bounding box has dimensions 236 × 236 × 220 and therefore the steering procedure only retains a small percentage of the rotation. Indeed, the ratio δ over dist (qfrom , q sampled ) is often very small thus after the steering procedure keeping only the δ over dist (qfrom , q sampled ) part of the segment, both rotational components of qfrom and qnew become very close. This problem does not happen in low-dimensional scenarios as there is a higher chance that the sampled points are close to their nearest neighbors. 12 4.10 Failed improvements 
+
+We conclude this section by reporting variations that looked promising but did not bring any significant improvement. 
+
+Orthogonal sampling. To maximize exploration in HARG, taking rays perpendicular to the previous ones seems appealing. A sample in the tree is located on a ray which has hit an obstacle or the bounding box. Sampling a new ray in the orthogonal complement might help to slide along the obstacle. For multi-robot problems, this can be implemented in two ways: either ray 1 is perpendicular to ray 2 for some scalar product, or each center of mass of each robot in ray 2 is moving perpendicularly to its corresponding motion in ray 1.Neither of these two strategies gave any significant performance changes. 
+
+Reset frequency. The original HAR algorithm defines a Markov chain, sampling a new point from the previous one. Applying this idea to perform robot planning results in a tree which is a path, with poor overall performances (time to find a solution, and solution quality). An intermediate solution consists of following HAR for Ksteps consecutive steps, before choosing the sample to be extended with the Voronoi bias rule. However, experiments showed that using a reset at each iteration, that is Ksteps = 0 , is the best choice. 
+
+Using variable steering range in RRT. In RRT, using a fixed value δ for the steering range may not be suitable if the clearance in Cfree varies. This is particularly true for multi-robot planning, as a short distance between a single pair of robots may jeopardize the sample qnew . Sampling δ according to some distribution ( e.g. an exponential distribution) provides more slack, with small values used in regions of low clearance. However, we did not observe any global consistent improvement for multi-robot planning. 
+
+Weighting the rotational parts in r parameter. The distance metric used requires weighting the rotational part – (2), with large values of r penalizing rotations. But varying r did not yield significant improvements, so that we stuck to r = 1 .
+
+Changing rotational parts of nodes in RRT. As discussed above (Fig. 8), RRT fails for small δ because the rotational parts are not changing enough. Patching the steered points with random rotations did not help either. 
+
+# 5 Outlook 
+
+A new tier of sampling-based planners. Rapidly-exploring random trees (RRT) and Hit-and-Run (HAR) al-gorithms are powerful techniques to explore high dimensional spaces. The former has been introduced in motion planning and uses the so-called Voronoi bias to diffuse in unseen regions of the configuration space. The latter comes from optimization and numerical mathematics. It defines a Markov chain that can be used to sample the uniform measure. Our interest in combining these techniques comes from multi-robot planning, a challenging task due to the need to handle jointly fixed obstacles and moving obstacles – the robots themselves. For such cases, a large number of robots entails a high dimensional space, and RRT faces difficulties in cluttered environments, since choosing the steering distance faces conflicting constraints: a too small value makes the robots barely advance, and too large values increase the collision rate. We show that a mixed sampling strategy combining RRT and HAR (resulting in HARG, HARL or HARF algorithms) gets the best of both worlds, the former favoring the exploration of unseen regions and the latter enabling search in any possible direction, avoiding mass-concentration phenomena. Importantly, our algorithms are purely sampling-based and require trivial changes in existing sampling-based planners – they merely require primitives to sample random points and random directions. Tests on different scenarios show that RRT variants struggle with an increased dimensionality. While they are very good with a small number of robots, they are not able to produce many nodes with a large cohort of robots. In contrast, HARL and HARG algorithms are more resilient to the increase of dimensionality. 
+
+Taming down configuration space. Recent work has shown that complex planning problems could also be tackled by stratifying the configuration space prior to using classical planners on the strata. While highly effective, this approach is relatively complex as it requires designing the stratification upon determining an appropriate number of levels. For multi-robot problems, a simpler (and apparently new) way to obtain this behavior is the rolling start mode 
+
+associated with a probability pr < 1, which amounts to using randomization to decide which robots move. 13 In fact, taming down a configuration space and developing novel planners, as we do, are complementary approaches since the latter can be used on strata of the original space. More powerful planners also bear a clear advantage, namely their simplicity and genericity. 
+
+Practical matters. As a practical guideline, RRT remains an excellent and well-understood default to plan in low dimensional spaces. As the number of robots grows and the space possibly becomes cluttered, the fixed-step steering of RRT degrades and it increasingly needs a reduced moving fraction pr to make progress; the HAR-based samplers, and in particular HARF, then become markedly more effective. On the tightest instances, no sampler copes with 
+
+pr = 1 , and tuning pr benefits every algorithm. In short, we recommend using RRT for low dimensional problems, HAR (and notably HARF, possibly with tuned pr ) for the many-robots case motivating this work. 
+
+Further work. Our work opens interesting research avenues. On the theoretical side, understanding the properties of our hybrid algorithm would be extremely interesting, and would stress the critical hyper-parameters as a function of the geometry of the free space. Such questions appear challenging though, to capture the interplay between RRT and HAR. Application-wise, our planners will prove beneficial to address the multi-robot planning problem for tens of robots in cluttered environments. One particularly compelling application is the elucidation of efflux mechanisms implemented by several cell types, with applications to the design of antibiotics and anti-cancer drugs. 
+
+Acknowledgments. Pierre Alliez is acknowledged for his help to process the flying drones geometric models using AlphaWrap. This work has been supported by the French government through the 3IA Côte d’Azur Investments (ANR-23-IACL-0001), and by a grant from the French government, managed by the French National Research Agency (ANR) under the France 2030 program operated by the Inria Quadrant Programme (ANR-24-RRII-0002). Akshat Jah is acknowledged for early work on this project. 
+
+# References 
+
+[1] John Canny. The complexity of robot motion planning . MIT press, 1988. [2] Jean-Claude Latombe. Robot motion planning . Kluwer, 1991. [3] S. LaValle. Planning algorithms . Cambridge university press, 2006. [4] Lydia Kavraki and J-C Latombe. Randomized preprocessing of configuration for fast path planning. In Proceedings of the 1994 IEEE International Conference on Robotics and Automation , pages 2138–2145. IEEE, 1994. [5] Mark H Overmars, Petr Svestka, et al. A probablisitic learning approach to motion planning. 1994. [6] Steven LaValle. Rapidly-exploring random trees: A new tool for path planning. Research Report 9811 , 1998. [7] J. Kuffner and S. LaValle. RRT-connect: An efficient approach to single-query path planning. In IEEE Interna-tional Conference on Robotics and Automation , volume 2, pages 995–1001. IEEE, 2000. [8] Michel Pocchiola and Gert Vegter. The visibility complex. In Proceedings of the ninth annual symposium on Computational geometry , pages 328–337, 1993. [9] Thierry Siméon, J-P Laumond, and Carole Nissoux. Visibility-based probabilistic roadmaps for motion planning. 
+
+Advanced Robotics , 14(6):477–493, 2000. [10] Béla Bollobás. Volume estimates and rapid mixing. Flavors of geometry , 31:151–182, 1997. [11] Robert L Smith. Efficient Monte Carlo procedures for generating points uniformly distributed over bounded regions. Operations Research , 32(6):1296–1308, 1984. [12] H. Berbee, C. Boender, A. Ran, C. Scheffer, R. Smith, and J. Telgen. Hit-and-run algorithms for the identification of nonredundant linear inequalities. Mathematical Programming , 37(2):184–207, 1987. [13] R. Kannan, L. Lovász, and M. Simonovits. Random walks and an o∗(n5) volume algorithm for convex bodies. 
+
+Random Structures & Algorithms , 11(1):1–50, 1997. 14 [14] L. Lovász. Hit-and-run mixes fast. Mathematical Programming , 86(3):443–461, 1999. [15] B. Cousins and S. Vempala. A practical volume algorithm. Mathematical Programming Computation , 8(2):133– 160, 2016. [16] L. Lovász and R. Kannan. Faster mixing via average conductance. In Proceedings of the Thirty-first Annual ACM Symposium on Theory of Computing , STOC ’99, pages 282–287, New York, NY, USA, 1999. ACM. [17] A. Chevallier, F. Cazals, and P. Fearnhead. Efficient computation of the the volume of a polytope in high-dimensions using Piecewise Deterministic Markov Processes. In AISTATS , 2022. [18] Yasin Abbasi-Yadkori, Peter Bartlett, Victor Gabillon, and Alan Malek. Hit-and-run for sampling and planning in non-convex spaces. In Artificial intelligence and statistics , pages 888–895. PMLR, 2017. [19] K. Dill and S. Bromberg. Molecular driving forces: statistical thermodynamics in biology, chemistry, physics, and nanoscience . Garland Science, 2010. [20] John Jumper, Richard Evans, Alexander Pritzel, Tim Green, Michael Figurnov, Olaf Ronneberger, Kathryn Tunyasuvunakool, Russ Bates, Augustin Žídek, Anna Potapenko, Alex Bridgland, Clemens Meyer, Simon A. A. Kohl, Andrew J. Ballard, Andrew Cowie, Bernardino Romera-Paredes, Stanislav Nikolov, Rishub Jain, Jonas Adler, Trevor Back, Stig Petersen, David Reiman, Ellen Clancy, Michal Zielinski, Martin Steinegger, Michalina Pacholska, Tamas Berghammer, Sebastian Bodenstein, David Silver, Oriol Vinyals, Andrew W. Senior, Koray Kavukcuoglu, Pushmeet Kohli, and Demis Hassabis. Highly accurate protein structure prediction with AlphaFold. 
+
+Nature , 596(7873):583–589, 2021. [21] A. Schmidt, H. Xu, A. Khan, T. O’Donnell, S. Khurana, L. King, J. Manischewitz, H. Golding, P. Suphaphiphat, A. Carfi, E. Settembre, P. Dormitzer, T. Kepler, R. Zhang, A. Moody, B. Haynes, H-X. Liao, D. Shaw, and S. Harrison. Preconfiguration of the antigen-binding site during affinity maturation of a broadly neutralizing influenza virus antibody. PNAS , 110(1):264–269, 2013. [22] T. Lelièvre, G. Stoltz, and M. Rousset. Free energy computations: A mathematical perspective . World Scientific, 2010. [23] L. Jaillet, F.J. Corcho, J-J. Pérez, and J. Cortés. Randomized tree construction algorithm to explore energy landscapes. J. Comp. Chem. , 32(16):3464–3474, 2011. [24] T. O’Donnell and F. Cazals. Enhanced conformational exploration of protein loops using a global parameterization of the backbone geometry. J. Comp. Chem. , 44(11):1094–1104, 2023. [25] M. Simsir, I. Broutin, I. Mus-Veteau, and F. Cazals. Studying dynamics without explicit dynamics: a structure-based study of the export mechanism by AcrB. Proteins: structure, function, and bioinformatics , 89:259–275, 2021. [26] Patrice Koehl, Rafael Navaza, Mustafa Tekpinar, and Marc Delarue. Minactionpath2: path generation between different conformations of large macromolecular assemblies by action minimization. Nucleic Acids Research , page gkae421, 2024. [27] T. O’Donnell, V. Agashe, and F. Cazals. Geometric constraints within tripeptides and the existence of tripeptide reconstructions. J. Comp. Chem. , 44(13):1236–1249, 2023. [28] Michael Erdmann and Tomas Lozano-Perez. On multiple moving objects. Algorithmica , 2(1):477–521, 1987. [29] Jur van Den Berg, Jack Snoeyink, Ming C Lin, and Dinesh Manocha. Centralized path planning for multiple robots: Optimal decoupling into sequential plans. In Robotics: Science and systems , volume 2, pages 2–3, 2009. [30] Rahul Shome, Kiril Solovey, Andrew Dobson, Dan Halperin, and Kostas E Bekris. drrt*: Scalable and informed asymptotically-optimal multi-robot motion planning. Autonomous Robots , 44(3):443–467, 2020. [31] Glenn Wagner and Howie Choset. M*: A complete multirobot path planning algorithm with performance bounds. In 2011 IEEE/RSJ international conference on intelligent robots and systems , pages 3260–3267. IEEE, 2011. 15 [32] Kiril Solovey, Oren Salzman, and Dan Halperin. Finding a needle in an exponential haystack: Discrete rrt for exploration of implicit roadmaps in multi-robot motion planning. The International Journal of Robotics Research ,35(5):501–513, 2016. [33] Jur P Van Den Berg and Mark H Overmars. Prioritized motion planning for multiple robots. In 2005 IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 430–435. IEEE, 2005. [34] Max Barer, Guni Sharon, Roni Stern, and Ariel Felner. Suboptimal variants of the conflict-based search algorithm for the multi-agent pathfinding problem. In Proceedings of the international symposium on combinatorial Search ,volume 5, pages 19–27, 2014. [35] Andreas Orthey, Sohaib Akbar, and Marc Toussaint. Multilevel motion planning: A fiber bundle formulation. 
+
+The international journal of robotics research , 43(1):3–33, 2024. [36] Yorai Shaoul, Itamar Mishani, Shivam Vats, Jiaoyang Li, and Maxim Likhachev. Multi-robot motion planning with diffusion models. In International Conference on Learning Representations , volume 2025, pages 95791–95811, 2025. [37] Fabian Schwarzer, Mitul Saha, and J-C Latombe. Adaptive dynamic collision checking for single and multiple articulated robots in complex environments. IEEE Transactions on Robotics , 21(3):338–353, 2005. [38] Min Tang, Young J Kim, and Dinesh Manocha. C 2 a: Controlled conservative advancement for continuous collision detection of polygonal models. In 2009 IEEE International Conference on Robotics and Automation ,pages 849–854. IEEE, 2009. [39] Ming C Lin, Dinesh Manocha, and Young J Kim. Collision and proximity queries. In Handbook of discrete and computational geometry , pages 1029–1056. Chapman and Hall/CRC, 2004. [40] Min Tang, Dinesh Manocha, and Young J Kim. Hierarchical and controlled advancement for continuous collision detectionof rigid and articulated models. IEEE transactions on visualization and computer graphics , 20(5):755– 766, 2013. [41] Sertac Karaman, Matthew R Walter, Alejandro Perez, Emilio Frazzoli, and Seth Teller. Anytime motion planning using the rrt. In 2011 IEEE international conference on robotics and automation , pages 1478–1483. ieee, 2011. [42] In-Bae Jeong, Seung-Jae Lee, and Jong-Hwan Kim. Quick-rrt*: Triangular inequality-based implementation of rrt* with improved initial solution and convergence rate. Expert Systems with Applications , 123:82–90, 2019. [43] Matthew Jordan and Alejandro Perez. Optimal bidirectional rapidly-exploring random trees. 2013. [44] Jonathan D Gammell, Siddhartha S Srinivasa, and Timothy D Barfoot. Informed rrt*: Optimal sampling-based path planning focused via direct sampling of an admissible ellipsoidal heuristic. In 2014 IEEE/RSJ international conference on intelligent robots and systems , pages 2997–3004. IEEE, 2014. [45] Roland Geraerts and Mark H Overmars. Creating high-quality paths for motion planning. The international journal of robotics research , 26(8):845–863, 2007. [46] A. Blum, J. Hopcroft, and R. Kannan. Foundations of data science . Cambridge, 2020. [47] R. Brégier, F. Devernay, L. Leyrit, and J. Crowley. Defining the pose of any 3d rigid object and an associated distance. International Journal of Computer Vision , 126(6):571–596, 2018. [48] James J Kuffner. Effective sampling and distance metrics for 3d rigid body path planning. In IEEE International Conference on Robotics and Automation, 2004. Proceedings. ICRA’04. 2004 , volume 4, pages 3993–3998. IEEE, 2004. [49] Weihang Guo, Theodoros Tyrovouzis, Emiliano Flores, Clayton W. Ramsey, Zachary K. Kingston, Ioan A. Şucan, Mark Moll, and Lydia E. Kavraki. The Open Motion Planning Library 2.0, 2026. [50] F. Cazals and T. Dreyfus. The Structural Bioinformatics Library: modeling in biomolecular science and beyond. 
+
+Bioinformatics , 7(33):1–8, 2017. 16 [51] L. Kettner, K. Mehlhorn, S. Pion, S. Schirra, and C. Yap. Classroom examples of robustness problems in geometric computations. Computational Geometry , 40(1):61–78, 2008. [52] Laurent Fousse, Guillaume Hanrot, Vincent Lefèvre, Patrick Pélissier, and Paul Zimmermann. Mpfr: A multiple-precision binary floating-point library with correct rounding. 2005. [53] Ioan A Sucan, Mark Moll, and Lydia E Kavraki. The open motion planning library. IEEE Robotics & Automation Magazine , 19(4):72–82, 2012. 17 Cubicles Box 405 × 200 × 200 | dist (q0, q ∞) = 205 | δRRT = 70 , δHARF = 80 , δHARL = δHARG = 110 | 1 min runs 1700 1800 1900 2000 Final path length 10 0
+
+10 1
+
+> First path computation time (s)
+
+RRT-C HARF-C HARL-C RRT Q-C HARG-C HARF Q-C HARL Q-C HARG Q-C (94%) RRT-C HARF-C HARL-C HARG-C RRT Q-C HARF Q-C HARL Q-C HARG Q-C  (94%) 0.00.10.20.30.40.50.60.70.8
+
+> nodes / iteration
+> 0k 20k 40k 60k 80k 100k 120k
+> number of nodes
+
+2D-small-obstacle Box 100 × 100 | dist (q0, q ∞) = 45 .5 | δRRT = δHARF = δHARL = δHARG = 10 | 1 min runs 45 50 55 60 Final path length 10 −2
+
+10 −1
+
+10 0
+
+> First path computation time (s)
+
+HARF-C HARG-C HARL-C HARF Q-C HARG Q-C HARL Q-C RRT-C RRT Q-C RRT-C HARF-C HARL-C HARG-C RRT Q-C HARF Q-C HARL Q-C HARG Q-C 
+
+> 0.00.20.40.60.8
+> nodes / iteration
+> 0k 100k 200k 300k 400k 500k
+> number of nodes
+
+2D-big-obstacle Box 100 × 100 | dist (q0, q ∞) = 45 .5 | δRRT = 12 , δHARF = δHARL = δHARG = 7 | 1 min runs 60 70 80 90 100 Final path length 10 −1
+
+10 0
+
+10 1
+
+> First path computation time (s)
+
+HARF-C HARF Q-C HARG-C HARG Q-C HARL-C HARL Q-C RRT Q-C (48%) 
+
+RRT-C (48%) RRT-C  (48%) 
+
+> HARF-C HARL-C HARG-C RRT Q-C  (48%)
+> HARF Q-C HARL Q-C HARG Q-C
+> 0.00.20.40.60.8
+> nodes / iteration
+> 0k 100k 200k 300k 400k
+> number of nodes
+
+Figure 4: Results for Cubicles and the 2D models in mass start mode ( pr = 1 ), averaged over Nr = 50 
+
+runs. (Left column) The models. (Middle column) Performances of contenders from Table 1. The nearest to the bottom left corner, the better. Percentages refer to the success rate over the Nr repeats. (Right column) Successful nodes per iterations (blue) and total number of created nodes (red). 18 Cradle-9 Box 228 × 228 × 220 | dist (q0, q ∞) = 30 .0 | δRRT = δHARF = δHARL = δHARG = 15 | 1 min runs 32 34 36 38 Final path length 10 −1
+
+10 0
+
+> First path computation time (s)
+
+HARF-C RRT-C HARL-C HARF Q-C HARG-C RRT Q-C HARG Q-C HARL Q-C RRT-C HARF-C HARL-C HARG-C RRT Q-C HARF Q-C HARL Q-C HARG Q-C 
+
+> 0.20.40.60.81.0
+> nodes / iteration
+> 0k 20k 40k 60k 80k 100k
+> number of nodes
+
+Cradle-25-coarse Box 280 × 280 × 220 | dist (q0, q ∞) = 60 .3 | δHARG = 25 , δRRT = δHARF = 35 , δHARL = 40 |
+
+1 min runs 62 .5 65 .0 67 .5 70 .0 72 .5 75 .0Final path length 10 0
+
+10 1
+
+> First path computation time (s)
+
+HARF-C HARL-C HARF Q-C RRT-C HARG-C HARL Q-C RRT Q-C HARG Q-C RRT-C HARF-C HARL-C HARG-C RRT Q-C HARF Q-C HARL Q-C HARG Q-C 
+
+> 0.00.20.40.60.81.0
+> nodes / iteration
+> 0k 10k 20k 30k 40k
+> number of nodes
+
+Cradle-25-tight Box 236 × 236 × 220 | dist (q0, q ∞) = 35 .4 | δHARL = δHARG = 25 | 5 min runs 52 .5 55 .0 57 .5 60 .0 62 .5 65 .0Final path length 10 2
+
+4 × 10 1
+
+6 × 10 1
+
+2 × 10 2
+
+> First path computation time (s)
+
+HARG-C HARL-C HARG Q-C HARL Q-C HARL-C HARG-C HARL Q-C HARG Q-C 
+
+> 0.20.40.60.8
+> nodes / iteration
+> 20k 40k 60k 80k 100k 120k 140k 160k
+> number of nodes
+
+Figure 5: Results for molecular cradle models in mass start mode ( pr = 1 ), averaged over Nr = 50 runs. (Left column) The models. (Middle column) Performances of contenders from Table 1. The nearest to the bottom left corner, the better. Percentages refer to the success rate over the Nr repeats. (Right column) Successful nodes per iterations (blue) and total number of created nodes (red). 19 0.2 0.4 0.6 0.8 1.0
+
+pr
+
+12345time first connection (s)  HARL-C RRT-C 0.2 0.4 0.6 0.8 1.0
+
+pr
+
+0100 200 time first connection (s)  HARL-C RRT-C Cradle-25-coarse Cradle-25-tight 
+
+Figure 6: Incidence of the per robot moving probability pr on the time of first connection. Run on 
+
+Cradle-25-coarse (left) and Cradle-25-tight (right) averaged over Nr = 50 repetitions. 20 2D-big-obstacle Box 100 × 100 | dist (q0, q ∞) = 45 .5 | δRRT = 12 , δHARF = δHARL = δHARG = 7 | 1 min runs 55 60 65 70 75 80 Final path length 10 −1
+
+10 0
+
+10 1
+
+> First path computation time (s)
+
+HARF-C pr =1 
+
+RRT-C pr =0 .3
+
+HARF Q-C pr =1 
+
+HARG-C pr =1 
+
+RRT Q-C pr =0 .3
+
+HARG Q-C pr =1 HARL-C pr =1 
+
+HARL Q-C pr =1 RRT-C  (48%) 
+
+> RRT-C HARF-C HARL-C HARG-C RRT Q-C  (48%)
+> RRT Q-C HARF Q-C HARL Q-C HARG Q-C
+> 0.00.20.40.60.8
+> nodes / iteration
+> 0k 100k 200k 300k 400k
+> number of nodes
+
+Cradle-25-tight Box 236 × 236 × 220 | dist (q0, q ∞) = 35 .4 | δRRT = 10 , δ HARF = δHARL = δHARG = 25 | 1 min runs 50 55 60 65 Final path length 10 1
+
+10 2
+
+> First path computation time (s)
+
+HARF-C pr =0 .25 
+
+RRT-C pr =0 .25 
+
+HARL-C pr =0 .3
+
+HARF Q-C pr =0 .25 
+
+HARG-C pr =0 .4
+
+RRT Q-C pr =0 .25 
+
+HARL Q-C pr =0 .3
+
+HARG Q-C pr =0 .4RRT-C HARF-C HARL-C HARG-C RRT Q-C HARF Q-C HARL Q-C HARG Q-C 
+
+> 0.20.30.40.50.60.70.80.9
+> nodes / iteration
+> 0k 5k 10k 15k 20k 25k 30k
+> number of nodes
+
+Cradle-64 Box 224 × 224 × 224 | dist (q0, q ∞) = 72 .7 | δHARF = 45 , δ RRT = 50 | 5 min runs 140 160 180 Final path length 10 1
+
+2 × 10 1
+
+3 × 10 1
+
+4 × 10 1
+
+6 × 10 1
+
+> First path computation time (s)
+
+HARF-C pr =0 .35 
+
+RRT-C pr =0 .1RRT-C HARF-C 
+
+> 0.10.20.30.40.5
+> nodes / iteration
+> 4k 6k 8k 10k 12k 14k 16k
+> number of nodes
+
+Figure 7: Results for some cluttered models in rolling start mode (pr ∈ (0 , 1] ), averaged over Nr = 50 
+
+runs. (Left column) The models. For the Cradle-64 model, 64 molecules are aligned on a grid with shuffled initial and final positions. (Middle column) Performances of contenders from Table 1. The nearest to the bottom left corner, the better. Percentages refer to the success rate over the Nr repeats. (Right column) Successful nodes per iterations (blue) and total number of created nodes (red). 21 Figure 8: Model Cradle-25-tight : rotations of the molecule n ◦1 only after a one-minute run of RRT-C 
+
+with δ = 2 . Representing rotations with the angle-axis convention, a rotation is a point in the ball of radius π, with antipodal points on the bounding sphere being identified. The two clusters illustrate the inability of RRT-C to sample rotations outside a small neighborhood of the starting and goal points. 22 S1 RRT and HAR: illustrations 
+
+Figures S1 and S2 depict the behavior of RRT and HARL algorithms on the following toy system, which also illustrates the genericity of the algorithms since a different configuration space is used: • Consider a cradle model with N molecules; • For each molecule, consider the geodesic path between the initial and final positions defined as a parameterized curve on [0 , 1] computed by Eq. (3). • The overall configuration space is C = [0 , 1] N . Note that this corresponds to moving N robots independently; • We use the algorithms to solve the associated motion planning problem with q0 = (0 , . . . , 0) T and q∞ =(1 , . . . , 1) T.• To illustrate the paths found by the various algorithms, we project nodes, edges and the solution onto the motion space of the first two robots. 23 RRT RRT-C 
+
+RRT ∗ RRT ∗-C 
+
+RRT Q RRT Q-C 
+
+Figure S1: Molecular motions of two molecules in a cradle. The collision zone is depicted in black. We show the behavior of the 6 RRT algorithms with an exagerately reduced steering value of 2% and after 1500 iterations. The best path is shown in orange. 24 HARG HARG-C 
+
+HARG ∗-∅ HARG ∗-C 
+
+HARG Q-∅ HARG Q-C 
+
+Figure S2: As Figure S1 mutatis mutandis for HAR algorithms. 25 S2 Models 
+
+Figure S3: A random domain defined as a connected region of unit cubes – a 3D polycube. Replacing the cubes by balls yields a fictitious random molecule/domain. See also https://en.wikipedia.org/wiki/Polycube 
+
+# S3 Sampling coupled translations 
+
+Let T1, . . . , T N ∈ R3 such that (T1, . . . T N ) is sampled on S3N −1. The following proves lemma 1. 
+
+Proposition. 1. For all i, let Gi ∼ N (0 , I 3) and G = ( G1, . . . , G N ). Then Ti and Gi/∥G∥ have the same law. Proof. This is direct from the previous section as we use gaussian distributions to sample on the sphere 
+
+Proposition. 2. The following relationships hold between the Normal, χ2 and Beta distributions: 
+
+∥Gi∥2 ∼ χ2(3) X 
+
+> j̸=i
+
+∥Gj ∥2 ∼ χ2(3 N − 3) therefore ∥Gi∥2
+
+∥G∥2 ∼ Beta (1 .5, 1.5N − 1.5) 
+
+Proof. The first two come from the definition of χ2 and the last comes from the fact that X ∼ χ2(a), Y ∼ χ2(b) and 
+
+X and Y independent implies XX + Y ∼ Beta (a/ 2, b/ 2) .
+
+Proposition. 3. Using the density function of Beta law we have: 
+
+E(∥Ti∥) = 2
+
+√π
+
+Γ(1 .5N )Γ(1 .5N + 0 .5) 
+
+Proof. From Proposition 2 and 1, we have that ∥Ti∥2 ∼ Beta (α, β ) with α = 1 .5 and β = 1 .5N − 1.5. Therefore the 26 expectancy of ∥Ti∥ is a simple computation: 
+
+E(∥Ti∥) = E(p∥Ti∥2) = 1
+
+B(α, β )
+
+Z 10
+
+√x × xα−1(1 − x)β−1 dx
+
+= 1
+
+B(1 .5, 1.5N − 1.5) 
+
+Z 10
+
+x(1 − x)1.5N −2.5 dx
+
+= B(2 , 1.5N − 1.5) 
+
+B(1 .5, 1.5N − 1.5) = Γ(2)Γ(1 .5N − 1.5) Γ(1 .5N + 0 .5) Γ(1 .5N )Γ(1 .5N − 1.5)Γ(1 .5) = 2Γ(1 .5N )
+
+√πΓ(1 .5N + 0 .5) 
+
+Remark 3. Some values can be computed with some values of N :
+
+• For N = 1 : As Γ(1 .5) = √π 
+
+> 2
+
+and Γ(2) = 1 , we have E(∥T1∥) = 1 which is logical as T is just T1 thus T1 is sampled on the unit sphere of R3.
+
+• For N = 2 : we have Γ(3) = 2 and Γ(3 .5) = 15 8
+
+√π therefore E(∥Ti∥) = 32 15 π ≈ 0.68 
+
+Proposition. 4. For N → ∞ , E(∥Ti∥) ∼
+
+r 83πN 
+
+Proof. It follows from Proposition 3 and from the fact that Γ( x + a)Γ( x + b) ∼∞ xa−b.Lemma 1 follows by sampling T on ρ S 3N −1 with ρ =
+
+r 3πN 
+
+8 δ.
+
+# S4 Detailed results 
+
+27 Cubicles Box 405 × 200 × 200 | dist (q0, q ∞) = 205 | δRRT = 70 , δHARF = 80 , δHARL = δHARG = 110 | 1 min runs 
+
+Algorithm pr Time first iter. [s] Path length Successful steering per iteration Nodes 
+
+RRT-C 1 0.846 ± 0.56 1951 .6 ± 66 .4 0.062 4.0 × 10 4
+
+HARF-C 1 3.55 ± 2.4 1917 .3 ± 66 .6 0.063 3.3 × 10 4
+
+HARL-C 1 3.59 ± 1.5 1936 .7 ± 60 .6 0.206 6.7 × 10 4
+
+HARG-C 1 7.65 ± 2.7 1955 .3 ± 79 .0 0.817 1.0 × 10 5
+
+RRT Q-C 1 4.93 ± 3.1 1711 .3 ± 32 .9 0.057 4.8 × 10 3
+
+HARF Q-C 1 16 .8 ± 7.1 1696 .2 ± 39 .9 0.068 5.4 × 10 3
+
+HARL Q-C 1 20 .0 ± 7.1 1747 .7 ± 53 .5 0.213 6.8 × 10 3
+
+HARG Q-C (94%) 1 37 .7 ± 12 1837 .9 ± 67 .9 0.734 9.6 × 10 3
+
+2D-small-obstacle Box 100 × 100 | dist (q0, q ∞) = 45 .5 | δRRT = δHARF = δHARL = δHARG = 10 | 1 min runs 
+
+Algorithm pr Time first iter. [s] Path length Successful steering per iteration Nodes 
+
+HARF-C 1 0.0169 ± 0.015 49 .1 ± 3.8 0.119 1.5 × 10 5
+
+HARG-C 0.9 0.0212 ± 0.025 47 .4 ± 3.2 0.871 4.3 × 10 5
+
+HARG-C 1 0.0238 ± 0.051 46 .4 ± 1.5 0.874 4.3 × 10 5
+
+RRT-C 0.3 0.0288 ± 0.021 51 .3 ± 4.2 0.304 2.9 × 10 5
+
+HARL-C 1 0.0401 ± 0.041 48 .0 ± 2.7 0.436 2.9 × 10 5
+
+RRT-C 1 0.510 ± 0.31 56 .0 ± 6.0 0.080 1.6 × 10 5
+
+HARF Q-C 1 0.0407 ± 0.051 45 .6 ± 0.1 0.006 4.0 × 10 3
+
+RRT Q-C 0.3 0.0782 ± 0.061 46 .3 ± 2.5 0.449 1.1 × 10 5
+
+HARG Q-C 1 0.0794 ± 0.12 45 .6 ± 0.0 0.683 1.2 × 10 5
+
+HARG Q-C 0.9 0.0825 ± 0.13 45 .6 ± 0.0 0.689 1.2 × 10 5
+
+HARL Q-C 1 0.135 ± 0.13 45 .6 ± 0.0 0.165 7.1 × 10 4
+
+RRT Q-C 1 0.646 ± 0.38 51 .5 ± 5.6 0.079 8.0 × 10 4
+
+2D-big-obstacle Box 100 × 100 | dist (q0, q ∞) = 45 .5 | δRRT = 12 , δHARF = δHARL = δHARG = 7 | 1 min runs 
+
+Algorithm pr Time first iter. [s] Path length Successful steering per iteration Nodes 
+
+HARF-C 1 0.400 ± 0.36 64 .4 ± 7.4 0.109 1.2 × 10 5
+
+RRT-C 0.3 0.487 ± 0.42 66 .3 ± 8.1 0.137 1.5 × 10 5
+
+HARG-C 1 0.813 ± 0.88 61 .8 ± 6.9 0.819 3.5 × 10 5
+
+HARL-C 1 2.08 ± 1.9 70 .8 ± 10 .5 0.392 1.6 × 10 5
+
+RRT-C (48%) 1 42 .8 ± 11 86 .2 ± 19 .2 0.000 2.7 × 10 3
+
+HARF Q-C 1 0.662 ± 0.54 61 .1 ± 6.8 0.105 7.7 × 10 4
+
+RRT Q-C 0.3 1.11 ± 0.99 65 .3 ± 8.2 0.129 8.1 × 10 4
+
+HARG Q-C 1 1.92 ± 1.7 61 .3 ± 6.4 0.791 1.9 × 10 5
+
+HARL Q-C 1 4.48 ± 3.6 68 .3 ± 7.9 0.382 9.7 × 10 4
+
+RRT Q-C (48%) 1 42 .7 ± 9.4 77 .2 ± 16 .9 0.000 2.5 × 10 3
+
+Figure S4: Table results of contenders on first three models: Cubicles, 2D-small-obstacle and 
+
+2D-big-obstacle . Results averaged over 50 runs. The results for pr = 1 and the optimal pr (if different from 1) are presented and are sorted by time to get the first path. Each table is split into a Connect block and a Quick-Connect block. Bold marks the best entry of a block, underline the second; a percentage after a name is its success rate when below 100% .28 Cradle-9 Box 228 × 228 × 220 | dist (q0, q ∞) = 30 .0 | δRRT = δHARF = δHARL = δHARG = 15 | 1 min runs 
+
+Algorithm pr Time first iter. [s] Path length Successful steering per iteration Nodes 
+
+HARF-C 1 0.0366 ± 0.020 33 .1 ± 1.7 0.494 6.7 × 10 4
+
+RRT-C 1 0.0495 ± 0.030 34 .9 ± 3.8 0.424 6.1 × 10 4
+
+HARL-C 1 0.0816 ± 0.050 33 .4 ± 1.9 0.628 7.3 × 10 4
+
+HARG-C 1 0.182 ± 0.12 32 .6 ± 1.5 0.942 7.2 × 10 4
+
+HARF Q-C 1 0.158 ± 0.14 31 .9 ± 0.7 0.169 2.3 × 10 3
+
+RRT Q-C 1 0.299 ± 0.34 32 .3 ± 1.5 0.236 7.0 × 10 3
+
+HARG Q-C 1 0.523 ± 0.56 31 .8 ± 0.9 0.890 9.5 × 10 3
+
+HARL Q-C 1 0.691 ± 0.66 31 .4 ± 0.7 0.323 7.0 × 10 3
+
+Cradle-25-coarse Box 280 × 280 × 220 | dist (q0, q ∞) = 60 .3 | δHARG = 25 , δRRT = δHARF = 35 , δHARL = 40 |
+
+1 min runs 
+
+Algorithm pr Time first iter. [s] Path length Successful steering per iteration Nodes 
+
+RRT-C 0.25 0.380 ± 0.16 68 .5 ± 2.8 0.775 3.0 × 10 4
+
+HARF-C 1 0.400 ± 0.13 66 .7 ± 2.2 0.110 1.1 × 10 4
+
+HARL-C 1 0.639 ± 0.21 66 .0 ± 2.0 0.384 2.0 × 10 4
+
+RRT-C 1 1.13 ± 0.45 70 .5 ± 4.1 0.446 2.6 × 10 4
+
+HARG-C 1 1.88 ± 0.86 65 .6 ± 2.2 0.970 3.3 × 10 4
+
+HARF Q-C 1 1.11 ± 0.49 65 .3 ± 1.4 0.204 1.9 × 10 3
+
+RRT Q-C 0.25 2.86 ± 1.5 68 .4 ± 3.3 0.415 1.4 × 10 3
+
+HARL Q-C 1 4.34 ± 2.4 65 .2 ± 1.8 0.309 2.7 × 10 3
+
+RRT Q-C 1 6.78 ± 4.1 70 .5 ± 4.1 0.231 1.0 × 10 3
+
+HARG Q-C 1 8.32 ± 4.4 64 .4 ± 1.6 0.874 4.0 × 10 3
+
+Cradle-25-tight Box 236 × 236 × 220 | dist (q0, q ∞) = 35 .4 | δHARL = δHARG = 25 | 5 min runs 
+
+Algorithm pr Time first iter. [s] Path length Successful steering per iteration Nodes 
+
+HARF-C 0.25 3.43 ± 0.85 55 .8 ± 4.4 0.557 1.9 × 10 4
+
+RRT-C 0.25 5.17 ± 1.6 60 .9 ± 6.4 0.567 2.1 × 10 4
+
+HARL-C 0.3 6.99 ± 2.2 56 .6 ± 5.7 0.622 1.8 × 10 4
+
+HARG-C 0.4 32 .8 ± 10 58 .9 ± 5.2 0.751 1.8 × 10 4
+
+HARG-C 1 62 .6 ± 20 58 .3 ± 5.4 0.885 1.2 × 10 5
+
+HARL-C 1 107 ± 46 59 .4 ± 5.4 0.214 4.3 × 10 4
+
+HARF Q-C 0.25 22 .0 ± 6.4 55 .2 ± 3.7 0.333 2.4 × 10 3
+
+RRT Q-C 0.25 35 .4 ± 11 60 .8 ± 7.1 0.236 2.0 × 10 3
+
+HARL Q-C 0.3 38 .6 ± 8.5 55 .6 ± 4.9 0.337 2.9 × 10 3
+
+HARG Q-C 0.4 92 .9 ± 32 57 .5 ± 3.9 0.734 1.5 × 10 4
+
+HARG Q-C 1 134 ± 42 58 .1 ± 4.7 0.631 1.8 × 10 4
+
+HARL Q-C 1 179 ± 55 57 .5 ± 4.9 0.129 1.4 × 10 4
+
+Cradle-64 Box 224 × 224 × 224 | dist (q0, q ∞) = 72 .7 | δHARF = 45 , δ RRT = 50 | 5 min runs 
+
+Algorithm pr Time first iter. [s] Path length Successful steering per iteration Nodes 
+
+HARF-C 0.35 17 .3 ± 8.6 139 .8 ± 8.0 0.082 4.3 × 10 3
+
+RRT-C 0.1 41 .6 ± 16 172 .5 ± 17 .4 0.519 1.2 × 10 4
+
+Figure S5: Table results of contenders on molecular cradle models: Cradle-9 , Cradle-25-coarse ,
+
+Cradle-25-tight and Cradle-64 . Results averaged over 50 runs. The results for pr = 1 and the optimal pr (if different from 1) are presented and are sorted by time to get the first path. Each table is split into a Connect block and a Quick-Connect block. Bold marks the best entry of a block, underline the second; a percentage after a name is its success rate when below 100% .29 Contents 
+
+1 Introduction 1
+
+1.1 Previous work . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11.2 Contributions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21.3 Notations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+
+2 Motion planning with Hit-and-Run sampling 3
+
+2.1 General setup . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32.2 The RRT planning algorithm . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42.3 Decoupling positions and directions in RRT with HAR . . . . . . . . . . . . . . . . . . . . . . . . . . . 42.4 Recovering RRT and HAR strategies by biasing the extension direction . . . . . . . . . . . . . . . . . 52.5 RRT improvements to HAR algorithms . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 52.6 Coordinating the robots: the moving fraction pr . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+
+3 Instantiations: planning in SE (3) and SE (3) N 7
+
+3.1 Rigid motions in SE (3) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 73.2 Rigid motions in SE (3) N . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+
+4 Experiments 8
+
+4.1 Setup . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 84.2 Implementation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 94.3 Hyper-parameter tuning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 94.4 Models . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10 4.5 RRT versus HAR in mass start mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11 4.6 RRT versus HAR in rolling start mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11 4.7 Observations irrespective of the start mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12 4.8 Comparison against recent contenders . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12 4.9 Steering in high dimensional spaces: different behaviors on rotations . . . . . . . . . . . . . . . . . . . 12 4.10 Failed improvements . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13 
+
+5 Outlook 13 S1 RRT and HAR: illustrations 23 S2 Models 26 S3 Sampling coupled translations 26 S4 Detailed results 27 
+
+30

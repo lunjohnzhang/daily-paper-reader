@@ -1,0 +1,1149 @@
+Title: CC-OPI: Online Distributed Task Allocation for UAV Swarms under Communication Constraints
+
+URL Source: https://arxiv.org/pdf/2609.19208v1
+
+Published Time: Fri, 18 Sep 2026 00:03:32 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+> 1
+
+# CC-OPI: Online Distributed Task Allocation for UAV Swarms under Communication Constraints 
+
+Liu Biao and Zhang Tong 
+
+Abstract —In multi-robot missions such as post-disaster search and rescue, a short communication range fragments a swarm of Unmanned Aerial Vehicles (UAVs) into transient information islands. Under such intermittent connectivity, the prevailing “allocate-then-execute” paradigm—which requires global consen-sus before any physical movement—breaks down. This paper proposes the Communication-Constrained Online Performance Impact (CC-OPI) algorithm, an event-driven method that inter-leaves task negotiation with physical execution. CC-OPI replans only at discrete physical and topological events and integrates two further elements. The first is a pair of cost-evaluation metrics adapted to dynamic topologies—one with a spatial locality penalty that promotes regionalized operation, the other with a deadline-aware urgency term—complemented by a non-preemptive state lock that shields each UAV’s ongoing action. The second is a decentralized fault-tolerance layer that pairs version-based state synchronization with a global-time-driven emergency pool. We establish that CC-OPI terminates in finite time, free of stale-completion deadlock and of unbounded reassignment within the mission horizon. In simulations at a 250 m communication radius, CC-OPI sustains a task completion rate of about 0.80 : it leads a matched online execution of the unmodified Performance Impact (PI) and Consensus-Based Bundle Algorithm (CBBA) rules by about seven percentage points, exceeds the naively trans-ferred static baselines by roughly 20 points, and remains within several points of PI and CBBA under full connectivity. Within the tested settings, CC-OPI degrades gracefully as connectivity weakens and absorbs packet loss, terrain occlusion, and runtime task arrival. The price is more messages and some redundant travel—a deliberate trade-off of efficiency for robustness. 
+
+Index Terms —Distributed task allocation, multi-UAV systems, intermittent connectivity, communication-constrained coordina-tion, online planning, event-driven replanning, deadline-aware scheduling, multi-agent systems. 
+
+I. I NTRODUCTION 
+
+# MULTI-AGENT Systems (MASs) are increasingly cen-tral to complex, time-sensitive missions such as post-disaster search and rescue [1], [2] or automated warehouse logistics [3]. At the core of such collaborative operations lies the Single-Task, Single-Robot, Time-Extended Assignment (ST-SR-TA) problem [4], [5], in which agents autonomously construct sequential execution paths to serve spatially dis-tributed tasks under strict deadline constraints. In real-world deployments, meeting these time windows while sustaining high overall execution efficiency is often decisive for mission success. To address the inherent computational complexity of task allocation [4], distributed heuristic algorithms—most notably the Consensus-Based Bundle Algorithm (CBBA) [6] and the Performance Impact (PI) algorithm [7]—have been studied ex-tensively. These methods attain near-optimal solutions through decentralized coordination among autonomous agents. How-ever, their convergence guarantees rest on the network staying connected during negotiation—or, in the weaker dynamic-topology variants, on the union of the communication graphs over a bounded window remaining connected, so that every message eventually propagates network-wide. Accordingly, these methods typically follow a static, offline “allocate-then-execute” paradigm, in which agents reach a global consensus through multiple rounds of communication before any physical movement begins [8]. In post-disaster deployments, damaged infrastructure and limited onboard hardware often restrict the communication range of Unmanned Aerial Vehicles (UAVs) to a short distance (e.g., 250 m) [9]–[12]. As a result, the global communica-tion network is frequently fragmented into multiple dynamic “information islands” [13]. This spatial isolation creates a fundamental paradox: information can be exchanged only after UAVs physically move to reconfigure the network topology, yet such connectivity-seeking movement competes with the timely execution of tasks. The resulting execution dilemma is twofold. Prioritizing task execution alone leads to prolonged disconnection, leaving local state views outdated and causing tasks to be omitted; conversely, deviating from efficient trajec-tories to preserve connectivity incurs deadline violations. Con-sequently, applying the traditional static planning paradigm in such intermittently connected networks induces blind cross-regional movement and persistent assignment oscillation, de-grading overall system performance. Fig. 1a illustrates this predicament. To overcome these limitations, this paper proposes the Communication-Constrained Online Performance Impact (CC-OPI) algorithm, which introduces an event-driven “allocate-while-executing” online paradigm (Fig. 1b). By decoupling algorithmic consensus from continuous connectivity, CC-OPI allows UAVs to sustain implicit coordination—conflict-reducing cooperation that emerges from a spatial partitioning induced by a spatial locality penalty, without explicit message exchange—even during communication disruptions. Specifi-cally, it redefines the Insertion Performance Impact (IPI) with this penalty, which encourages the UAV swarm to adopt a regionalized operating pattern. In addition, it reformulates the Removal Performance Impact (RPI) to prioritize near-deadline tasks, and pairs it with a non-preemptive state-locking mechanism that shields each UAV’s ongoing physical action, thereby suppressing assignment oscillation when partitioned subnets merge. The main contributions of this paper are summarized as follows: arXiv:2609.19208v1 [cs.MA] 16 Sep 2026 2
+
+(a) Information islands under a short communica-tion radius Rc
+
+(b) Static “allocate-then-execute” versus CC-OPI’s online “allocate-while-executing” paradigm  
+
+> Fig. 1. Motivating scenario and paradigm comparison.
+
+1) An Online Allocation Framework for Persistent Partitioning: We carry event-driven replanning during execution—itself an established idea in asynchronous distributed allocation (Section II)—into the regime in which the network may remain partitioned throughout the mission, with no joint-connectivity guarantee. Rather than separating planning from execution as in static paradigms, the framework allows UAVs’ physical move-ment and task negotiation to proceed asynchronously and concurrently. 2) Cost-Evaluation Mechanisms Adapted to Dynamic Topologies: We design marginal performance-evaluation functions for dynamic network topologies. These func-tions center on a spatial locality penalty, retain deadline-aware urgency weighting as part of the overall scoring design, and are complemented by a non-preemptive state-locking mechanism that protects ongoing physical actions, mitigating blind cross-regional task chasing and assignment oscillation under intermittent connectivity. 3) Decentralized State Synchronization and Fault Toler-ance: We develop a decentralized state-synchronization and fault-tolerance mechanism. Building on a mono-tonic, version-based consistency protocol and a global-time-driven Emergency Pool, it averts the stale-information coordination deadlocks and task omissions that arise in fragmented networks. The remainder of this paper is organized as follows. Sec-tion II reviews related work on distributed task allocation and multi-agent coordination under communication constraints. Section III presents the system model and formally defines the optimization problem. Section IV details the core mechanisms and design of the proposed CC-OPI algorithm. Section V establishes the finite-time termination of the algorithm and its freedom from stale-completion deadlock and unbounded reassignment, together with its computational complexity. Sec-tion VI evaluates the algorithm through extensive simulation experiments. Section VII concludes the paper and outlines future research directions. II. R ELATED WORK 
+
+A. Distributed Task Allocation 
+
+Early work on multi-agent task allocation relied largely on centralized optimization [14], which achieves global optimality in principle but scales poorly and is vulnerable to single points of failure; the field has therefore shifted toward distributed coordination, in which market-based auction mechanisms are a mainstream solution [15], [16]. Among distributed auction approaches, CBBA [6] and the PI algorithm [7] are the classical baselines. CBBA couples distributed auctions with a consensus protocol: agents iteratively build task bundles from marginal scores and resolve conflicts through predefined con-sensus rules. The PI algorithm instead evaluates the marginal impact of a candidate task on an agent’s current local path, alternating inclusion and removal phases to reach a conflict-free assignment. A later extension, referred to as PI-MaxAss [17], augments PI with a two-stage rescheduling procedure that explicitly maximizes the number of assigned tasks, im-proving task coverage when the network is fully connected; more recent distributed methods further pursue this maximum-assignment objective [18]. Task allocation under temporal and ordering constraints has been systematically categorized [19], and deadline-constrained distributed assignment has been studied explicitly [20]; across this line of work, auction-based methods converge to near-optimal solutions using only local, iterative communication [21]. These algorithms do not, strictly speaking, require a com-plete communication graph: PI was evaluated on sparse local topologies such as row, star, and mesh networks [7], and the convergence theory of CBBA admits dynamic networks, provided the union of the communication graphs over a3
+
+bounded window remains connected [6]. What they share is the weaker but still demanding premise that sufficient information propagation is achieved—through joint connec-tivity or eventually reliable message delivery—within the negotiation horizon. Both analytical and experimental studies show that once communication falls below this level, the solution quality of such static auction and consensus methods degrades substantially [8], [22]. The “allocate-then-execute” paradigm, moreover, requires agents to reach a global assign-ment consensus before any physical movement, and is fragile under strict communication-range limits and frequent network partitioning: agents isolated in separate information islands may, from outdated local views, admit the same task into multiple execution paths or fail to respond to time-critical tasks altogether. 
+
+B. Task Allocation under Communication Constraints 
+
+Research on task allocation under restricted communica-tion in MASs follows two main directions. The first seeks to maintain continuous network connectivity throughout the mission [23], [24], typically by deploying dedicated commu-nication relay nodes or imposing line-of-sight and distance constraints on agent trajectories. In environments with severely limited communication radii (e.g., Rc ≤ 250 m) and complex terrain, however, enforcing continuous connectivity is costly: it restricts the physical coverage of the UAV swarm and effectively reduces high-performance rescue UAVs to mobile relays, undermining the primary mission objectives. The second direction—which this paper also adopts— relaxes continuous connectivity and instead exploits local or opportunistic communication, for example through optimized local task swaps [25] or the Delay-Tolerant Network paradigm [26]. In this setting, agents act on local, possibly stale in-formation and synchronize state only during opportunistic physical encounters. Asynchronous consensus auctions, no-tably ACBBA [27], likewise remove the synchronized-round structure and allow agents to negotiate over locally timed message exchanges; they still presume, however, that messages are eventually delivered across the network, and they do not account for the physical commitment a UAV accumu-lates while executing. These relaxed-communication strate-gies share a further fundamental limitation—their marginal performance-evaluation metrics remain “myopic” with respect to the disconnected state of the network, implicitly treating an isolated view as the global ground truth. This lack of partition awareness has two consequences. First, agents in different information islands tend to lock onto the same remote, high-value task, causing spatial conflicts and redundant deployment. Second, when disconnected subnets merge, consensus resolves conflicts using only the current numerical bids, disregarding the movement cost already invested; the resulting preemption induces persistent assignment oscillation and often causes preempted agents to miss the deadlines of alternative tasks. Recent work extends these directions along four axes. Under intermittent or unreliable links, communication-aware consensus auctions weigh the value of each exchange against its cost before transmitting [28], and dynamic allocation pro-tocols have been hardened against stale, asymmetric views of the assignment [29]. Event-triggered coordination places replanning-on-significant-change on a principled footing [30], and bundle-auction extensions replan locally when time-sensitive tasks change during a mission [31]. A third axis co-designs motion and communication, either by steering robots to restore connectivity intermittently under temporal-logic task specifications [32] or through allocation rules that themselves induce connectivity in a flying ad hoc network [33]. Afourth axis strengthens systems validation, coupling robot and network simulators [34] and carrying swarm autonomy into urban field experimentation [35]. Across these axes, however, reconciliation is still assumed to complete within bounded contact windows, or connectivity is treated as an objective the robots must actively restore; in either case the allocation scores remain decoupled from the physical commitment ac-cumulated during execution—the precise combination that the persistently partitioned regime demands. In contrast, the proposed CC-OPI framework targets the regime in which no joint-connectivity guarantee holds: the network may remain partitioned for a large fraction of the mission, the topology changes are induced by the UAVs’ own task-driven movement, and state reconciliation is there-fore opportunistic and must proceed while physical execu-tion continues. To operate in this regime, CC-OPI gives UAVs an implicit-coordination capability during communi-cation disruptions. A dynamic spatial locality penalty factor 
+
+μ guides the swarm toward regionalized operation, which discourages blind cross-regional assignment and reduces the overlapping claims that drive assignment oscillation when fragmented subnets merge. A non-preemptive state-locking mechanism complements this spatial regularization by shield-ing a UAV’s ongoing service and its final, irreversible ap-proach during opportunistic consensus. We note that spa-tial regularization, non-preemptive locking, monotone gossip, and deadline-triggered prioritization each have precedents in neighboring literatures; the contribution claimed here is their disciplined integration into a single online allocation protocol, together with the specific formulations—the fixed deploy-ment anchor and the conditional lifting of the spatial penalty for unattended emergencies—that make the combination ef-fective under persistent partitioning. A capability mapping of the cited methods across six dimensions—connectivity premise, planning–execution coupling, commitment protec-tion, completion-state dissemination, runtime task arrival, and communication pattern—is tabulated in the supplementary material; a static geographic-partition baseline representing the territory-based alternative is evaluated experimentally in Section VI. 
+
+C. Online Planning and Dynamic Adaptation 
+
+Practical deployments, particularly search and rescue, must also cope with the unpredictable emergence of new tasks (e.g., newly discovered trapped victims). A common approach in traditional distributed allocation handles such dynamics through periodic or event-triggered global replanning under a “time-freezing” abstraction, which suspends the physical movement of the entire UAV swarm until a new round of 4
+
+consensus has converged [36]. This again presumes a persis-tent, fully connected network: under partitioning, the global “pause” or “replan” signal cannot reach isolated subnets, so newly emerged time-critical tasks are overlooked or assigned in conflict. CC-OPI instead dispenses with the staged, static planning paradigm and adopts an event-driven, decentralized execution model [27], [37]: a task that emerges mid-mission is treated as an ordinary local trigger, processed with the same priority as a topology change or a task completion, without requiring network-wide suspension. We therefore use dynamically arriv-ing tasks as an additional scenario to assess robustness rather than as a core capability. III. P ROBLEM FORMULATION 
+
+A. System Model 
+
+Consider a post-disaster search and rescue scenario in which a swarm of heterogeneous UAVs is deployed to deliver critical supplies (e.g., medical kits or food) to spatially distributed trapped individuals. The set of UAVs is denoted by U =
+
+{u1, u 2, . . . , u N }, where each UAV ui ∈ U is described by the tuple: 
+
+ui ≜ ⟨type i, v i, C i, p i(t)⟩. (1) Here, type i ∈ { medicine , food } is the supply type that ui can transport; vi is its constant cruising speed; Ci is the maximum payload capacity, defined as the upper bound on the number of tasks in its execution path; and pi(t) ∈ R2 is its position at time t.The set of search and rescue tasks is denoted by T =
+
+{τ1, τ 2, . . . , τ M }, where each task τk ∈ T is described by the tuple: 
+
+τk ≜ ⟨type k, p k, s k, D k⟩. (2) Here, type k ∈ { medicine , food } is the required supply type; 
+
+pk ∈ R2 is the task location; sk is the deterministic service time required upon arrival; and Dk is the hard deadline. A task τk is completed if and only if a type-compatible UAV 
+
+ui (i.e., type i = type k) arrives at pk at a time Ai,k satisfying 
+
+Ai,k ≤ Dk, with equality counting as on time; service may finish after the deadline. Each task is served by at most one UAV: a UAV that arrives at a task already completed, or under service by a peer, abandons it, so no task is served concurrently or repeatedly. 
+
+B. Distance-Dependent Communication Network 
+
+In post-disaster environments, establishing and maintain-ing a persistent, fully connected communication backbone is generally impractical because of the destruction of ground infrastructure and the limited transmission power of mobile UAVs. The UAV swarm must therefore rely on opportunis-tic short-range peer-to-peer communication links. We model this dynamic topology as a time-varying undirected graph 
+
+G(t) = ( U, E(t)) , where U is the set of UAVs and E(t) is the set of active communication edges at time t.A communication link between two UAVs is determined by their spatial proximity. Specifically, a communication edge 
+
+eij (t) ∈ E (t) exists between UAVs ui and uj if and only if their Euclidean distance does not exceed the maximum communication radius Rc:
+
+E(t) = {eij (t) | ∥ pi(t) − pj (t)∥ ≤ Rc, ∀ui, u j ∈ U , i ̸ = j},
+
+(3) where Rc is a hardware-specific constant representing the physical limit of reliable data transmission. Because the operational workspace is large relative to the communication radius Rc, the graph G(t) is typically sparse and frequently disconnected throughout task execution, par-titioning the UAV swarm into disjoint information islands. Global synchronization is therefore infeasible [26], and each UAV ui must maintain an independent local state view Si(t),which is subject to information lag and may deviate from the true global state, especially regarding UAVs and tasks in remote subgraphs. 
+
+C. Task Execution Kinematics 
+
+Each UAV ui maintains an ordered execution path Pi =[τi, 1, τ i, 2, . . . , τ i, |Pi|] ⊆ T , subject to the payload capacity constraint |Pi| ≤ Ci. This ordered structure couples the UAV’s spatial trajectory with its temporal schedule. Execution timing is governed by the estimated arrival times of the tasks along the path. Evaluated at the current physical time t, the estimated arrival time Ai,k of UAV ui at the k-th task τi,k in its path Pi is computed recursively. For the first task in the path ( k = 1 ), the arrival time depends on the current position pi(t) of the UAV and its constant cruising speed vi:
+
+Ai, 1 = t + ∥pi(t) − pτi, 1 ∥
+
+vi
+
+, (4) where pτi, 1 denotes the position of task τi, 1. For any sub-sequent task ( k > 1), the arrival time is the sum of the arrival time at the preceding task, its deterministic service time 
+
+sτi,k −1 , and the flight time between the two successive task locations: 
+
+Ai,k = Ai,k −1 + sτi,k −1 + ∥pτi,k −1 − pτi,k ∥
+
+vi
+
+. (5) Because rescue operations are time-critical, deadline satis-faction is mandatory. A path Pi is feasible if and only if the UAV arrives no later than the hard deadline of every assigned task: 
+
+Ai,k ≤ Dτi,k , ∀τi,k ∈ Pi. (6) Any path that violates this condition is treated as infeasible during allocation. 
+
+D. Optimization Objective and Challenge 
+
+Assuming a centralized controller with global knowledge of all UAVs and tasks, the task allocation problem can be cast as a lexicographic multi-objective optimization. The primary ob-jective maximizes the number of assigned tasks [17], while the secondary objective improves overall operational efficiency. Let xi,k ∈ { 0, 1} be a binary decision variable, where xi,k = 1 5
+
+if task τk is assigned to UAV ui, and xi,k = 0 otherwise. The global optimization objective is defined as: lex min  
+
+> X
+
+[−F 1(X), F2(X)] (7) subject to: 
+
+> N
+
+X
+
+> i=1
+
+xi,k ≤ 1, ∀τk ∈ T , (8) 
+
+|Pi| ≤ Ci, ∀ui ∈ U , (9) 
+
+xi,k = 1 ⇒ type i = type k, ∀ui ∈ U , τ k ∈ T , (10) 
+
+xi,k = 1 ⇒ Ai,k ≤ Dk, ∀ui ∈ U , τ k ∈ T , (11) where F1 = PNi=1 
+
+PMk=1 xi,k denotes the total number of assigned tasks—each guaranteed to be completed on time by the deadline constraint—and F2 = PNi=1 
+
+P  
+
+> τk∈Pi
+
+Ai,k 
+
+denotes the MinSum objective [7], i.e., the aggregate arrival time over all assigned tasks. However, under the communication limitations described in Section III-B, this centralized optimum is unattainable in practice. Traditional distributed heuristics (e.g., CBBA [6] and PI [7]) require the topology graph G(t) to remain connected, or at least sufficiently periodically connected, to guarantee global state convergence; under the fragmentation described above, static consensus cannot achieve network-wide synchronization, and the inconsistent local views Si(t) lead to conflicting assignments or omitted tasks. This dilemma is the primary motivation for the CC-OPI algorithm: rather than pursuing a static global optimum, we develop a fully decentralized, event-driven online mechanism. By allowing UAVs to evaluate and synchronize their assign-ment states concurrently with physical execution, CC-OPI seeks to approximate the global optimum despite persistent and unpredictable communication disruptions. Two clarifications connect this formulation to the evaluation in Section VI. First, the lexicographic objective is a centralized 
+
+reference objective rather than a quantity any UAV optimizes directly: CC-OPI optimizes local marginal surrogates of F1
+
+and F2 (Section IV), and under stale views two partitions may transiently assign the same task, so the number of locally assigned feasible tasks need not equal the number of tasks uniquely completed. The empirical counterpart of F1
+
+is therefore the realized task completion rate—the fraction of tasks reached by their deadline and served exactly once, uniqueness following from the single-service rule above and completion knowledge spreading through the synchronization layer of Section IV. Second, a task that no type-compatible UAV could reach in time even by direct flight admits no feasible assignment under the deadline constraint; such tasks are excluded from the completion-rate denominator, and dy-namically arriving tasks, evaluated from the swarm state at their arrival, are treated by the same rule (Section VI). IV. T HE CC-OPI A LGORITHM 
+
+To address the communication limitations and pursue the optimization objectives established in Section III, this sec-tion introduces the CC-OPI algorithm. CC-OPI restructures the task allocation process, replacing the traditional static  
+
+> Fig. 2. The CC-OPI architecture at a single UAV.
+
+paradigm with an event-driven online execution model in which task evaluation and state synchronization are trig-gered by discrete physical and topological changes rather than by synchronous iteration. By reformulating the marginal performance-evaluation metrics and adding a decentralized fault-tolerance mechanism, CC-OPI allows UAVs to approxi-mate the global optimization objectives through local interac-tion and implicit coordination, even under persistent commu-nication disruptions. 
+
+A. Event-Driven Online Execution Paradigm 
+
+Traditional distributed task allocation relies on network-wide information propagation to reach the global consensus that drives each algorithm iteration. In networks fragmented by communication constraints, this reliance leaves each UAV with local or outdated information, producing cascading iteration errors and, ultimately, allocation failures. To avoid this, CC-OPI adopts an asynchronous, event-driven architecture that decouples the physical dynamics of the UAVs from the ne-gotiation process. Under this paradigm, physical execution (e.g., flying toward a target or performing a rescue) is never suspended to wait for network synchronization. Instead, each UAV continuously follows its locally maintained execution path and replans only when a specific local event occurs. Fig. 2 depicts this architecture at a single UAV. To limit computation and communication overhead during prolonged isolation, the core evaluation engine of CC-OPI remains dormant by default and is awakened only by one of three physical or temporal triggers:  
+
+> •
+
+Topology Change Event : triggered when relative motion among UAVs changes the local neighbor set, i.e., when a neighbor enters or leaves the communication radius Rc.It opportunistically activates local state synchronization and conflict resolution between previously disconnected subnets.  
+
+> •
+
+Task Completion Event : activated when a UAV finishes the service phase of a task or, upon arrival, physically 6
+
+confirms that the task has already been served. It frees the UAV’s capacity, moves the task into the locally confirmed completed set, and prompts the UAV to evaluate new candidate tasks from the unallocated pool.  
+
+> •
+
+Heartbeat Event : triggered periodically at a low, fixed frequency by the passage of physical time. It scans the temporal state (e.g., the remaining time window) of every uncompleted task in the UAV’s view, identifying tasks that approach their hard deadlines so that timely emergency intervention is possible. By restricting algorithm activation to these explicit events, CC-OPI consumes computation and communica-tion resources—the latter measured as discrete broadcast messages—only during meaningful state transitions, which suits operation under intermittent connectivity. Algorithm 1 summarizes the per-UAV execution flow. Each wake-up runs a four-phase pipeline—event handling, con-sensus, removal, and inclusion—in which no phase iterates to a fixed point, a property that underpins the bounded per-invocation cost established in Section V. The cost-evaluation metrics and fault-tolerance mechanisms invoked by the pipeline are detailed in the remainder of this section. 
+
+B. Spatial-Aware Dynamic IPI Evaluation 
+
+In the standard PI framework, the inclusion of a new task is evaluated by its IPI [7]. Let Pi ⊕n τk denote the insertion of task τk at the n-th position of UAV ui’s execution path 
+
+Pi. The raw IPI, IP I raw (τk), is the minimum objective cost increment over all insertion positions that satisfy the time-window constraints: 
+
+IP I raw (τk) = min  
+
+> n
+
+[F2(Pi ⊕n τk) − F 2(Pi)] , (12) where F2(·) is the execution cost function (the MinSum objective evaluated at the current physical time). Applying IP I raw (τk) directly in fragmented networks, however, has a clear limitation: without global state infor-mation, UAVs in disconnected subnets bid greedily on the same remote, high-value tasks, producing spatial conflicts and wasted travel once the subnets reconnect and consensus is triggered. To suppress such blind cross-regional movement, CC-OPI introduces a spatial locality penalty factor μ(τk) that gives UAVs an implicit-coordination capability. The factor scales the insertion cost according to how far a candidate task lies from the UAV’s initial spatial anchor pi,init :
+
+μ(τk) = 
+
+(1, unattended emergency task, 
+
+1 + λ · ¯d(τk)γ , otherwise, (13) where ¯d(τk) = ∥pτk −pi,init ∥ 
+
+> Dmap
+
+is the Euclidean distance normal-ized by the map diagonal Dmap , and the parameters λ > 0
+
+and γ ≥ 1 control the strength and growth rate of the penalty, respectively. The anchor is fixed at each UAV’s deployment position rather than its current location: a fixed anchor grants every UAV a stable spatial territory, whereas an anchor that drifted with the UAV would continually re-center the low-cost region on its current location and thus fail to curb long-range 
+
+Algorithm 1 CC-OPI Online Execution at UAV ui.
+
+Require: execution path Pi ← [ ] ; score, assignment, and logical-time vectors; completed set Ci ← ∅ with version Vi ← 0;
+
+Emergency Pool ← ∅  
+
+> 1:
+
+for each physical frame of duration ∆t do  
+
+> 2:
+
+advance the physical state machine: fly toward the head of Pi,continue service, or idle  
+
+> 3:
+
+collect the local events E fired this frame: topology change, task completion, heartbeat, or new-task announcement (when runtime task arrival is enabled)  
+
+> 4:
+
+broadcast the local state to neighbors within Rc if E̸ = ∅ or the state changed since the last broadcast  
+
+> 5:
+
+if E̸ = ∅ or a neighbor message arrived then  
+
+> 6:
+
+Phase 1 (event handling):  
+
+> 7:
+
+add each task completed by ui, or observed completed upon arrival, to Ci; advance Vi; evict members of Ci from Pi 
+
+> 8:
+
+if heartbeat ∈ E then  
+
+> 9:
+
+place every uncompleted task with 0 < t rem (τk ) <Temergency in the Emergency Pool  
+
+> 10:
+
+end if  
+
+> 11:
+
+Phase 2 (consensus):  
+
+> 12:
+
+for each received message do  
+
+> 13:
+
+merge the sender’s completions missing from Ci, advance 
+
+Vi, and evict the merged tasks from Pi 
+
+> 14:
+
+resolve task ownership by the standard PI consensus rules [6], [7], skipping tasks in Ci 
+
+> 15:
+
+end for  
+
+> 16:
+
+Phase 3 (removal):  
+
+> 17:
+
+for each τk ∈ Pi whose consensus owner is no longer ui
+
+do  
+
+> 18:
+
+if τk ∈ Ωlock then  
+
+> 19:
+
+reclaim ownership of τk 
+
+> 20:
+
+else if RP I raw (τk ) exceeds the winning consensus score 
+
+then  
+
+> 21:
+
+remove τk from Pi 
+
+> 22:
+
+else  
+
+> 23:
+
+retain τk and reassert ownership  
+
+> 24:
+
+end if  
+
+> 25:
+
+end for  
+
+> 26:
+
+Phase 4 (inclusion):  
+
+> 27:
+
+while |Pi| < C i do  
+
+> 28:
+
+for each type-compatible candidate τk /∈ Pi ∪ C i,compute IP I dynamic (τk ) over the deadline-feasible in-sertion positions, never ahead of a locked head; a flagged unattended task is exempt from the spatial penalty (μ(τk ) = 1 ) 
+
+> 29:
+
+let the gain of τk be RP I global (τk ) − IP I dynamic (τk ),adding Abonus to RP I global (τk ) first if τk is flagged and unattended  
+
+> 30:
+
+insert the candidate with the largest positive gain at its best position; break if no gain is positive  
+
+> 31:
+
+end while  
+
+> 32:
+
+update RP I ef f (τk ) for every τk ∈ Pi and write it into the score vector  
+
+> 33:
+
+end if  
+
+> 34:
+
+end for 
+
+roaming. The first case lifts the penalty entirely for a task that has been flagged as time-critical and left unattended; this exemption, rather than any change to the task’s bid, is the mechanism that permits a UAV to cross regions for a rescue, and its precise condition is given with the emergency-rescue protocol in Section IV-D2. The normalized anchor distance is speed-agnostic: the same ¯d(τk) corresponds to different flight times for the two cruising speeds, a known simplification that we retain for uniformity across the heterogeneous swarm. 7
+
+The fixed anchor likewise presumes a dispersed deployment: if the initial positions are clustered, or unrelated to the task geography, the induced territories overlap and the penalty loses its partitioning effect—a stress case we do not evaluate and leave to future work. The spatial-aware dynamic IPI used in CC-OPI is then: 
+
+IP I dynamic (τk) = IP I raw (τk) × μ(τk). (14) When a UAV is disconnected from the global network, 
+
+μ(τk) raises the perceived cost of distant assignments and thus discourages the UAV from claiming remote tasks. This constrains each UAV’s effective operating radius and leads the swarm to self-organize into a regionalized operating pattern without explicit communication. Because each UAV concen-trates on its local vicinity, overlapping claims become less likely, and fewer assignment collisions remain to be resolved once communication is restored. 
+
+C. Urgency-Aware Dynamic RPI 
+
+Complementing task inclusion, the standard PI framework uses the RPI [7] to quantify the marginal contribution of an allocated task to a UAV’s execution path. For a task τk already in Pi, the raw RPI, RP I raw (τk), is the reduction in objective cost when the task is removed: 
+
+RP I raw (τk) = F2(Pi) − F 2(Pi \ τk). (15) In traditional consensus protocols, conflicts that arise when subnets reconnect are resolved by comparing the RP I raw 
+
+of competing UAVs. Once execution and allocation proceed concurrently, this purely cost-based comparison overlooks two factors and can cause assignment oscillation. First, it disre-gards physical commitment: a UAV in its final approach to a target, or already serving it, may lose ownership to a neigh-bor with a marginally lower instantaneous bid, interrupting an effectively irreversible action and wasting the committed travel. Second, it disregards temporal urgency: a task near its deadline is treated no differently from a non-urgent one, so it may be preempted by a competitor with a slightly lower bid and subsequently miss its time window. To address both factors and stabilize assignments during reconnection, CC-OPI defines the effective RPI, RP I ef f (τk),as a piecewise function: 
+
+RP I ef f (τk) = 
+
+
+
+−∞ , if τk ∈ Ωlock ,
+
++∞, if tslack ≤ 0,RP I raw (τk) − ρurgency , otherwise .
+
+(16) Here, Ωlock is the set of tasks granted non-preemptive immu-nity: if a UAV is actively serving the task at the head of its path, or is approaching that head task with remaining distance below a threshold dlock (e.g., 50 m), the task is hard-locked to preserve the continuity of the ongoing physical motion. An effective RPI of −∞ is the strongest possible retention bid, so a locked task cannot be preempted in consensus; this protects the irreversible final approach and the in-progress service from disruption. Conversely, if a local evaluation determines that a task will inevitably miss its time window— that is, its remaining time slack tslack = Dk − Ai,k satisfies 
+
+tslack ≤ 0—the UAV broadcasts an RPI of +∞ to signal that it is abandoning ownership. For any task that is neither locked nor certain to miss its deadline, the effective RPI adjusts the raw value by an urgency penalty ρurgency that prioritizes tasks close to their deadline. Under a cost-minimization objective such as MinSum, a lower RPI represents a stronger retention bid, so subtracting ρurgency 
+
+makes a more urgent task harder for neighbors to preempt. Let 
+
+tsaf e be a safety threshold on the remaining slack. The penalty is defined as: 
+
+ρurgency =
+
+(
+
+β ×
+
+ tsaf e −tslack 
+
+> tslack
+
+κ
+
+, if 0 < t slack < t saf e ,
+
+0, if tslack ≥ tsaf e ,
+
+(17) where β > 0 scales the magnitude of the penalty and 
+
+κ ≥ 1 controls how sharply it grows as tslack → 0. When 
+
+tslack ≥ tsaf e , the task is not yet time-critical and incurs no penalty; once tslack drops below tsaf e , ρurgency rises steeply, progressively shielding the near-deadline task from reassignment. 
+
+D. Decentralized State Synchronization and Emergency Res-cue 
+
+In fragmented networks, stale information is a primary cause of coordination failure. Disconnected communication sub-graphs may persist for long periods, producing large discrep-ancies in how UAVs perceive global task progress. To main-tain eventual consistency without a centralized database, CC-OPI combines a version-based completion-synchronization mechanism with a global-time-driven emergency-rescue pro-tocol. The fault tolerance provided at this layer is state reconciliation—recovery from inconsistent ownership and completion views—rather than tolerance of vehicle hardware failures, which we do not model. 
+
+1) Version-Based Completion Synchronization: To prevent a UAV from pursuing a task already completed by peers in other partitions—a situation that can induce coordina-tion deadlock—each UAV ui maintains a locally confirmed completed-task set Ci and a monotonically increasing version number Vi. A task enters Ci locally when ui completes it, or when ui arrives at the task location and physically observes that it has been served. When a Topology Change Event brings UAVs ui and uj into communication range, each merges the completions it has not yet recorded, Ci ← C i∪C j , and advances its version counter by the number of newly recorded tasks. The merge is driven by set content rather than by comparing version numbers across UAVs—local counters are not mutu-ally ordered, so a version-gated merge could stall between UAVs holding equal versions but different sets; the version number instead acts as a local change counter that triggers the rebroadcast of the updated state. Each broadcast carries the UAV’s full completed set—the scheme is thus a versioned full-state gossip with a monotone merge, not a delta transmission— and completion information propagates through opportunistic encounters in the manner of an epidemic protocol [13], [38]. 8
+
+Any task in Ci is removed from the UAV’s execution path and excluded from the subsequent inclusion phase, which purges obsolete assignments and resolves deadlocks caused by stale information. 
+
+2) Emergency Pool and Attractiveness Bonus: Beyond con-sistency, the system must mitigate the risk of task omission caused by spatial regionalization. Driven by the Heartbeat Event , each UAV periodically scans the temporal state of every uncompleted task in its local view using the objective remain-ing time trem (τk) = Dk − t, where t is the current physical time. Unlike the UAV-specific slack tslack = Dk − Ai,k ,this quantity is identical across all UAVs, so they agree on which tasks are at risk. If 0 < trem (τk) < Temergency ,the task is flagged and placed in a local Emergency Pool .This agreement presupposes a globally known task catalog and a shared mission clock—assumptions stated explicitly in Section VI; since both the heartbeat period and the deadline scale exceed realistic time-synchronization errors by orders of magnitude, a bounded clock skew does not alter which tasks are flagged. A task in the Emergency Pool that is unattended —either unassigned or abandoned by its previous owner (signaled by a broadcast RP I ef f = + ∞)—triggers a two-part response that suspends the spatial regionalization for that task alone. First, the spatial locality penalty is lifted. As defined in Sec-tion IV-B, the candidate’s penalty factor is set to μ(τk) = 1 ,so its dynamic insertion cost reduces to IP I dynamic (τk) = 
+
+IP I raw (τk) and is evaluated on its true merit rather than inflated by distance. This exemption is the primary mechanism that allows a UAV with spare capacity to leave its region and perform a cross-regional rescue: the geographic barrier that μ(τk) erects in the normal case is precisely what would otherwise cause a distant emergency task to be neglected. Second, the task’s priority is raised during inclusion. The algorithm adds a large positive constant Abonus to its value in the global consensus vector, RP I global (τk). Recall that the inclusion phase adopts candidates that maximize the gain RP I global (τk) − IP I dynamic (τk), so a higher RP I global 
+
+makes a task more attractive to adopt—the complement of the consensus phase, where a lower RPI denotes a stronger claim to retain a task already held. The bonus is applied as 
+
+RP I global (τk) ← RP I global (τk) + Abonus , (18) which promotes the flagged task in the inclusion ranking when a UAV’s capacity is contested. It acts as a soft priority margin whose exact magnitude is immaterial provided it is large enough to favor the flagged task, a property examined in Section VI-D. Together, the exemption and the bonus lead UAVs with spare capacity to rescue tasks under severe time pressure, improving the overall task completion rate. V. T HEORETICAL ANALYSIS 
+
+A. Finite-Time Termination 
+
+Classical convergence guarantees for distributed allocation methods such as CBBA and PI [6], [7] rest on two premises: the task scores are static constants, and the communication net-work remains sufficiently connected throughout negotiation, mirroring the connectivity conditions under which consensus dynamics over switching topologies are known to converge [39]. CC-OPI satisfies neither. Its effective scores vary with the UAVs’ physical positions and the elapsed time, and its topology is intermittently connected and may fragment into isolated components. We therefore establish finite-time termi-nation together with deadlock- and livelock-freedom , rather than convergence to a global optimum, which is unattainable under persistent partitioning. Concretely, three layered facts are proved: each solver invocation halts after a bounded amount of work (Lemma 1); the mission performs finitely many operations and terminates within a bounded horizon (Theorem 1); and, within that horizon, no stale-completion deadlock and no unbounded reassignment sequence occur (Corollaries 1 and 2). We do not claim that the assignment reaches a network-wide fixed point before the task deadlines; under persistent partitioning, no algorithm can guarantee this. The analysis requires no assumption on the marginal-gain structure of the score functions. 
+
+Assumption 1: The following standing conditions hold throughout: (A1) The number of UAVs N and the number of tasks M are finite. (A2) Each cruising speed is bounded below, vi ≥ vmin > 0;each service time sk and each capacity Ci is finite. (A3) Each deadline Dk is finite. (A4) The lock distance satisfies dlock > 0, and physical time advances in fixed steps ∆t > 0.(A5) Ties in the consensus rules are broken by a fixed total order on the UAV indices. 
+
+Definition 1: A task is live at time t if it is neither completed nor expired, where a task is expired once t > D k. The system is in a terminal state if every task is completed or expired and every UAV is idle with an empty path. The potential Φ( t)
+
+denotes the number of live tasks, so that Φ( t) ∈ { 0, 1, . . . , M }.A coordination deadlock is the indefinite holding or pursuit of an already-completed task, sustained by stale completion information; a reassignment livelock is an unbounded sequence of ownership transfers of the same task within the mission. We recall from Section IV that a task belongs to the lock set 
+
+Ωlock when it is the head of its owner’s path and the owner is serving it or moving toward it with remaining distance below 
+
+dlock , in which case its effective removal score is RP I ef f =
+
+−∞ .
+
+Lemma 1 (Bounded computation per invocation): Each wake-up of the CC-OPI online solver processes the pending events and then executes the consensus, removal, and inclusion phases of Section IV exactly once, halting after a number of operations that is finite and polynomial in N , M , and Ci. The explicit bound is given in Section V-B. 
+
+Proof: No phase is iterated to a fixed point. Event han-dling performs a single pass over the task set; the consensus phase performs a single pass over the received neighbor messages, scanning the task set once per message; the removal phase performs a single pass over the current path, whose length is at most Ci; and the inclusion phase admits at most Ci
+
+tasks, each admission requiring a scan of at most M candidates over at most Ci insertion positions. Each phase thus processes 9
+
+a finite set a bounded number of times, so the invocation performs finitely many operations and returns. 
+
+Lemma 2 (Monotone confirmed completion): For each UAV 
+
+ui, the locally confirmed completed set Ci(t) is non-decreasing in t and satisfies |C i(t)| ≤ M .
+
+Proof: The set Ci is modified only by union: with a task completed by ui or observed completed upon arrival, or with the previously unrecorded elements of a neighbor’s completed set during a topology-change synchronization. No element is ever removed, so |C i| is non-decreasing; the bound |C i| ≤ M
+
+follows from (A1). 
+
+Corollary 1 (Deadlock-freedom within a component): 
+
+Within any connected component whose members remain connected until the completed-set synchronization finishes, no completed task is re-included by its members; hence no co-ordination deadlock arises from stale completion information inside such a component. 
+
+Proof sketch: The completion fact propagates mono-tonically (Lemma 2) to every member that remains in the component within finitely many synchronization rounds—and, after a split, along any later temporal contact path (the gossip semantics of Section IV)—whereupon each holder evicts the task and permanently excludes it from the inclusion phase. The complete proof is given in the supplementary material. 
+
+Lemma 3 (Eventual commitment): Let ui move toward its primary target τ , the head of its path. Once the remaining distance falls below dlock , τ ∈ Ωlock and RP I ef f (τ ) = −∞ ;thereafter τ is neither preempted through consensus nor dis-placed from the head of the path. The task τ then leaves the path of ui within dlock /v min + sτ , either served by ui or, if another UAV is already serving it, dropped by ui upon arrival. Moreover, if τ is deadline-feasible at the instant it is locked, this resolution is an on-time completion by exactly one UAV. 
+
+Proof sketch: A locked task carries the strongest possible retention bid ( RP I ef f = −∞ ), is reclaimed rather than released by the removal phase, and cannot be displaced from the head of the path by insertion, so it remains the head until physically resolved; resolution within dlock /v min + sτ
+
+follows from the bounded remaining distance and the non-interruptible service. The complete proof, including the treat-ment of concurrent locking and of heads that are already deadline-infeasible when locked, is given in the supplementary material. 
+
+Theorem 1 (Finite-time termination): Under Assumption 1, CC-OPI reaches a terminal state within finite physical time and performs finitely many operations. Recalling the map diagonal 
+
+Dmap from Section IV, the termination time satisfies 
+
+Tstop ≤ Tmax := max  
+
+> k
+
+Dk +
+
+
+
+max  
+
+> i
+
+Ci
+
+ Dmap 
+
+vmin 
+
++ max  
+
+> k
+
+sk
+
+
+
+.
+
+(19) 
+
+Proof sketch: (i) Once t > max k Dk no task is live, so the inclusion phase admits nothing and each UAV merely drains its path of length at most max i Ci, each head resolving within Dmap /v min + max k sk (Lemma 3), which yields (19). 
+
+(ii) By (A4) the number of frames is at most Tmax /∆t, and each wake-up is bounded by Lemma 1. (iii) Resolution is per-manent, so Φ( t) is non-increasing; Corollary 1 precludes stale-completion deadlock, and Lemma 3 ensures that committed progress is resolved rather than reversed. The complete proof is given in the supplementary material. The horizon bound (19) follows from the finite deadlines to-gether with the bounded time to drain each path; the substance of Theorem 1 lies in parts (ii) and (iii), which guarantee that within this horizon the algorithm performs only finitely many operations and makes monotone progress toward termination, rather than expending the horizon on unbounded negotiation or reassignment oscillation. 
+
+Corollary 2 (Deadlock- and livelock-freedom): Within the execution horizon of Theorem 1, CC-OPI admits neither co-ordination deadlock arising from stale completion information nor an unbounded reassignment sequence. 
+
+Proof sketch: Deadlock-freedom follows from Corol-lary 1 together with Remark 1; livelock-freedom follows because the wake-up budget over [0 , T max ] is finite (The-orem 1), each wake-up modifies a path by a bounded amount (Lemma 1), and a locked commitment is irreversible (Lemma 3). The complete proof is given in the supplementary material. 
+
+Remark 1 (Scope of the guarantee): The guarantee estab-lished here is finite-time termination together with deadlock-and livelock-freedom; it is not convergence to a global op-timum, which is unattainable under persistent partitioning. In particular, two UAVs in disconnected components may transiently hold the same task; such a conflict is resolved by the consensus rules once the components merge. Components that never regain contact cannot resolve such a conflict— an impossibility of coordination without any communication opportunity, not a deficiency of the algorithm. 
+
+B. Complexity Analysis 
+
+We now quantify the per-UAV computational, communi-cation, and storage costs of CC-OPI. Let N be the number of UAVs, M the number of tasks, and C := max i Ci the maximum path length, which is bounded by the payload capacity. A central property of the event-driven design is that these costs are incurred only at discrete wake-ups, rather than continuously. 
+
+1) Computational Complexity: Consider a single wake-up of UAV ui (Lemma 1). Scoring a candidate path of length at most C requires O(C) time. The costs of the three phases are as follows.  
+
+> •
+
+Consensus compares the local state with each of at most 
+
+N − 1 neighbor messages over the M tasks, giving 
+
+O(N M ). 
+
+> •
+
+Removal performs a single pass over the at most C held tasks, each evaluated by an O(C) path-cost recomputa-tion, giving O(C2). 
+
+> •
+
+Inclusion admits at most C tasks; each admission scans at most M candidates, and evaluating one candidate searches at most C insertion positions with an O(C)
+
+feasibility-and-cost check per position. This dominates, at O(M C 3).The cost of one wake-up is therefore 
+
+O M C 3 + N M  . (20) 10 
+
+Because the capacity C is a small constant in practice, (20) re-duces to O(N M ) per wake-up, matching the per-iteration cost of the underlying PI consensus. Over the bounded horizon of Theorem 1, the number of wake-ups is at most N ⌈Tmax /∆t⌉,so the mission-level computation is finite and proportional to the number of simulated frames. We state the character of this bound precisely: the per-wake-up cost is polynomial in the discrete dimensions N , M , and C, whereas the frame count Tmax /∆t scales with the numerical magnitudes of the deadlines, the map diameter, the inverse speed, and the inverse time step—a pseudo-polynomial dependence unless these physical quantities are treated as fixed constants. 
+
+2) Communication and Storage Complexity: At each broad-cast, a UAV transmits its score vector ( O(M )), its assignment vector ( O(M )), its logical-time vector ( O(N )), and its ver-sioned completed set ( O(M )). The message size is thus 
+
+O(M + N ). (21) A UAV broadcasts only when an event fires or its local state changes substantively, rather than once per frame. Let E
+
+denote the total number of such broadcasts over a run. The total communication volume is then O(E(M + N )) , with the worst-case bound E ≤ N ⌈Tmax /∆t⌉ stated in Proposition 1. 
+
+Proposition 1 (Communication-overhead bound): Over the horizon [0 , T max ] of Theorem 1, the number of broadcasts satisfies E ≤ N ⌈Tmax /∆t⌉, and the total communication volume is O(N ⌈Tmax /∆t⌉(M + N )) .
+
+Proof: By (A4), each UAV broadcasts at most once per frame and there are at most ⌈Tmax /∆t⌉ frames over [0 , T max ];summing over the N UAVs bounds E, and multiplying by (21) bounds the volume. The bound in Proposition 1 coincides with that of a syn-chronous round-based scheme only in the degenerate case where an event fires at every UAV in every frame. Under inter-mittent connectivity, events are sparse: broadcasts are triggered by topology changes, completions, and periodic heartbeats, so 
+
+E scales with the number of such events rather than with the number of frames. This separation between worst-case and typical communication cost is the principal advantage of the event-driven paradigm over frame-synchronous polling; the measured communication cost is reported in Section VI. Finally, the per-UAV storage—the score, assignment, and logical-time vectors, the completed set, the emergency pool, and the execution path—is likewise O(M + N ), and no UAV stores any global structure indexed by both N and M
+
+simultaneously. VI. S IMULATION AND EXPERIMENTAL RESULTS 
+
+This section evaluates CC-OPI through extensive simula-tions. We first describe the simulation setup, the evaluation protocol, and the performance metrics (Section VI-A). We then report a four-regime performance comparison against the classical and matched online baselines (Section VI-B), an ablation study that isolates the contribution of each mecha-nism (Section VI-C), sensitivity analyses with respect to the algorithm’s hyperparameters (Section VI-D) and to the com-munication radius Rc (Section VI-E), and a robustness study under link-level packet loss, terrain occlusion, and dynamic task arrival (Section VI-F). All reported results are averaged over 30 independent random seeds. Tables report the mean and standard deviation; error bars or shaded bands in the figures denote t-based 95% confidence intervals of the mean. 
+
+A. Simulation Setup and Metrics 1) Simulation Setup: We simulate a post-disaster search and rescue scenario on a 10 ,000 ×10 ,000 m field. The UAV swarm is heterogeneous, comprising medical-supply UAVs (cruising speed 30 m/s) and food-supply UAVs (cruising speed 50 m/s) in a 1:1 ratio; each UAV has a fixed payload capacity Ci
+
+and a communication radius Rc = 250 m. This radius is representative of the effective air-to-air range measured for UAV ad hoc networks with commodity radios [9], [10]; its value is swept as an explicit variable in Section VI-E. In graph terms it is a severe connectivity regime: at Rc = 250 mand the representative scale, the initial communication graph is typically empty, the time-averaged mean degree is 0.16 
+
+with the largest connected component covering 15% of the swarm, and a mission produces about 15 pairwise contacts of median duration 12 s; the corresponding statistics for every swept radius are tabulated in the supplementary material, so that the results can be mapped to other environments. Tasks are likewise split evenly between the two supply types, with service times of 300 s (medical) and 350 s (food), and each task is assigned a hard deadline drawn uniformly from a fixed range. The physical engine advances in steps of ∆t = 1 s, and the heartbeat that drives the global-time scan fires every 
+
+20 s. In-range messages are delivered reliably within the same simulation step; the loss assumption is relaxed in the robustness study of Section VI-F. UAVs, tasks, and deadlines are randomly generated per seed within these bounds. The principal parameters are summarized in Table I, and Table II consolidates the information and physical assumptions of the model; each assumption holds identically for every method and regime evaluated below. To assess scalability, we vary the problem size across six levels, with the UAV count N ∈ { 6, 8, 10 , 12 , 14 , 16 } and the task count M fixed by the task-to-UAV ratio. Unless otherwise noted, two settings are used. The default setting 
+
+fixes the ratio at M = 2 N , the capacity at Ci = 3 , and the deadline range at [0 , 2000] s. Under this setting, the task completion rate of the stronger methods approaches saturation, which compresses the differences between them. We therefore adopt a tight-constraint setting as the primary scenario for the performance comparison: the load is raised to M = 3 N ,the deadlines are tightened to [0 , 1200] s, and the capacity is increased to Ci = 4 . We deliberately keep the capacity generous so that Ci · N > M ; the difficulty thus arises from the time windows rather than from a shortage of task slots, which avoids structurally favoring the online paradigm. Under the tight-constraint setting, the full-connectivity results drop to roughly 0.80 –0.93 depending on the method, so the metrics are no longer saturated and the differences between methods become measurable. A dedicated scaling study additionally runs CC-OPI at up to 128 UAVs and 384 tasks, reporting 11                                                             
+
+> TABLE I PRINCIPAL SIMULATION PARAMETERS
+> Parameter Default Tight-constraint
+> Field size 10 ,000 ×10 ,000 mCommunication radius Rc250 mUAV speed (medical / food) 30 /50 m/s Task service time (med. / food) 300 /350 sTime step ∆t/ heartbeat 1s / 20 sTask-to-UAV ratio M:N2:1 3:1
+> Payload capacity Ci34
+> Deadline range [0 ,2000] s[0 ,1200] sUAV count N{6,8,10 ,12 ,14 ,16 }
+> Random seeds 30 (mean ±std) TABLE II INFORMATION AND PHYSICAL MODELING ASSUMPTIONS
+> Assumption Scope and implication
+> Static tasks globally known Every UAV knows all initial tasks (position, type, deadline) from deployment; only the assignment and completion state is subject to the communication constraints. Injected tasks globally discovered The existence of a runtime task is announced to all UAVs upon arrival; its allocation remains communication-constrained (Section VI-F). Synchronized clocks Deadlines and the emergency criterion
+> trem (τk) = Dk−tpresume a shared physical time; clock skew is not modeled. Ideal in-range links Connectivity is a binary graph determined by the radius Rcand line of sight; in-range messages arrive within one simulation step, without loss, delay, reordering, or bandwidth contention. The loss, delay, and reordering assumptions are relaxed in Section VI-F. Straight-line motion UAVs fly at constant speed along straight segments; obstacles block communication only, never the flight path (Section VI-F). Unlimited endurance, no failures No energy budget and no mid-mission UAV failure are modeled; the mission horizon is bounded by the deadlines alone (Section V). Both are future work (Section VII).
+
+runtime, per-wake-up latency, memory, and message sizes (supplementary material). 
+
+2) Evaluation Protocol: A central methodological point is that communication constraints are an intrinsic property of the target scenario rather than a handicap imposed on the baselines. Accordingly, we evaluate four regimes:  
+
+> •
+
+(i) Full-connectivity reference: the classical methods (PI, CBBA, and PI-MaxAss) running on a fully connected network. This regime reflects the idealized assumption under which these methods were designed, and serves as each method’s ideal-connectivity reference; it is not an upper bound on the achievable performance (see Section VI-E).  
+
+> •
+
+(ii) Naive-transfer baseline: the same classical meth-ods running on the radius-limited network, denoted PI-C, CBBA-C, and PI-MaxAss-C. These represent the outcome of directly deploying a static method in the communication-constrained environment.  
+
+> •
+
+(iii) Matched online baselines: the unmodified scoring functions and consensus rules of PI and CBBA executed in the same event-driven online regime as CC-OPI, de-noted PI-OM and CBBA-OM, with negotiation re-run at every wake-up over the radius-limited network. These baselines separate the benefit of the online paradigm from the benefit of CC-OPI’s specific mechanisms.  
+
+> •
+
+(iv) CC-OPI: the proposed method on the radius-limited network. For regime (ii), the static “allocate-then-execute” paradigm reaches a single consensus over the connectivity available at 
+
+t = 0 and then freezes the assignment for execution, without replanning while the topology evolves. This is a faithful reflection of the inherent limitation of the static paradigm— execution-time replanning is precisely the online paradigm that constitutes our contribution—rather than an artificially weakened baseline. Beyond the four regimes, the main comparison includes a static geographic-partition baseline, denoted GEO, repre-senting the territory-based alternative of Section II: every task is statically owned by the type-compatible UAV whose deployment position is nearest (a Voronoi partition over the pre-mission deployment, shared before launch), each UAV plans its own region by cheapest feasible insertion without any bidding or consensus, completed-task knowledge is identical to CC-OPI’s, and a UAV whose own insertable tasks are exhausted may adopt a flagged near-deadline task from any region, duplicate pursuits being resolved by physical confir-mation on arrival. GEO runs in the same online paradigm on the radius-limited network, on the same seeds. For regime (iii), the scoring and consensus logic of the wrapped methods is left untouched; a thin wrapper adds only the adaptations without which any allocation method fails trivially online. Completion knowledge is identical to CC-OPI’s: tasks confirmed completed—by the UAV itself, observed on arrival, or learned from neighbors’ broadcasts— are evicted from the plan and withdrawn from bidding; a planned task whose estimated arrival time exceeds its deadline is released together with its consensus entry. For CBBA only, the time-discounted bids of the held tasks are re-scored from the current state at each wake-up, since a bid placed early in absolute time could otherwise never be outbid later; PI recomputes its removal scores on every invocation and needs no refresh. All four regimes share the same seeds and problem instances, per-frame topology and communication opportuni-ties, task visibility and deadline semantics, and broadcast-count accounting; in regimes (iii) and (iv), motion is never suspended. 
+
+3) Evaluation Metrics: We report the following metrics, computed from the final simulation state:  
+
+> •
+
+Task completion rate (TCR, ↑): the fraction of reachable 
+
+tasks that a type-compatible UAV reaches, and starts serving, no later than their deadline and subsequently completes (arrival exactly at the deadline counts as on time; see Section III). The criterion is enforced directly: the simulator records the first service-start timestamp of every task, and a physically finished service that started 12 
+
+late is excluded from all completion-based metrics. Such exclusions are rare—a dedicated audit over the central configurations (720 runs) finds 18 late starts among 
+
+15 ,901 finished services ( 0.1% ), most of them in ablated variants with protection mechanisms disabled. The de-nominator excludes tasks that are physically impossible to reach in time even under direct flight, so that the metric is not distorted by infeasible instances. TCR is the primary metric for cross-algorithm comparison.  
+
+> •
+
+Makespan (↓): the completion time of the last completed task.  
+
+> •
+
+Total distance (↓): the aggregate flight distance of all UAVs.  
+
+> •
+
+Wasted distance (↓): the flight distance rendered ineffec-tive by reassignment. For the static baselines, allocation precedes any movement, so this quantity is zero by construction; it is incurred only by online replanning.  
+
+> •
+
+Reassignment count (↓): the number of ownership trans-fers, reflecting coordination overhead and assignment oscillation.  
+
+> •
+
+Messages per completed task (↓): the number of messages normalized by the number of completed tasks, where one message is one event-driven broadcast for the online methods and one per-round state exchange for the static methods; we normalize because the two semantics make absolute counts incomparable. Each broadcast carries a serialized payload of O(M + N ) (Section V)—at most 
+
+16 M + 8 N + 8 bytes under the canonical encoding, i.e., 
+
+568 B at the representative scale, the maximum being reached only when the monotone completed set is full. We additionally record the receiver-side deliveries—one delivery being the receipt of a broadcast by one in-range receiver—and the serialized payload bytes of every message under a canonical binary encoding ( 8-byte floats, 
+
+4-byte integers), so that the communication cost can be compared in sender-side and receiver-side units alike. All communication metrics are application-layer quantities— broadcast attempts, successful deliveries, and canonical payload bytes—and do not measure airtime: over-the-air contention, retransmission, and channel occupation are not modeled.  
+
+> •
+
+Emergency rescue rate (↑): among all tasks that ever entered the emergency pool, the fraction ultimately com-pleted. This metric is meaningful only for CC-OPI, since the baselines maintain no emergency pool; it is therefore used solely as internal evidence in the ablation study and never for cross-algorithm comparison. 
+
+4) Statistical Protocol: All algorithms and variants are evaluated on the same 30 problem instances (seeds), so every cross-method comparison is paired by instance. For the main comparison of Section VI-B, which we treat as the planned primary analysis, we report per-instance paired differences with 95% confidence intervals obtained from a percentile bootstrap ( 10 4 resamples). The comparison set is small and directionally specified, though not formally prereg-istered, and the same seeds were also used during development and sensitivity exploration; we therefore rely on effect sizes with confidence intervals rather than dichotomous significance claims and apply no multiplicity correction. The mechanism, sensitivity, and robustness studies (Sections VI-C–VI-F) are exploratory. Because the six problem scales sharing a seed are generated from nested random streams, comparisons pooled across scales use a seed-cluster bootstrap that resamples seeds and retains all scales within each draw; the per-scale intervals remain the primary evidence. With 30 seeds, the standard error of the mean (SEM) of the TCR is about one percentage point, and the paired confidence intervals have half-widths below two percentage points. Finally, the headline comparisons are re-validated on 30 fresh hold-out seeds that played no role in development or tuning; the effect sizes replicate (supplemen-tary material). 
+
+B. Main Performance Comparison 
+
+We now compare CC-OPI against the classical and matched online baselines under the four regimes defined in Sec-tion VI-A, with the tight-constraint setting as the primary scenario. Fig. 3 reports the TCR against the problem scale— with CC-OPI on the radius-limited network drawn as ashared reference line in both panels—and Fig. 4 reports the corresponding wasted distance and communication overhead. Table III summarizes all metrics, including the makespan, at a representative scale of 10 UAVs and 30 tasks. 
+
+1) Task Completion Rate: The TCR results reveal five findings. 
+
+First, the naive transfer of static methods collapses under communication constraints, whereas CC-OPI remains robust. 
+
+As shown in Fig. 3b, the constrained baselines PI-C and CBBA-C achieve a TCR of only about 0.58 –0.62 , and their performance further deteriorates as the scale grows. CC-OPI, operating under the same 250 m communication limit, sustains a TCR of roughly 0.80 that is essentially flat across scales. The margin over the naive baselines is between 18 and 22 
+
+percentage points and is widest at the largest scale (paired differences pooled across scales, seed-cluster bootstrap: +19 .0
+
+percentage points against PI-C, 95% CI [+17 .5, +20 .5] , and 
+
++19 .2 against CBBA-C, [+17 .8, +20 .6] ), indicating that CC-OPI’s online replanning compensates for the connectivity that the static paradigm assumes but cannot obtain. 
+
+Second, the matched online comparison attributes this mar-gin to two sources: the online paradigm accounts for the larger share, and the CC-OPI mechanisms add a consistent gain on top. The naive baselines conflate two differences—the execution regime and the allocation logic—so their collapse alone cannot isolate the value of CC-OPI’s mechanisms. The matched baselines PI-OM and CBBA-OM remove the first difference. Executing the unmodified PI rules online recov-ers +12 .1 percentage points over the frozen PI-C (paired difference pooled across scales, 95% CI [+10 .9, +13 .2] ;CBBA-OM over CBBA-C: +10 .1 [+9 .0, +11 .3] ). On top of this paradigm gain, CC-OPI leads PI-OM by a further 
+
++6 .9 points ( [+6 .1, +7 .8] pooled) and CBBA-OM by +9 .0
+
+([+8 .1, +10 .0] ), and the per-scale differences neither vanish nor shrink as the swarm grows (Fig. 3b); the mechanism-level attribution of this gain is given in Section VI-C4. CBBA-OM 13 6 8 10 12 14 16   
+
+> Number of UAVs (tasks = 3 × UAVs)
+> 0.2 0.4 0.6 0.8 1.0
+> Task completion rate (feasible)
+> PI CBBA PI-MaxAss CC-OPI (ours)
+
+(a) Full-connectivity baselines (reference) 6 8 10 12 14 16    
+
+> Number of UAVs (tasks = 3 × UAVs)
+> 0.2 0.4 0.6 0.8 1.0
+> Task completion rate (feasible)
+> PI-C CBBA-C PI-MaxAss-C GEO PI-OM CBBA-OM CC-OPI (ours)
+
+(b) Constrained baselines (naive transfer)  
+
+> Fig. 3. Task completion rate versus problem scale under the tight-constraint setting.
+
+also exposes why commitment protection matters: a consensus auction run online without it oscillates severely, with a median of 660 ownership transfers per run at the representative scale (interquartile range 216 –1295 , maximum 3186 ) against 19 
+
+(16 –23 , maximum 29 ) for CC-OPI, and roughly twice CC-OPI’s messages per completed task (Table III). CBBA releases its whole bundle suffix on every lost conflict and each released task counts as one transfer, so its absolute count is not directly comparable to the PI-based methods; the order-of-magnitude gap and the doubled message rate nonetheless indicate genuine instability. 
+
+Third, the geographic-partition baseline confirms that the mechanisms add value beyond static territories. GEO al-ready avoids the frozen-consensus collapse: pooled across scales it leads PI-C by +12 .2 percentage points ( 95% CI 
+
+[+11 .0, +13 .3] , seed-cluster bootstrap) and is statistically indistinguishable from PI-OM ( +0 .1 [ −0.9, +1 .1] )—spatial decomposition alone recovers roughly the paradigm gain. CC-OPI nevertheless leads GEO by +6 .8 points pooled ([+5 .9, +7 .8] ), with per-scale differences of +6 .4 to +7 .6
+
+whose intervals all exclude zero, and incurs 32 .6 km less re-dundant travel at the representative scale ( [−40 .1, −25 .2] ; Ta-ble III): static territories cannot rebalance load across regions, and their emergency adoptions duplicate pursuits that CC-OPI resolves through consensus. The value of the PI machinery is thus established against the territory-based alternative, not only against frozen consensus. 
+
+Fourth, CC-OPI approaches the full-connectivity perfor-mance of PI and CBBA using only local communication. 
+
+Despite having no access to global information, CC-OPI attains a TCR comparable to that of CBBA (paired differ-ence pooled across scales: −2.5 percentage points, 95% CI 
+
+[−3.3, −1.8] ) and within roughly six percentage points of PI (−5.0 [ −6.6, −3.4] at the representative scale), both evaluated on a fully connected network (Fig. 3a). The remaining gap to PI-MaxAss, the strongest full-connectivity reference (about 
+
+0.85 –0.92 ), reflects the price of operating in a decentralized manner without the global picture; we do not claim to match a method that re-optimizes the complete assignment under full connectivity. 
+
+Fifth, the methods that optimize most aggressively for the global picture are the most brittle when that picture is unavailable. PI-MaxAss is the strongest method under full connectivity (up to about 0.92 ) but the weakest under the communication constraint: PI-MaxAss-C degrades from 0.380 
+
+at the smallest scale to 0.173 at the largest. Its two-stage rescheduling, which presumes a globally consistent view to maximize the number of assigned tasks, becomes counter-productive once that view is fragmented across information islands. 
+
+2) Efficiency and Overhead: Fig. 4 and Table III char-acterize the cost of this robustness. CC-OPI’s makespan is comparable to CBBA’s and lower than PI-MaxAss’s, so the TCR gain does not slow the mission. The cost appears in two coupled quantities: the wasted distance, zero by construction for the static baselines, grows with scale under online reas-signment, and the communication overhead is about an order of magnitude above PI or CBBA, because CC-OPI coordinates continuously throughout execution rather than only once be-forehand. Against the matched online baselines, however, the comparison reverses: at every scale CC-OPI incurs the least wasted distance and the fewest messages per completed task of the three online consensus methods ( 79 .6 km and about 55 
+
+messages at 16 UAVs, versus 95 .5/114 .8 km and 73 /130 mes-sages for PI-OM/CBBA-OM), so these costs are a property of online execution itself—one that CC-OPI’s mechanisms miti-gate rather than aggravate. The geographic baseline broadcasts even less, since it exchanges only completion facts, but pays for the missing negotiation with the highest wasted distance of every constrained method at every scale (Fig. 4). CC-OPI’s own makespan exceeds the matched baselines’ (about 1294 sversus 1170 –1180 s at the representative scale), the counterpart of the emergency-rescue behavior: the additional completions it secures are precisely near-deadline tasks that start service on time but finish service after the deadline. These results should be read as a trade-off rather than an advantage: CC-OPI spends 14 10 15 050 100  
+
+> Wasted distance (km)
+> 10 15 050 100 150
+> Msgs. per completed task
+
+Number of UAVs (tasks = 3 × UAVs) 
+
+> PI-C CBBA-C PI-MaxAss-C GEO PI-OM CBBA-OM CC-OPI (ours)
+> Fig. 4. Coordination overhead versus problem scale under the tight-constraint setting.
+
+additional communication and some redundant travel to secure its completion gains. Table IV completes the communication accounting in receiver-side and byte-level units, and the choice of unit mat-ters. In sender-side units—application-layer broadcast attempts and transmitted payload bytes—CC-OPI indeed pays about an order of magnitude more than the full-connectivity methods. The receiver side inverts the picture: on the sparse 250 mnetwork a CC-OPI broadcast reaches only 0.25 receivers on average, whereas every full-connectivity exchange is delivered to all N − 1 peers, so per completed task CC-OPI induces 
+
+14 .5 deliveries ( 6.5 kB) against 45 .7 (19 .8 kB) for PI—about a third of the received traffic of the idealized consensus. The naive constrained baselines mark the opposite degenerate corner: their broadcasts on the typically empty initial graph reach no receiver at all, which quantifies why the frozen transfer fails. Among the three online methods, CC-OPI is the cheapest in every unit; the order-of-magnitude penalty is thus a statement about application-layer broadcast attempts on a mostly empty neighborhood—since channel occupation and contention are not modeled, we draw no conclusion about airtime or congestion. Placing every method in a single completion-versus-cost plane at the representative scale (Fig. S1 in the supplementary material) summarizes this trade-off: the full-connectivity meth-ods reach a comparable TCR at roughly an order of magnitude less communication (an advantage derived from the idealized connectivity they assume); the naively transferred baselines fall to the low-completion region; the matched online baselines sit below and to the right of CC-OPI, which dominates them on both axes; and the geographic baseline sits below CC-OPI at a comparable message cost. Among the evaluated methods, none dominates CC-OPI within the constrained regime: reaching its TCR otherwise requires the full-connectivity assumption that the target scenario denies. 
+
+3) Default Setting: The same qualitative pattern holds un-der the relaxed default setting: CC-OPI attains a TCR of about 
+
+0.97 –0.98 , close to the full-connectivity reference, whereas PI-C and CBBA-C drop to roughly 0.71 –0.78 and PI-MaxAss-C falls to 0.22 at the largest scale—the collapse is a structural consequence of intermittent connectivity, not an artifact of the tight-constraint setting. 
+
+C. Ablation Study 
+
+To isolate the contribution of each mechanism, we disable the spatial locality penalty, the state-locking mechanism, and the emergency pool one at a time, and compare each variant against the full model. All variants run on the radius-limited network over the default scales, since enabling full connectiv-ity would mask the differences that these mechanisms address. A sunk-cost factor explored in early development was found to have a negligible effect and was removed from the algorithm; it is therefore not among the ablated mechanisms. Because the TCR is near saturation under this setting, each mechanism is assessed primarily through the metric it most directly affects rather than through the TCR alone. Table V reports the percent change of each variant relative to the full model, averaged over the scales; the per-scale curves, omitted for space, show that these trends are consistent across scales. 
+
+1) Spatial Locality Penalty: Removing the spatial penalty leaves the TCR essentially unchanged but inflates the coordi-nation cost markedly: the wasted distance rises by 26 .5% , the reassignment count by 37 .6% , and the total flight distance by 
+
+12 .0% (Table V). Without the penalty, disconnected UAVs bid greedily on the same remote, high-value tasks, so once subnets reconnect, consensus forces costly handovers and redundant travel. The spatial penalty thus delivers its intended effect— suppressing blind cross-regional chasing and the oscillation it induces—without sacrificing completion. The mild reduction in makespan when the penalty is removed indicates that unconstrained chasing can occasionally finish a few tasks sooner, but at a disproportionate cost in wasted travel. 
+
+2) Emergency Pool: The emergency pool exhibits a clear trade-off. Disabling it lowers the TCR by 3.6% in rel-ative terms, while simultaneously reducing the total dis-tance (−15 .6% ), wasted distance (−7.9% ), reassignments (−12 .1% ), and makespan ( −9.2% ). The pool spends addi-tional flight effort to rescue tasks approaching their dead-lines that the spatial penalty would otherwise cause UAVs to neglect; switching it off recovers those costs but forfeits the rescued completions. The mechanism should therefore be understood as trading travel for TCR under time pressure, not as a means of reducing distance. For the variants that retain the pool, the emergency rescue rate is high (about 0.92 –0.96 
+
+across scales), confirming that the flagged near-deadline tasks are in fact being recovered. 
+
+3) State Lock: In the cross-scale aggregate, removing the state lock produces only small changes in the wasted distance (+4 .5% ) and in the TCR ( −0.7% ; the strict service-start accounting reveals that, without the lock, a handful of comple-tions start after their deadline), which might suggest that the lock is inconsequential. Two considerations show otherwise. First, the lock is foremost a correctness and stability mecha-nism: it protects an in-progress or irreversible physical action from preemption and underpins the finite-time termination 15 
+
+TABLE III PERFORMANCE SUMMARY AT 10 UAV S / 30 TASKS (T IGHT -C ONSTRAINT SETTING )
+
+Regime Method TCR ↑ Makespan (s) ↓ Total Dist. (km) ↓ Wasted Dist. (km) ↓ Reassign. ↓ Msg./Task ↓
+
+Full conn. (reference) PI 0.839 ±0.058 1202 ±47 57 .6±9.0 0.0 14 .4±4.5 5.08 ±0.84 
+
+CBBA 0.821 ±0.060 1256 ±93 59 .6±11 .3 0.0 25 .1±6.0 4.25 ±0.42 
+
+PI-MaxAss 0.904 ±0.067 1394 ±58 107 .3±11 .8 0.0 0.0 11 .31 ±1.47 
+
+Constrained (naive) PI-C 0.598 ±0.075 1313 ±110 76 .2±40 .7 0.0 0.0 4.40 ±0.68 
+
+CBBA-C 0.592 ±0.074 1315 ±109 81 .6±43 .4 0.0 0.0 3.66 ±0.50 
+
+PI-MaxAss-C 0.251 ±0.040 1294 ±120 116 .8±71 .8 0.0 0.0 21 .04 ±3.44 
+
+Constrained (geographic) GEO 0.721 ±0.069 1252 ±104 119 .0±17 .1 77 .3±19 .7 49 .1±8.8 49 .21 ±11 .96 
+
+Constrained (matched) PI-OM 0.730 ±0.045 1179 ±119 93 .0±12 .0 48 .0±9.7 18 .5±5.9 72 .06 ±11 .61 
+
+CBBA-OM 0.708 ±0.069 1168 ±105 97 .3±15 .1 55 .4±14 .0 890 ±830 123 .35 ±39 .54 
+
+Ours CC-OPI 0.789 ±0.054 1294 ±92 105 .0±15 .4 44 .7±12 .0 19 .3±4.8 54 .74 ±8.93 
+
+TABLE IV COMMUNICATION ACCOUNTING PER COMPLETED TASK AT 10 UAV S / 30 
+
+TASKS (T IGHT -C ONSTRAINT SETTING )
+
+Regime Method Bcast. Deliv. Sent (kB) Recv. (kB) 
+
+Full conn. (reference) PI 5.1 45 .7 2.2 19 .8
+
+CBBA 4.2 38 .2 1.8 16 .6
+
+PI-MaxAss 11 .3 101 .8 4.9 44 .2
+
+Constrained (naive) PI-C 4.4 0.0 1.9 0.0
+
+CBBA-C 3.7 0.0 1.6 0.0
+
+PI-MaxAss-C 21 .0 0.0 9.1 0.0
+
+Constrained (matched) PI-OM 72 .1 35 .1 32 .3 16 .0
+
+CBBA-OM 123 .3 86 .8 55 .4 39 .4
+
+Ours CC-OPI 54 .7 14 .5 24 .4 6.5
+
+TABLE V ABLATION : P ERCENT CHANGE RELATIVE TO THE FULL MODEL 
+
+Metric w/o Spatial w/o StateLock w/o Emergency 
+
+Task completion rate +0 .1% −0.7% −3.6% 
+
+Wasted distance +26 .5% +4 .5% −7.9% 
+
+Reassignment count +37 .6% −2.4% −12 .1% 
+
+Total distance +12 .0% +2 .8% −15 .6% 
+
+Makespan −7.2% +4 .7% −9.2% 
+
+guarantee of Section V—without it, Ωlock is empty and the eventual-commitment property (Lemma 3) loses its premise— a role that an aggregate efficiency metric does not capture. Second, its efficiency benefit is masked by scale aggregation and becomes visible only when the connectivity regime is varied at a fixed scale. To expose this, we sweep the communication radius Rc
+
+at a fixed scale and compare the full model against the no-lock variant on shared seeds (Fig. 5). With the lock enabled, the wasted distance is consistently 9% –12% lower across the entire range, a per-radius paired difference of 6–10 km whose 95% CI excludes zero at every radius; the makespan is directionally lower as well, although its per-radius paired 50 100 150 200 250 300 350 400 
+
+Communication radius Rc (m) 
+
+60 65 70 75 80 85  
+
+> Wasted distance (km)
+> Full w/o StateLock
+
+Fig. 5. State-lock ablation versus communication radius Rc at a fixed scale. 
+
+CIs generally include zero. Crucially, the benefit is largest at small-to-medium radii ( Rc ≈ 75 –100 m) and decays as 
+
+Rc grows. This trend matches the mechanism’s rationale: at smaller radii the network fragments more frequently, creating more opportunities for a UAV to be preempted mid-flight, so protecting its committed approach yields a larger saving; as connectivity improves, such mid-flight conflicts become rare and the lock’s effect diminishes. The aggregate ablation therefore understates the lock’s role, which the radius-resolved view makes explicit. 
+
+4) Cumulative Ablation from the Online Backbone: The preceding ablations disable one mechanism at a time. To connect this mechanism-level view with the paradigm-level attribution of Section VI-B, we additionally enable the mech-anisms cumulatively on top of the bare online backbone—the event-driven execution with every CC-OPI-specific score dis-abled ( λ = 0 , no state lock, no emergency pool, β = 0 )—at the representative tight-constraint scale on the same 30 seeds. The backbone retains the completed-set synchronization, which is correctness infrastructure for online execution rather than a scoring mechanism, and it is statistically indistinguishable from PI-OM (paired difference +0 .5 percentage points, 95% 16                                    
+
+> TABLE VI CUMULATIVE (B ACKBONE ) A BLATION AT 10 UAV S/30 TASKS
+> (T IGHT -C ONSTRAINT SETTING )
+> Variant TCR ↑∆TCR (pt) Wasted (km) Msg./Task
+> Backbone 0.734 —48 .3109 .9+Spatial 0.759 +2 .5 [+0 .8,+4 .0] 44 .5100 .8+Lock 0.771 +1 .2 [+0 .6,+1 .9] 44 .152 .1+Urgency 0.766 −0.5 [ −1.2,+0 .1] 43 .854 .1+Emergency (Full) 0.789 +2 .2 [+0 .8,+3 .7] 44 .754 .7
+
+CI [−0.7, +1 .7] ), cross-validating the two implementations. Table VI reports the ladder, in which each row enables one further mechanism on top of the preceding row and ∆TCR is the per-seed paired increment over that row with a bootstrap 
+
+95% CI; the enabling order was fixed in advance and is not reordered post hoc. The ladder decomposes the mechanism gain. The spatial penalty and the emergency pool carry the largest completion improvements ( +2 .5 and +2 .2 points, each with a CI ex-cluding zero), and the spatial penalty simultaneously reduces the wasted distance and the reassignments, consistent with Section VI-C. The state lock contributes a statistically resolved 
+
++1 .2 points—part of which the strict service-start accounting uncovers, by no longer crediting the late completions that the unlocked variants accumulate—and, more strikingly, halves the communication cost: the messages per completed task drop from about 100 to 52 when the lock is enabled, because irrevocable ownership near completion stops the consensus vectors from oscillating and thereby suppresses the event-driven rebroadcasts—the same instability that inflates the mes-sage and reassignment counts of CBBA-OM in Section VI-B. The urgency rung, in contrast, yields no measurable TCR gain on its own ( −0.5 points, CI spanning zero, consistent with the 
+
+β sweep of Section VI-D); we accordingly do not claim the urgency term as an independently validated contribution, but retain it as a design component whose intended effect is sub-sumed by the emergency layer. In total, the mechanisms add 
+
++5 .4 points over the backbone ( 95% CI [+3 .4, +7 .3] ), which, combined with the backbone–PI-OM equivalence, reproduces the +5 .9-point gap between CC-OPI and PI-OM at this scale. 
+
+D. Sensitivity to Hyperparameters 
+
+CC-OPI exposes a small set of hyperparameters that were fixed to a single configuration across every experiment above and never tuned per scenario. To verify that the preceding conclusions are not an artifact of this particular choice, we vary the three free strength and threshold parameters one at a time at the representative tight-constraint scale—the spatial-penalty strength λ, the urgency-penalty weight β, and the emergency-pool margin Temergency —holding the remaining parameters, which are fixed by physical or temporal reasoning, at their defaults. The TCR is insensitive to λ and β within one SEM: the benefit of the spatial penalty appears in the coordination cost (disabling it raises the wasted distance by 11% and the reassignment count by 18% ) and plateaus for λ ≳ 5, and the weak effect of β is consistent with the unresolved urgency rung of Section VI-C4. The emergency margin Temergency is the one genuinely sensitive parameter: an overly large margin flags too many tasks as emergencies too early, so the spatial-penalty exemption ( μ = 1 ) erodes the regionalized operation, and the TCR degrades gradually from about 0.80 to 0.74 as the margin grows from the default 700 s to 1500 s, the default sitting inside a wide safe plateau. The attractiveness bonus 
+
+Abonus acts as a soft infinity whose only requirement is to be large enough to favor a flagged task in the inclusion ranking: a sweep over Abonus ∈ [500 , 20000] produces identical results at every value, and removing the bonus entirely lowers the TCR and the emergency rescue rate by less than one percentage point each (within one SEM)—the cross-regional rescues are carried by the spatial-penalty exemption ( μ = 1 ) rather than by the bonus. The full protocol and per-parameter figures are given in the supplementary material (Fig. S3). Because the parameter values were fixed once and held fixed across all experiments, the gains reported in Sections VI-B–VI-F are not the product of per-scenario tuning. 
+
+E. Sensitivity to the Communication Radius 
+
+The premise of this work is a limited communication radius, so we now examine how performance varies with Rc as the explicit independent variable. We fix the tight-constraint scenario at 10 UAVs and 30 tasks and sweep Rc from 75 mto 15 ,000 m, the latter exceeding the map diagonal and thus approximating full connectivity. To isolate the effect of the radius, terrain occlusion is disabled for this experiment; line-of-sight blockage is treated separately as a robustness factor. CC-OPI runs on the radius-limited network; the static methods run as constrained baselines (PI-C, CBBA-C, PI-MaxAss-C), and their full-connectivity counterparts are drawn as horizontal reference lines. Fig. 6 reports the TCR, wasted distance, and communication overhead against Rc.
+
+CC-OPI degrades gracefully over the swept range, whereas the static baselines collapse. As Rc decreases from near-full connectivity to 75 m, the TCR of CC-OPI declines gently from about 0.88 to 0.79 , a drop of roughly ten percentage points. Over the same range, the constrained baselines fall steeply: PI-C and CBBA-C drop from about 0.84 and 0.82 
+
+to about 0.60 , and PI-MaxAss-C from 0.90 to 0.25 . At the representative deployment radius Rc = 250 m, the margins— about 20 percentage points over PI-C and CBBA-C and more than 50 over PI-MaxAss-C—agree with Table III. Notably, the baselines are insensitive to Rc below roughly 500 m: at these radii the initial communication graph is typically empty, so the static methods reduce to independent greedy allocation regardless of the exact value of Rc.
+
+The large-radius limit validates the comparison and locates the crossover. As Rc grows, each constrained baseline con-verges to its own full-connectivity reference (PI-C to 0.839 ,CBBA-C to 0.821 , and PI-MaxAss-C to 0.904 , matching Table III), confirming that the degradation at small Rc is attributable to the loss of connectivity alone. Within the swept range, CC-OPI leads every evaluated baseline for all 
+
+Rc ≤ 4000 m. The only method that overtakes it is PI-MaxAss-C, and only once the network is nearly complete 17 10 2 10 3 10 4
+
+> 0.4 0.6 0.8
+> Task completion rate (feasible)
+
+Completion rate   
+
+> 10 210 310 4
+> 020 40
+> Wasted distance (km)
+
+Wasted distance   
+
+> 10 210 310 4
+> 0100 200 300
+> Messages per completed task
+
+Communication overhead          
+
+> Communication radius Rc(m, log scale)
+> CC-OPI (ours) PI-C CBBA-C PI-MaxAss-C full-conn. reference (per method)
+> Fig. 6. Sensitivity to the communication radius Rcat a fixed scale.
+
+(Rc ≳ 8000 m), where its two-stage global re-optimization regains the conditions for which it was designed. The resulting crossover lies at a radius of several kilometers—more than an order of magnitude above any radius representative of a post-disaster deployment—so within the regime of interest CC-OPI is the only method evaluated that sustains a high TCR. We further note that, at the full-connectivity end of the sweep, CC-OPI ( 0.883 ) even exceeds the static PI ( 0.839 ) and CBBA (0.821 ), since its continuous online execution does not freeze after an initial allocation; we report this observation without claiming it as a design objective. 
+
+Coordination cost scales with connectivity. The secondary metrics expose the cost structure of the online paradigm (Fig. 6). As Rc increases, CC-OPI’s wasted distance falls sharply, from about 46 km at Rc = 75 m to under 1 km near full connectivity, because better connectivity resolves conflicts earlier and avoids redundant travel. Conversely, its communication overhead rises monotonically, from about 52 
+
+to 325 messages per completed task, as a larger radius admits more neighbors and thus more frequent broadcasts. CC-OPI therefore exchanges wasted travel for messages as connectivity improves; at the representative radius it operates in the regime of higher wasted distance and lower message count. 
+
+F. Robustness to Packet Loss, Terrain Occlusion, and Dynamic Task Arrival 1) Link-Level Packet Loss: The evaluation protocol so far delivers every in-range message (Table II). We now re-lax this idealization: each delivery of a broadcast to one in-range receiver is dropped independently with probability 
+
+p ∈ { 0.1, 0.3, 0.5}, while broadcasts remain counted as sent, preserving the message-metric semantics. The study uses the representative tight-constraint scale ( 10 UAVs, 30 tasks) at 
+
+Rc = 250 m on the same 30 seeds and compares CC-OPI with the matched online baselines PI-OM and CBBA-OM under the same loss probability. The frozen static baselines are omitted: their single consensus round operates on the typically empty initial graph at this radius (Section VI-E), so message loss leaves them essentially unchanged. Fig. 7 reports the results. 0.00.1 0.3 0.5 0.70 0.75 0.80      
+
+> Completion rate
+> 0.00.1 0.3 0.5 40 50 60
+> Wasted distance (km)
+> Link loss probability
+> CC-OPI (ours) PI-OM CBBA-OM
+> Fig. 7. Robustness to link-level packet loss at a fixed scale.
+
+CC-OPI is nearly indifferent to the loss rate. Its TCR remains at 0.78 –0.79 across the sweep—the paired difference against the loss-free runs is −0.6 percentage points ( 95% CI 
+
+[−1.7, +0 .5] ) at 30% loss and −0.5 ([−1.6, +0 .7] ) at 50% ,indistinguishable from zero even when half of all deliveries are dropped—and the emergency rescue rate stays at about 
+
+0.74 . The cost surfaces in redundant travel: the wasted distance grows by 4.7 km ( [+1 .2, +8 .3] ) at 30% and by 7.5 km ([+4 .2, +11 .1] ) at 50% loss, about 17% above the loss-free level, because lost messages defer conflict resolution until the UAVs meet again or converge physically. The messages per completed task even decline slightly (from about 55 to 51 ): fewer received messages trigger fewer state changes and hence fewer event-driven rebroadcasts. The margin over the matched baselines widens rather than erodes. PI-OM degrades significantly (−1.8 points, 
+
+[−3.0, −0.7] , at 50% loss), so the paired advantage of CC-OPI grows from +5 .9 points ( [+3 .9, +7 .6] ) without loss to +7 .2
+
+([+4 .9, +9 .3] ) at 50% , and remains between +6 .8 and +8 .1
+
+points over CBBA-OM throughout. Notably, CBBA-OM im-proves slightly under mild loss ( +1 .3 points, [+0 .1, +2 .6] , at 
+
+10% ), its median reassignment count falling from 660 to 113 :18 
+
+random loss happens to interrupt the bid oscillation that com-mitment protection suppresses by design (Section VI-C4)—a symptom of the pathology rather than a virtue, since its TCR still trails CC-OPI by about seven points. This tolerance is structural: no CC-OPI mechanism assumes that a message arrives. The monotone completed set recovers a lost completion fact at any later contact, the timestamped consensus rules reconcile late-arriving state correctly, the periodic heartbeat acts as a natural retransmission, and the state lock ties physical commitment to position rather than to message arrival. A lost delivery therefore translates into delay—and ultimately into the moderate additional travel quantified above—rather than into an inconsistent allocation. Burst-correlated loss and delivery delay do not alter this picture. Replacing the independent drops with a two-state Gilbert–Elliott gate per link—parameterized so that the sta-tionary loss equals each tested level while outages arrive in bursts of five seconds on average—leaves the TCR of CC-OPI statistically unchanged at every level (paired difference at 50% 
+
+mean loss: −0.2 points, 95% CI [−1.3, +0 .8] ), while PI-OM again degrades ( −1.2 [ −2.0, −0.4] ) and the margin over PI-OM widens to +6 .8 [+4 .9, +8 .6] . Subjecting every surviving delivery to a uniform random delay of up to ten seconds— under which messages arrive out of order—likewise leaves the TCR of CC-OPI unchanged ( −0.1 [ −1.2, +1 .0] at the harshest level) at the cost of 5.4 km [+1 .3, +9 .4] of additional redundant travel: the same structural properties reconcile late, out-of-order state correctly. The full protocols and per-level results are given in the supplementary material. Interference, contention, and channel capacity remain unmodeled (Table II). 
+
+2) Terrain Occlusion: Terrain can additionally block line-of-sight links: a communication edge exists only if the two UAVs are within range and no obstacle intersects the segment between them. In an isolated communication-occlusion test— conducted at a radius large enough that the obstacle-free network is essentially fully connected, since at Rc = 250 m the distance cutoff alone already disconnects almost every pair— sweeping from 0 to 10 large random obstacles lowers the TCR of CC-OPI only modestly, from about 0.88 to 0.87 (paired difference −1.6 percentage points, 95% CI [−2.7, −0.5] ), while the wasted distance rises roughly fivefold, because conflicts that early consensus would resolve are instead dis-covered later through physical convergence. Occlusion blocks communication only; physical motion follows straight lines without obstacle avoidance. The full protocol and per-metric results are given in the supplementary material (Fig. S2). 
+
+3) Dynamic Task Arrival: Search and rescue missions must also cope with tasks that emerge after deployment, such as newly discovered survivors. The event-driven design of CC-OPI accommodates this without network-wide suspension: a newly injected task is announced as a new-task wake-up event and processed as an ordinary local trigger, with the same priority as a topology change or a completion. We adopt a global-discovery model, in which the existence of an injected task is announced to all UAVs upon arrival, while its allocation 
+
+remains subject to the communication constraints. We do not claim dynamic arrival as a core capability; rather, we use it to assess the robustness of the online paradigm to runtime changes. We fix the tight-constraint setting at 10 UAVs and 30 base tasks at the representative radius Rc = 250 m with clear terrain, and inject an increasing number of additional tasks during the mission at a fixed cadence (one task every 120 s); each injected task is given a deadline relative to its arrival time. Fig. 8 reports the overall TCR and the injected-task completion rate as the number of injected tasks grows from 0 to 10 (a 33% 
+
+increase in total workload); the associated costs are quoted below. The overall TCR remains essentially flat, between 0.75 and 
+
+0.79 , as the injected workload grows. Because the injected tasks enter both the numerator and the denominator of this metric, we also examine the base tasks separately: their com-pletion rate declines by 0.7 percentage points at two injections (paired against the injection-free runs, 95% CI [−1.3, −0.2] )and settles at −1.8 points ( [−2.7, −1.0] ) from six injections onward—indeed, the per-seed base-task outcomes at six and ten injections are identical, a direct between-level difference of exactly zero. Runtime arrivals therefore displace the ex-isting allocation only by a small amount over the tested 
+
+0–10 injection levels—the expected price of admitting new tasks under a shared capacity—rather than destabilizing it. For the injected tasks, since each run contributes only a few, we report the completion rate pooled across seeds per injection level, with a 95% confidence interval from a run-level cluster bootstrap that resamples whole runs and thus preserves within-run correlation (a pooled Wilson interval [40] gives nearly identical bounds). The pooled rate rises from 
+
+0.47 (CI [0 .33 , 0.60] over 60 injected tasks) at two injections to 0.77 (CI [0 .73 , 0.81] over 300 tasks) at ten; the direct between-level differences are positive with intervals excluding zero ( +18 .9 points [+8 .3, +28 .9] from two to six injections and +11 .4 [+8 .2, +14 .7] from six to ten, paired seed-cluster bootstrap), so the increase is supported by a direct test. The upward trend reflects the injection schedule as much as the algorithm: at the fixed 120 s cadence, a higher injection count also extends the arrival window, so more tasks arrive after the initial workload has largely cleared and meet more available capacity. We therefore do not read the trend as evidence that higher intensities are inherently easier to absorb. The cost scales with the added workload—the total distance, makespan, and reassignment count all increase as more tasks are served— whereas the communication overhead per completed task stays nearly constant (about 54 –58 messages), indicating that the per-task coordination effort does not inflate with the injection load. Overall, these results indicate that, under the tested fixed-cadence schedule, the event-driven paradigm handles runtime task arrival gracefully, in contrast to the static paradigm, which would require a network-wide replanning pause that is unachievable under partitioned connectivity. VII. C ONCLUSION AND FUTURE WORK 
+
+This paper addressed distributed task allocation under re-stricted communication, where a limited communication radius fragments the UAV swarm into transient information islands and invalidates the static “allocate-then-execute” paradigm. 19 0 2 4 6 8 10 0.0 0.2 0.4 0.6 0.8      
+
+> Completion rate
+> 246810 0.0 0.2 0.4 0.6 0.8
+> Injected-task rate Number of injected tasks
+> Fig. 8. CC-OPI under dynamic task injection at a fixed scale.
+
+We proposed CC-OPI, an event-driven online algorithm that interleaves task negotiation with physical execution rather than separating the two. CC-OPI rests on three components: an asynchronous online framework that replans only at discrete physical and topological events; a pair of cost-evaluation metrics tailored to dynamic topologies—a dynamic IPI with a spatial locality penalty and an effective RPI with deadline-aware urgency—complemented by a non-preemptive state lock that protects each UAV’s ongoing physical action; and adecentralized fault-tolerance layer that combines version-based state synchronization with a global-time-driven emergency pool. We further established that CC-OPI terminates in finite time, free of stale-completion deadlock and of unbounded reassignment within the mission horizon, at a per-wake-up cost that is polynomial in the problem size (Section V). Beyond these guarantees, extensive simulations characterize the practical performance of CC-OPI. At the representative communication radius of 250 m, CC-OPI sustains a TCR of about 0.80 that stays essentially flat across problem scales, exceeding the naively transferred static baselines by roughly 
+
+18 to 22 percentage points while remaining comparable to CBBA and within roughly six percentage points of PI, both evaluated under full connectivity. A matched online compari-son decomposes this margin: executing the unmodified PI rules in the same event-driven regime recovers about 12 points over the frozen transfer, and CC-OPI’s mechanisms add a further 
+
+7 points ( 95% CI [+6 .1, +7 .8] , replicated on fresh hold-out seeds) while incurring less wasted travel and fewer messages per completed task than the matched baselines. As the radius shrinks, CC-OPI degrades gracefully where the static baselines collapse, leading every constrained baseline evaluated until the network is nearly complete; it also absorbs the tested link-level packet loss, terrain occlusion, and runtime task arrival with only a modest loss in TCR. These gains are not free. Because CC-OPI coordinates continuously throughout execution, it incurs a higher communication volume—roughly an order of magnitude more application-layer broadcasts and transmitted bytes per completed task than the static methods, although in successful deliveries it is cheaper than the full-connectivity consensus (Section VI)—together with some redundant travel from online reassignment. CC-OPI therefore favors robustness under intermittent connectivity over optimality under idealized assumptions, and this cost, together with the simplified phys-ical model, delineates the boundaries of the present study. These boundaries point to two complementary avenues for future work. The first targets the coordination cost of the online paradigm. As reported in Section VI, CC-OPI trades a higher communication volume and some redundant travel for its robustness, and narrowing this gap—for example through adaptive broadcast suppression, message compression, and leaner conflict resolution—is a direct line of improvement. Adapting the algorithm’s parameters to the operating condi-tions offers a further lever in the same direction: although a single fixed configuration is robust across all evaluated scenarios (Section VI), the state-lock ablation also shows that the benefit of individual mechanisms varies with the connectivity regime. A policy that adjusts the spatial, urgency, and locking parameters to the observed connectivity—learned, for instance, through multi-agent reinforcement learning— could therefore reduce the coordination overhead below what any fixed configuration achieves. The second avenue concerns the physical fidelity of the model. The present kinematics assume unlimited endurance and constant-speed straight-line motion: the termination hori-zon is bounded by task deadlines alone, with no energy con-straint, and terrain occlusion affects only connectivity rather than the flight path. Incorporating energy budgets together with return-to-base recharging would couple the battery state with the allocation decision, so that a detour consumes a finite resource rather than time alone. Integrating obstacle-aware path planning would in turn allow terrain to constrain the physical trajectory as well, unifying communication blockage and motion blockage within a single model. Resilience to UAV failure belongs to the same agenda: although the fault-tolerance layer is motivated in part by the loss of task owners, mid-mission UAV failures are not exercised in our experi-ments, and evaluating how gracefully the swarm absorbs them remains open. We regard these extensions as necessary steps toward deploying the online paradigm under field conditions. DATA AND CODE AVAILABILITY 
+
+The complete simulation platform, all experiment runners, the raw per-run result data, and the plotting and statistical-analysis scripts that produce every figure, table, and confi-dence interval in this paper are publicly available at https:// github.com/bdathe-lb/CC-OPI-Exp (release v1.0-tmc , MIT license). The repository documents the pinned software envi-ronment (Python 3.12), the seed protocol (seeds 42 –71 , shared across all experiments), the reachable-task exclusion criterion, the runtime of each experiment suite, and the mapping from each raw data file to its figure or table; the committed raw data allow the analysis and plots to be reproduced without re-running the simulations. The matched online wrappers PI-OM and CBBA-OM are released in the same repository as first-class reproducible baselines. REFERENCES [1] J. P. Queralta, J. Taipalmaa, B. C. Pullinen, V. K. Sarker, T. N. Gia, H. Tenhunen, M. Gabbouj, J. Raitoharju, and T. Westerlund, “Collaborative multi-robot search and rescue: Planning, coordination, 20 
+
+perception, and active vision,” IEEE Access , vol. 8, pp. 191 617–191 643, 2020. [2] M. Erdelj, E. Natalizio, K. R. Chowdhury, and I. F. Akyildiz, “Help from the sky: Leveraging UAVs for disaster management,” IEEE Pervasive Comput. , vol. 16, no. 1, pp. 24–32, 2017. [3] P. R. Wurman, R. D’Andrea, and M. Mountz, “Coordinating hundreds of cooperative, autonomous vehicles in warehouses,” AI Mag. , vol. 29, no. 1, pp. 9–20, 2008. [4] B. P. Gerkey and M. J. Matari´ c, “A formal analysis and taxonomy of task allocation in multi-robot systems,” Int. J. Robot. Res. , vol. 23, no. 9, pp. 939–954, 2004. [5] G. A. Korsah, A. Stentz, and M. B. Dias, “A comprehensive taxonomy for multi-robot task allocation,” Int. J. Robot. Res. , vol. 32, no. 12, pp. 1495–1512, 2013. [6] H.-L. Choi, L. Brunet, and J. P. How, “Consensus-based decentralized auctions for robust task allocation,” IEEE Trans. Robot. , vol. 25, no. 4, pp. 912–926, 2009. [7] W. Zhao, Q. Meng, and P. W. Chung, “A heuristic distributed task allocation method for multivehicle multitask problems and its application to search and rescue scenario,” IEEE Trans. Cybern. , vol. 46, no. 4, pp. 902–915, 2016. [8] M. Otte, M. J. Kuhlman, and D. Sofge, “Auctions for multi-robot task allocation in communication limited environments,” Auton. Robots ,vol. 44, no. 3–4, pp. 547–584, 2020. [9] S. Hayat, E. Yanmaz, and R. Muzaffar, “Survey on unmanned aerial vehicle networks for civil applications: A communications viewpoint,” 
+
+IEEE Commun. Surveys Tuts. , vol. 18, no. 4, pp. 2624–2661, 2016. [10] M. Asadpour, D. Giustiniano, K. A. Hummel, and S. Heimlicher, “Characterizing 802.11n aerial communication,” in Proc. ACM MobiHoc Workshop Airborne Netw. Commun. , 2013, pp. 7–12. [11] M. Mozaffari, W. Saad, M. Bennis, Y.-H. Nam, and M. Debbah, “A tutorial on UAVs for wireless networks: Applications, challenges, and open problems,” IEEE Commun. Surveys Tuts. , vol. 21, no. 3, pp. 2334– 2360, 2019. [12] Y. Zeng, R. Zhang, and T. J. Lim, “Wireless communications with un-manned aerial vehicles: Opportunities and challenges,” IEEE Commun. Mag. , vol. 54, no. 5, pp. 36–42, 2016. [13] A. Vahdat and D. Becker, “Epidemic routing for partially connected ad hoc networks,” Duke University, Tech. Rep. CS-2000-06, 2000. [14] H. W. Kuhn, “The hungarian method for the assignment problem,” Naval Res. Logist. Q. , vol. 2, no. 1–2, pp. 83–97, 1955. [15] R. G. Smith, “The contract net protocol: High-level communication and control in a distributed problem solver,” IEEE Trans. Comput. , vol. C-29, no. 12, pp. 1104–1113, 1980. [16] M. B. Dias, R. Zlot, N. Kalra, and A. Stentz, “Market-based multirobot coordination: A survey and analysis,” Proc. IEEE , vol. 94, no. 7, pp. 1257–1270, 2006. [17] J. Turner, Q. Meng, G. Schaefer, A. Whitbrook, and A. Soltoggio, “Distributed task rescheduling with time constraints for the optimization of total task allocations in a multirobot system,” IEEE Trans. Cybern. ,vol. 48, no. 9, pp. 2583–2597, 2018. [18] S. Wang, Y. Liu, Y. Qiu, S. Li, and J. Zhou, “An efficient distributed task allocation method for maximizing task allocations of multirobot systems,” IEEE Trans. Autom. Sci. Eng. , vol. 21, no. 3, pp. 3588–3602, 2024. [19] E. Nunes, M. Manner, H. Mitiche, and M. Gini, “A taxonomy for task allocation problems with temporal and ordering constraints,” Robot. Auton. Syst. , vol. 90, pp. 55–70, 2017. [20] L. Luo, N. Chakraborty, and K. Sycara, “Distributed algorithms for multirobot task assignment with task deadline constraints,” IEEE Trans. Autom. Sci. Eng. , vol. 12, no. 3, pp. 876–888, 2015. [21] A. K. A., D. U. J., and U. Subramaniam, “A systematic literature review on multi-robot task allocation,” ACM Comput. Surv. , vol. 57, no. 3, pp. 1–28, 2025. [22] S. Nayak, S. Yeotikar, E. Carrillo, E. Rudnick-Cohen, M. K. M. Jaffar, R. Patel, S. Azarm, J. W. Herrmann, H. Xu, and M. Otte, “Experimental comparison of decentralized task allocation algorithms under imperfect communication,” IEEE Robot. Autom. Lett. , vol. 5, no. 2, pp. 572–579, 2020. [23] M. M. Zavlanos, M. B. Egerstedt, and G. J. Pappas, “Graph-theoretic connectivity control of mobile robot networks,” Proc. IEEE , vol. 99, no. 9, pp. 1525–1540, 2011. [24] S. S. Ponda, L. B. Johnson, A. N. Kopeikin, H.-L. Choi, and J. P. How, “Distributed planning strategies to ensure network connectivity for dynamic heterogeneous teams,” IEEE J. Sel. Areas Commun. , vol. 30, no. 5, pp. 861–869, 2012. [25] L. Liu, N. Michael, and D. A. Shell, “Communication constrained task allocation with optimized local task swaps,” Auton. Robots , vol. 39, no. 3, pp. 429–444, 2015. [26] K. Fall, “A delay-tolerant network architecture for challenged internets,” in Proc. Conf. Appl., Technol., Archit., Protocols Comput. Commun. ,2003, pp. 27–34. [27] L. Johnson, S. Ponda, H.-L. Choi, and J. How, “Asynchronous de-centralized task allocation for dynamic environments,” in Proc. AIAA Infotech@Aerospace Conf. , 2011, AIAA Paper 2011-1441. [28] S. Raja, G. Habibi, and J. P. How, “Communication-aware consensus-based decentralized task allocation in communication constrained envi-ronments,” IEEE Access , vol. 10, pp. 19 753–19 767, 2022. [29] C. Zhao, M. Li, X. Zhu, and C. Zhu, “Assignment-consistent dynamic multi-UAV task allocation: Communication-efficient dynamic multi-unmanned aerial vehicle task allocation under stale and asymmetric information,” Drones , vol. 10, no. 7, p. 523, 2026. [30] C. Nowzari, E. Garcia, and J. Cort´ es, “Event-triggered communication and control of networked systems for multi-agent consensus,” Automat-ica , vol. 105, pp. 1–27, 2019. [31] J. Chen, X. Qing, F. Ye, K. Xiao, K. You, and Q. Sun, “Consensus-based bundle algorithm with local replanning for heterogeneous multi-UAV system in the time-sensitive and dynamic environment,” J. Supercomput. ,vol. 78, pp. 1712–1740, 2022. [32] Y. Kantaros, M. Guo, and M. M. Zavlanos, “Temporal logic task planning and intermittent connectivity control of mobile robot networks,” 
+
+IEEE Trans. Autom. Control , vol. 64, no. 10, pp. 4105–4120, 2019. [33] W. L. Leong, J. Cao, and R. Teo, “Scalable task allocation with communications connectivity for flying ad-hoc networks,” J. Intell. Robot. Syst. , vol. 110, no. 1, p. 25, 2024. [34] S. Acharya, A. Bharadwaj, Y. Simmhan, A. Gopalan, P. Parag, and H. Tyagi, “CORNET: A co-simulation middleware for robot networks,” in Proc. Int. Conf. Commun. Syst. Netw. (COMSNETS) , 2020, pp. 245– 251. [35] T. H. Chung and R. Daniel, “DARPA OFFSET: A vision for advanced swarm systems through agile technology development and experimen-tation,” Field Robot. , vol. 3, pp. 97–124, 2023. [36] X. Chen, P. Zhang, G. Du, and F. Li, “A distributed method for dynamic multi-robot task allocation problems with critical time constraints,” 
+
+Robot. Auton. Syst. , vol. 118, pp. 31–46, 2019. [37] W. P. Heemels, K. H. Johansson, and P. Tabuada, “An introduction to event-triggered and self-triggered control,” in Proc. 51st IEEE Conf. Decision Control (CDC) , 2012, pp. 3270–3285. [38] A. Demers, D. Greene, C. Hauser, W. Irish, J. Larson, S. Shenker, H. Sturgis, D. Swinehart, and D. Terry, “Epidemic algorithms for repli-cated database maintenance,” in Proc. 6th Annu. ACM Symp. Principles Distrib. Comput. , 1987, pp. 1–12. [39] R. Olfati-Saber and R. M. Murray, “Consensus problems in networks of agents with switching topology and time-delays,” IEEE Trans. Autom. Control , vol. 49, no. 9, pp. 1520–1533, 2004. [40] L. D. Brown, T. T. Cai, and A. DasGupta, “Interval estimation for a binomial proportion,” Statist. Sci. , vol. 16, no. 2, pp. 101–133, 2001. 1
+
+# Supplementary Material for “CC-OPI: Online Distributed Task Allocation for UAV Swarms under Communication Constraints” 
+
+Liu Biao and Zhang Tong 
+
+This document provides the complete proofs of Corol-lary 1, Lemma 3, Theorem 1, and Corollary 2 of the main paper, whose statements are repeated here for con-venience, together with the supplementary trade-off figure (Fig. S1), the full terrain-occlusion robustness experiment (Fig. S2), the full hyperparameter-sensitivity study (Fig. S3), the communication-graph statistics of the simulated mobility process (Table S1), the capability mapping of distributed allocation methods (Table S2), the hold-out seed validation of the headline comparisons, the burst-loss and delivery-delay robustness experiments (Table S3), and the scaling study (Ta-ble S4), all referenced in Sections II and VI of the main paper. All notation, definitions, and assumptions (A1)–(A5) follow Section V of the main paper; equation, lemma, corollary, and remark numbers below refer to the main paper. 
+
+Corollary 1 (Deadlock-freedom within a component): 
+
+Within any connected component whose members remain connected until the completed-set synchronization finishes, no completed task is re-included by its members; hence no co-ordination deadlock arises from stale completion information inside such a component. 
+
+Proof: Once a task is completed, its identity is added to the completed set of some member; by the version-based synchronization of Section IV of the main paper, it propagates to every other member that remains in the same component within a finite number of synchronization rounds and, by Lemma 2, is never dropped thereafter. A member that still holds the task evicts it from its path upon synchronization and permanently excludes it from subsequent inclusion. Hence no member re-includes a completed task, and the component can-not deadlock on stale completion information. If the compo-nent splits before the synchronization finishes, the completion fact is not lost: it continues to spread along later opportunistic contacts (the gossip semantics of Section IV of the main paper), reaching any UAV to which a temporal contact path exists. Stale information held across disconnected components is resolved by the consensus rules once the components merge, as noted in Remark 1 of the main paper. 
+
+Lemma 3 (Eventual commitment): Let ui move toward its primary target τ , the head of its path. Once the remaining distance falls below dlock , τ ∈ Ωlock and RP I ef f (τ ) = −∞ ;thereafter τ is neither preempted through consensus nor dis-placed from the head of the path. The task τ then leaves the path of ui within dlock /v min + sτ , either served by ui or, if another UAV is already serving it, dropped by ui upon arrival. Moreover, if τ is deadline-feasible at the instant it is locked, this resolution is an on-time completion by exactly one UAV. 
+
+Proof: When τ is locked, its effective score RP I ef f (τ ) = 
+
+−∞ is the strongest possible retention bid, so no neighbor can win τ away from ui under the consensus rules; the removal phase reclaims a locked task rather than releasing it, and the non-preemption constraint forbids the inclusion phase from inserting any task ahead of a locked head. Hence τ remains the head of the path of ui until physically resolved. The remaining distance is below dlock and the speed is at least 
+
+vmin , so ui reaches τ within dlock /v min . Two UAVs in the same component may both lock τ , since locking is a local decision; in that case the consensus tie is broken by the order in (A5), yet the loser still retains τ locally and continues toward it. Upon arrival, ui either finds τ unserved and serves it within sτ (the service being non-interruptible), or finds it already served and drops it; in either case τ leaves the path of ui within dlock /v min + sτ . Finally, the estimated arrival time Ai,k = t + dist rem /v i is invariant under direct flight at constant speed, so a task deadline-feasible at the instant of locking remains feasible until served, and its resolution is an on-time completion by exactly one UAV. A head already deadline-infeasible when locked is still resolved within the same bound, but not as an on-time completion: the UAV proceeds to it and, upon arrival, either drops it (if already served) or serves it late—a physical completion whose service starts after the deadline and is therefore excluded from the completion metric (Section VI of the main paper). Either outcome removes the head from the path, which suffices for termination. 
+
+Theorem 1 (Finite-time termination): Under Assumption 1, CC-OPI reaches a terminal state within finite physical time and performs finitely many operations. Recalling the map diagonal 
+
+Dmap , the termination time satisfies 
+
+Tstop ≤ Tmax := max  
+
+> k
+
+Dk +
+
+
+
+max  
+
+> i
+
+Ci
+
+ Dmap 
+
+vmin 
+
++ max  
+
+> k
+
+sk
+
+
+
+.
+
+(1) 
+
+Proof: (i) Bounded horizon. By (A3), once t > max k Dk,every task is resolved: it is either already completed or expired, so no live task remains. Beyond this time no task is deadline-feasible, so the inclusion phase admits no new task and every path can only shrink. Each UAV then drains its remaining path of length at most max i Ci by physically reaching its head task in turn; each such step takes at most Dmap /v min of travel, since any leg is at most Dmap long and the speed is at least vmin , plus at most max k sk of non-interruptible service 2
+
+(Lemma 3), after which the task leaves the path. Once every path is empty and no UAV is serving, the terminal state is reached, which yields (1). 
+
+(ii) Finite computation. By (A4), physical time advances in steps ∆t > 0, so the number of frames is at most Tmax /∆t.In each frame, every awakened UAV invokes the solver once, which is bounded by Lemma 1. The total number of operations is therefore finite. 
+
+(iii) Productive progress. Beyond termination, the progress is productive. The task set is fixed and resolution is perma-nent, so Φ( t) is non-increasing; Corollary 1 with Lemma 2 precludes stale-completion deadlock within a component; and Lemma 3 ensures that a commitment reaching the dlock neigh-borhood is resolved within a bounded time—by an on-time completion whenever the task is still feasible when locked— rather than reversed. Hence the horizon is spent productively reducing Φ( t) rather than being lost to idling, deadlock, or oscillation. 
+
+Corollary 2 (Deadlock- and livelock-freedom): Within the execution horizon of Theorem 1, CC-OPI admits neither co-ordination deadlock arising from stale completion information nor an unbounded reassignment sequence. 
+
+Proof: Deadlock-freedom within a component is Corol-lary 1, and stale information across components is resolved upon merging (Remark 1 of the main paper). For livelock-freedom, parts (i)–(ii) of Theorem 1 bound the number of wake-ups over [0 , T max ] by N ⌈Tmax /∆t⌉, and each wake-up modifies a path by a bounded amount (Lemma 1), while a locked commitment is irreversible (Lemma 3). The emergency bonus operates within this finite wake-up budget and hence introduces no unbounded re-attraction. The total number of reassignments is therefore finite. SUPPLEMENTARY FIGURE 
+
+Fig. S1 places every method of the main performance com-parison (Section VI of the main paper) in a single completion-versus-cost plane at the representative scale. SUPPLEMENTARY EXPERIMENT : T ERRAIN OCCLUSION 
+
+This section reports the full protocol and results of the terrain-occlusion robustness test summarized in Section VI-F of the main paper. Beyond the communication radius, terrain can block line-of-sight links: a communication edge exists only if the two UAVs are within range and no obstacle intersects the seg-ment between them. We study how CC-OPI tolerates such occlusion. Because occlusion only removes a link that is already within range, its effect is masked at the representative radius Rc = 250 m, where the distance cutoff alone already disconnects almost every pair. To isolate the occlusion factor, we therefore set the radius large enough that the obstacle-free network is essentially fully connected, and then sweep the occlusion intensity by introducing an increasing number of large, randomly placed circular obstacles (radius 500 –
+
+1200 m) at the fixed scale of 10 UAVs and 30 tasks under the tight-constraint setting, averaging over the same 30 seeds as the main experiments. We emphasize that occlusion blocks 4 10 20 40 100 
+
+Messages per completed task    
+
+> 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9
+> Task completion rate (feasible)  PI CBBA PI-MaxAss PI-C CBBA-C PI-MaxAss-C GEO PI-OM CBBA-OM
+> CC-OPI
+> better
+> Full connectivity Naive constrained Matched online Geographic CC-OPI (ours)
+> Fig. S1. Robustness-versus-cost trade-off at a representative scale ( 10 UAVs,
+> 30 tasks, tight-constraint setting).
+
+communication only: physical motion follows straight lines without obstacle avoidance, so tasks never become physically unreachable and only coordination is affected. The comparison is internal to CC-OPI, isolating the effect of occlusion rather than comparing algorithms. Fig. S2 reports the results. As the number of obstacles increases from 0 to 10 , the task completion rate of CC-OPI declines only modestly, from about 0.88 to 0.87 (paired difference at ten obstacles: −1.6
+
+percentage points, 95% CI [−2.7, −0.5] —small but statis-tically resolved). The coordination cost, however, is more visible: the wasted distance rises consistently, from about 
+
+0.9 km to 4.8 km—a roughly fivefold increase—while the communication overhead falls from about 325 to 251 messages per completed task. This pattern admits a coherent explanation. Occlusion removes communication links, so conflicting claims that would otherwise be resolved through early consensus are instead discovered later, once UAVs converge in phys-ical space, which incurs additional redundant travel; at the same time, fewer reachable neighbors mean fewer broad-casts. The makespan is essentially unaffected. In this isolated communication-occlusion test, CC-OPI thus absorbs line-of-sight blockage primarily as a moderate increase in redundant travel rather than as failed tasks. SUPPLEMENTARY EXPERIMENT : H YPERPARAMETER 
+
+SENSITIVITY 
+
+This section reports the full protocol and per-parameter results of the hyperparameter-sensitivity study summarized in Section VI-D of the main paper. CC-OPI exposes a small set of hyperparameters that were fixed to a single configuration across every experiment of the main paper and never tuned per scenario. To verify that the re-ported conclusions are not an artifact of this particular choice, we vary the three free strength and threshold parameters one at a time, holding the others at their defaults: the spatial-penalty 30 2 4 6 8 10 0.0 0.2 0.4 0.6 0.8      
+
+> Completion rate
+> 0246810 0246
+> Wasted distance (km)
+
+Number of occluding obstacles   
+
+> Fig. S2. Robustness of CC-OPI to terrain occlusion at a fixed scale ( 10 UAVs,
+> 30 tasks, tight-constraint setting).
+
+strength λ, the urgency-penalty weight β, and the emergency-pool margin Temergency . The remaining parameters are fixed by physical or temporal reasoning rather than swept—the spa-tial exponent γ = 1 (a deliberately linear penalty), the urgency exponent κ and onset tsaf e , and the lock distance dlock = 50 m(an irreversibility radius of about 1.7 s and 1.0 s of flight at the two cruising speeds). The attractiveness bonus Abonus acts as a soft infinity whose only requirement is to be large enough to favor a flagged task in the inclusion ranking: a separate sweep over Abonus ∈ [500 , 20000] produces identical results at every value, and removing the bonus entirely ( Abonus = 0 )lowers the TCR and the emergency rescue rate by less than one percentage point each—the cross-regional rescues are carried by the spatial-penalty exemption ( μ = 1 ) rather than by the bonus. We use the tight-constraint setting at 10 UAVs and 30 
+
+tasks, the representative radius Rc = 250 m, and clear terrain, averaging over the same 30 seeds; shaded bands denote 95% 
+
+confidence intervals of the mean, and the standard error of the mean (SEM) of the TCR is about one percentage point. Fig. S3 reports, for each parameter, the metric that carries its conclusion. 
+
+The TCR is insensitive to λ, whose benefit appears in the coordination cost and saturates quickly. As λ varies over 
+
+[0 , 50] , the TCR remains near 0.80 within a single SEM, so the spatial penalty does not trade away completions. Its effect is instead visible in the efficiency metrics (Fig. S3a): disabling it ( λ = 0 , which coincides with the “w/o Spatial” ablation variant of Section VI-C of the main paper) raises the wasted distance from about 43 to 48 km ( +11% ) and the reassignment count from about 19 to 23 (+18% ), consistent with the ablation. Both metrics flatten for λ ≳ 5 and stay essentially constant through λ = 50 , so the default λ = 10 
+
+lies on a broad plateau rather than at a sharp optimum. 
+
+The urgency weight β has only a weak effect. Across 
+
+β ∈ [0 , 2000] the TCR varies by about one percentage point— within one SEM (Fig. S3b)—while the wasted distance grows only mildly with β. The default β = 500 therefore sits in a stable region; we do not claim it to be optimal, and the insensitivity itself indicates that the reported performance does not hinge on this value. 
+
+The emergency margin Temergency is the one genuinely                                                                
+
+> TABLE S1 COMMUNICATION -GRAPH STATISTICS PER RADIUS (10 UAV S,30 TASKS ,
+> CLEAR TERRAIN ,MEANS OVER 30 SEEDS ).
+> Rc(m) Init. degree Avg. degree Avg. comp. Largest frac. Contacts per run Median contact (s)
+> 75 0.00 0.15 9.28 0.14 12 .812 150 0.00 0.16 9.22 0.15 12 .913 250 0.00 0.17 9.15 0.15 14 .49500 0.05 0.21 8.96 0.17 17 .617 1000 0.23 0.38 8.19 0.22 21 .842 2000 0.89 1.10 5.52 0.38 30 .2177 4000 2.91 3.17 1.84 0.83 45 .8424 8000 7.58 7.83 1.00 1.00 52 .01185 15000 9.00 9.00 1.00 1.00 45 .01290
+
+sensitive parameter, and the default lies within its safe region. 
+
+For Temergency ≤ 700 s the TCR stays near 0.80 , but it degrades to about 0.78 at 1000 s and 0.74 at 1500 s (Fig. S3c), a drop of roughly five SEM. The trend follows the mechanism: an overly large margin flags too many tasks as emergencies too early, so the spatial-penalty exemption ( μ = 1 ) applies to a large fraction of tasks and erodes the regionalized operation that suppresses blind cross-regional chasing; the emergency rescue rate falls in step. The accompanying decrease in total distance and makespan does not reflect greater efficiency but fewer completed tasks. The default Temergency = 700 s sits just inside the safe plateau; the marginally higher rate at 500 sis within statistical error and we do not read it as a better setting. Taken together, these sweeps indicate that the reported conclusions are robust to CC-OPI’s hyperparameters: the TCR is insensitive to λ and β within statistical error, and Temergency 
+
+admits a wide safe region around the default and degrades gradually even when grossly mis-specified. SUPPLEMENTARY TABLE : C OMMUNICATION -G RAPH 
+
+STATISTICS 
+
+Table S1 characterizes, in graph terms, what each com-munication radius means in the simulated mobility process (Section VI-A of the main paper), so that the results can be mapped to other environments. All quantities are averaged over the 30 seeds of CC-OPI runs at the representative scale (10 UAVs, 30 tasks, tight-constraint setting, clear terrain, matching the radius sweep of Section VI-E); the statistics depend only on the UAV trajectories. At the representative setting with the default terrain ( Rc = 250 m), the values are essentially identical to the clear-terrain row (time-averaged mean degree 0.16 , largest-component fraction 0.15 , about 15 
+
+contacts of median duration 12 s per mission). SUPPLEMENTARY TABLE : C APABILITY MAPPING OF 
+
+DISTRIBUTED ALLOCATION METHODS 
+
+Table S2 maps the distributed allocation methods discussed in Section II of the main paper onto the six capability dimensions that decide viability under persistent partitioning: the connectivity premise, the coupling between planning and 40 20 40 40 45 50 
+
+> Wasted distance (km)
+
+(a) Spatial-penalty strength λ (de-fault 10 )0 1000 2000 0.78 0.80 0.82 
+
+> Task completion rate
+
+(b) Urgency-penalty weight β (de-fault 500 )500 1000 1500 0.725 0.750 0.775 0.800 0.825 
+
+> Task completion rate
+
+(c) Emergency-pool margin 
+
+Temergency (default 700 s)     
+
+> Fig. S3. Hyperparameter sensitivity of CC-OPI at a fixed scale ( 10 UAVs, 30 tasks, tight-constraint setting).
+
+physical execution, the protection of physical commitment, the dissemination of completion state, the handling of runtime task arrival, and the communication pattern. Each entry reflects the method as characterized in the source cited in Section II of the main paper; PI-OM and CBBA-OM are the matched online wrappers of Section VI-A of the main paper, and the experimental comparison against a static geographic-partition baseline is reported in Section VI-B of the main paper. SUPPLEMENTARY EXPERIMENT : H OLD -O UT SEED 
+
+VALIDATION 
+
+All development, mechanism exploration, and hyperparam-eter sensitivity work used the 30 seeds 42 –71 . To verify that the reported effect sizes are not an artifact of the development instances, the headline comparisons were re-run on 30 fresh hold-out seeds ( 72 –101 ) that played no role in development or tuning, over all six problem scales of the tight-constraint setting, with the same protocol and the seed-cluster pooled inference of Section VI-A of the main paper. PI-MaxAss variants are omitted; the validated effects are the naive-transfer margin, the paradigm gain, the mechanism gain, and the full-connectivity gap. Every effect replicates. Pooled across scales, CC-OPI leads PI-OM by +7 .1 percentage points ( 95% CI [+6 .1, +8 .1] ;development seeds: +6 .9 [+6 .1, +7 .8] ) and CBBA-OM by 
+
++9 .1 [+8 .0, +10 .2] ; the naive-transfer margins are +19 .6[+18 .2, +20 .9] over PI-C and +19 .8 [+18 .4, +21 .2] over CBBA-C; the paradigm gain of PI-OM over PI-C is +12 .5[+11 .4, +13 .6] ; and the gaps to the full-connectivity refer-ences are −4.2 [ −5.1, −3.2] to PI and −2.4 [ −3.3, −1.6] 
+
+to CBBA. At the representative scale, CC-OPI leads PI-OM by +5 .9 [+3 .8, +7 .9] . Under 50% independent delivery loss at the representative scale, the hold-out runs likewise reproduce the loss study: the TCR change of CC-OPI remains statistically indistinguishable from zero ( −1.2 [ −2.4, +0 .1] ), PI-OM degrades ( −2.3 [ −3.7, −0.9] ), and the margin of CC-OPI over PI-OM stands at +7 .0 [+5 .0, +8 .9] .SUPPLEMENTARY EXPERIMENT : B URST -C ORRELATED 
+
+LOSS AND DELIVERY DELAY 
+
+This section reports the full protocols and per-level results of the burst-loss and delivery-delay robustness tests summarized in Section VI-F of the main paper. Both use the representative tight-constraint scale ( 10 UAVs, 30 tasks) at Rc = 250 m on the same 30 seeds as the independent-loss study, comparing CC-OPI with the matched online baselines PI-OM and CBBA-OM; the frozen static baselines are omitted for the reason given in the main paper. Paired differences are computed against the unperturbed runs of the same seeds. 
+
+Burst-correlated loss. The independent per-delivery drop is replaced by a two-state Gilbert–Elliott gate per undirected link: a link in the Bad state drops every delivery of that frame, the chain parameters are set so that the stationary Bad probability equals the mean loss level p ∈ {0.1, 0.3, 0.5}
+
+while the mean Bad dwell is five frames ( 5 s), and the per-frame state transitions consume random draws in a fixed link order, independent of the message pattern, so runs are reproducible. Each mean loss level is thus directly comparable with its independent-loss counterpart, but outages arrive in time-correlated bursts that can silence a link for an entire contact. The loss-free level bypasses the gate and is bit-identical to the loss-free rows of the independent-loss study. 
+
+Delivery delay and reordering. Each surviving deliv-ery is assigned an integer delay drawn uniformly from 
+
+{0, . . . , D max } seconds, with Dmax ∈ { 2, 5, 10 }; a delayed message is buffered and handed to its receiver at the arrival frame regardless of connectivity at that time (the transmission already occurred), so a later broadcast with a shorter draw overtakes an earlier one and messages arrive out of order. This directly exercises the mechanism claims under reordering: the timestamped consensus rules, the monotone completed-set merge, and the position-based state lock must remain correct when state arrives late and out of sequence. The Dmax = 0 
+
+level consumes no draws and is bit-identical to the loss-free rows. Table S3 reports the results. At every level of both per-turbations, the paired TCR change of CC-OPI is statistically indistinguishable from zero, and the margin over PI-OM is preserved or widens; PI-OM degrades under bursts at every level ( −1.2 points, 95% CI [−2.0, −0.4] , at p = 0 .5). CBBA-OM improves slightly under mild bursts ( +0 .9 [+0 .2, +1 .7] at 
+
+p = 0 .1), the same symptom observed under independent loss: random outages interrupt the bid oscillation that commitment 5                                                                
+
+> TABLE S2 CAPABILITY MAPPING OF DISTRIBUTED ALLOCATION METHODS UNDER PERSISTENT PARTITIONING .Method Connectivity premise Planning–execution coupling Commitment protection Completion dissem-ination Runtime task arrival Communication pat-tern CBBA (Choi et al.) Jointly connected graph union over a bounded win-dow Allocate-then-execute (synchronized rounds) None Not applicable (allocation precedes execution) Global replan Per-round neighbor exchange of O(M)
+> state PI (Zhao et al.) Sufficient propagation over the (possibly sparse) topology within the negotiation horizon Allocate-then-execute None Not applicable Global replan Per-round neighbor exchange PI-MaxAss (Turner et al.) Globally consistent view for the two-stage rescheduling Allocate-then-execute None Not applicable Global replan Two-stage per-round exchange ACBBA (Johnson et al.) Eventual network-wide message delivery Asynchronous, locally timed replanning None Implicit through bid consensus Local trigger Asynchronous broad-casts Communication-limited auctions (Otte et al.) Message loss tolerated during the auction; allocation completes before execution Allocate-then-execute None Not applicable Global replan Repeated auction rounds Local task exchange (Liu et al.) Opportunistic neighbor contacts Pairwise swaps on contact; scores partition-myopic None Pairwise state ex-change Not addressed Neighbor-local exchanges Time-freezing replanning (Chen et al.) Network-wide pause sig-nal reachable Periodic global replan-ning, motion frozen None Within each replan-ning round Global replan Round-based re-consensus PI-OM / CBBA-OM (this paper) None (opportunistic con-tacts) Allocate-while-executing (event-driven) None Monotone completed-set gossip Local trigger Event-driven broadcasts CC-OPI (this paper) None (persistent partition-ing tolerated) Allocate-while-executing (event-driven) Non-preemptive state lock Monotone completed-set gossip Local trigger Event-driven, suppression-gated broadcasts
+
+protection suppresses by design. The cost to CC-OPI again surfaces as redundant travel rather than lost completions— 
+
++5 .5 km [+1 .3, +9 .7] at 50% burst loss and +5 .4 km 
+
+[+1 .3, +9 .4] at Dmax = 10 s. SUPPLEMENTARY EXPERIMENT : S CALING 
+
+This section reports the scaling study referenced in Sec-tion VI-A of the main paper. CC-OPI is run at 32 × 96 ,
+
+64 × 192 , and 128 × 384 (UAVs × tasks), alongside the representative 10 × 30 for reference, under the tight-constraint setting over the same 30 seeds—the largest tier being eight times the largest configuration of the main study in both dimensions. Every run executes in a fresh process, four runs in parallel on the eight-core reference machine (AMD Ryzen 7 5800H, 16 GB RAM), so that the timing figures are not inflated by contention; the per-wake-up latency is measured by wrapping the solver invocation with a monotonic clock and isolates the allocation cost, whereas the mission wall-clock additionally includes the simulator’s physics and topology maintenance. Table S4 reports the results. The systems-level costs grow as the analysis of Section V of the main paper predicts. The mean per-wake-up solver latency grows from 0.18 to 1.89 ms—a factor of ten for a 12 .8-fold increase in both N and M , consistent with the 
+
+O(M C 3 + N M ) per-wake-up bound—and remains below 
+
+2 ms even at 128 UAVs, so the allocation itself is far from be-ing a real-time bottleneck. Peak resident memory is essentially flat ( 128 to 137 MB, dominated by the interpreter baseline), reflecting the O(M + N ) per-UAV state. The mean payload per broadcast tracks the analytic 16 M + 8 N + 8 -byte bound (7,176 B at the largest tier; the observed mean of 5,760 B and maximum of 5,805 B stay below it because the monotone completed set never fills). Two quantities grow faster than linearly in the mission size: the broadcasts per completed task rise from 54 .7 to 99 .1, because a denser swarm on the fixed field produces more topology events and more receivers per broadcast, and the mission wall-clock reaches about one minute at the largest tier—the aggregate of roughly 28 ,000 
+
+solver invocations across the swarm (about 53 s), which a real deployment would execute in parallel on 128 vehicles, the remainder being the simulator’s physics and O(N 2) topology maintenance. The completion quality does not deteriorate: the TCR rises from 0.789 to 0.845 , since a denser deployment on the fixed field yields richer contact opportunities, and the redundant travel per UAV saturates at about 6 km. We report these figures as simulation-scale evidence; they do not establish deployment-scale feasibility of the radio layer, which is outside the model. 6
+
+TABLE S3 BURST -LOSS AND DELIVERY -DELAY RESULTS AT THE REPRESENTATIVE SCALE (MEANS OVER 30 SEEDS ; BRACKETED INTERVALS ARE PAIRED BOOTSTRAP 95% CI S IN PERCENTAGE POINTS ). Level CC-OPI TCR PI-OM TCR CBBA-OM TCR CC-OPI 
+
+∆ vs clean CC-OPI 
+
+− PI-OM none 0.789 0.730 0.708 — +5 .9
+
+burst p = 0 .1 0.785 0.724 0.717 −0.3 [ −0.8, +0 .1] +6 .1 [+4 .2, +7 .8] 
+
+burst p = 0 .3 0.788 0.720 0.710 −0.1 [ −1.2, +1 .1] +6 .7 [+4 .5, +8 .9] 
+
+burst p = 0 .5 0.786 0.718 0.704 −0.2 [ −1.3, +0 .8] +6 .8 [+4 .9, +8 .6] 
+
+delay Dmax = 2 s 0.791 0.722 0.712 +0 .2 [ −0.6, +1 .1] +6 .9 [+4 .8, +8 .8] 
+
+delay Dmax = 5 s 0.782 0.723 0.711 −0.7 [ −1.7, +0 .4] +5 .9 [+3 .8, +7 .9] 
+
+delay Dmax = 10 s 0.787 0.722 0.711 −0.1 [ −1.2, +1 .0] +6 .6 [+4 .4, +8 .6] 
+
+TABLE S4 SCALING OF CC-OPI UNDER THE TIGHT -CONSTRAINT SETTING (MEANS OVER 30 SEEDS ). Scale TCR Mission wall-clock (s) Wake-up latency (ms) Peak RSS (MB) Bcast. per task Payload (B/bcast.) 
+
+10 × 30 0.789 0.5 0.18 128 54 .7 456 32 × 96 0.820 3.3 0.58 128 64 .7 1440 64 × 192 0.828 12 .5 1.05 129 74 .3 2878 128 × 384 0.845 60 .4 1.89 137 99 .1 5760
