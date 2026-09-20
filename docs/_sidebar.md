@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-09-20 <!--dpr-date:20260920-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/20/2609.19600v1-worldcontact-a-contact-centric-world-model-for-scalable-robot-learning" data-sidebar-item="{&quot;title&quot;: &quot;WorldContact: A Contact-Centric World Model for Scalable Robot Learning&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.19600v1-worldcontact-a-contact-centric-world-model-for-scalable-robot-learning&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;面向机器人环境表征的世界模型&quot;}">WorldContact: A Contact-Centric World Model for Scalable Robot Learning</a>
   * 2026-09-18 <!--dpr-date:20260918-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/18/2609.19208v1-cc-opi-online-distributed-task-allocation-for-uav-swarms-under-communication-constraints" data-sidebar-item="{&quot;title&quot;: &quot;CC-OPI: Online Distributed Task Allocation for UAV Swarms under Communication Constraints&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.19208v1-cc-opi-online-distributed-task-allocation-for-uav-swarms-under-communication-constraints&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;分布式多机器人任务分配与协调&quot;}">CC-OPI: Online Distributed Task Allocation for UAV Swarms under Communication Constraints</a>
