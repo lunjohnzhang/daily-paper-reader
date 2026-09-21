@@ -1,0 +1,276 @@
+Title: Gripper-Aware Automatic Dense Packing of Irregular Objects
+
+URL Source: https://arxiv.org/pdf/2609.22062v1
+
+Published Time: Mon, 21 Sep 2026 01:18:05 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# Gripper-Aware Automatic Dense Packing of Irregular Objects 
+
+Tianhao Qin, Connor McCann, Berk Calli, and Jing Xiao 
+
+Robotics Engineering Department Worcester Polytechnic Institute, Worcester, MA 01609, USA 
+
+tqin@wpi.edu 
+
+Abstract. Automatic dense packing is widely desired in warehouse op-erations but remains a fundamental challenge in robotic manipulation. Existing work on irregular-object packing largely targets simulation with idealized contact, treating the object as an isolated rigid body. The grip-per often enters as a discrete, post-hoc feasibility check, if considered at all, and the perception and contact drift accumulated during execution are not addressed. We present a closed-loop pipeline that integrates per-ception, gripper-aware placement optimization, and force-guided execu-tion on a real manipulator. The optimizer represents the object together with the gripper as a single composite body of hierarchical sphere trees. It searches over five degrees of freedom on a GPU within a CMA-ES framework, with the vertical coordinate grounded analytically against the current heightmap. During execution, a force-monitored vertical de-scent stops on first contact. A post-release consolidation push then closes the residual lateral clearance that gripper-aware planning leaves behind. The container is re-perceived between placements so that drift does not accumulate. We validate the system on a Franka Emika Panda robot packing a 3D-printed set of flat, curved, and concave objects, and a YCB object subset. An ablation study isolates the contribution of gripper-aware optimization, the consolidation push, and mesh-derived geometry to end-to-end success, achieved density, and computational cost. We fur-ther benchmark against the heightmap-minimization method as a base-line representative of prior irregular-object packing work. 
+
+Keywords: robot manipulation, dense packing, irregular objects, CMA-ES, force-guided assembly 
+
+## 1 Introduction 
+
+Dense packing of objects into a container is a common task in warehouse logis-tics and order fulfillment, where performance depends on how efficiently each container is filled. Classical formulations, dating back to bin-packing and pallet-loading, assume the items are regular boxes with known dimensions [12]. How-ever, such formulations no longer match today’s operations that increasingly require densely packing irregular items. Recent work has accordingly turned to packing irregular objects, but the gap still remains when those approaches are arXiv:2609.22062v1 [cs.RO] 18 Sep 2026 2 Tianhao Qin et al. 
+
+executed on a real robot. In this paper, we present a full robotic system capable of dense packing of objects with arbitrary shape. 
+
+1.1 Related Work Irregular-Object Packing. Automatic packing of irregular objects has pro-gressed much in recent years. Wang and Hauser introduced a heightmap mini-mization formulation over arbitrary meshes for stable bin packing with a robot manipulator [21]. However, it is executed open-loop, with the object treated as an isolated rigid body. Learning-based methods have also been applied to bin-packing. In the cuboid setting, PackerBot [24] uses heuristic-assisted deep reinforcement learning, and Packing Configuration Tree [26] learns over a tree of candidate placements. Both achieve strong densities on cuboid items but do not extend to arbitrary mesh geometry. For irregular shapes, Huang et al. [11] use hi-erarchical reinforcement learning to jointly plan packing sequence and placement, IR-BPP [25] combines geometric candidate generation with a learned placement-selection policy trained in physics simulation, and SDF-Pack [15] formulates placement as signed-distance-field minimization. Most recently, RoboPacker [23] integrates shape estimation, hierarchical reinforcement learning for packing se-quence and placement, and manipulation strategies into an autonomous system. These methods report strong packing performance in simulation, and several also demonstrate physical robotic packing. However, the object is planned as an isolated rigid body, contact models are idealized, and gripper geometry never enters as part of a continuous placement objective. We hypothesize that in dense configurations the gripper geometry is equally if not more likely to collide with the environment than the object itself, so a placement that fits the object alone may still be unreachable. 
+
+Execution-Aware and Contact-Rich Placement. A separate line of work addresses the gap between simulation and execution. Even with a heightmap planner, Wang and Hauser report that open-loop physical execution succeeds on only 83% of five-item orders without resensing and replanning after a place-ment shifts [21], indicating that strong simulation-time density alone does not translate to reliable real-robot performance. This gap has several sources that prior work has tackled in isolation. Ignoring gripper geometry in the planner pro-duces approach-time collisions, perception drift between planned and achieved poses accumulates across an open-loop sequence, and small lateral errors that would be harmless in free space cause the object to wedge when seated into a tight gap. Conservative planning that enlarges clearances around each placement trades achievable density against the risk of an infeasible execution [21], while hand-designed primitives such as toppling and push-to-place repair the config-uration after the nominal placement [18]. Recent benchmarking [22] quantifies the gap between geometric compactness and physics-feasible execution in sim-ulation. Most closely related, Cao and Xiao [4] present a complete pipeline for online dense packing of novel objects that reasons about sensing and motion Dense Packing 3
+
+uncertainty, but the objects are restricted to prism-like shapes that are irregular only in planform, and a vacuum gripper is used mostly to simplify the effect of grasping in packing optimization. What is still missing is a closed perception-to-execution loop that couples gripper-aware placement optimization with contact-reactive descent so that drift accumulated across a sequence of placements is absorbed at the time scale it appears. A related family of contact-rich assembly methods [3] couples a sphere-tree representation [20] with active force/torque-guided recovery. Their part-into-part setting is different from packing, but the sphere-tree representation is a direct precedent for ours. 
+
+1.2 Approach and Contributions 
+
+This paper addresses dense packing of irregular objects with a soft parallel jaw gripper, under the perception and contact uncertainties that are often ignored in simulation-optimal pipelines. We assume a pre-registered library of object meshes with associated grasps, in line with industrial settings where a unit cat-alog is available. The contributions of this paper are as follows: 
+
+– A gripper-aware placement optimizer that reasons about the object and the gripper as a single composite body and searches over 5 DoF on a GPU. 
+
+– A closed-loop execution layer that absorbs perception and contact drift through force-monitored descent and a post-release consolidation push, with the container re-perceived between placements. 
+
+– System validation on real hardware over a set of 3D-printed and YCB ob-jects with various shapes, with ablations isolating the contribution of each component and comparative study against a prior baseline. Detect next object and    
+
+> estimate object pose
+> Execution Module
+> Pick object
+> Perception Module Planning Module
+> Build object+gripper sphere tree
+> Scan container point cloud Build container sphere tree
+> Object remains in
+> staging area?
+> Yes
+> Done
+> No
+> Is floor object?
+> Contact-aware
+> descent
+> No
+> CMA-ES placement search Output placement
+> SE(3) pose
+> Yes Consolidation
+> push
+
+Fig. 1: Dense packing pipeline. Perception detects the next target object and scans the container, Planning composes the object with its grasp and searches over placements with CMA-ES, and Execution picks, descends with force/torque monitoring, and consolidates eligible placements before looping back. 4 Tianhao Qin et al. 
+
+## 2 Method 
+
+Figure 1 shows the overall pipeline. At iteration k, the system perceives the workspace to obtain the current container configuration Ck and the next target object, runs the gripper-aware placement optimizer over Ck and the target object (Sec. 2.1), and executes the resulting placement with force-monitored descent and post-release consolidation (Sec. 2.2) before looping back for Ck+1 .
+
+2.1 Gripper-Aware Placement Optimization 
+
+The optimizer treats the object and the gripper holding it as a single composite body, and searches over five degrees of freedom under a multi-term objective that is evaluated in batches on a GPU. 
+
+Composite Body and 5-DOF Grounded Formulation. Let PO ∈ RNO ×3
+
+be the target object point cloud in the object’s own frame, and PG ∈ RNG×3 be the gripper point cloud, rigidly attachedthrough the pre-registered grasp. The union PO ∪ PG forms the composite body. A candidate placement pose is a rigid-body transform in the workspace frame whose origin is the container corner and whose axes are parallel to the robot base frame, with position ( x, y, z ) and an axis-angle rotation θ ∈ R3. The search vector is defined as 
+
+x = ( x, y, θ 1, θ 2, θ 3) ∈ R5 (1) excluding z. For each x sampled by the search, z is set analytically as the highest support point beneath the object, by indexing a heightmap h of the current Ck
+
+at 5 mm cell resolution: 
+
+z∗(x, y, θ) = max   
+
+> (i,j )∈N O(x,y )
+
+h(i, j ) − min 
+
+> p∈PO
+
+R(θ) p 
+
+> z
+
+, (2) where NO (x, y ) is the set of heightmap cells above the rotated object’s projected footprint. The first term is the height of the tallest surface already present be-neath the object at position ( x, y ), whether the container floor or a previously placed object. The second term is the object’s lowest point once it has been rotated by R(θ), measured about its own origin. Subtracting the latter from the former drops the rotated object straight down until it rests on that support, so the placement neither floats above the configuration nor interpenetrates it. Operation (2) is a discrete max over a finite cell set, not a differentiable closed form. CMA-ES does not require gradients, so the discontinuity is benign, and floating placements that are not physically possible are ruled out at no extra search cost. 
+
+Sphere-Tree Representation. For each candidate, the optimizer queries dis-tances and penetrations between the composite body and the current container configuration Ck. To keep these queries fast, we represent each cloud as a hier-archical sphere tree [16], built by recursive PCA-based binary splitting. At each Dense Packing 5
+
+node we fit a Ritter bounding sphere [17], and we stop recursing once a leaf holds ten points. We write S(·) for the sphere-tree representation of a cloud, so 
+
+Sk = S(Ck) is the container sphere tree at iteration k and SO , SG are built once per object and gripper. The leaf centers and radii of the moving composite body are then transformed by the candidate ( x, y, z ∗, θ) and tested against the leaves of Sk in parallel as tensor operations. 
+
+Multi-Term Objective. We score a candidate x by a weighted sum of eight terms, 
+
+f (x) = wvol ˆfvol + wcen ˆfcen + wpck ˆfpck + whgt ˆfhgt + wfro ˆffro 
+
++ wcol ˆfcol + wbnd ˆfbnd + wori ˆfori , (3) where each ˆfi is a term-specific scalar score computed from the geometries of 
+
+Sk and the composite body. The first five are packing-quality terms, evaluated on the object sphere tree SO alone because they describe the configuration that remains after the gripper retracts. The latter three represent feasibility terms, evaluated on the composite sphere tree SO ∪ S G or on SG alone, because the gripper should be taken into account while it holds the object. In what follows, 
+
+C(S) denotes the set of leaf sphere centers of a sphere tree S, and a bar denotes their centroid. For the packing-quality terms, Volume ˆfvol is the axis-aligned bounding-box volume of C(Sk) ∪ C(SO ), rewarding placements that compress into a small en-closing box. Centroid distance ˆfcen = ∥C(Sk) − C(SO )∥ pulls the new object toward the existing container configuration. Packing gap ˆfpck averages the dis-tance from each container leaf center c ∈ C(Sk) to its nearest center in C(SO ). It penalizes empty space against the current pile. Height ˆfhgt penalizes both the maximum z over C(Sk) ∪ C(SO ) and the z of C(SO ). Frontier ˆffro pulls C(SO )toward the workspace origin only while floor occupancy is below 70%, preventing it from fighting the height and packing terms once the base layer is in place. For the feasibility terms, Collision ˆfcol sums pairwise sphere penetrations between SO ∪ S G and Sk. It is evaluated on the full composite body so the gripper itself cannot pass through placed objects. Bounds ˆfbnd sums per-axis container overflows with a split rule, where object spheres must stay inside at all heights, while gripper spheres only have to stay inside when below the container rim. Orientation ˆfori combines a hard-cone penalty when the gripper z-axis tilts more than αmax = 45 ◦ with a soft term linearly penalizing any tilt. Weights and point-set assignments are summarized in Table 1. The relative magnitudes encode a strict priority. Feasibility terms carry weights an order of magnitude larger than packing-quality terms, so violating a hard constraint costs far more than leaving an empty corner. Within the packing-quality group, the height term dominates so that low and flattening placements are preferred over compact placements that grow upward. The soft orientation weight is intention-ally small to steer the search toward upright grasps while not overriding packing 6 Tianhao Qin et al. 
+
+Table 1: Optimization configuration: objective function weights with point-set assignments, and CMA-ES parameters.                                         
+
+> Term Vol. Cent. Pack. Height Front. †Coll. Bounds Orient. Symbol ˆfvol ˆfcen ˆfpck ˆfhgt ˆffro ˆfcol ˆfbnd ˆfori
+> Weight 2.0 2.0 2.0 10 / 5 10 50 50 50 / 4 Point set OOOOOO+G O+G GO = Object points, G = Gripper points, O+G = both. Height weight 10 /5 de-notes (max-zweight) / (centroid-zweight); Orient. weight 50 /4 denotes (hard-cone weight) / (soft-tilt weight). †Frontier active only while floor occupancy <70%.
+> CMA-ES: population 128, max generations 200, initial σ= 1 .0, patience 50, in-dependent restarts 3.
+
+quality when a tilted grasp is genuinely better. The weights and the 70% gate were fixed once by an offline grid search, not tuned per object or per trial. 
+
+GPU-Batched CMA-ES. We optimize f over x ∈ R5 with CMA-ES [10], whose gradient-free, population-based search suits the non-convex, mildly multi-modal landscape of f avoids the non-differentiability of Eq. (2). At each gener-ation the entire population is evaluated in a single batched GPU call. To avoid settling into a suboptimal local minima, the default configuration runs three independent CMA-ES instances with distinct seeds and keeps the best result. Optimization parameters are summarized in Table 1. 
+
+2.2 Closed-Loop, Uncertainty-Aware Execution 
+
+The placement returned by the optimizer is a nominal target, but not a guar-anteed achievable pose. Calibration error, slip during the grasp, and contact dynamics during descent each move the achieved pose away from the planned pose. The execution layer absorbs these errors at the time scale they appear on, instead of budgeting for them as inflated clearances in the optimizer. 
+
+Force-Monitored Continuous Descent. Guarded motion under force/torque sensing is a long-standing technique in force-controlled assembly [13]. A short window of wrist samples before each descent gives a baseline wrench w0 that cancels the grasped object’s weight. The arm then descends along world −z,at fixed rotation θ using the Pilz LIN Cartesian-linear planner [14], and aborts once the world-frame vertical force delta, ∆F world  
+
+> z
+
+exceeds a threshold F thresh  
+
+> z
+
+.The contact height is then logged, and the gripper releases the object. 
+
+Post-Release Consolidation Push After releasing the object, two indepen-dent axis-aligned pushes ( −x and −y) consolidate it toward the workspace origin, absorbing the small lateral clearance left by the contact-safe descent together Dense Packing 7
+
+with the residual drift between the planned and achieved poses. Each axis is skipped if the object is already at the origin wall, if the gripper start pose would lie outside the container, or if the corridor behind the object is already occu-pied. On a surviving axis, the gripper descends low on the object’s side at a low height chosen to push it translationally rather than tip it, then executes a slow Cartesian-linear push that aborts once ∥∆Fworld  
+
+> xy
+
+∥ exceeds a small threshold. This gives a deterministic stop on a wall or a neighboring object. 
+
+## 3 Experiments 
+
+We evaluate the full pipeline on a real Franka arm on a 3D-printed object set and a YCB subset. We also conduct ablation study isolating gripper-aware op-timization, the consolidation push, and mesh-derived geometry. And finally we compare our method against a baseline of prior irregular-object packing work. 
+
+Fig. 2: Hardware platform and object set. Left : (a) Intel RealSense D415 and D455 depth cameras mounted on opposite sides of the workspace, (b) 7-DoF Franka Emika Panda [9], (c) ATI wrist force/torque sensor, (d) 3D-printed soft parallel fin-ray gripper, (e) Container, (f) Staging area with the seven-object set. 
+
+Right : the eight-object YCB subset used to test generalization. 
+
+3.1 Hardware and Object Sets 
+
+The platform is shown in Fig. 2. The ATI wrist force/torque sensor streams at 100 Hz, and the container has inner dimensions 6 × 12 × 4 in. Optimization and motion planning run on an NVIDIA RTX 3090 workstation using MoveIt [5] with the Pilz industrial motion planner [14]. We use a set of seven 3D-printed replicas of irregular household and warehouse objects selected to span the variation that drove our formulation. The set contains one flat support that anchors the base layer, two tall and slender vases with a tight approach angle tolerance, two 8 Tianhao Qin et al. 
+
+duck-shaped objects with curved geometry, and two L-shaped objects whose concave profile rewards careful orientation. Each entry comes with a CAD mesh, a sampled surface point cloud, and a single pre-registered antipodal grasp in the object’s own frame (Fig. 2). To test generalization beyond this set, we additionally evaluated our approach on an eight-object subset of the YCB Object and Model Set [2]: banana, gelatin box, mug, orange, pear, potted meat can, pudding box, and tomato soup can (Fig. 2) . These objects span a comparable range of shape complexity, from simple prisms to curved and asymmetric geometry. 
+
+3.2 Perception 
+
+Two RealSense cameras are mounted on opposite sides of the workspace reduce occlusion. For each camera, depth measurements are averaged over ten captures. Camera poses relative to the robot base are estimated from a fixed workspace ArUco marker [8] using SQPnP [19], and repeated estimates are averaged in 
+
+SE (3). The table is removed by a RANSAC plane fit [7], the remaining points are clustered with DBSCAN [6] to isolate the target object, and the cluster is matched to the CAD library by point-to-point ICP [1] scored by Chamfer distance. Combining object at the matched pose with the gripper at the pre-registered grasp gives the composite body directly in the robot base frame. 
+
+3.3 Test Sequences 
+
+Objects are sequenced by decreasing spatial extent, 
+
+sk = max(dim( Pk)) · VAABB (Pk), (4) which biases picking large flat objects so that the base layer is formed first. To isolate the contribution of the sequencing rule, we evaluate the full system on three fixed orderings of the object set, each repeated for five trials. The Opti-mized sequence follows the largest-first ordering rule of Eq. (4). The Random 1 
+
+and Random 2 sequences are random orderings that expose how much density the optimizer can achieve without the benefit of the sequencing rule. We addi-tionally run the YCB object set on a fixed sequence also for five trials, without random orderings, since the goal is to test generalization rather than to isolate the sequencing rule again. The sequences are listed in Table 2. 
+
+3.4 Evaluation Metrics 
+
+We report metrics in three groups. Packing-quality metrics describe the final static packing result in the container, execution-robustness metrics describe the run-time behavior of the pipeline, and computational metric describes the cost of producing each placement. Dense Packing 9
+
+Table 2: Test sequences (five trials each).      
+
+> Sequence Object ordering Optimized support, duck, duck, vase, vase, L, L Random 1 vase, L, vase, L, duck, duck, support Random 2 duck, vase, L, support, L, vase, duck YCB mug, tomato soup can, banana, potted meat can, pudding box, gelatin box, pear, orange
+
+Packing Quality. Space utilization. Ratio of total volume of placed objects to the total volume of the object set. The container is sized so the full set only barely fits, which keeps space utilization a discriminative metric. An object is counted as placed only if it lies fully within he container planform up to the vase height. An object can only be counted in a binary in/out sense, since partial overhangs are not realistic for downstream warehouse handling. This is a variant of the density metric used by prior bin-packing work [26, 15, 21]. 
+
+Number of objects packed. The number of objects successfully placed inside the container by the end of a run, or before an abort. Reported with space utilization to distinguish dropping one large object vs. several small ones. 
+
+Execution Robustness. End-to-end success rate. The fraction of orderings in which every object is placed without an aborted insertion, dropped grasp, or toppled neighbor. A single failure invalidates the ordering. This is the closest analogue to the order-level success rate reported by Wang and Hauser [21]. 
+
+Per-placement success rate. For each attempted placement we record either success or failure due to optimizer-infeasible, grasp failure, approach collision, insertion abort, or post-release disturbance. 
+
+Computational Cost. Optimizer wall time. Mean and maximum time spent inside the CMA-ES loop per object, reported separately from end-to-end itera-tion time because the latter is dominated by robot motion. 
+
+3.5 Ablations 
+
+We isolate the contribution of each of the three pipeline functions (i.e., using the 3-D irregular shape of each object directly, pushing, and gripper-aware opti-mization) through ablation study against the full system. Each ablation toggles a single function and leaves everything else unchanged. All ablations run on the 
+
+Optimized sequence defined in Sec. 3.3. Variants are summarized in Table 3. A1 swaps each object’s mesh-derived sphere tree for a prism extruded from its XY planform. A2 disables the consolidation push. A3 removes the gripper points PG from the composite body and drops the orientation constraint, though the gripper stays attached during execution so approach-time interference is still exposed. Each variant is run for five trials. 10 Tianhao Qin et al. 
+
+Table 3: Ablation variants, run on the Optimized sequence.          
+
+> ID Ablations Hypothesis tested A0 Full system Reference for paired comparison. A1 Prism-like geometry Planform-extrusion proxy [4] cannot pack as dense as using the irregular shapes directly. A2 No consolidation push Post-release push contributes measurably to fi-nal density. A3 No gripper-aware optimiza-tion Omitting the gripper from the composite body causes collision.
+
+3.6 Comparative Study 
+
+To evaluate our approach relative to prior work, we additionally compare against Wang and Hauser’s heightmap-minimization (HM) formulation [21], the closest existing method targeting dense packing of irregular objects with a real manip-ulator. We hold perception, grasp selection, and execution identical to our own pipeline and substitute our optimizer with Wang and Hauser’s own grid search over discretized ( x, y ) positions and angles, scored by minimizing the resulting heightmap. Since its quality depends on grid resolution, we evaluate two set-tings, five trials each: HM Low Resolution reproduces their reported resolution (Table 7), and HM High Resolution matches the candidate count of our own CMA-ES budget, isolating whether any shortfall traces to a coarse search or to the grid-based formulation itself. 
+
+## 4 Results and Discussion 
+
+We organize the results around three questions. Sec. 4.1 reports the full system across the four test sequences and quantifies the effect of sequencing. Sec. 4.2 isolates the contribution of mesh-derived geometry, the post-release push, and gripper-aware optimization through ablations on the Optimized sequence. Sec. 4.3 shows how our method performs compared to the baseline. A video recording of the test sequences, each ablation case, and the compared baseline, is provided as supplementary material. 
+
+4.1 Packing Across Test Sequences 3D-printed Objects Table 4 reports the full system on the three test sequences of Sec. 3.3, each repeated for five trials. The key result is that 14 out of 15 orderings completed end-to-end. The single failure occurred in the Random 1 sequence, where the flat support object was not picked up due to perception drift and the run terminated after six objects. Final packing results for each sequence are shown in Fig. 3, and a per-configuration summary of utilization and objects packed is shown in Fig. 6(a). Dense Packing 11 
+
+Table 4: Average system performance of three test sequences (five trials each).                                                 
+
+> Metric Optimized Random 1 Random 2 Overall Space utilization (%) 95 .59 ±6.06 81 .37 ±0.02 75 .19 ±5.66 84 .05 ±9.89 Objects packed 6.60 ±0.55 6.00 ±0.00 5.40 ±0.55 6.00 ±0.65 End-to-end success 5/54/55/514 /15 Per-placement success 35 /35 34 /35 35 /35 104 /105 CMA wall time (s/obj) 3.56 ±0.20 3.32 ±0.21 3.19 ±0.11 3.34 ±0.22
+
+Fig. 3: Three final packing results (out of five) for each sequence. The Optimized sequence produces visibly flatter and tighter configurations, while the random orderings leave larger residual cavities as small objects are committed early. 
+
+YCB Objects On the YCB sequence (Table 5), the system completes all five trials end-to-end with every attempted placement succeeding (40 /40). Table 5: Average system performance on the YCB objects (five trials each).            
+
+> Space utilization (%) Objects packed CMA wall time (s/obj) YCB subset 82 .45 ±10 .36 6.60 ±0.89 3.00 ±0.46
+
+Fig. 4: Final packing results for all five trials of the YCB sequence. 
+
+Sequencing sets an upper bound on achievable density. The roughly 20-point drop between Optimized and Random 2 exceeds the within-sequence variation by a wide margin, so sequencing has a real effect on achievable density. Even when small or concave objects are committed early, the optimizer still returns reachable, collision-free placements for every subsequent object, but cannot re-cover the volume lost to a base layer that was never built. End-to-end success and CMA wall time are essentially unaffected, so this cost is purely in density, not reliability or search effort. The YCB result lands in the same Random 1/Ran-12 Tianhao Qin et al. 
+
+dom 2 range of the 3D-printed set. The fact that it reaches comparable den-sity and preserves perfect per-placement success suggests the robustness of our composite-body formulation and packing terms on a different object set. 
+
+4.2 Ablations 
+
+We compare the full system against three ablations on the Optimized sequence, with five trials each. Table 6 reports the result. Fig. 5 shows a representative final packing result per variant, and Fig. 6(b) shows the ablation bars next to the sequencing bars of (a) on the same scale. Table 6: Paired ablation on the Optimized sequence.                                               
+
+> Metric A0 (Full) A1 (Prism-like) A2 (No-push) A3 (No-gripper) Space utilization (%) 95 .59 ±6.06 80 .00 ±9.50 70 .62 ±12 .43 26 .09 ±21 .23 Objects packed 6.60 ±0.55 5.20 ±0.84 5.20 ±0.84 1.40 ±1.14 End-to-end success 5/55/55/50/5Per-placement success 35 /35 35 /35 35 /35 7/35 CMA wall time (s/obj) 3.56 ±0.20 1.87 ±0.12 3.30 ±0.28 2.69 ±0.39
+
+Fig. 5: Three final packing results (out of five) for each ablation variant on the Optimized sequence. 
+
+No gripper-aware optimization (A3) collapses the pipeline. Space utilization drops significantly, only 1 .4 objects are placed on average, and no trial com-pletes end-to-end (0 /5). Two failure modes account for the collapse. First, with the gripper removed from the composite body, the optimizer clips the first sup-port object flush against the container origin, so during execution the fingers strike the two adjacent walls and the object rolls free into the container before release. Second, because the orientation term acts on the gripper axis, remov-ing the gripper from the optimization also removes the upright preference, and the optimizer returns physically impossible upside-down poses for asymmetric objects such as the duck. CMA wall time drops to 2 .69 ± 0.39 s/obj because the search terminates as soon as the object-only sphere tree fits, but the resulting poses are unreachable for the real arm-and-gripper system. 
+
+No consolidation push (A2) causes the larger density drop among the variants that still complete end-to-end, from 95.6% to 70.6% utilization at unchanged 35/35 per-placement success. Dense Packing 13 
+
+Prism-like geometry (A1) reaches 80 .0% utilization and 5 .2 objects packed, both below the full system, while CMA wall time roughly halves. 
+
+Fig. 6: Comparison of space utilization and objects packed. (a) The left three bars correspond to the sequential packing tests. (b) The right three bars correspond to the ablation variants on the Optimized sequence. Bars show the mean over five trials per configuration with error bars indicating one standard deviation. 
+
+The gripper belongs in the planner, and pushing recovers what it costs. The A3 result reflects a qualitative failure rather than a gradual loss of density. The gripper lets the optimizer verify that the arm and gripper together can physically reach a placement, not merely that the placement suits the object alone. Removing it from the composite-body representation eliminates that check entirely, so the optimizer can no longer tell whether its output is executable. The drop observed under A2 reflects the price of that reachability. Since gripper-aware optimization must leave lateral clearance around a neighboring object to keep the gripper collision-free during approach, this clearance persists even after the gripper retracts. The consolidation push then closes that clearance after release, which makes the division of labor explicit. Planning secures reachability at the cost of clearance, and pushing subsequently recovers the density that this clearance leaves behind. 
+
+Geometric fidelity vs. search cost. A1’s lower wall time follows from its smaller, shallower sphere tree, and its utilization appears competitive because planform extrusion preserves each object’s footprint. Curved and concave objects, however, are seated against an idealized prism rather than against their true shape. As a result, the optimizer reserves more space than the object actually occupies, and neighboring objects cannot nest into its concavities. This effect is most visible for the L-shaped object, whose true volume is far smaller than that of its prism hull. Planform extrusion therefore remains workable for catalogs of upright, prism-like items [4], but it breaks down for irregular or concave ones. 
+
+4.3 Comparative Study 
+
+Table 7 and Fig. 7 report the comparison on the Optimized sequence. Our system achieves the highest packing quality of the three configurations, exceeding both 14 Tianhao Qin et al. 
+
+HM baselines in space utilization and in the number of objects packed. All three configurations complete every trial end-to-end (5 /5) with a clean per-placement record (35 /35), so the gap lies entirely in how densely each method packs the container rather than in failed grasps or collisions. Table 7: Full system (Optimized sequence) vs. Wang and Hauser [21] heightmap-minimization (HM) baseline, with two search budgets: HM Low Resolution (10 mm XY step, ∆r = π/ 4, their Sec. VI setting) and HM High Resolution (5 mm step, 16 yaws, a matched search budget). Five trials each.                      
+
+> Metric Optimized HM Low Resolution HM High Resolution Space utilization (%) 95 .59 ±6.06 77 .66 ±8.33 82 .35 ±6.06 Objects packed 6.60 ±0.55 5.00 ±0.71 5.40 ±0.55
+
+Fig. 7: Final packing results for the HM baseline on the Optimized sequence. 
+
+Algorithmic and Computation Comparison Our optimizer searches its 5-DOF pose continuously (Eq. (1)), whereas HM enumerates a discrete grid of positions and angles and scores each heightmap cell. HM’s quality is a function of grid resolution. The gain from HM Low Resolution to HM High Resolution comes entirely from using a finer grid, whereas our continuous search has no such parameter to tune and still reaches higher utilization than either discretization. There is also a scoring bias from rasterization. HM scores a yaw by rasterizing the object’s rotated footprint onto the grid, so for a radially asymmetric object the score depends on how the footprint boundary aligns with the grid lines rather than on the true occupied area. This biases the search toward certain orientations in a way that sampling more yaws cannot remove. Our optimizer instead scores orientation directly on the sphere-tree geometry (Sec. 2.1) without rasterizing, so it is not subject to this bias. In addition, refining HM’s grid increases the number of candidates polyno-mially. Wall time rises from 0 .42 ± 0.03 to 1 .04 ± 0.03 s/obj for that gain in utilization, and closing the remaining gap to our own result would require much larger refinement at correspondingly larger cost. 
+
+4.4 Limitations 
+
+Our results assume a pre-registered library with a single antipodal grasp per object. This matches industrial unit-catalog settings but excludes novel-object Dense Packing 15 
+
+packing, where grasp planning is part of the inner loop. The system also does not re-estimate each object’s pose after placement, instead treating the raw merged point cloud inside the container as Ck. Sensor noise and partial occlusion therefore inflate Ck relative to the true placed geometry, which slightly restricts the optimizer’s view of free space. 
+
+## 5 Conclusions 
+
+We presented a closed-loop, real-time pipeline for dense packing of irregular objects with a real manipulator, treating the object and gripper as a single composite body optimized over five degrees of freedom on a GPU and absorbing perception and contact drift through force-monitored descent, a post-release con-solidation push, and re-perception between placements. We tested our method using a real robot to pack a set of flat, curved, and concave objects, including generalization to a YCB subset. The system completed 19 out of 20 trials end-to-end and achieved 95.6% space utilization on the Optimized sequence, exceeding a baseline at both tested grid resolutions and at a fixed computational cost. Ablations show that gripper-aware optimization governs whether a placement is reachable rather than how dense it is, the consolidation push recovers the clearance that gripper-aware planning leaves behind, and non-prism object rep-resentation is necessary to achieve high packing density for non-compact shapes. Extensions include re-estimating placed object poses to refine the container sta-tus and lifting the pre-grasp assumption toward novel-object packing. 
+
+## Acknowledgment 
+
+This work was funded by an Amazon Robotics −WPI grant and supported in part by the National Science Foundation under the award ECCS-2338703. 
+
+## References 
+
+> 1. Besl, P.J., McKay, N.D.: A method for registration of 3-D shapes. IEEE Transac-tions on Pattern Analysis and Machine Intelligence (1992) 2. Calli, B., Singh, A., Bruce, J., Walsman, A., Konolige, K., Srinivasa, S., Abbeel, P., Dollar, A.M.: Yale-CMU-Berkeley dataset for robotic manipulation research. The International Journal of Robotics Research (2017) 3. Cao, S., Xiao, J.: On efficient and flexible autonomous robotic insertion assembly in the presence of uncertainty. IEEE Robotics and Automation Letters (RAL) (2024) 4. Cao, S., Xiao, J.: Dynamic dense packing of unknown objects based on perception. IEEE Transactions on Automation Science and Engineering (TASE) (2026) 5. Coleman, D., S ¸ucan, I.A., Chitta, S., Correll, N.: Reducing the barrier to entry of complex robotic software: a MoveIt! case study. Journal of Software Engineering for Robotics (2014) 6. Ester, M., Kriegel, H.P., Sander, J., Xu, X.: A density-based algorithm for discov-ering clusters in large spatial databases with noise. In: International Conference on Knowledge Discovery and Data Mining (1996)
+
+16 Tianhao Qin et al. 7. Fischler, M.A., Bolles, R.C.: Random sample consensus: A paradigm for model fitting with applications to image analysis and automated cartography. Communi-cations of the ACM (1981) 8. Garrido-Jurado, S., Mu˜ noz-Salinas, R., Madrid-Cuevas, F.J., Mar´ ın-Jim´ enez, M.J.: Automatic generation and detection of highly reliable fiducial markers under oc-clusion. Pattern Recognition (2014) 9. Haddadin, S., Parusel, S., Johannsmeier, L., Golz, S., Gabl, S., Walch, F., Sabaghian, M., J¨ ahne, C., Hausperger, L., Haddadin, S.: The Franka Emika robot: A reference platform for robotics research and education. IEEE Robotics & Au-tomation Magazine (2022) 10. Hansen, N., Ostermeier, A.: Completely derandomized self-adaptation in evolution strategies. Evolutionary Computation (2001) 11. Huang, S., Wang, Z., Zhou, J., Lu, J.: Planning irregular object packing via hier-archical reinforcement learning. RAL (2023) 12. Martello, S., Pisinger, D., Vigo, D.: The three-dimensional bin packing problem. Operations Research (2000) 13. Mason, M.T.: Compliance and force control for computer-controlled manipulators. IEEE Transactions on Systems, Man, and Cybernetics (1981) 14. MoveIt: Pilz industrial motion planner. Noetic documentation, https: //moveit.github.io/moveit tutorials/doc/pilz industrial motion planner/ pilz industrial motion planner.html 15. Pan, J.H., Hui, K.H., Gao, X., Zhu, S., Liu, Y.H., Heng, P.A., Fu, C.W.: SDF-Pack: Towards compact bin packing with signed-distance-field minimization. In: IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) (2023) 16. Quinlan, S.: Efficient distance computation between non-convex objects. In: IEEE International Conference on Robotics and Automation (ICRA) (1994) 17. Ritter, J.: An efficient bounding sphere. In: Graphics Gems. Academic Press (1990) 18. Shome, R., Tang, W.N., Song, C., Mitash, C., Kourtev, H., Yu, J., Boularias, A., Bekris, K.E.: Towards robust product packing with a minimalistic end-effector. In: ICRA (2019) 19. Terzakis, G., Lourakis, M.: A consistently fast and globally optimal solution to the perspective-n-point problem. In: European Conference on Computer Vision (2020) 20. Wang, D., Zhang, X., Zhang, Y., Xiao, J.: Configuration-based optimization for six degree-of-freedom haptic rendering for fine manipulation. IEEE Transactions on Haptics (2013) 21. Wang, F., Hauser, K.: Dense robotic packing of irregular and novel 3D objects. IEEE Transactions on Robotics (2022) 22. Wang, Z., Zhao, H., Xu, J., Zhang, S., Hu, R., Zhu, C., Zeng, Z., Zhu, W., Xiong, Z., Yu, H., Xu, K.: RoboBPP: Benchmarking robotic online bin packing with physics-based simulation. arXiv:2512.04415v4 (2026) 23. Wu, Z., Wang, Z., Huang, S., Liu, Z., Xu, X., Yan, H., Lu, J.: RoboPacker: An autonomous robotic packing system for general objects. TASE (2025) 24. Yang, Z., Yang, S., Song, S., Zhang, W., Song, R., Cheng, J., Li, Y.: Packer-Bot: Variable-sized product packing with heuristic deep reinforcement learning. In: IROS (2021) 25. Zhao, H., Pan, Z., Yu, Y., Xu, K.: Learning physically realizable skills for online packing of general 3D shapes. ACM Transactions on Graphics (2023) 26. Zhao, H., Yu, Y., Xu, K.: Learning efficient online 3D bin packing on packing con-figuration trees. In: International Conference on Learning Representations (2022)
