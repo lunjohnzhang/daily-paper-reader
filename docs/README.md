@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-21</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-22</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 12 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-21 22:29:34 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-22 21:58:04 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日筛选7篇机器人规划与操作论文，精读1篇、速读6篇。最值得关注的是9.0分的MA-LIPP，用负载感知的信息路径规划协调异构机器人团队；速读中不规则物体密集装箱（7.0分）也有实用价值。普通读者可优先看MA-LIPP了解多机协作如何兼顾任务与负载，再扫一眼装箱方法。</p>
+<p>2026-09-22 多智能体日报精选 12 篇，精读 6 篇、速读 6 篇，聚焦仓储多智能体路径规划与多机器人冲突检测。最值得看的是满分 TRACS 的几何感知可扩展路径规划框架，以及 9 分的 MR-SPITE 分层扫掠体冲突扫描加速方法。若你关注仓储机器人调度，建议先从这两篇入手理解&quot;规模化+几何约束&quot;这一主线。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MA-LIPP: Cooperative Multi-Agent Load-Aware Informative Path Planning for Heterogeneous Robot Teams">MA-LIPP: Cooperative Multi-Agent Load-Aware Informative Path Planning for Heterogeneous Robot Teams</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="TRACS: A Geometry-Aware Framework for Scalable Multi-Agent Path Finding in Warehouses">TRACS: A Geometry-Aware Framework for Scalable Multi-Agent Path Finding in Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="MR-SPITE: Accelerating Multi-Robot Conflict Scans via Hierarchical Swept-Volume Approximations">MR-SPITE: Accelerating Multi-Robot Conflict Scans via Hierarchical Swept-Volume Approximations</span></li><li><span class="dpr-home-dashboard-paper-title" title="Density-Driven Area Coverage for Nonholonomic Multi-Robot Systems with Safety Guarantee">Density-Driven Area Coverage for Nonholonomic Multi-Robot Systems with Safety Guarantee</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -87,7 +87,7 @@
     <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Gripper-Aware Automatic Dense Packing of Irregular Objects">Gripper-Aware Automatic Dense Packing of Irregular Objects</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning to Optimize UAV Path Planning for Data Sensing in Wireless Sensor Networks">Learning to Optimize UAV Path Planning for Data Sensing in Wireless Sensor Networks</span></li><li><span class="dpr-home-dashboard-paper-title" title="GAVEL: Graph World Models for Verified and Efficient Long-Horizon LLM Task Planning">GAVEL: Graph World Models for Verified and Efficient Long-Horizon LLM Task Planning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Mixed-integer flow formulations for motion planning and decision-making of networked multi-agent systems">Mixed-integer flow formulations for motion planning and decision-making of networked multi-agent systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="General Collaborative Intelligence: Architecting Cognition for Resilient Multi-Agent Ecosystems">General Collaborative Intelligence: Architecting Cognition for Resilient Multi-Agent Ecosystems</span></li><li><span class="dpr-home-dashboard-paper-title" title="AC-DC: Adaptive Communication for Scalable Dynamic Average Consensus in Multi-Robot Ergodic Search">AC-DC: Adaptive Communication for Scalable Dynamic Average Consensus in Multi-Robot Ergodic Search</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>

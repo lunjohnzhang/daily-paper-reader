@@ -1,0 +1,424 @@
+Title: CAST: Collision-Aware Assembly with Construction Robots using Simultaneous Trajectory Estimation and Planning
+
+URL Source: https://arxiv.org/pdf/2609.24841v1
+
+Published Time: Tue, 22 Sep 2026 03:07:16 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# CAST: Collision-Aware Assembly with Construction Robots using Simultaneous Trajectory Estimation and Planning 
+
+Karthik Shaji 1, Chisung Kim 2, John D’Amato 2, Edvard Bruun 2 and Frank Dellaert 3
+
+Abstract — Multi-robot systems have shown increasing via-bility in construction due to their ability to execute high-precision actions while reducing human exposure to hazardous tasks. However, these environments have high-dimensional con-figuration spaces and possess substantial collision-avoidance constraints, which include other robots, assembly objects, and workspace boundaries. We utilize a single factor graph for trajectory estimation and planning that incorporates measured robot states together with explicit collision and learned cable constraints. This supports changing workspaces and enables synchronized, high-dimensional robot motion planning while accounting for the stiff, vibration-induced uncertainty of heavy robotic systems. We demonstrate the success of our framework on the construction of a post-and-lintel structure using one robot arm as a timber gripper, and a second robot as a nail-fastener. 
+
+I. I NTRODUCTION 
+
+Construction robots have shown promise to automate construction due to their high precision and ability to replace humans in dangerous tasks. Applications include block-block construction [1], additive manufacturing [2], and fastening tasks [3]. Their ability to operate in constrained workspaces offers potential to streamline building of large-scale struc-tures, for both terrestrial and planetary applications [4]. In recent years, interest in collaborative manufacturing has grown due to how it enables multiple actuators to support each other and work objects while carrying out a given set of tasks [5]. For instance, robots together can lay bricks in a step-by-step method to build masonry arches [1], using methods of supporting each other, and thus avoiding putting humans into the construction workspace. However, to scale efficiently into real-world construction workspaces, these systems must also handle complex col-lision constraints, which includes robot-object, and robot-robot [6] in the case of multi-actuator and manipulator systems. Existing approaches include Logic Geometric Pro-gramming (LGP) [7], hierarchical methods with A* [8], and reinforcement learning [9]. However, the LGP method [7]        
+
+> *This material is based upon work supported by the National Science Foundation Graduate Research Fellowship Program under Grant No. DGE-2039655. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the author(s) and do not necessarily reflect the views of the National Science Foundation.
+> 1Karthik Shaji is with the Daniel Guggenheim School of Aerospace Engineering, Georgia Institute of Technology, Atlanta 30332, USA
+
+kshaji3@gatech.edu  
+
+> 2Chisung Kim, John D’Amato, and Edvard Bruun are with the School of Civil and Environmental Engineering, Georgia Institute of Technology, Atlanta 30332, USA, USA
+> 3Frank Dellaert is with the Institute of Robotics and Intelligent Machines, Georgia Institute of Technology, Atlanta 30332, USA, USA
+> Fig. 1. Dual-arm gantry and manipulator setup which holds a timber gripper on one arm and a nail gun on the other.
+
+solves a joint nonlinear trajectory optimization problem over the entire task space, which can become computationally expensive as the planning horizon, number of discrete modes, and robot degrees of freedom (DoF) increase. Methods using A* are highly reliant on careful heuristic design, and can incur substantial runtime costs when backtracking is needed over large discrete search spaces. Lastly, the reinforcement learning method proposed in [9] is itself not a continu-ous multi-robot motion planner, and rather relegates actual motion feasibility to inverse kinematics, collision checking, and cuRobo planning. Furthermore, these algorithms must efficiently handle the tradeoffs between roadmap preprocess-ing and single-query planning for collaborative assembly planning frameworks. While [6] use multi-modal probabilis-tic roadmaps (PRMs) [10] to enable efficient online task and path search, the required offline roadmap construction and collision annotation are computationally expensive, with collision annotation being found to require hundreds of hours for their larger domains. Recent approaches [7] have instead incorporated sampling-based single-query planners with Rapidly Exploring Random Tree (RRT) algorithms within hierarchical TAMP formulations to avoid constructing dense global roadmaps, which allow for rapid feasible path generation over complex configuration spaces. The ability for rapid, feasible path generation is critical in changing construction workspaces, where newly placed and assembled components change the collision environment. Approaches such as [11] used decentralized frameworks with usage of large language models (LLMs) for task planning. However, these methods introduce high-level task planning arXiv:2609.24841v1 [cs.RO] 21 Sep 2026 overhead and do not directly address challenges with high-dimensional collision optimization considered here. Many existing works [6] treat the workspace as static and compute long-horizon trajectories based on assumed placement, but this may not be the case all the time. We treat our multi-actuator system as a single robotic system, building a unified factor graph that handles trajectory estimation, obstacle collision and self-collision constraints by stacking both robots into one state. We first compute an offline trajectory plan and then iteratively resolve it to estimate the current trajectory through the addition of measurements. We initialize the offline trajectory plan via RRT-Connect [12], hence avoiding computational bottle-necks from extensive preprocessing and edge-validation steps in PRMs. We demonstrate the utility of our approach through simulation and hardware in the construction of a post-and-lintel structure. Furthermore, we show how our algorithm, CAST, can incorporate learned constraints obtained from deformable cable dynamics. The key contributions of our work are listed below: 1) We present a trajectory estimation and planning frame-work that uses a unified factor graph to incorporate measured robot states during execution and optimize future motion under collision and cable constraints. 2) We build upon existing inter- and intra-robot collision formulations by introducing differentiable learned col-lision constraints that account for deformable cable behavior during motion. 3) We demonstrate the proposed framework on an 18-DoF robotic system consisting of two actuators performing collaborative gripping and nail-fastening tasks to con-struct a post-and-lintel structure. An open source implementation of the code will be made available upon acceptance. II. R ELATED WORK 
+
+A. Construction Robotics/Cooperative Assembly 
+
+Cooperative robotic fabrication combines component placement and temporary support within a shared workspace. Two-robot workflows have previously fabricated timber frame modules [13] and spatial metal structures [14], show-ing capabilities across different materials and assembly ge-ometries. In the domain of masonry construction, cooperative placement and support has enabled scaffold-free arch fab-rication [1]. Using multiple robots also supports reversible construction, such as in the ZeroWaste project which used a three-robot cell for the disassembly and reuse of timber framing [15]. Across these examples, robot motions must accommodate both the work of other robots and account for the partially assembled structure. However, while prior systems demonstrate cooperative fabrication, they primarily aim to show feasible techniques; we build on this by tack-ling automated continuous motion planning with changing assembly geometry. 
+
+B. Trajectory Planning 
+
+There are several methods for planning initial trajectories, including PRMs [10] and RRT-based methods [12]. The advantage of PRM-based approaches is that they sample the configuration space to create a reusable roadmap, but this trades a higher initial runtime for a lower long-term runtime. When the collision geometry changes between assembly stages, this roadmap preprocessing and edge validation is harder to amortize. As a result, the benefits arising from PRMs are reduced as RRT methods can compute feasible paths more rapidly as they do not depend on this environment amortization, thus operating better in dynamic environments where multiple queries are not as necessary. However, meth-ods such as RRT-Connect [12] do suffer from the drawback that they have no asymptotic optimality guarantee. Since this is not necessary for our approach as we are using it for setting a feasible seed, we choose it over PRMs. 
+
+C. Factor Graph Motion Planning 
+
+Factor graphs [16], [17] have been used in motion planning for both Gaussian Process Motion Planning (GPMP) [18], as well as for Simultaneous Trajectory Estimation and Planning (STEAP) [19]. The core advantage of this approach is that it leverages how Gaussian processes can be parameterized by a sparse set of support states and then be efficiently interpolated for collision checking in between nodes. When combined with factor graphs, the resultant sparse linear alge-bra becomes very efficient. Subsequent work on STEAP [20] has extended it to be capable of tracking moving objects. Our CAST framework follows the joint estimation-and-planning structure of STEAP while extending the factor graph to coordinated dual-robot collision optimization, changing as-sembly geometry, and learned cable constraints. Prior work on GPMP has combined sampling and trajectory optimiza-tion over graphs, allowing for improved efficiency in higher dimensions [21]. However, these works do not address the combination of joint inter- and intra-robot collision optimiza-tion, changing assembly geometry, and learned constraints. 
+
+D. Deformation-Aware Planning 
+
+Previous work in deformation-aware planning has ad-dressed deformable mechanics either through component-level physical modeling or manipulation-based identifica-tion of material properties. Gayle et al. [22] represented deformable systems through spring-mass-damper models. While these approaches provide a physics-level description, they require explicit mechanical characterization, and may be computationally costly. More recent work has considered deformation through manipulation, such as in [23], where parameters such as Young’s modulus were estimated using force and torque measurements. Yin et al. [24] survey learning, perception, and control methods for deformable-object handling instead of through direct system property characterization. However, in our case the robot-mounted cable is not a manipulation or control target, and hence is not independently actuated or directly instrumentable. III. P RELIMINARIES 
+
+A. Gaussian Processes for Trajectory Smoothing 
+
+Vector-valued Gaussian processes (GPs) are a principled way of reasoning about continuous-time trajectories, where trajectories map time to state. We consider continuous-time trajectories as samples from a vector-valued GP, 
+
+θ(t) ∼ GP (μ(t), K(t, t ′)) , (1) where μ(t) is a vector-valued mean function and K(t, t ′) is a matrix-valued covariance function. The GP defines a prior over the space of trajectories, as in Eq. (2): 
+
+p(θ) ∝ exp 
+
+
+
+− 12 ∥θ − μ∥2
+
+> K
+
+
+
+. (2) A linear time-varying stochastic differential equation (LTV-SDE) can generate a structured kernel [25], which we define as 
+
+˙θ(t) = A(t)θ(t) + u(t) + F (t)w(t), (3) where u(t) is the known control input, A(t) and F (t) are time-varying matrices of the system, and w(t) is a white process-noise term modeled as the zero-mean GP 
+
+w(t) ∼ GP (0, Q cδ(t − t′)) . (4) As shown in [18], [19], [25], Gaussian processes can be parameterized by sparse support states and queried at arbitrary times through GP interpolation. The posterior mean of the trajectory at time τ is obtained by conditioning on the support states, 
+
+θ(τ ) = ¯ μ(τ ) + eK(τ, t ) eK−1(θ − eμ), (5) which can be computed efficiently by exploiting the sparse GP-prior structure, 
+
+θ(τ ) = eμ(τ ) + Λ( τ )( θi − eμi) + Ψ( τ )( θi+1 − eμi+1 ). (6) 
+
+B. Gaussian Processes in Factor Graphs 
+
+A factor graph is a bipartite graph G = {Θ, F, E} , where 
+
+Θ denotes variable nodes, F denotes factor nodes, and E
+
+denotes the edges connecting them. In GPMP, the variable nodes correspond to trajectory states, while each factor encodes a probabilistic cost or constraint. The posterior distribution can thus be written as 
+
+p(θ | e) ∝
+
+> M
+
+Y
+
+> m=1
+
+fm(Θ m), (7) where fm are factor terms on variable subsets Θm. Within GPMP [18], obstacle and joint-limit constraints are standard factor terms used to encode collision avoidance and feasible joint ranges. The obstacle factor is defined as 
+
+f obs  
+
+> i
+
+(θi) = exp 
+
+
+
+− 12 ∥h(θi)∥2
+
+> σobs
+
+
+
+. (8) We utilize a trilinearly interpolated signed distance field (SDF) so that the distance to the nearest obstacle and its gradient are available in closed form at any point. For each query point on the robot, determined by the current configuration, we evaluate a hinge loss on its distance d to the relevant collision boundary, 
+
+c(d) = 
+
+(
+
+dsafe − d if d < d safe 
+
+0 otherwise , (9) where dsafe is the standoff distance obtained by extending a safety margin ϵ (in practice, we use spheres as our collision primitive, so dsafe = r + ϵ). For obstacle avoidance, d is the SDF distance at the query point; for self-collision, d =
+
+∥xa − xb∥ for a non-adjacent link pair (a, b ) ∈ S , with 
+
+dsafe = ra + rb + ϵab . Once a point passes this margin, the graph error grows quadratically with penetration depth, driving the optimizer back onto the safe path. Joint-limit violations are handled by projecting violating states back into the feasible region. These factors are used in the resulting optimization problem in our work. A GP-interpolated obstacle factor also allows collision checking between support states, 
+
+f intp  
+
+> τj
+
+(θi, θi+1 ) = exp 
+
+
+
+− 12 h θ(τj ) 2
+
+> σobs
+
+
+
+= exp 
+
+
+
+− 12 hintp  
+
+> τj
+
+(θi, θi+1 ) 2
+
+> σobs
+
+
+
+.
+
+(10) IV. J OINT ESTIMATION AND PLANNING 
+
+We formulate trajectory estimation and planning jointly as a single maximum a posteriori (MAP) inference over a factor graph. The MAP trajectory θ∗ maximizes the product of all factors, equivalently minimizing the sum of their weighted squared residuals: 
+
+θ∗ = arg max 
+
+> θ
+
+Y
+
+> m
+
+fm(θ) = arg min 
+
+> θ
+
+X
+
+> m
+
+∥em(θ)∥2 
+
+> Σm
+
+, (11) where each factor fm contributes a residual em weighted by its covariance Σm. Measurement factors perform estimation, while GP-prior, goal, obstacle, self-collision, and cable fac-tors perform planning; feasibility requirements such as joint limits, obstacle clearance, and fixed start and goal states enter as factors in this objective rather than as hard constraints. 
+
+A. CAST Factor Graph 
+
+We model the dual-arm system with an 18-dimensional state vector including both actuators and gantries, allowing for optimization across the full system with a single factor graph. The stacked configuration is θ = [ θ1⊤, θ2⊤]⊤ ∈ RD ,with D = 18 , ensuring that all constraints are optimized jointly rather than per-arm. Robot-robot collision is handled within the same stacked state representation, since both actuators are included in a single configuration vector. We use the self-collision factor to handle link-link collision checking across both arms, which allows for a single MAP inference over the graph coordinates to coordinate both arms. In practice, our robot collision geometry is represented with spheres, although the formulation below is stated more generally. In the factor graph implementation, the obstacle, self-collision, and cable factors are finite-weight soft penalties in the MAP objective. They encourage clearance, but do not provide hard constraints, and the resulting MAP estimate includes an estimate of the executed trajectory and a plan for the remaining motion. 
+
+1) Measurement Factors: Following the measurement-factor structure used in STEAP [19], we incorporate mea-sured robot states into the factor graph during maneuver execution. For a measured state zi associated with trajectory state θi, we define the measurement factor as 
+
+f meas  
+
+> i
+
+(θi) = exp 
+
+
+
+− 12 ∥ri(θi, zi)∥2
+
+> Σi
+
+
+
+, (12) where ri is the measurement residual and Σi is the measure-ment covariance. These factors update the posterior trajectory estimate as measurements become available. 
+
+2) Self-Collision Factors: Self-collision is penalized through a hinge-loss factor over non-adjacent link pairs, thereby optimizing for link-link clearance during motion, as shown in Eq. (14). Following [18], [21], we represent a robot body with query points ϕ(θ) = {x1, . . . , xP }
+
+computed from the joint-space configuration via forward kinematics. Self-collision is only possible for non-adjacent links; therefore, we only evaluate constraints for link pairs with non-constant separation, which we do via the hinge loss in Eq. (9). An SDF is not required here because the distance is evaluated between body points that directly depend on the configuration. As done in [21], we stack the losses of all pairs into hself (θi), yielding the unary self-collision factor 
+
+f self i (θi) = exp 
+
+
+
+− 12 hself (θi) 2
+
+> σself
+
+
+
+. (13) Like its unary obstacle counterpart, this only penalizes self-collision at the nodes, and neglects the trajectory between them. Therefore, we introduce a new GP-interpolated factor for self-collision, constructed analogously to Eq. (10), where the state θ(τj ) is recovered from the neighboring support states, and the self-collision loss is evaluated there, 
+
+f self,intp τj (θi, θi+1 ) = exp 
+
+
+
+− 12 hself  θ(τj ) 2
+
+> σself
+
+
+
+= exp 
+
+
+
+− 12 hself,intp τj (θi, θi+1 ) 2
+
+> σself
+
+
+
+.
+
+(14) This binary factor connects consecutive support states and penalizes self-collision between them, which improves continuous-time clearance for articulated robots. 
+
+B. Initialization 
+
+RRT-Connect [12] provides the initial feasible trajectory used to initialize the factor graph, after which we refine it through joint optimization over smoothness, self-collision, and cable-spline constraints. Gaussian-process motion plan-ning is non-convex, so the initialized trajectory strongly affects the resulting optimum. RRT-Connect is a single-query planner that grows two trees iteratively: one rooted at the start and one rooted at the goal, and greedily connects them. To obtain the start and goal states, we use inverse kinematics on the world-space coordinates. The resulting waypoint path is then resampled to the n support states used in GPMP and used as the initial estimate. As GPMP optimizes both smoothness and clearance, we only require an approximate trajectory; in particular, we initialize the trajectory to be feasible for the SDF obstacle field while leaving the cable-collision and self-collision to be handled by GPMP. At each assembly step, the workspace changes as com-ponents are placed; accordingly, a new initialization is per-formed using the updated obstacle set, and the resulting fac-tor graph is solved. We also considered RRT x [26], which is designed to repair the graph in the presence of continuously moving obstacles. However, while that approach may be appropriate for GPMP methods such as [20], the environment here changes only between discrete assembly steps, and each step is planned against a fixed obstacle snapshot. This makes the asymptotically optimal machinery in that approach less useful in our setting, motivating the use of RRT-Connect. 
+
+C. Online Estimation and Replanning 
+
+During execution, measured robot states, which are joint angles and gantry positions, are incorporated through mea-surement factors, updating the posterior estimate of the trajectory. The updated estimate is then used to generate the remaining motion plan, in STEAP fashion [19]. V. L EARNED CABLE -S PLINE FACTORS 
+
+A key feature of our system is how we model de-formable cables attached to the actuators with a learned spline representation and integrate it into the same factor graph optimization framework. A significant challenge in the construction-robotics setting is the presence of a large, deformable cable housing that moves with the actuators as the joint configuration changes. If this cable housing snags on obstacles or on another actuator, it can cause substantial damage to the robot and prevent the task from being completed. Traditional cable models are often based on finite-element or related physics-based solvers, but these methods are computationally expensive. We therefore learn a neural-network model of the cable geometry to enable fast inference during optimization. 
+
+A. Modeling Cable Geometry as a Chebyshev Spline 
+
+To model the cable geometry itself, we use a pseu-dospectral Chebyshev spline. Rather than parameterizing a polynomial by its coefficients, the pseudospectral approach parameterizes it by its values at a set of Chebyshev points of the second kind. Mapped onto the unit interval s ∈ [0 , 1] ,these points are given by 
+
+sj = 12
+
+
+
+1 − cos jπ N − 1
+
+
+
+, j = 0 , . . . , N − 1, (15) which cluster near the endpoints of the interval, avoiding the oscillations that arise when interpolating at equally spaced nodes. Given nodal values pj = p(sj ), the spline can then be evaluated at any s ∈ [0 , 1] via barycentric Lagrange interpolation [27]: 
+
+p(s) =  
+
+> N−1
+
+X
+
+> j=0
+
+wj (s) pj , wj (s) = λj /(s − sj )
+
+PN −1 
+
+> k=0
+
+λk/(s − sk) ,
+
+(16) where λj = ( −1) j , halved at the two endpoint nodes j = 0 
+
+and j = N − 1. The weights satisfy wj (sk) = 1 if j = k
+
+and 0 otherwise, so the interpolant passes exactly through its nodal values. As the evaluation is linear in the nodal values, the derivatives required for gradient-based trajectory optimization are readily available. We use this representation as the output parameterization of the neural network. The two cable attachment points are assumed to be known because each is fixed in the local frame of its corresponding robot link and can therefore be transformed into the selected reference frame. For a configuration θ, let pA(θ) and pB (θ) denote the attachment points anchored at the endpoint nodes s0 = 0 and sN −1 = 1 .Let R(θ) denote the rotation from the prediction frame to the selected reference frame, and let ρ(θ) = gϕ(S(θ)) 
+
+denote the learned multilayer perceptron with parameters 
+
+ϕ. The selection operator S identifies the joint variables supplied to the network. The network predicts the N − 2
+
+interior Chebyshev nodal residuals ρ = [ρ1, . . . , ρN −2],where ρj ∈ R3, relative to the chord between the attachment points. The predicted cable position xcab is 
+
+xcab (s; θ) = (1 − s) pA(θ) + s pB (θ)+ R(θ) 
+
+> N−2
+
+X
+
+> j=1
+
+wj (s) ρj (θ), s ∈ [0 , 1] ,
+
+(17) where wj (s) are the barycentric weights of Eq. (16). Since the residual vanishes at the attachment points, the sum runs over the interior nodes only. 
+
+B. Cable Spline Factor 
+
+We incorporate the learned cable geometry into a cable-spline factor. The factor evaluates the cable curve in Eq. (17) at a given configuration θ. The cable cost vector stacks the sphere-based hinge loss h(·) with standoff inflated by the cable radius rcab at M samples {sm} along the curve: 
+
+hcab (θ) =  h xcab (s1; θ), . . . , h xcab (sM ; θ)  ⊤.
+
+(18) The unary cable-spline factor follows the same form as the standard obstacle factor: 
+
+f cab i (θi) = exp 
+
+
+
+− 12 hcab (θi) 2
+
+> σcab
+
+
+
+. (19) The corresponding Gaussian-process interpolated cable fac-tor is 
+
+f cab,intp τj (θi, θi+1 ) = exp 
+
+
+
+− 12 hcab  θ(τj ) 2
+
+> σcab
+
+
+
+= exp 
+
+
+
+− 12 hcab,intp τj
+
+> 2
+> σcab
+
+
+
+.
+
+(20)  
+
+> Fig. 2. System arrangement and dimensions of our 18-DoF construction setup.
+
+VI. E XPERIMENTAL SETUP 
+
+A. Robot Description 
+
+We use a dual-arm construction system consisting of two 6-DoF manipulators, whose arrangement and dimensions are shown in Figs. 1 and 2. We use COMPAS Fab [28] for the control software on the robot and COMPAS RRC [29] to interface with it in Python. Each arm is mounted on a 3-DoF gantry, yielding a 9-DoF arm configuration that provides large-scale positioning in the x-, y-, and z-directions while preserving fine-grained end-effector control. Each arm can be equipped with either a nail gun or a gripper for handling timber. The experiments are designed to demonstrate coor-dinated multi-actuator motion planning with trajectory esti-mation in a dynamically changing construction workspace. Two robots cooperatively handle and fasten components during assembly. To evaluate the planner and estimator, each assembly step begins without a complete model of the structure that will result from the preceding steps. 
+
+B. Simulation and Algorithm Implementation 
+
+Before testing our code on real hardware, we test our man-ufacturing sequences in both Rhino/Grasshopper/Kangaroo, and RobotStudio for manual collision checking prior to de-ployment. We trained our neural network for cable dynamics on a Kangaroo Extended Position-Based Dynamics (XPBD) solver [30], and ran simulations on 4096 rested cable poses on different joint configurations for each arm with their respective tool attached. The algorithm development was done in Python using the open source libraries GTSAM [31] and GTDynamics with Python bindings. For integrating measurement factors into motion planning, we fold in new measurements of the 18-DoF robot state from per-joint sensors using iSAM2 [32]. Each new factor is linearized at the current estimate, and iSAM2 then moves up from the affected variable’s clique to the root, marking all cliques along that path. It then undoes those marked cliques Fig. 3. Post-and-lintel structure assembly, with annotations for fixed and nailed components.  
+
+> Fig. 4. Assembly sequence for the post-and-lintel structure. The base is first fixed to the workspace via clamps. Then robot 1 first grips the left column and then the right column while robot 2 performs the nailing. Finally, robot 1 places the final beam on top and robot 2 fastens it into place.
+
+back into a factor graph, re-eliminates it, and then back-substitutes to update affected variables. In this way, only affected cliques and trajectory values are changed. 
+
+C. Experiments 
+
+We use the assembly of a post-and-lintel structure as a representative test case, shown in Fig. 3. This structure consists of a fixed base, two columns which are nailed to the base from the sides, and a top beam nailed across the column tops. After a component has been placed and fastened, the estimator incorporates measurements of the executed motion and the planner updates the workspace and collision constraints before generating the next motion plan. The new columns added to the workspace have known measurements and we assume they are placed where intended. This pro-cedure exposes the system to changing obstacle and self-collision constraints while requiring the robots to coordinate their roles: one robot can support a component while the other performs the fastening operation. The resulting plans demonstrate simultaneous multi-actuator coordination in a progressively changing construction environment. Fig. 4 il-lustrates the four-step build order used to evaluate the planner and estimator. VII. E XPERIMENTAL RESULTS 
+
+A. Simulation - Cable Dynamics 
+
+We train one cable-geometry network per arm due to how each arm’s tool makes the cable drape differently, and trade prediction accuracy against inference runtime. We present the results of our ablations on both arms in Tables I and II. We chose the bolded architecture, which had the most runtime, but highest accuracy.                                                                                                           
+
+> TABLE I CABLE MODEL ABLATIONS FOR ARM 1 (G RIPPER ). A RCHITECTURE IS LISTED AS (HIDDEN LAYERS )×(NEURONS PER LAYER ). Architecture Train RMSE (cm) Test RMSE (cm) μs/sample
+> 1×16 11.58 11.50 0.461
+> 1×32 10.73 10.88 0.498
+> 1×64 9.20 9.85 0.702
+> 2×16 10.16 10.58 0.871
+> 2×32 8.35 9.37 1.012
+> 2×64 6.82 8.56 1.108
+> 3×16 9.23 10.39 1.407
+> 3×32 6.75 8.75 2.157
+> 3×64 5.21 7.81 2.242
+> TABLE II CABLE MODEL ABLATIONS FOR ARM 2 (N AILER ). A RCHITECTURE IS LISTED AS (HIDDEN LAYERS )×(NEURONS PER LAYER ). Architecture Train RMSE (cm) Test RMSE (cm) μs/sample
+> 1×16 11.61 11.56 0.639
+> 1×32 10.40 10.57 0.576
+> 1×64 9.06 9.46 0.559
+> 2×16 10.73 10.77 0.766
+> 2×32 7.80 8.95 0.780
+> 2×64 6.76 8.65 0.913
+> 3×16 7.97 8.97 0.834
+> 3×32 6.18 7.87 0.956
+> 3×64 4.59 7.60 1.516
+
+B. Planning and Estimation 
+
+Trajectory generation using our framework is efficient across all three sub-assembly tasks, with RRT-Connect taking an average of 46.9 ms for initialization, GPMP generation taking an average of 46.7 s, and each iSAM2 update taking an average of 292 ms (Table III). Initialization via RRT-Connect is a negligible component of the total runtime cost for the offline trajectory generation, whose reported statistics include the RRT-initialization time. The final approach and withdraw at each nail are short, single-axis gantry moves into an already-cleared target, so we script them; the collision-relevant transit and repositioning motion is planned. The beam repositions cross the structure, so they are planned with GPMP/iSAM2, which accounts for its higher computation time. The iSAM2 update time is two orders of magnitude lower than trajectory generation, and when empirically com-pared to trajectory execution time, our system experienced no noticeable lag in decision-time during real-time execution. TABLE III TIMING STATISTICS FOR TRAJECTORY GENERATION AND ESTIMATION                                 
+
+> Member RRT Init (ms) Offline Traj. Gen. (s) iSAM2 Update (ms) Left Col. 40.8 38.9 225 Right Col. 64.4 46.2 255 Top Beam 35.6 54.9 396
+> Average 46.9 46.7 292 TABLE IV AVERAGE MINIMUM CLEARANCE PER MANEUVER ,FOR OBSTACLE ,
+> CABLE ,AND SELF -COLLISION CONSTRAINTS .Member Obstacle (m) Cable (m) Self-Collision (m) Left Col. 0.037 0.175 0.877 Right Col. 0.024 0.200 0.568 Top Beam 0.021 0.251 0.470
+> Average 0.027 0.208 0.638
+
+In Table IV, we show how our algorithm maintains safe average minimum clearances for obstacle, cable, and self-collision constraints at every assembly stage, excluding the steps where the nail gun approaches to nail. While the column obstacle clearances are below our 10 cm clearance target, this is reflective of the soft penalty methods we used, and can also be attributed to the empirical conservativeness of our sphere collision model when comparing sphere rep-resentation vs. actual meshes. 
+
+C. Hardware Testing 
+
+We validate the full pipeline on hardware in a tightly constrained workspace, shown in Fig. 5, planning each trajec-tory offline and updating it from live measurements through iSAM2 during execution. For safety when working with large robotic setups, we broke our total trajectory into three,       
+
+> Fig. 5. Tightly constrained workspace of hardware test including obstacles.
+> Fig. 6. Preplanned (dashed) vs. executed (solid) end-effector centroid trajectories per arm, shown as xy ,xz coordinates.
+> Fig. 7. Completed post-and-lintel structure with both robot arms in their final configurations.
+
+separately testable parts, and stored a trajectory checkpoint for reproducibility in the next run. Hence, once one assembly step was complete, we would test the next trajectory first, to account for effects not modeled in our simulation such as wood warping, bending, and shifting during placement, and then run it. We stitched the resulting trajectories together, along with the planned reference with respect to the end-effector centroid in Fig. 6. The executed trajectory closely follows the nominal plan, with divergences at looping repo-sitioning segments; this is consistent with regions of higher uncertainty where iSAM2 triggers replanning. After nailing the first column, which only had two nails, we manually nailed in two extra nails for stability. We then updated the second column trajectory to nail four nails automatically. We show the finished product in Fig. 7. VIII. C ONCLUSION 
+
+We presented CAST, a unified factor graph framework that jointly plans and estimates collision-free trajectories for a dual-arm construction system, combining explicit obstacle and self-collision factors with a learned cable-deformation constraint and live measurement updates. We implemented and evaluated our work on a task involving the building of a post-and-lintel structure in a highly constrained workspace. In future work, we aim to add sensing through cameras or LiDAR to actively sense and identify unexpected obstacles and changes in the workspace. ACKNOWLEDGMENT Parts of the code used to develop Fig. 3, 4 and the results in this paper were developed by the authors in combination with Claude Sonnet and Opus models. REFERENCES [1] E. P. G. Bruun, R. Pastrana, V. Paris, A. Beghini, A. Pizzigoni, S. Parascho, and S. Adriaenssens, “Three cooperative robotic fabri-cation methods for the scaffold-free construction of a masonry arch,” 
+
+Automation in Construction , vol. 129, p. 103803, 2021. [2] Y. Huang, C. R. Garrett, I. Ting, S. Parascho, and C. T. Mueller, “Robotic additive construction of bar structures: Unified sequence and motion planning,” Construction Robotics , vol. 5, no. 2, pp. 115–130, 2021. [3] T. Peters, K. Cheung, and I. Kostitsyna, “Assembly order planning for modular structures by autonomous multi-robot systems,” in Proc. IEEE Int. Conf. Robotics and Automation (ICRA) , Atlanta, GA, USA, 2025, pp. 11 496–11 502. [4] P. Culbertson, S. Bandyopadhyay, and M. Schwager, “Multi-robot assembly sequencing via discrete optimization,” in Proc. IEEE/RSJ Int. Conf. Intelligent Robots and Systems (IROS) , Macau, China, 2019, pp. 6502–6509. [5] E. P. G. Bruun, S. Adriaenssens, and S. Parascho, “Structural rigidity theory applied to the scaffold-free (dis)assembly of space frames using cooperative robotics,” Automation in Construction , vol. 141, p. 104405, 2022. [6] J. Chen, J. Li, Y. Huang, C. Garrett, D. Sun, C. Fan, A. Hofmann, C. Mueller, S. Koenig, and B. C. Williams, “Cooperative task and motion planning for multi-arm assembly systems,” arXiv preprint arXiv:2203.02475 , 2022. [7] V. N. Hartmann, O. S. Oguz, D. Driess, M. Toussaint, and A. Menges, “Robust task and motion planning for long-horizon architectural construction planning,” in Proc. IEEE/RSJ Int. Conf. Intelligent Robots and Systems (IROS) , 2020, pp. 6886–6893. [8] L. Nagele, A. Hoffmann, A. Schierl, and W. Reif, “LegoBot: Auto-mated planning for coordinated multi-robot assembly of LEGO struc-tures,” in Proc. IEEE/RSJ Int. Conf. Intelligent Robots and Systems (IROS) , 2020, pp. 9088–9095. [9] A. Cebulla, T. Asfour, and T. Kr¨ oger, “Beyond feasibility: Efficiently planning robotic assembly sequences that minimize assembly path lengths,” in Proc. IEEE/RSJ Int. Conf. Intelligent Robots and Systems (IROS) , Abu Dhabi, United Arab Emirates, 2024, pp. 4076–4083. [10] L. E. Kavraki, P. Svestka, J.-C. Latombe, and M. H. Overmars, “Prob-abilistic roadmaps for path planning in high-dimensional configuration spaces,” IEEE Transactions on Robotics and Automation , vol. 12, no. 4, pp. 566–580, Aug. 1996. [11] H. Yang, W. Xu, D. T. Pham, L. Qi, and M. Ba, “Decentralised task planning and motion coordination for scalable multi-robot collabora-tive manufacturing,” Robotics and Computer-Integrated Manufactur-ing , vol. 100, p. 103255, 2026. [12] J. Kuffner and S. LaValle, “Rrt-connect: An efficient approach to single-query path planning,” in Proceedings 2000 ICRA. Millennium Conference. IEEE International Conference on Robotics and Automa-tion. Symposia Proceedings (Cat. No.00CH37065) , vol. 2, 2000, pp. 995–1001 vol.2. [13] A. Thoma, A. Adel, M. Helmreich, T. Wehrle, F. Gramazio, and M. Kohler, “Robotic fabrication of bespoke timber frame modules,” in 
+
+Robotic Fabrication in Architecture, Art and Design 2018 . Springer International Publishing, 2018, pp. 447–458. [14] S. Parascho, T. Kohlhammer, S. Coros, F. Gramazio, and M. Kohler, “Computational design of robotically assembled spatial structures: A sequence based method for the generation and evaluation of structures fabricated with cooperating robots,” in Advances in Architectural Geometry 2018 . Klein Publishing GmbH, 2018, pp. 112–139. [15] E. P. G. Bruun, E. Besler, S. Adriaenssens, and S. Parascho, “Scaffold-free cooperative robotic disassembly and reuse of a timber structure in the ZeroWaste project,” Construction Robotics , vol. 8, 2024. [16] F. Dellaert and M. Kaess, Factor Graphs for Robot Perception .Foundations and Trends in Robotics, 2017, vol. 6, no. 1–2. [17] F. Dellaert, “Factor graphs and GTSAM: A hands-on introduction,” Georgia Institute of Technology, Tech. Rep. GT-RIM-CP&R-2012-002, 2012. [18] M. Mukadam, J. Dong, X. Yan, F. Dellaert, and B. Boots, “Continuous-time gaussian process motion planning via probabilistic inference,” 
+
+The International Journal of Robotics Research , vol. 37, no. 11, pp. 1319–1340, Sep. 2018. [19] M. Mukadam, J. Dong, F. Dellaert, and B. Boots, “STEAP: simultaneous trajectory estimation and planning,” CoRR , vol. abs/1807.10425, 2018. [Online]. Available: http://arxiv.org/abs/1807. 10425 [20] M. King–Smith, P. Tsiotras, and F. Dellaert, “Simultaneous control and trajectory estimation for collision avoidance of autonomous robotic spacecraft systems,” in 2022 International Conference on Robotics and Automation (ICRA) , 2022, pp. 257–264. [21] K. V. Alwala and M. Mukadam, “Joint sampling and trajectory opti-mization over graphs for online motion planning,” in 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2021, pp. 4700–4707. [22] R. Gayle, P. Segars, M. C. Lin, and D. Manocha, “Path planning for deformable robots in complex environments,” in Proc. Robotics: Science and Systems (RSS) , Cambridge, MA, USA, 2005. [23] B. Aksoy and J. T. Wen, “Planning and control for deformable linear object manipulation,” IEEE Transactions on Automation Science and Engineering , vol. 23, pp. 1093–1111, 2026. [24] H. Yin, A. Varava, and D. Kragic, “Modeling, learning, perception, and control methods for deformable object manipulation,” Science Robotics , vol. 6, no. 54, p. eabd8803, 2021. [25] T. D. Barfoot, C. H. Tong, and S. S¨ arkk¨ a, “Batch continuous-time trajectory estimation as exactly sparse gaussian process regression,” in 
+
+Robotics: Science and Systems Conference , 2014. [Online]. Available: https://api.semanticscholar.org/CorpusID:16668561 [26] M. Otte and E. Frazzoli, “Rrtx: Asymptotically optimal single-query sampling-based motion planning with quick replanning,” 
+
+The International Journal of Robotics Research , vol. 35, no. 7, pp. 797–822, 2016. [Online]. Available: https://doi.org/10.1177/ 0278364915594679 [27] J.-P. Berrut and L. N. Trefethen, “Barycentric lagrange interpolation,” 
+
+SIAM Review , vol. 46, no. 3, pp. 501–517, 2004. [Online]. Available: https://doi.org/10.1137/S0036144502417715 [28] R. Rust, G. Casas, S. Parascho, D. Jenny, K. D¨ orfler, M. Helmreich, A. Gandia, Z. Ma, I. Ariza, M. Pacher, B. Lytle, Y. Huang, C. Kasirer, E. Bruun, and P. Leung, “COMPAS FAB: Robotic fabrication package for the compas framework,” https://github.com/compas-dev/compas fab/, 2018, gramazio Kohler Research, ETH Z¨ urich. [Online]. Available: https://doi.org/10.5281/zenodo.3469478 [29] P. Fleischmann, G. Casas, and M. Lyrenmann, “COMPAS RRC: Online control for abb robots over a simple-to-use python interface.” 7 2020, https://compas-rrc.github.io/compas rrc. [Online]. Available: https://doi.org/10.5281/zenodo.4639418 [30] M. Macklin, M. M¨ uller, and N. Chentanez, “Xpbd: position-based simulation of compliant constrained dynamics,” in Proceedings of the 9th International Conference on Motion in Games , ser. MIG ’16. New York, NY, USA: Association for Computing Machinery, 2016, p. 49–54. [Online]. Available: https://doi.org/10.1145/2994258.2994272 [31] F. Dellaert and GTSAM Contributors, “borglab/gtsam,” May 2022, version 4.2a8. [Online]. Available: https://github.com/borglab/gtsam [32] M. Kaess, H. Johannsson, R. Roberts, V. Ila, J. J. Leonard, and F. Dellaert, “isam2: Incremental smoothing and mapping using the bayes tree,” The International Journal of Robotics Research , vol. 31, no. 2, pp. 216–235, 2012. [Online]. Available: https://doi.org/10.1177/0278364911430419
