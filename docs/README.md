@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-23</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-24</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-23 21:44:38 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-24 22:42:04 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读3篇多智能体研究，两篇MATES/MATE同获7.0分领跑。最值得看的是用冻结单智能体策略做多智能体交互学习，以及人形机器人协作数据采集平台。普通读者可优先了解这两条路线，后续关注它们能否复现与落地。</p>
+<p>2026-09-24 日报：6 篇论文聚焦多机器人协同与多智能体强化学习，精读 3 篇、速读 3 篇。最值得看的是 9.0 分的 CoRelNav，研究多机器人如何在空间受限环境中协同语义导航，其次是 8.0 分的 MultiPush，用车队式推手学习重排物体。普通读者可先从这两篇精读入手，若对模型底层感兴趣，再补读速读中的 D-JEPA 世界模型。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CoRelNav: Collaborative Relational Navigation for Multi-Robot Spatially Constrained Semantic Navigation">CoRelNav: Collaborative Relational Navigation for Multi-Robot Spatially Constrained Semantic Navigation</span></li><li><span class="dpr-home-dashboard-paper-title" title="MultiPush: Learning to Rearrange with Teams of Car-Like Pushers">MultiPush: Learning to Rearrange with Teams of Car-Like Pushers</span></li><li><span class="dpr-home-dashboard-paper-title" title="Controlling Collectives of AI Agents in Reasoning Space with Spatial Transformers">Controlling Collectives of AI Agents in Reasoning Space with Spatial Transformers</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -87,7 +87,7 @@
     <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MATES: Learning Multi-Agent Interactions by Transforming Observations for Frozen Single-Agent Policies">MATES: Learning Multi-Agent Interactions by Transforming Observations for Frozen Single-Agent Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="MATE: Multi-Agent Virtual Teleoperation Platform for Humanoid Collaboration Data Collection">MATE: Multi-Agent Virtual Teleoperation Platform for Humanoid Collaboration Data Collection</span></li><li><span class="dpr-home-dashboard-paper-title" title="Conflicting Pattern Formation by Teams of Anonymous, Fully Disoriented Robots">Conflicting Pattern Formation by Teams of Anonymous, Fully Disoriented Robots</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="D-JEPA: A Decision-Aligned Latent World Model">D-JEPA: A Decision-Aligned Latent World Model</span></li><li><span class="dpr-home-dashboard-paper-title" title="Fully Byzantine-Resilient Multi-Agent Reinforcement Learning">Fully Byzantine-Resilient Multi-Agent Reinforcement Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Connectivity Preservation and Graph Stretching in Range-Only Swarm Dispersion">Connectivity Preservation and Graph Stretching in Range-Only Swarm Dispersion</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
