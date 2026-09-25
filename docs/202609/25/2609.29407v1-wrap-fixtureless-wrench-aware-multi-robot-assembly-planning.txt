@@ -1,0 +1,372 @@
+Title: WRAP: Fixtureless Wrench-aware Multi-Robot Assembly Planning
+
+URL Source: https://arxiv.org/pdf/2609.29407v1
+
+Published Time: Fri, 25 Sep 2026 01:15:15 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# WR A P : Fixtureless Wrench-aware Multi-Robot Assembly Planning 
+
+Valentin N. Hartmann, Huang Su, Yijiang Huang, Stelian Coros 
+
+Abstract — Assembly using robots often requires specially designed fixtures, or relies on top-down only assembly strategies. Using multiple robots, we can avoid using fixtures and make robotic assembly more flexible. Planning assembly sequences for multiple robots is challenging due to the high number of possible task assignments and orders. In addition, we need to reason over forces that occur during the assembly process, e.g., to decide if multiple robots are required for support, or if external support such as a table should be used. We present W R A P , a multi-robot assembly planner for multi-part assemblies, given the inter-part ordering-dependencies, the part meshes, and their initial state. We formulate a linear program to reason about valid grasps for supporting the forces that occur during assembly. The search leverages the assembly sequence, and greedily finds a feasible solution per assembly step by computing a heuristic via a cheap backwards search, and using the heuristic in the more expensive forward search. We then solve the multi-robot, multi-goal motion planning problem, and for execution, we split the plan into contact-rich assembly skills, and free space motion. We benchmark the planner on a variety of multi-part assemblies, and apply the planner to groups of robots differing in size and kinematics. We validate the work both in a physics simulation, and in real. Videos and code are available at www.vhartmann.com/wrap .
+
+I. IN T RO D U C T I O N 
+
+Multi-part assemblies are all around us: be it things that we use in our day to day and assemble at home, such as furniture, or things that are assembled in factories, such as cars, or PCBs. While robots are used for automated assembly in structured settings such as, building a car, assembly planning is tedious even in these scenarios, and relies on custom fixtures, manual task assignment, sequencing, and motion planning. Recently, robots have also been applied to less structured assembly settings, but were usually limited by the required assumptions: To make the assembly tasks feasible for robots, possible restrictions are purely sequential assembly, pure top down assembly, or assuming access to a fixture to place the part and hold it in place. Further, in most planners, the forces that happen during assembly are ignored, and realistic contact-rich assembly tasks (such as press fits, or screwing parts into another) might thus not be possible. By enabling flexible, fixtureless automated planning for high-mix low-repetition settings, robotic assembly becomes more economical [1]. To illustrate what we aim to do, we begin with an example: Think of an instruction booklet for assembling a toy: The instructions tell you the sequence of parts, and their goal location, but not how the part has to be grasped, or the path that your hands have to take in order to bring the part to the assembly pose. The user needs to locate the part, decide how to reposition and possibly regrasp, and hold the subassemblies 
+
+> All authors are with the Computational Robotics Lab, ETH Zurich, CH.
+
+Fig. 1: Multi-robot assembly: (left) Two OpenArm robots assembling a toy car. (right) Two UR5e arms collaborating to assemble a bench. 
+
+both in order to reach the assembly pose, and in order to support the forces that the assembly step requires. To enable such behavior, we propose W R A P : a Wrench-aware Multi-Robot Assembly Planning approach that does not require fixtures for assembly thanks to using multiple robots. WR A P takes inter-part dependencies as input, and computes the required grasps and handovers in order to support the forces happening during the assembly process. We compare the plans from W R A P to baselines and present ablations. We also compare the solutions from W R A P to plans without forces being taken into account in order to motivate why forces should be accounted for in the planning process. We demonstrate the resulting motion plans both in a physics simulator and on a real robot system. We open source the code, in addition to the 3D models that we used in this work. II. R E L AT E D WO R K 
+
+A. Assembly Sequence Planning 
+
+Assembly sequence planning determines an order and a corresponding motion to build a multi-part assembly. Classical formulations are part-centric: parts are free-floating rigid bodies, and the questions are which subsets of parts can be separated [2–4]. Common approaches in this part-centric planning are sampling-based planning in the configuration space of the parts [5–7], reinforcement learning for the combinatorial ordering problem [8, 9], and physics simulation, which allows disassembling parts with tight clearances [10]. If robots are considered at all, they usually enter as a feasibility filter: a sequence is rejected if a part is unreachable or if the partial assembly would collapse under gravity [11, 12], or a contact is selected once the sequence has been inferred [13]. Our work is complementary: we take a dependency graph as input, and reason over the robot action sequence: which robot grasps which part with which grasp, when parts are handed over or set down, and how is the mating wrench balanced are decided within one search, since none of these questions can be answered by reasoning about part motions alone. 
+
+Forces and Stability in Assembly Planning: Mattikalli et al. [14, 15] formulate the gravitational stability of a partial assembly with friction as a linear program over contact arXiv:2609.29407v1 [cs.RO] 24 Sep 2026 wrenches, [16] extends the analysis along the motion path of a single gripper, and [17] adds such gravitational constraints to a dual-arm assembly planner. In task and motion planning, forces have been incorporated as decision variables [18], and Holladay et al. [19] plan forceful manipulation by verifying that a single forceful kinematic chain can sustain the task wrench robustly. To the best of our knowledge, no prior work considers forceful multi-robot assignment and sequencing. 
+
+B. Multi-Robot Assembly Systems and Planning 
+
+Robotic assembly has also been realized as complete systems in specific domains, from IKEA chairs [20] and LEGO models [21] to building-scale structures [22–24]. Each of these systems is engineered around the geometry and joints of its own domain and does not transfer to assemblies of another kind. In manufacturing, using a second robot as a “dy-namic fixture” is an established strategy to avoid part-specific tooling [1], but the holder and inserter roles are usually fixed. Dogar et al. [25] solve multi-robot grasp selection for a given assembly sequence as a constraint satisfaction problem, but optimistically assume that any required reorientation can be attained by handovers without explicitly planning them, and forces are entirely disregarded. Long-horizon planners [26– 28] compute robot assignments, sequences, and coordinated paths from a dependency structure, but all of these abstract the mating operation away. Complementarily, AutoMate learns policies for contact-rich mating motions across diverse geometries [29], but does not address multi-part sequencing, robot assignment, or force-support planning. Closest to our work, Fabrica [30] integrates sequence, grasp, and motion planning for dual-arm assembly of general multi-part objects and adds supporting actions to counter-balance the insertion force of the other robot. However, the partial assembly is held rigidly at a fixed pose once assembled; regrasping and reorientation is disallowed, which limits the reachability of the system and the types of parts it can assemble, and mating forces are not modeled beyond a grasp-stability heuristic. W R A P plans handovers, regrasps, and set-downs of subassemblies without fixtures, and verifies for every step which agents can balance the mating wrench. III. PRO B L E M F O R M U L AT I O N 
+
+An assembly is given as a set of parts P with initial poses 
+
+p0 
+
+> i
+
+, and a set of valid final relative poses P fi with respect to the part they are mated onto. We allow multiple possible assembly orientations since some parts are symmetric. We use A ⊆ 2P \ { ∅} for the set of all possible subassemblies. Similar to [25] we then describe the assembly sequence as the dependency graph G = ( A, E ) between assembly steps. The vertices are the subassemblies (or parts) Ai ∈ A , and edges (Ai, A j ) ∈ E connect a preceding subassembly to the subassembly it is used to build. One assembly step then takes (multiple) sub-assemblies as input (all parent vertices of Aj ), and produces one new subassembly Aj , thus enabling first building (multiple) sub-assemblies that are later assembled. Parts are mated (e.g., inserted or screwed) onto other parts with a controller that applies a maximum nominal mating                                                                          
+
+> Algorithm 1: High level search of W R A P .
+> Input: Assembly problem A, flag optimize
+> Output: Task plan π⋆and motion ξ⋆
+> 1(O,G)←PR E P RO C E S S (A)
+> 2S ← IN I T I A L I Z E TA S K SE A R C H (A,O,G)
+> 3Q ← ∅ ,I← ⊥
+> 4while budget remains and candidates remain do
+> 5π←NE X T TA S K PL A N (S, I )
+> 6if π̸=⊥
+> 7Q ← Q ∪ { (π, SE L E C T WI T N E S S E S (π)) }
+> 8(π, W )←SE L E C T FA I R LY (Q)
+> 9ξ←MOT I O N PL A N (π, W, NE X T EF F O RT (π, W ))
+> 10 if ξ̸=⊥
+> 11 I←KE E P BE S T (I, (π, W, ξ ))
+> 12 if not optimize return (π, ξ )
+> 13 else
+> 14 SU S P E N D (π, W )
+> 15 if I=⊥return UN K N OW N
+> 16 return OP T I M I Z E (I)
+
+wrench wi. The (new) connection between two assembled parts p and q is not perfectly rigid, but can only sustain a convex set of wrenches Tp,q . Assembly actions then need to fulfill both a collision constraint, where the robots and their end effectors avoid each other, and the combined wrench capabilities of the grasps need to fulfill a wrench constraint arising from the required assembly force. For execution, we have a heterogeneous set of robots R
+
+with composite configuration space Q, and end effectors with wrench capabilities Wr. Additionally, the table has friction, and we model the wrench that the table can balance using the wrench set Wtable .The problem that we aim to solve is then finding the discrete action sequence S and its parameterization, i.e., when, how, and which robot manipulates which object, and how assemblies need to be supported. With this multi-robot action sequence, we then compute configurations that fulfill the constraints imposed at task boundaries by the action sequence. Finally, we need to find a collision free trajectory π(t) : 
+
+R → Q that includes the execution of the controllers for the assembly actions. IV. M U LT I -RO B OT A S S E M B LY P L A N N I N G 
+
+Our approach is described in Alg. 1 and an overview is given in Fig. 2. Informally, we formulate the problem of finding a feasible action sequence as a search over a set of robot actions and their parameterizations. In this work, we only consider prehensile manipulation. WR A P computes a set of valid grasps GAi using a grasp sampler, and stable placement poses OAi for all subassemblies 
+
+Ai appearing in the dependency graph G, then runs the search, and computes a motion plan for the found action plan using [31]. Finally, the path is postprocessed to fulfill dynamics constraints, and the contact-rich segments are replaced by local controllers that deal with interaction forces. 
+
+A. Force constraints 
+
+To evaluate if a certain assembly step is feasible, we solve a linear program (LP) to check if a static equilibrium (Fig. 3) Fig. 2: System overview: The input to our algorithm is part meshes, the initial state of the scene, and assembly dependencies, and mating wrenches. It then computes grasps, and stable rest orientations. After, it plans discrete robot-action sequences and their corresponding continuous configurations. The plan is then checked by a kinematic motion planner, and depending on feasibility of the path, replanning the plan is required. We then optimize the keyframes, and finally, we postprocess the path to make it dynamically feasible, and execute it.     
+
+> Fig. 3: (left) Illustration of an assembly action and (right) the force constraints that we introduce.
+
+exists for a set of grasp capabilities Wr , and possible wrench capabilities Tp,q per part: 
+
+X
+
+> i∈R (p)∪{ table }
+
+wi + X 
+
+> q∈N (p)
+
+tqp + wext  
+
+> p
+
+= 0, ∀p ∈ P , (1) where p is the part we are currently considering, R is the set of robots acting on part p, N is the set of parts that are connected to p, and wext  
+
+> p
+
+is the external wrench acting on part p. Gravitational forces are contained in wext  
+
+> p
+
+, and we model table support as a wrench with capability set Wtable ,that is active if the part is on the table. The LP is then 
+
+∃ wtable , {wr }r∈R , {tpq }(p,q )∈E 
+
+s.t. Eq. (1) ,
+
+wr ∈ W r , ∀r ∈ R , wt ∈ W table ,
+
+tpq ∈ T p,q , ∀(p, q ) ∈ E ,
+
+(2) where E is the set of interfaces between parts. 
+
+Robust satisfaction: The forces happening during an assembly step will not be perfectly what we expect at planning time, e.g., due to observation noise, minor grasp errors, or imperfect controllers. We model the additional forces as the nominal force, plus bounded components along the transverse directions, and a positional offset to the application point of the force. With gravity, this leads to a set of external wrenches 
+
+U that needs to be satisfied. We then require solving the LP for all the vertices of U:
+
+∀ wext ∈ vert (U), ∃ { wr }, {tij } s.t. (2) . (3) With this robust satisfaction we see behavior such as placing a component on the table to resist the nominal press, while adding a brace to withstand possible lateral deviations that could otherwise topple it. 
+
+B. Preprocessing 
+
+Before we can proceed with task planning, we need to compute stable resting orientations OAi and stable grasps GAi
+
+for all subassemblies Ai appearing in the assembly process, and for all involved end effector types. 
+
+Stable placement orientations: To place objects back on the working surface after picking them up, we compute stable resting poses OAi ⊂ SO (3) for each subassembly by finding orientations that lead to the center of mass being inside of the supporting points of the convex hull of the subassembly. 
+
+Grasp sampling: To manipulate the parts that we eventually want to assemble, we need to find a set of stable grasps GAi for all parts and eventual subassemblies. We compute grasps via antipodal sampling and check that there is a certain minimum overlap between the finger pads and the object. This could be replaced by a grasp generator, e.g., [32], which could also check in simulation if the grasp is stable under a given load. For the vacuum gripper, we sample grasps that are normal to the surface, and have a minimum area of support. 
+
+C. Task planning 
+
+We formulate a search problem over a set of actions, and their discretized parameterizations. The actions we consider are pick/place/assemble/handover/add grasp/release, and their parameterizations are, e.g., the ID of a grasp transformation, or the ID of a placement pose, and which robot(s) are doing the task. The state that we search over is then 
+
+Sfwd =
+
+ assembly status 
+
+z}|{ 
+
+C ,
+
+> Table objs.
+
+z }| {
+
+{(Ai, σ i)}i,
+
+> Grasped objs.
+
+z }| {
+
+{(rj , p j , κ j )}j
+
+
+
+(4) where C ⊆ A denotes the set of subassemblies that have already been completed, σi is the id of the placement pose of assembly Ai, and κ the id of the grasp transformation with which robot r grasps part p. Each action has a pre- and a post-condition, which means that from a given initial symbolic state s ∈ Sfwd , we apply the actions to alter the state. We can then run a search in order to find a valid action sequence that brings us to the desired final assembly. However, a standard optimal search over the full state space Sfwd does not scale both due to the branching, and the expensive validity checks. Algorithm 2: Lazy milestone fill of W R A P .                                                             
+
+> Input: State s, milestone m
+> Output: Validated milestone plan ρ
+> 1hm←RE V E R S E AB S T R AC T DI J K S T R A (m)
+> 2foreach nested action set Φdo
+> 3while search or IK effort remains do
+> 4ρ←BE S T FI R S T FI L L (s, m, h m,Φ)
+> 5if ρ=⊥break
+> 6valid ←true
+> 7foreach e∈UN VA L I DAT E D ED G E S (ρ)do
+> 8ℓ←NE X T EF F O RT LE V E L (e)
+> 9if VA L I DAT E IK(e, ℓ)
+> 10 CAC H E WI T N E S S (e)
+> 11 else
+> 12 SU S P E N D ED G E (e, ℓ)
+> 13 valid ←false
+> 14 break
+> 15 if valid return ρ
+> 16 RE O P E N AN D WI D E N (Φ)
+> 17 return ⊥
+
+We leverage the given dependency graph of parts to split the search in milestones, where we only compute robot action sequences for one assembly step at a time. In this milestone search, we backtrack when we fail to find a solution, and try another part if possible, or report the problem as infeasible. To manage the high branching factor due to many grasps, and many possible placements, we perform the search with a subset of the grasps and placement poses, which is widened if no solution could be found at the current resolution level. The search (Alg. 2) for a concrete robot action sequence is then split into a forward, and a backward component. 
+
+Backward Search: In the backward pass, we compute a heuristic by disassembling the parts. We only do cheap feasibility checks, such as collision checking of grasps by placing the involved end effectors at the grasp positions, and checking the wrench LP. However, even a backward pass with only cheap checks runs in to the branching issues described before. Thus, we run the search over a projected state 
+
+Sbwd =
+
+ status 
+
+z}|{ 
+
+a ,
+
+> assembly grasps
+
+z }| {
+
+{(pj , K j )}j ,
+
+> table rest
+
+z}|{ 
+
+ϕ ,
+
+> carried objs.
+
+z }| {
+
+{(pℓ, K ℓ)}ℓ
+
+
+
+. (5) Here, a indicates if the current assembly step is finished, the tuple (pj , K j ) describes how part pj of the current target assembly is currently grasped, ϕ indicates if and how the assembly rests on the table, and finally, (pℓ, K ℓ) describes which loose components are carried, and how. Crucially, the grasp labels K are not the original grasp identifiers, and ϕ
+
+is not the original placement identifier. Instead, they identify equivalence classes that preserve only some information of the original grasp or placement. Empirically, we found that a good tradeoff between the size of the search space, and the informativeness of the projection is ‘can this grasp transmit the required assembly wrench’, i.e., we project each grasp id κ onto this binary class. The heuristic is then computed by running a Dijkstra search over the state, where the actions are the ‘reverse’ of the forward actions. Concretely, we initialize all valid abstract goal states with distance zero and repeatedly apply inverse forward actions. Whenever an action refers to a grasp class, it is considered feasible if any grasp represented by that class satisfies the corresponding geometric and wrench constraints. 
+
+Forward Search: In the forward search, we use this heuristic by projecting the forward state to its backwards equivalence class. We run a greedy lazy shortest path search, and do inverse kinematics to try to find a valid configuration for the actions. 
+
+Plan improvement: Once a valid task plan was found, we continue running the search in order to improve the path: We run a large neighborhood search (LNS) [33], where in each fill window, we first run a greedy search, and then an exact A* search, using the previously found plan as upper bound on the cost in the forward and in the backward search. We then widen the fill window (i.e., assemble n parts in one search), and repeat the process until the window size is the full assembly horizon, or the timeout is reached. This improves the robot action sequence, but we keep the initial assembly sequence that we chose, i.e., our task planner is not optimal for non-sequential assemblies. 
+
+Inverse kinematics (IK): The constraints for the IK problem we solve are given by the action we are considering: for a handover, all involved robots need to be at the selected grasping position, but the pose of the object is free; for a place action, the pose and the grasp is given, and only the configuration of the arm is free. In addition to the constraints from the poses that need to be reached, we also enforce a minimum clearance between robots. We use an optimization-based IK solver that we initialize with analytical solutions, and restart a limited amount of times with different seeds. This allows a slight relaxation of the hard grasp constraint, which in turn allows using fewer grasps in the search. However, an optimization-based solver can never certify infeasibility, so we do not mark a search node as infeasible based on the lack of an IK solution, but store it in a queue to revisit later at a different effort level [34]. We use the number of restarts as ‘effort’ here. 
+
+Joint Keyframe Optimization: After a full task plan was found, we jointly optimize over sets of keyframes. We do so by generating candidates for each keyframe, and then use dynamic programming to select a sequence minimizing IK-branch changes, and joint motion. We additionally maximize per-keyframe clearance between robots in order to avoid configurations where robots are closely intertwined. This step does not change the task sequence. 
+
+D. Motion planning 
+
+We formulate the motion planning problem as a multi-modal, multi-goal, multi-robot path planning problem, which we can solve using [31]. A task plan might not have a feasible motion plan. Hence, we include a feedback loop from motion planning to task planning. Similar to IK, our motion planner can not certify infeasibility, thus we suspend motion planning on timeout, store the task plan, and invest more planning effort later. Fig. 4: New assemblies from left to right: Stool, Chair, Cross, Cube. 
+
+E. Retiming and Execution 
+
+We postprocess the motion plan in order to satisfy kinody-namic constraints of the robots, to enable execution on real hardware. We retime the paths: each robot stays constrained to its geometric path, but may advance along it independently. The manipulation events, and possible collisions if deviating too far from the original timing impose synchronization constraints for this independent optimization. We reserve expected skill durations, allowing unrelated robots to continue advancing on their paths up until a certain maximum deviation. If a manipulation skill exceeds its reserved duration, the participating robots wait at the event while unrelated continue until they are synchronized again. In contrast to APEX-MR [35], which represents asynchronous execution using a temporal plan graph, we directly optimize and certify the robots’ continuous path phases. V. EX P E R I M E N T S 
+
+A. Benchmark Suite and Setup 
+
+We introduce four new assemblies (Fig. 4):  
+
+> •
+
+Stool (5 parts): A stool with a base and 4 legs, which we use for testing the assembly plan in real. The legs have a snap-fit mechanism.  
+
+> •
+
+Chair (8 parts): a chair consisting of a base with 4 legs, and a backrest, which has to be assembled separately before both modules can be assembled.  
+
+> •
+
+Cross (7 parts): A cross-like shape in 3D, which requires many reorientations to add all cubes onto the center cube, which we use for the scaling analysis.  
+
+> •
+
+Cube (8 parts): A 2x2x2 cuboid consisting of smaller cubes, which we only use for the scaling analysis. We also compare against the objects that were introduced in [30] (Beam (5 parts), Plumber block (5), Car (5), Gamepad (6), Cooling Manifold (7), Duct (8), and Stool (9)), but remove the fixtures for the initial poses of the parts, and the fixtures that allow on-table assembly without any reorientation. This makes the problem considerably harder, requiring multiple handovers before final assembly. The scenarios that we are looking at are summarized in Table I. For the simulation experiments, we use 10 N insertion force, and no noise if not stated otherwise. The wrench capabilities of the grippers are specified in Table V. We run the planner with the same settings in all environments, except for the grasp-set size: For the more complex mesh geometries of the Fabrica models, we use a larger fixed grasp set (64 compared to the standard 20) and disable grasp widening. If not stated otherwise, we repeat all experiments 10 times.                               
+
+> TABLE I: Overview of the scenarios used to test our planner.
+> Env. Robots DoF EE # parts Dep. type Stool 4 UR5e 24 Mixed 5DAG Chair 4 UR5e 24 Mixed 8DAG Cross 4 UR5e 24 2F 7Sequence Cube 4 UR10e 24 Vac. 8Sequence Fabrica (7 assemblies) 4 UR5e 24 2F 5–9 DAG
+
+1) Computation times: To the best of our knowledge, there is no other work taking the wrench constraints into account in the assembly planning problem, therefore comparing to an adequate baseline is difficult. We thus compare against an approach that is similar to [25], i.e., we optimistically solve for the assembly grasps and poses, and then plan the required reorientation and handover actions. Table II shows the mean of the initial solution time (without preprocessing) per assembly and the mean cost of the solution at this time. Compared to the Optimistic planner, our planner is usually faster, but (due to the greedy search) sometimes finds worse solutions. The solution times for the assemblies from Fabrica are significantly higher than for the assemblies introduced here. This is due to our current backend requiring a convex decomposition of the parts, leading to a more expensive collision check. Table III gives details on where search time is spent: The most significant differences are in the computation of the grasp database, the forward search, and the motion planning, all collision check heavy operations. We can also see that the wrench LP and the heuristic computation take negligible time in most cases. 
+
+2) Scaling: We analyze the scaling behavior of W R A P 
+
+for more robots, and larger assemblies. We test the scaling on the cross with robots with two-finger grippers, and on a 2x2x3 version of the cube assembly, using vacuum grippers. Figure 5 shows roughly linear scaling in the number of parts in compute time, and also shows that the computation time increases significantly when adding more robots. This increase in computation time when adding more robots is caused by the larger search space: there are many more possibilities for valid pick assignments and handovers. 
+
+Wrench/no-wrench: Figure 5 also shows planning times when not including any forces (what most other assembly plans do), including gravity only, and scaling the mating forces with λ. Not requiring the grasps to satisfy wrench constraints, or only satisfying gravity, the search times are significantly lower (and the plans are shorter), as there are fewer constraints needing to be satisfied. 
+
+3) Ablations: We show a series of ablations to justify the choices in the planner. Particularly, we show in Table II:  
+
+> •
+
+Flat lazy searches over the complete task-state, i.e., not decomposing into subproblems according to the assembly dependency graph.  
+
+> •
+
+Milestones + counting uses the same milestones as WR A P , but replaces the backward search with a simple heuristic that counts the minimum number of pick, assembly, and release actions still required.  
+
+> •
+
+Exact fills replaces the greedy search with a weight-one lazy A* search. TABLE II: Comparison of search times and costs for different algorithms. We report the mean and standard deviation of 10 runs.                                                                                                                                                                                                                                            
+
+> Solver Metric Cross Stool Chair F. Beam F. Plumber block F. Car F. Gamepad F. Cooling Manifold F. Duct F. Stool Optimistic tinit 11 .25 ±0.15 14 .42 ±0.09 timeout 13 .01 ±0.03 9.73 ±0.05 49 .29 ±0.23 115 .13 ±0.28 60 .65 ±0.08 51 .46 ±0.09 20 .59 ±0.04
+> cost 22 20 timeout 14 14 18 19 26 25 24
+> Ours tinit 2.01 ±0.02 1.60 ±0.02 8.93 ±0.03 9.73 ±0.05 7.87 ±0.02 19 .71 ±0.03 82 .25 ±0.13 19 .11 ±0.11 17 .74 ±0.26 27 .70 ±0.07
+> cost 22 32 43 16 14 18 23 46 25 30
+> Flat lazy tinit OOM OOM OOM OOM OOM OOM OOM OOM OOM 45 .12 ±0.08
+> cost OOM OOM OOM OOM OOM OOM OOM OOM OOM 24
+> Milestones + counting tinit 1.69 ±0.01 41 .12 ±0.30 3.84 ±0.02 10 .26 ±0.05 7.48 ±0.03 19 .53 ±0.04 59 .78 ±0.13 timeout 47 .32 ±0.39 20 .70 ±0.29
+> cost 22 24 31 14 14 18 19 timeout 25 24
+> Ours, exact fills tinit 1.98 ±0.02 12 .51 ±0.04 5.53 ±0.02 9.96 ±0.03 7.87 ±0.03 19 .37 ±0.03 87 .64 ±0.17 20 .19 ±0.08 43 .24 ±0.29 31 .55 ±0.10
+> cost 22 20 31 14 14 18 19 26 25 24
+> Ours, fine projection tinit 5.73 ±0.02 2.02 ±0.01 16 .37 ±0.06 10 .34 ±0.04 11 .01 ±0.04 22 .10 ±0.04 98 .02 ±0.25 50 .02 ±0.24 44 .27 ±0.42 28 .84 ±0.09
+> cost 22 32 43 16 14 18 23 38 25 30
+
+TABLE III: Breakdown of where time is spent in W R A P . We report mean and standard deviation from 10 runs.                                                                                                                                                       
+
+> Backwards Forward Motion Object tgrasp tbwd search tforce LP tfwd search tIK tMP init
+> Cross 0.48 ±0.01 0.77 ±0.02 0.19 0.66 ±0.01 0.40 7.67 ±0.57
+> Stool 2.43 ±0.02 0.35 0.05 0.70 ±0.02 0.50 9.65 ±0.46
+> Chair 11 .81 ±0.05 1.27 ±0.01 0.40 3.46 ±0.03 3.80 14 .31 ±0.68
+> F. Beam 8.99 ±0.10 0.10 ±0.01 0.05 9.28 ±0.05 0.30 3.14 ±0.20
+> F. Plumb. block 5.49 ±0.03 0.64 ±0.01 0.09 5.24 ±0.03 1.89 ±0.03 44 .36 ±3.05
+> F. Car 6.93 ±0.03 1.25 0.03 7.43 ±0.03 11 .00 20 .71 ±1.91
+> F. Gamepad 49 .87 ±0.30 1.47 ±0.01 0.11 46 .93 ±0.11 33 .74 ±0.05 113 .37 ±14 .25
+> F. Cool. Mani. 17 .52 ±0.04 1.79 ±0.04 0.22 14 .98 ±0.08 2.12 ±0.04 38 .51 ±2.29
+> F. Duct 42 .96 ±0.13 1.76 ±0.02 0.17 ±0.01 13 .39 ±0.20 2.43 ±0.05 125 .36 ±14 .60
+> F. Stool 23 .14 ±0.05 2.71 ±0.02 0.35 20 .64 ±0.07 4.00 65 .54 ±2.98
+
+(a) Cross, two-finger grippers. 
+
+(b) Cube, vacuum grippers. 
+
+w/o wrench λ = 0 λ = 0 .01 λ = 0 .1
+
+λ = 0 .5 λ = 1 λ = 2 
+
+Fig. 5: Scaling comparison for two objects and different wrench models for ( left ) two, ( middle ) three, and ( right ) four robots. λ is a scaling factor on the required assembly force. 
+
+• Fine projection replaces the backward abstraction with a finer projection. On average, W R A P obtains the initial solution fastest, but in many cases the simple counting heuristic and the optimistic search are competitive. Flat lazy stops due to running out of memory for all problems due to the large search space. We also show the solutions cost of the plan, i.e., the number of actions that are taken in Table II. The optimal forward search in the local fills leads to better solution than the greedy search in W R A P , but at the cost of being slower. 
+
+4) Convergence and Optimality: WR A P continues to search for a better task plan and decreases the cost until the timeout is reached. We show a cost convergence plot (Fig. 6) for three assemblies, namely ’Cross’, ’Stool’, and ’Chair’. While W R A P usually finds a solution earlier than the other planners, the initial cost is usually worse. If given enough time, our planner often converges to the same or better solution cost when we keep optimizing the task plan. A counterexample to this is ‘Chair’, which consists of many 
+
+Ours Optimistic Flat lazy Counting Exact fills Fine projection 
+
+Fig. 6: Cost convergence plot for (left) Cross, (middle) Stool and 
+
+(right) Chair. 
+
+parts and submodules. There’s two effects: (1) while we can optimize within the chosen assembly sequence, we might not be able to find the optimal solution, and (2) when we improve the milestone fills, we constrain ourselves to the previously chosen end-state. If that end-state is suboptimal, we can only escape this when filling in longer horizons. 
+
+5) Generalizations: We demonstrate two extensions with no changes to W R A P : the Cross assembly using four seven-DoF OpenArm manipulators (Fig. 8), and a five-part stool whose four legs are attached using screw motions rather than linear insertions in the supplementary material. 
+
+B. Simulation 
+
+We run the paths that we compute in a physics simulator (MuJoCo) to ensure feasibility under the assembly wrenches and the robot dynamics. Since real-to-sim is a difficult problem to solve in itself (i.e., matching friction behavior, and contact-rich insertion behavior from reality to the simulation), we rigidly attach the parts to the grippers and manually check the wrench at the interface and apply the mating wrenches as external wrenches that are applied to the bodies. We compute a path with the wrench gates in the search, one with only gravity, and one without any wrench checks. Table IV reports the utilization of the wrench limits separately for the vacuum grippers and the two-finger grippers in the scene, and we report the utilization during transport and during insertion separately. Plans can fail with peak utilization lower than 100 with other failure modes than fail-during-insertion: Both approaches that do not take the assembly wrench into account do not manage to complete an assembly. The most common failures for ‘Cross’ and ‘Cube’ are attempting to assemble objects without support on the table, and the object sliding away, and for ‘Chair’ using the vacuum gripper in a direction that does not support a force. On the cube example, W R A P 
+
+fails once due to object misalignment when assembling. 
+
+C. Real world execution 
+
+We show real robot execution on the example of a version of the stool with two UR5e robots mounted on a stationary TABLE IV: Simulation success of plans computed with different support models. We report success and mean peak support utilization over 10 runs for the successful part of the trajectory. Utilization is split by execution phase and gripper type; bold values exceed the limit. – denotes an absent gripper type.                                                             
+
+> Env. Model Succ. Tasks Fail. Transport util. Insertion util. [%] 2F Vac. 2F Vac. Cross w/o wrench 0 11/26 no support (10) 10 –18 –Gravity 0 11/26 no support (10) 10 –18 –Full 100 22/22 –25 –21 –Cube w/o wrench 0 1.4/21 no support (10) –8–34 Gravity 0 1.4/21 no support (10) –8–34 Full 90 41.4/44 seat (1) –47 –28 Chair w/o wrench 0 2/30 vac. (10) 034 0104
+> Gravity 0 2/30 vac. (10) 036 0103
+> Full 100 36/36 –18 95 19 89
+
+Fig. 7: Robot calibration (left and middle) and closeup of the snap fit (right) that we use in the stool model. 
+
+husky base, with snapshots in Fig. 9, and a video in the supplementary material. We cut the stool in half for the demo: The plan then consists of 7 actions, containing a handover, and the two assembly steps inserting the legs into the base. We track the reference path with a joint space velocity controller, and we run a compliant controller for the insertion. The compliant controller was enough to successfully insert the legs in the stool, since we know the initial positions of the parts due to an accurate calibration of the system, and, e.g., vision based recovery was not needed. 
+
+Gripper wrench and insertion wrench calibration: The set of wrenches Wr that the gripper can transmit to the object without slippage is dependent on the gripper-object interface. We measure the range by grasping an object of the correct material, and applying an external force until the object moves, either through slipping, or through the gripper letting go. Fig. 7 shows the setup for the measurement of the slippage-limits, and Table V lists the manufacturer limit of the gripper, and the calibrated limits at which slippage happens. To be conservative in what forces and torques we apply, we take the minimum of both values. We also measure the forces that happen during the mating of the parts that we execute on the real robot system. The maximum forces we measure during multiple test insertions were 17 .32 N axial force, and 5.38 N transverse force. The maximum torques were 0.70 N m , 1.34 N m and 2.08 N m .With a safety factor, we therefore set the nominal force that we plan with for the real execution to 25 N .VI. D I S C U S S I O N & L I M I TAT I O N S 
+
+The approach we present here is based on a classical search, which means that eventually, in order to certify infeasibility, all possible actions and parameterizations have to be tested, 
+
+TABLE V: Wrench limits used during assembly and transport. Two-finger values are the minimum of the manufacturer limit and the measured slippage load (in parentheses). The same limits apply to assembly and transport. For the vacuum gripper, only a z-force is allowed during assembly, since deflection otherwise occurs.                                
+
+> Two-finger gripper Vacuum gripper Parameter Adopted (measured) Assembly measured Transport measured
+> Fx[N]50 (95.3) 067.4
+> Fy[N]39.7 (39.7) 067.4
+> Fz[N]50 (80.4) 110.0 110.0
+> Mx[N m ]4.7 (4.7) 05.0
+> My[N m ]4.5 (4.5) 05.0
+> Mz[N m ]3(9.8) 02.1
+
+which is not scaleable for large assemblies and many robots. This effect is visible in the scaling experiments, where the performance is influenced both by the number of robots, and the number of parts. In the settings where we solved the same assembly with a different number of robots, ideally the runtime would not increase from involving more robots if it is possible to solve with fewer robots. One could deal with this by focusing on subsets of the whole state space, i.e., not considering all robots from the beginning on. While we showed the execution of the plans on real robots, closed loop execution of plans is left as future work. The controllers currently absorb some inaccuracies, but a replanning approach is required to deal with larger execution failures. The approach is currently limited to prehensile manipulation, and actions that have deterministic effects, currently preventing, e.g., pushing objects away to reach a part. We intend to combine this task planning approach with learned policies, enabling both non-prehensile manipulation, and, e.g., dexterous manipulation for in-hand reorientation instead of requiring multiple handovers. In the real robot execution, the rigidity assumption per part does not necessarily hold anymore: Depending on the grasp, some parts bent under load: internal stress should be taken into account in the task planning, in addition to the external forces. VII. C O N C L U S I O N 
+
+We presented W R A P , a method to compute robot task assignments and sequences in order to compute a multi-robot action plan from a given assembly dependency graph for a multi-part assembly. W R A P takes the forces that happen during assembly steps into account, does not require fixtures, and computes asynchronous motion plans that are executable on a real multi-robot system. VIII. A C K N OW L E D G M E N T This work was part of an Innovation project supported by Innosuisse. YH was supported by the ETH postdoc fellowship and the SNSF Ambizione Grant (Grant No. 223384) We used coding agents to rewrite initial implementations, including Claude Opus and Fable 5, GPT 5.6 Sol, GLM 5.3, Deepseek V4. 
+
+RE F E R E N C E S [1] J. A. Marvel, R. Bostelman, and J. Falco, “Multi-robot assembly strategies and metrics,” ACM Computing Surveys , vol. 51, 2018. Fig. 8: Snapshots from simulation, from left to right: Duct, 2x2x3 Cube, Cross with OpenArm, Car, Half-Stool with Husky. 
+
+Fig. 9: Sequence from the real robot execution of the stool assembly with two UR5e arms on a stationary Husky base. From left to right: initial configuration, handing over the first leg, grasping the seat, inserting a leg into the seat held in mid-air, grasping the second leg, and insertion, and placing the assembled stool on the table. 
+
+[2] D. Halperin, J.-C. Latombe, and R. H. Wilson, “A general framework for assembly planning: The motion space approach,” Algorithmica ,vol. 26, no. 3, pp. 577–601, 2000. [3] P. Jim´ enez, “Survey on assembly sequencing: a combinatorial and geometrical perspective,” Journal of Intelligent Manufacturing , vol. 24, no. 2, pp. 235–250, 2013. [4] M. V. A. R. Bahubalendruni and B. B. Biswal, “A review on assembly sequence generation and its automation,” Proceedings of the Institution of Mechanical Engineers, Part C: Journal of Mechanical Engineering Science , vol. 230, no. 5, pp. 824–838, 2016. [5] S. Sundaram, I. Remmler, and N. M. Amato, “Disassembly sequencing using a motion planning approach,” in Proc. of the IEEE Int. Conf. on Robotics and Automation (ICRA) , vol. 2, 2001, pp. 1475–1480. [6] X. Zhang, R. Belfer, P. G. Kry, and E. Vouga, “C-space tunnel discovery for puzzle path planning,” ACM Trans. on Graphics , 2020. [7] S. B. Bayraktar, A. Orthey, Z. Kingston, and M. Toussaint, “Peel: Parallel extraction for long-horizon disassembly planning via scale-invariant sampling,” arXiv preprint arXiv:2608.08773 , 2026. [8] N. Funk, G. Chalvatzaki, B. Belousov, and J. Peters, “Learn2assemble with structured representations and search for robotic architectural construction,” in Conf. on Robot Learning (CoRL) , 2022. [9] S. K. S. Ghasemipour, S. Kataoka, B. David, D. Freeman, S. S. Gu, and I. Mordatch, “Blocks assemble! Learning to assemble with large-scale structured reinforcement learning,” in Int. Conf. on Machine Learning (ICML) , 2022, pp. 7435–7469. [10] Y. Tian, J. Xu, Y. Li, J. Luo, S. Sueda, H. Li, K. D. Willis, and W. Matusik, “Assemble them all: Physics-based planning for generalizable assembly by disassembly,” ACM Trans. Graph. , 2022. [11] Y. Tian, K. D. Willis, B. Al Omari, J. Luo, P. Ma, Y. Li, F. Javid, E. Gu, J. Jacob, S. Sueda et al. , “Asap: Automated sequence planning for complex robotic assembly with physical feasibility,” in Proc. of the IEEE Int. Conf. on Robotics and Automation (ICRA) . IEEE, 2024. [12] I. Rodr´ ıguez, K. Nottensteiner, D. Leidner, M. Kaßecker, F. Stulp, and A. Albu-Sch¨ affer, “Iteratively refined feasibility checks in robotic assembly sequence planning,” IEEE Robot. and Automat. Lett. (R-AL) ,2019. [13] X. Zhu, D. K. Jha, D. Romeres, L. Sun, M. Tomizuka, and A. Cherian, “Multi-level reasoning for robotic assembly: From sequence inference to contact selection,” in Proc. of the IEEE Int. Conf. on Robotics and Automation (ICRA) , 2024, pp. 816–823. [14] R. Mattikalli, D. Baraff, P. Khosla, and B. Repetto, “Gravitational stability of frictionless assemblies,” IEEE Trans. on Robotics , 1995. [15] R. Mattikalli, D. Baraff, and P. Khosla, “Finding all stable orientations of assemblies with friction,” IEEE Trans. on Robotics , vol. 12, pp. 290–301, 1996. [16] S. Rakshit and S. Akella, “The influence of motion paths and assembly sequences on the stability of assemblies,” IEEE Trans. on Automation Science and Engineering , vol. 12, no. 2, pp. 615–627, 2015. [17] R. Moriyama, W. Wan, and K. Harada, “Dual-arm assembly planning considering gravitational constraints,” in Proc. of the IEEE/RSJ Int. Conf. on Intelligent Robots and Systems (IROS) , 2019, pp. 5566–5572. [18] M. Toussaint, J.-S. Ha, and D. Driess, “Describing physics for physical reasoning: Force-based sequential manipulation planning,” 
+
+IEEE Robotics and Automation Letters , 2020. [19] R. Holladay, T. Lozano-P´ erez, and A. Rodriguez, “Robust planning for multi-stage forceful manipulation,” International Journal of Robotics Research , vol. 43, no. 3, pp. 330–353, 2024. [20] F. Su´ arez-Ruiz, X. Zhou, and Q.-C. Pham, “Can robots assemble an ikea chair?” Science Robotics , vol. 3, no. 17, p. eaat6385, 2018. [21] L. N¨ agele, A. Hoffmann, A. Schierl, and W. Reif, “Legobot: Automated planning for coordinated multi-robot assembly of lego structures,” in 
+
+Proc. of the IEEE/RSJ Int. Conf. on Intelligent Robots and Systems (IROS) . IEEE, 2020, pp. 9088–9095. [22] Y. Huang, C. R. Garrett, I. Ting, S. Parascho, and C. T. Mueller, “Robotic additive construction of bar structures: Unified sequence and motion planning,” Construction Robotics , vol. 5, pp. 115–130, 2021. [23] Z. Wang, F. Kennel-Maushart, Y. Huang, B. Thomaszewski, and S. Coros, “A temporal coherent topology optimization approach for assembly planning of bespoke frame structures,” ACM Trans. on Graphics , vol. 42, no. 4, 2023. [24] C.-J. Liang, S.-C. Kang, and M.-H. Lee, “RAS: a robotic assembly system for steel structure erection and assembly,” International Journal of Intelligent Robotics and Applications , vol. 1, pp. 459–476, 2017. [25] M. Dogar, A. Spielberg, S. Baker, and D. Rus, “Multi-robot grasp planning for sequential assembly operations,” Autonomous Robots ,vol. 43, no. 3, pp. 649–664, 2019. [26] V. N. Hartmann, A. Orthey, D. Driess, O. S. Oguz, and M. Toussaint, “Long-horizon multi-robot rearrangement planning for construction assembly,” IEEE Trans. on Robotics , 2022. [27] J. Chen, J. Li, Y. Huang, C. Garrett, D. Sun, C. Fan, A. Hofmann, C. Mueller, S. Koenig, and B. C. Williams, “Cooperative task and motion planning for multi-arm assembly systems,” Mar 2022. [Online]. Available: http://arxiv.org/abs/2203.02475 [28] N. Hargus, A. Orthey, and M. Toussaint, “Coordinated multi-robot disassembly for makespan optimization of large-scale assemblies,” 
+
+arXiv preprint arXiv:2608.05830 , 2026. [29] B. Tang, I. Akinola, J. Xu, B. Wen, A. Handa, K. Van Wyk, D. Fox, G. S. Sukhatme, F. Ramos, and Y. Narang, “AutoMate: Specialist and generalist assembly policies over diverse geometries,” in Proc. of Robotics: Science and Systems (R:SS) , 2024. [30] Y. Tian, J. Jacob, Y. Huang, J. Zhao, E. L. Gu, P. Ma, A. Zhang, F. Javid, B. Romero, S. Chitta, S. Sueda, H. Li, and W. Matusik, “Fabrica: Dual-arm assembly of general multi-part objects via integrated planning and learning,” in Conf. on Robot Learning (CoRL) , 2025. [31] V. N. Hartmann, T. Heinle, Y. Huang, and S. Coros, “Sampling-based multi-modal multi-robot multi-goal path planning,” in World Symposium on the Algorithmic Foundations of Robotics (WAFR) , 2026. [32] H.-S. Fang, C. Wang, H. Fang, M. Gou, J. Liu, H. Yan, W. Liu, Y. Xie, and C. Lu, “Anygrasp: Robust and efficient grasp perception in spatial and temporal domains,” IEEE Trans. on Robotics , 2023. [33] D. Pisinger and S. Ropke, Large Neighborhood Search . Cham: Springer International Publishing, 2019, pp. 99–127. [34] M. Toussaint, J. Ortiz-Haro, V. N. Hartmann, E. Karpas, and W. H¨ onig, “Effort level search in infinite completion trees with application to task-and-motion planning,” in Proc. of the IEEE Int. Conf. on Robotics and Automation (ICRA) . IEEE, 2024, pp. 14 902–14 908. [35] P. Huang, R. Liu, S. Aggarwal, C. Liu, and J. Li, “Apex-mr: Multi-robot asynchronous planning and execution for cooperative assembly,” in Proc. of Robotics: Science and Systems (R:SS) , 2025.

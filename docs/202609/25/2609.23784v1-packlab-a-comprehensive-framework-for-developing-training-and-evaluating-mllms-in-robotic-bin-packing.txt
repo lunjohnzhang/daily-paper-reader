@@ -1,0 +1,360 @@
+Title: PackLab: A Comprehensive Framework for Developing, Training, and Evaluating MLLMs in Robotic Bin Packing
+
+URL Source: https://arxiv.org/pdf/2609.23784v1
+
+Published Time: Tue, 22 Sep 2026 01:45:57 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# PackLab: A Comprehensive Framework for Developing, Training, and Evaluating MLLMs in Robotic Bin Packing 
+
+Donghao Zhou 1,∗, Jia-Hui Pan 1,∗, Fan Zhang 1, Xingyuan Bu 2, Shilong Li 2, Xiaojie Gao 1,Yun-Hui Liu 3, Chi-Wing Fu 1,†, and Pheng-Ann Heng 1,†
+
+Abstract — Robotic bin packing requires long-horizon se-quential decision-making, as each object placement affects the available space for subsequent packing. Existing methods primarily rely on hand-crafted geometric heuristics that optimize predefined objectives or reinforcement learning policies learned through trial and error over predefined training configurations. Despite recent advances in multimodal large language models (MLLMs) for this task, their potential for closed-loop sequential decisions across heterogeneous packing configurations remains underexplored. To address this gap, we introduce PackLab, a comprehensive framework for developing, training, and evaluat-ing MLLMs for closed-loop robotic bin packing. PackLab-Suite 
+
+provides a physics-based simulation platform for scalable gener-ation of diverse training packing trajectories and evaluation of their physical outcomes. PackLab-VLM is a packing-specialized MLLM that understands the evolving object and container states to jointly select objects and predict placements in a closed-loop manner. PackLab-Bench provides standardized packing scenarios at multiple difficulty levels for systematic evaluation. Extensive experiments demonstrate that, on average, PackLab-VLM outperforms conventional packing heuristics, traditional reinforcement learning methods, and general-purpose MLLMs across object sets and container configurations, highlighting the potential of MLLMs for long-horizon robotic packing. The code, model, dataset, and benchmark are available at 
+
+https://github.com/Correr-Zhou/PackLab .
+
+I. I NTRODUCTION 
+
+Robotic bin packing is a classical optimization problem that maximizes space utilization by arranging objects into a constrained container, with broad applications in logistics, warehousing, and robotic manipulation. It is not only a geo-metric optimization problem, but also a sequential decision-making problem in which each object placement changes the available space for all subsequent objects. Effective packing therefore requires understanding the long-term consequences of individual placement decisions. Existing robotic packing methods primarily rely on packing heuristics [1], [2], [3], [4], [5] or reinforcement learning (RL) [6], [7], [8], [9], [10]. Heuristic methods score candidate placements using hand-crafted geometric objectives, whereas RL methods learn sequential policies through trial and error, typically under predefined object and container distributions.  
+
+> This study was supported by the InnoHK initiative of the Innovation and Technology Commission of the Hong Kong Special Administrative Region Government via the Hong Kong Centre for Logistics Robotics.
+> ∗Equal contribution. †Corresponding authors.
+> 1Donghao Zhou, Jia-Hui Pan, Fan Zhang, Xiaojie Gao, Chi-Wing Fu, and Pheng-Ann Heng are with the Department of Computer Science and Engineering, The Chinese University of Hong Kong.
+> 2Xingyuan Bu and Shilong Li are with M-A-P.
+> 3Yun-Hui Liu is with the Department of Mechanical and Automation Engineering, The Chinese University of Hong Kong. (a) Quantitative Packing Performance Comparison (b) A Real-world Packing Case Produced by Our Method
+
+Fig. 1: (a) PackLab-VLM outperforms the baseline and existing methods. (b) A real-world packing result produced by our method, with 1.00 Success Ratio and 0.72 Compactness. Learning a unified policy that handles heterogeneous packing configurations, however, remains challenging. Recent ad-vances in multimodal large language models (MLLMs) offer a promising foundation for learning a unified packing policy across heterogeneous configurations, as their multimodal representations and flexible sequence modeling enable joint conditioning on variable object sets, container geometries, and interaction histories. Nevertheless, existing studies [11], [12], [13] primarily use MLLMs to infer object properties or semantic constraints, while relying on conventional planners to determine packing actions. This raises a fundamental question: Can an MLLM directly perform closed-loop object selection and placement across diverse object sets and container configurations? 
+
+Answering this question requires developing and evaluating MLLM-based packing policies across diverse object sets, con-tainer configurations, and task complexities. However, existing work lacks an integrated framework for physics-grounded simulation, scalable training data generation, packing-specific training, and standardized evaluation. To address this gap, we introduce PackLab , a comprehensive framework for arXiv:2609.23784v1 [cs.RO] 20 Sep 2026 developing, training, and evaluating MLLMs in robotic bin packing. In Figure 1, we illustrate PackLab’s superior packing performance compared with existing methods in terms of the Overall Score, together with a real-world packing example to further show its effectiveness. PackLab comprises three core components that respec-tively support physics-grounded simulation and scalable data generation, closed-loop packing-specific training, and stan-dardized evaluation. Specifically, PackLab-Suite is a physics-grounded platform for packing simulation with a layout-first data generation engine to produce diverse, physically valid training packing trajectories, curated as the PackData-20K dataset. PackLab-VLM is fine-tuned on PackData-20K to integrate container heightmaps, candidate-object attributes, and observation-action histories, jointly predicting object and placement selection at each step. Lastly, PackLab-Bench 
+
+structures test cases into three difficulty levels progressing from easy to hard through larger buffers, richer object sets, and enlarged container dimensions. It provides standardized evaluation metrics of Success Ratio, Compactness, and their product as the Overall Score. On average, PackLab-VLM 
+
+outperforms packing heuristics, RL methods, and the general-purpose MLLM baseline across heterogeneous packing set-tings. Ablation studies validate the effectiveness of each design, while physical experiments validate its applicability to real-world robotic bin packing. The main contributions of this work are as follows:  
+
+> •
+
+We introduce PackLab , a comprehensive framework for developing, training, and evaluating MLLM-based robotic bin packing policies.  
+
+> •
+
+Three core components are developed within the pro-posed framework: PackLab-Suite for physics-grounded simulation and scalable training trajectory generation, 
+
+PackLab-VLM for closed-loop packing decisions, and 
+
+PackLab-Bench for standardized evaluation.  
+
+> •
+
+We conduct extensive evaluations, demonstrating 
+
+PackLab-VLM ’s effectiveness across heterogeneous pack-ing settings and its real-world feasibility. II. R ELATED WORK 
+
+Existing robotic bin packing methods adopt different paradigms for packing optimization. Early approaches op-timize entire packing sequences offline using genetic al-gorithms [2], [1], [14], [15], tabu search [16], simulated annealing [17], or integer linear programming [18], [19]. However, these approaches incur substantial computational costs and may require replanning when executed placements deviate from planned ones. To enable online planning, packing heuristics evaluate candidate placements using hand-crafted geometric objec-tives [1], [20], [3], [4], [5]. Existing packing heuristics evaluate candidate placements using different criteria. Deepest-Bottom-Left-Fill (DBLF) prioritizes placements that are both deep and low [1]. Maximum-Touching-Area (MTA) maximizes the contact area between the placed item and its surrounding objects and container walls [20]. Heightmap-Minimization (HM) selects placements that minimize the increase in container heightmap [3], [4]. SDF-Pack chooses placements with minimum signed distance field values [5]. These methods efficiently select placements based on the current container state in an online manner. However, their local objectives primarily evaluate individual placements without explicitly accounting for their effects on the remaining space and feasibility of subsequent placements. To optimize long-term packing decisions, reinforcement learning (RL) methods formulate packing as a sequential decision-making problem and learn policies that maximize cumulative rewards [8], [21], [22], [6], [7]. Unlike packing heuristics that evaluate only the immediate quality of a place-ment, these methods can account for how each action changes the remaining free space and influences subsequent decisions. Representative approaches employ deep Q-networks [23], hierarchical or dueling architectures [8], [7], and specialized objectives that encourage stable placements [6], [7] or incorporate heuristic guidance to improve exploration and solution quality [10]. However, policy learning requires extensive trial-and-error over predefined object and container settings, which may limit generalization to unseen settings. Recent advances in multimodal large language models (MLLMs) have motivated their application to robotic bin packing, leveraging their capabilities in object understanding. Existing studies [13], [12], [11] primarily employ MLLMs to infer object properties, physical relationships, or packing constraints, which are subsequently incorporated into conven-tional planners for object selection and placement. Sim et al. [24] employ a large language model to generate packing heuristics, but report limited generalization across problem instances. PackingGPT [25] directly predicts sequential object placements, but does not perform closed-loop decision-making based on evolving packing states. In contrast to explicit optimization, hand-crafted heuristics, and trial-and-error policy learning, we aim to train an MLLM to jointly select objects and predict placements across diverse object and container size configurations. Compared with prior MLLM-based approaches, PackLab performs long-horizon, closed-loop robotic packing by understanding the dynamically evolving container and object states. III. M ETHODOLOGY 
+
+A. Problem Formulation 
+
+Robotic bin packing is formulated as a closed-loop sequen-tial decision process over T packing steps. At step t, the scene state St = ( Ht, Bt) comprises the current container occupancy, encoded as a top-down heightmap Ht, and a candidate-object buffer Bt with each object described by its identity and 3D dimensions. A packing policy predicts the packing action: 
+
+at = ( bt, o t, x t, y t), (1) where bt ∈ B t is the selected object, ot is its horizontal orientation, and its placement location (xt, y t), which is defined by the minimal horizontal location of its bounding box at the target pose. Scenario Sampling Layout Partition Replay Validation Trajectory Curation 
+
+> Data Generation Engine
+
+PackLab-Suite PackLab-VLM PackLab-Bench     
+
+> Container Heightmap Candidate Objects Observation-Action History
+> Outputs
+> Action History Update
+> Inputs
+> Physics-Grounded Action Execution
+> Closed-Loop Policy Model Standardized Evaluation Protocol Physics-Grounded Platform
+> Gravity Dynamics Stability Feedback Rigid-Body Collision
+> {“ID”: 1, “Size”: [8, 6, 10] }, …
+> Buffer Area Container Object
+> PackData-20K
+> Interactive Decision-Making
+> Easy Medium Hard
+> Success Ratio Compactness Overall Score
+> PackLab-VLM
+
+🔥 Evaluation Metrics   
+
+> 𝑯 !
+> ℬ!
+> 𝑯 "! , ℬ "! , 𝒜 "!
+> {“Object ID”: 4, “Rotation”: 1, “x”: 12, “y”: 8 }
+> 𝒂 !
+> Heightmap Update
+> Test Cases by Difficulty Levels Simulation Environment
+> System Prompt 𝒫 #$#
+
+Fig. 2: Overview of PackLab. Left: PackLab-Suite simulates physical interactions to generate, validate, and curate diverse packing trajectories to support policy training and form the PackData-20K dataset. Center: PackLab-VLM predicts packing actions in a closed-loop manner based on the container heightmap, candidate object attributes, observation-action history, and system prompt. Right: PackLab-Bench organizes test cases by difficulty levels and evaluates Success Ratio, Compactness, and Overall Score. The vertical placement coordinate zt is determined by the lowest physically reachable position under gravity, which is written as 
+
+zt = max 
+
+> 0≤i<l otbt
+> 0≤j<w otbt
+
+Ht[xt + i, y t + j], (2) where lot 
+
+> bt
+
+and wot 
+
+> bt
+
+denote the length and width of object bt at orientation ot. Ht denotes the top-down container heightmap. After executing at, the environment returns an updated scene state St+1 , which informs the next decision. The packing process continues until all objects have been processed. The goal is to maximize the successfully packed object volume and the compactness of the resulting object arrangement. 
+
+B. Framework Overview 
+
+PackLab is a self-contained robotic bin packing framework comprising PackLab-Suite , a physics-grounded platform; 
+
+PackLab-VLM , a multimodal closed-loop policy; and PackLab-Bench , a standardized evaluation protocol. Figure 2 presents an overview of the framework. 
+
+PackLab-Suite models gravity dynamics, rigid-body colli-sions, and stability feedback to facilitate the state transition from St to St+1 . Training packing trajectories ( i.e. , the PackData-20K dataset) are constructed based on its data generation engine and are subsequently used to train the closed-loop policy model PackLab-VLM . At each packing step t, PackLab-VLM predicts an action at, specifying the selected object, orientation, and planar placement coordinates, based on the scene state St including the container heightmap and candidate object attributes, as well as the observation– action history. After physics-grounded execution, the updated heightmap and action history are fed back to support closed-loop decision-making. PackLab-Bench organizes test cases into three difficulty levels, easy, medium, and hard, and evaluates the Success Ratio, Compactness, and Overall Score. 
+
+C. PackLab-Suite: Physics-Grounded Platform PackLab-Suite is a physics-grounded platform that performs simulation with gravity dynamics, rigid-body collision, and stability feedback. Its data generation engine constructs PackData-20K by partitioning container space into candi-date layouts and inversely reconstructing the corresponding packing trajectories to facilitate subsequent policy training. 
+
+Simulation Environment. After each placement at, PackLab-Suite simulates gravity-driven dynamics with the gravitational acceleration set to −9.8 m /s2 along the vertical axis, allowing the newly placed object to settle within the container. The objects, buffer surface, and container boundaries are represented using box-shaped collision geometries, enabling the simulator to resolve object–object, object–ground, and object–wall contacts. The stability-feedback module advances the simulation while monitoring the placed object’s linear and angular velocities; once both fall below predefined thresholds, the object is deemed stationary, and the resulting post-placement state is recorded to facilitate closed-loop planning. 
+
+Data Generation Engine. PackLab-Suite also incorporates a data generation engine that adopts a layout-first data generation pipeline that avoids exhaustive forward sampling over object–placement combinations. The data generation procedure comprises four stages: scenario sampling, layout partition, replay validation, and training trajectory curation. First, the container size and the number of packing objects are sampled to instantiate each packing scenario. Next, the usable container space is partitioned along its height into stacked horizontal layers, each of which is further subdivided across the horizontal plane into non-overlapping regions that define the object target poses and collectively form a terminal packing layout. A forward packing trajectory is then recovered by iteratively removing geometrically accessible objects from the layout and reversing the removal order, with the terminal object poses serving as placement targets. The resulting packing trajectory is represented as 
+
+A∗ = ( b∗ 
+
+> t
+
+, o ∗ 
+
+> t
+
+, x ∗ 
+
+> t
+
+, y ∗ 
+
+> t
+
+)T −1 
+
+> t=0
+
+, (3) where A∗ denotes the resultant training packing trajectory, and b∗ 
+
+> t
+
+, o ∗ 
+
+> t
+
+, (x∗ 
+
+> t
+
+, y ∗ 
+
+> t
+
+) denote the selected object, its orientation, and horizontal placement location, respectively. Lastly, each reconstructed training packing trajectory is replayed and validated under gravity dynamics, rigid-body collision handling, and stability feedback, and packing trajectories containing invalid placements are discarded. The scene states, placement actions, and physical feedback from valid rollouts are curated to form PackData-20K, a diverse collection of 20K training packing trajectories for closed-loop policy training. PackData-20K spans the three difficulty levels described in Sec. III-E, and trajectories from different levels are mixed for robust policy training. 
+
+D. PackLab-VLM: Closed-Loop Policy Model PackLab-VLM is a packing-specialized multimodal large language model. At each packing step, it conditions on the complete multi-turn interaction context, comprising the previous scene states and executed actions together with the current scene state, and predicts the packing action. 
+
+Multimodal State Encoding and Action Prediction. Let 
+
+Sk = ( Hk, Bk) denote the scene state at step k. The model input is defined as a temporally ordered multimodal context: 
+
+Xt = ( Psys , S1, a1, . . . , St−1, at−1, St) , (4) which includes a system prompt Psys , historical heightmaps 
+
+H<t , historical candidate-object buffers B<t , executed actions 
+
+A<t , and the current observation St = ( Ht, Bt).The textual components of Xt, including B≤t and A<t ,are serialized in chronological order to form a structured prompt Qt with image placeholders and mapped to model token embeddings: 
+
+Ut = Etext (Tok( Qt)) ∈ RNq ×d, (5) where Tok( ·) denotes the tokenizer, Etext (·) denotes the token embedding layer, Nq is the number of textual tokens, and d is the embedding dimension. Meanwhile, each current or historical container heightmap 
+
+Hk is processed by a visual encoder Evisual (·). The resulting visual features are projected by a vision-language merger 
+
+M (·) into the shared model embedding space: 
+
+Vk = M (Evisual (Hk)) ∈ RNv ×d, (6) where Nv is the number of visual tokens and d matches the model embedding dimension. The visual tokens are inserted at the corresponding image-placeholder positions in the textual prompt, forming a shared multimodal token sequence: 
+
+Ft = Φ ( Ut, V≤t) . (7) where V≤t = ( V1, . . . , Vt) denotes the visual tokens from the current and historical steps, and Φ( ·) denotes placeholder-based multimodal token composition. TABLE I: Statistics of PackLab-Bench test cases by difficulty.             
+
+> Difficulty Buffer Layers Objects Easy 31–2 4–8 Medium 52–3 9–18 Hard 10 3–4 19–32
+
+Finally, PackLab-VLM autoregressively decodes the multi-modal representation Ft into a structured textual output bτ t,which is parsed into an executable packing action at:
+
+bτ t = Ψ( Ft),
+
+at = ( bt, o t, x t, y t) = Parse ( bτ t) . (8) where Ψ( ·) denotes the standard token-level autoregressive decoding process of PackLab-VLM .
+
+Policy Training. PackLab-VLM is fine-tuned on step-level multimodal examples extracted from the training packing trajectories in the PackData-20K dataset, denoted by 
+
+D =   Xn,t , τ ∗
+
+> n,t
+
+ | 1 ≤ n ≤ N, 1 ≤ t ≤ Tn , (9) where n is the index of a training packing trajectory, t is the packing-step index, Xn,t denotes the multimodal state–history context at step t, and τ ∗ 
+
+> n,t
+
+denotes the corresponding ground-truth textual action output formed by the training packing trajectory A∗. Each trajectory provides supervision at its decision steps, training the MLLM to generate executable structured action text. The supervised fine-tuning objective is the target-token negative log-likelihood: 
+
+L = − 1
+
+N
+
+> N
+
+X
+
+> n=1
+> Tn
+
+X
+
+> t=1
+
+log pΘ
+
+ τ ∗ 
+
+> n,t
+
+| X n,t 
+
+ , (10) where Tn denotes the total number of packing steps in the 
+
+n-th training trajectory, Θ denotes the trainable parameters of PackLab-VLM , and pΘ(·) is the token probability distri-bution produced by the model. The probability is factorized autoregressively over the target action-output tokens. 
+
+E. PackLab-Bench: Standardized Evaluation Protocol 
+
+Test Cases Organized by Difficulty Levels. PackLab-Bench 
+
+contains 60 test cases, evenly divided among easy, medium, and hard levels, spanning 905 packing steps in total. As summarized in Table I, task difficulty is defined by jointly varying the candidate-buffer size, number of packing layers and objects, and container dimensions, providing controlled coverage of different decision horizons and spatial configura-tions. PackLab-Bench is strictly disjoint from PackData-20K, as all test cases are independently sampled and carefully verified to exclude any overlap. 
+
+Evaluation Metrics. We evaluate each method with three metrics after the completion of each packing case: Success Ratio, Compactness, and Overall Score. Let O denote the complete object set and Osucc denote the subset of TABLE II: Quantitative results on PackLab-Bench . We compare PackLab-VLM with representative packing methods across easy, medium, hard, and average settings. Each setting reports Success Ratio (Succ.), Compactness (Comp.), and Overall Score (Overall). The best average results are marked in bold .
+
+Method Easy Medium Hard Average Succ. ↑ Comp. ↑ Overall ↑ Succ. ↑ Comp. ↑ Overall ↑ Succ. ↑ Comp. ↑ Overall ↑ Succ. ↑ Comp. ↑ Overall ↑
+
+DBLF [1] 0.788 0.690 0.568 0.967 0.645 0.626 0.720 0.641 0.469 0.825 0.659 0.554 HM [3], [4] 0.788 0.690 0.568 0.967 0.639 0.619 0.680 0.601 0.415 0.812 0.643 0.534 MTA [20] 0.764 0.654 0.543 0.895 0.540 0.489 0.571 0.487 0.285 0.743 0.560 0.439 FFP [26] 0.771 0.673 0.558 0.698 0.389 0.278 0.440 0.362 0.162 0.636 0.475 0.333 SDF-Pack [5] 0.880 0.795 0.718 0.966 0.640 0.619 0.719 0.646 0.469 0.855 0.694 0.602 TAP-Net [8] 0.890 0.555 0.501 0.972 0.548 0.535 0.673 0.566 0.386 0.845 0.556 0.474 IR-BPP [9] 0.695 0.592 0.434 0.916 0.565 0.520 0.656 0.559 0.372 0.756 0.572 0.442 
+
+PackLab-VLM (Ours) 0.999 0.923 0.922 0.966 0.680 0.665 0.680 0.552 0.394 0.882 0.718 0.660 DBLF                 
+
+> Succ.=0.822 Comp.=0.813 Overall=0.668
+> HM
+> Succ.=0.601 Comp.=0.615 Overall=0.370
+> MTA
+> Succ.=0.603 Comp.=0.570 Overall=0.343
+> FFP
+> Succ.=0.461 Comp.=0.406 Overall=0.187
+> SDF-Pack
+> Succ.=0.674 Comp.=0.570 Overall=0.385
+> TAP-Net
+> Succ.=0.722 Comp.=0.591 Overall=0.427
+> IR-BPP
+> Succ.=0.669 Comp.=0.522 Overall=0.349
+> PackLab-VLM
+> Succ.=1.000 Comp.=1.000 Overall=1.000
+
+Fig. 3: Qualitative comparison of PackLab-VLM with existing methods on an example packing case. PackLab-VLM produces a complete and compact arrangement with all objects contained within the container, achieving 1.000 on all three metrics, whereas competing methods yield less compact layouts with lower Success Ratio. successfully packed objects whose post-placement geometric centers lie in the container boundaries. The Success Ratio is 
+
+Rsucc =
+
+P
+
+b∈O succ Vb
+
+P
+
+b∈O Vb
+
+, (11) where Vb denotes the volume of a packed object b. Com-pactness is measured by the ratio of the total volume of successfully packed objects to the packing-envelope volume, defined by the container base area and the maximum occupied height in the final heightmap: 
+
+C =
+
+P
+
+b∈O succ Vb
+
+W · L · max x,y HT +1 [x, y ] , (12) where W and L are the container’s width and length, and 
+
+HT +1 is the terminal heightmap. Overall Score is the product of Success Ratio and Compactness, defined as 
+
+Rall = Rsucc · C. (13) It serves as the primary metric for jointly evaluating how much volume is packed and how compactly it is arranged. IV. E XPERIMENTS 
+
+A. Experimental Setup 
+
+Implementation Details. We instantiate PackLab-VLM with Qwen3.5-9B [27] as the backbone and train it on PackData-20K using packing-oriented supervised fine-tuning. We dis-cretize ot as 0 and 1 to represent 0◦ and 90 ◦, respectively, and discretize (xt, y t) at 2.5 cm resolution. Optimization uses AdamW with a fixed learning rate of 1 × 10 −5 and a global batch size of 8, where each GPU processes one training sample per step. We train the model for a total of 5 epochs on an 8-GPU training cluster. To make long-context multimodal training feasible in practice, we use Fully Sharded Data Parallel (FSDP), bf16 precision, and gradient checkpointing during training. 
+
+Compared Methods. We compare with five classic placement heuristics, as well as two reinforcement learning (RL)-based methods using their official checkpoints. Deepest-Bottom-Left-Fill (DBLF) [1] favors low-corner placements for compact bottom-up stacking. Heightmap-Minimization heuristic (HM) [3], [4] evaluates candidate placements by heightmap changes to maintain a low, smooth surface. Easy Medium Hard Average  
+
+> Difficulty
+> 0.2 0.4 0.6 0.8 1.0
+> Overall Score
+> Before Training After Training (Ours)
+
+Fig. 4: Distributions of packing performance before and after training across different difficulty levels. Each scatter point denotes the Overall Score obtained for an individual packing case, while the box plots report the median and interquartile range for each difficulty level. The post-training scores are consistently higher than the corresponding pre-training scores across all difficulty levels, indicating improved packing performance after task-specific training. Maximum Touching Area (MTA) [20] maximizes contact area with the floor, walls, or packed objects. First Feasible Placement (FFP) [26] returns the first feasible position in the search order. SDF-Pack [5] minimizes signed distance field values to favor spatially compact placements. TAP-Net [8] learns a transport-and-pack policy for sequential packing, while IR-BPP [9] learns an online packing policy with a reinforcement-learning objective. For these two learning-based baselines, we evaluate the official checkpoints with the required action-interface adaptation. 
+
+B. Main Results 
+
+Table II reports the quantitative results on PackLab-Bench .All methods are evaluated on the same fixed test cases, and the reported results are averaged over three independent runs with different random seeds. Overall, PackLab-VLM achieves the best average performance among all compared methods, with an average Overall Score of 0.660, outperforming the strongest heuristic baseline, SDF-Pack, by 0.059, and the strongest official RL checkpoint, TAP-Net, by 0.186. It also obtains the highest average Success Ratio and Compactness scores, reaching 0.882 and 0.718, respectively, both higher than SDF-Pack, TAP-Net, and IR-BPP. This indicates that the improvement is not driven by a single metric but by jointly placing more object volume inside the container and arranging it more compactly. Across difficulty levels, PackLab-VLM performs particu-larly strongly on easy and medium tasks. On easy cases, it achieves nearly complete Success Ratio and a substantially higher Overall Score than all baselines, showing that the model can effectively leverage visual state, object information, and packing history when spatial constraints are moderate. On medium cases, its Success Ratio is comparable to the best heuristic and RL baselines, while its higher Compactness TABLE III: Ablation results on input context.          
+
+> Aspect Variant Overall Score ↑
+> Visual Input Distractor Heightmap 0.494 Original Heightmap (Ours) 0.660
+> Sequential History Only Current Observation 0.533 W/o Action History 0.589 Full History (Ours) 0.660
+
+TABLE IV: Ablation results on training data.          
+
+> Aspect Variant Overall Score ↑
+> Data Scale 25% Training Data 0.578 50% Training Data 0.630 100% Training Data (Ours) 0.660
+> Data Recipe Easy-Only Recipe 0.587 Easy+Medium Recipe 0.604 Mixed Recipe (Ours) 0.660
+
+leads to the best Overall Score, suggesting better spatial organization rather than merely placing more objects. Hard cases remain more challenging due to tighter space constraints and more complex residual layouts. PackLab-VLM still achieves competitive performance in this setting, while geometry-search heuristics such as SDF-Pack and DBLF retain advantages in some densely constrained cases. These results demonstrate the effectiveness of PackLab-VLM over greedy packing heuristics and RL policies opti-mized for fixed configurations. For a controlled comparison, we retrain TAP-Net [8] and IR-BPP [9] under the same task distribution, using an equivalent number of trial-and-error iterations. Across three test-time seeds, TAP-Net and IR-BPP achieve average Overall Scores of 0.405 and 0.345, respectively, underscoring the difficulty of learning a unified RL policy across heterogeneous packing configurations. In Figure 3, we also provide qualitative comparisons among all methods. The visualized packing trajectories and final configurations show that PackLab-VLM generally produces more coherent arrangements, makes better use of the available space, and preserves usable regions for subsequent objects. In contrast, heuristic methods often favor locally feasible placements that can fragment the remaining space and limit future packing opportunities. Although RL-based methods can outperform some heuristics in certain cases, their layouts are still less complete and compact than PackLab-VLM under heterogeneous packing configurations. These examples illustrate how incorporating visual observations, object attributes, and packing history enables PackLab-VLM 
+
+to reason about both immediate placement feasibility and the longer-term organization of the container. More results are presented in the supplementary video. 
+
+C. Ablation Studies and More Analysis 
+
+We perform ablation studies on PackLab-VLM ’s training and input context, along with additional analysis on the training data and model size. Following the main experiments, all results are averaged over three runs. (b) Physical Packing System         
+
+> Initial State Step 2 Step 4 Step 6 Final State
+> PackLab-VLM (Ours)
+> Initial State Step 2 Step 4 Step 6 Final State
+> Baseline
+> (a) Comparison of Physical Packing Results Produced by PackLab-VLM and Baseline
+
+Fig. 5: Qualitative comparison on the same real-world packing case of eight objects. (a) Sequential snapshots show that 
+
+PackLab-VLM (top) successfully packs all objects into the container with a compact, space-efficient arrangement, whereas the baseline (bottom) packs only a subset of three objects and leaves a large portion of the container unused. (b) The physical robotic packing system used for the real-world experiment. 
+
+Training Effect. We first examine whether the gain of 
+
+PackLab-VLM comes from packing-oriented training rather than the zero-shot capability of the Qwen3.5-9B backbone. We directly compare the base model and the trained model under the same benchmark setting. As shown in Figure 4, training substantially improves the average Overall Score from 0.209 to 0.660. The improvement is consistent across difficulty levels: Easy increases from 0.246 to 0.922, Medium from 0.220 to 0.665, and Hard from 0.162 to 0.394. The cross-case distributions also shift upward after training, indicating that the gain is not caused by a few favorable cases. These results confirm that task-specific supervision is essential for learning valid action formats, object selection, and spatially grounded placement behavior. 
+
+Input Context. We study whether PackLab-VLM relies on input context rather than superficial input formatting. For visual input, we keep the trained model and inference pipeline unchanged, but replace the original heightmap with a black distractor heightmap at inference time. For sequential history, we compare full history with two reduced settings: using only the current observation and removing assistant action history. As shown in Table III, replacing the original heightmap reduces Overall Score from 0.660 to 0.494, confirming that visual geometry provides essential spatial cues. Removing sequential history also hurts performance: Only Current Observation scores 0.533, while W/o Action History reaches 0.589, both below the full-history setting. These results show that PackLab-VLM benefits from both the visual and sequential history input designs, supporting the effectiveness of our multimodal closed-loop formulation. 
+
+Training Data. We next explore whether PackLab-VLM 
+
+benefits from more training data and a broader difficulty recipe. For data scale, we keep the architecture and evaluation protocol fixed while using 25%, 50%, and 100% of the 0.870 0.875 0.880 
+
+> Success Ratio
+> 0.67 0.68 0.69 0.70 0.71 0.72 0.73
+> Compactness
+> 0.617 0.645 0.660
+> Model Size
+> 2B 4B 9B
+
+Fig. 6: Model-size ablation of trained models. Each point reports Success Ratio and Compactness, with nearby text showing the Overall Score. training data. Overall Score improves steadily from 0.578 to 0.630 and 0.660, showing that additional training packing tra-jectories provide useful coverage beyond basic action-format learning. For the data recipe, Easy-Only reaches 0.587, while Easy+Medium improves to 0.604 by adding more constrained states. However, both are below the mixed easy/medium/hard recipe, which achieves 0.660. This indicates that diverse difficulty coverage is important for learning robust packing behavior: easy cases stabilize basic geometric grounding, medium cases teach common constrained decisions, and hard cases expose dense, high-ambiguity states. Together, these results support the effectiveness of our full training recipe. 
+
+Model Size. Finally, we examine how model capacity affects the trained packing policy. Figure 6 compares trained 2B, 4B, and 9B models using Success Ratio and Compactness as axes, with Overall Score annotated near each point. Due to computational resource constraints, we use 9B as the largest model in this study. All three models achieve a strong Success Ratio after task-specific training, while larger models consistently improve Compactness and Overall Score. Specifically, the Overall Score increases from 0.617 for 2B to 0.645 for 4B and 0.660 for 9B. This trend suggests that larger models better integrate heightmaps, object attributes, and sequential history when organizing compact placements, rather than merely increasing the amount of packed volume. Larger MLLMs remain an important direction for future work. 
+
+D. Evaluation on a Physical Platform 
+
+To assess the real-world applicability of PackLab-VLM ,we developed a physical platform that performs scene perception, packing planning, and robotic execution, with re-planning triggered when the observed container state deviates substantially from the prediction. The platform comprises an AUBO robot arm with a suction cup, a RealSense RGB camera, a Photoneo depth camera, a buffer area with randomly posed objects, and a 30 cm × 30 cm × 10 cm container. We use SAM3 [28] to detect and segment all buffered objects, whose point clouds are extracted to estimate their 3D dimensions and initialize the virtual environment. PackLab-VLM then selects objects and predicts their target poses. For each object, the segmented point cloud provides a top-center grasp and 2D orientation through principal-axis analysis. The robot aligns this axis with the container y-axis and executes the placement. After each placement, the container is re-scanned to determine whether re-planning is required. Figure 5 shows the physical setup and compares PackLab-VLM with the baseline using the same object set. The results show that PackLab-VLM produces a more compact packing arrangement than the baseline, resulting in more effective utilization of the container space. Additional results are provided in the supplementary video. V. C ONCLUSION 
+
+In this paper, we study MLLM-based robotic bin packing under a multimodal decision-making paradigm. To address this problem, we propose PackLab , a comprehensive frame-work including PackLab-Suite for physics-based simulation and data generation, PackLab-VLM for closed-loop object selection and placement prediction, and PackLab-Bench for standardized evaluation across tasks of varying difficulty. Ex-tensive experiments show that PackLab-VLM outperforms con-ventional packing heuristics, reinforcement learning methods, and general-purpose MLLMs, demonstrating the effectiveness of packing-specific training and evaluation for improving MLLM-based robotic bin packing. Future work will extend PackLab to broader object geometries and physical settings, and enable more flexible packing behaviors through user-defined objectives and constraints. REFERENCES [1] K. Karabulut and M. M. ˙ Inceo˘ glu, “A hybrid genetic algorithm for packing in 3D with deepest bottom left with fill method,” in Inter-national Conference on Advances in Information Systems . Springer, 2004, pp. 441–450. [2] A. G. Ramos, J. F. Oliveira, J. F. Gonc ¸alves, and M. P. Lopes, “A container loading algorithm with static mechanical equilibrium stability constraints,” Transportation Research Part B: Methodological , vol. 91, pp. 565–581, 2016. [3] F. Wang and K. Hauser, “Stable bin packing of non-convex 3D objects with a robot manipulator,” in 2019 International Conference on Robotics and Automation . IEEE, 2019, pp. 8698–8704. [4] F. Wang and K. Hauser, “Dense robotic packing of irregular and novel 3d objects,” IEEE Transactions on Robotics , vol. 38, no. 2, pp. 1160–1173, 2021. [5] J.-H. Pan, K.-H. Hui, X. Gao, S. Zhu, Y.-H. Liu, P.-A. Heng, and C.-W. Fu, “Sdf-pack: Towards compact bin packing with signed-distance-field minimization,” in 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2023, pp. 10 612–10 619. [6] S. Huang, Z. Wang, J. Zhou, and J. Lu, “Planning irregular object packing via hierarchical reinforcement learning,” IEEE Robotics and Automation Letters , vol. 8, no. 1, pp. 81–88, 2022. [7] H. Zhao, Z. Pan, Y. Yu, and K. Xu, “Learning physically realizable skills for online packing of general 3D shapes,” ACM Transactions on Graphics , vol. 42, no. 5, pp. 1–21, 2023. [8] R. Hu, J. Xu, B. Chen, M. Gong, H. Zhang, and H. Huang, “TAP-Net: transport-and-pack using reinforcement learning,” ACM Transactions on Graphics , vol. 39, no. 6, pp. 1–15, 2020. [9] H. Zhao, Q. She, C. Zhu, Y. Yang, and K. Xu, “Online 3D bin packing with constrained deep reinforcement learning,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 35, no. 1, 2021, pp. 741–749. [10] S. Yang, S. Song, S. Chu, R. Song, J. Cheng, Y. Li, and W. Zhang, “Heuristics integrated deep reinforcement learning for online 3D bin packing,” IEEE Transactions on Automation Science and Engineering ,2023. [11] J.-H. Pan, Y. T. Cheah, Z. Liu, K.-H. Hui, X. Gao, P.-A. Heng, Y.-H. Liu, and C.-W. Fu, “Opa-pack: Object-property-aware robotic bin packing,” arXiv preprint arXiv:2505.13339 , 2025. [12] Y. Blei, M. Krawez, A. G¨ oß, D. V. Sheela, T. J¨ ulg, P. Krack, F. Walter, and W. Burgard, “ipack: Intuitive bin packing with large language models,” arXiv preprint arXiv:2503.08445 , 2025. [13] Y. Blei, M. Krawez, T. J¨ ulg, P. Krack, F. Walter, and W. Burgard, “Llm-pack: Intuitive grocery handling for logistics applications,” arXiv e-prints , pp. arXiv–2503, 2025. [14] K. Kang, I. Moon, and H. Wang, “A hybrid genetic algorithm with a new packing strategy for the three-dimensional bin packing problem,” 
+
+Applied Mathematics and Computation , vol. 219, no. 3, pp. 1287–1299, 2012. [15] J. F. Goncalves and M. G. Resende, “A biased random key genetic algorithm for 2d and 3d bin packing problems,” International journal of production economics , vol. 145, no. 2, pp. 500–510, 2013. [16] A. Lodi, S. Martello, and D. Vigo, “Heuristic algorithms for the three-dimensional bin packing problem,” European Journal of Operational Research , vol. 141, no. 2, pp. 410–420, 2002. [17] X. Liu, J.-M. Liu, A.-X. Cao, and Z.-L. Yao, “HAPE3D—a new constructive algorithm for the 3D irregular packing problem,” Frontiers of Information Technology & Electronic Engineering , vol. 16, no. 5, pp. 380–390, 2015. [18] C. Lamas-Fernandez, J. A. Bennell, and A. Martinez-Sykora, “Voxel-based solution approaches to the three-dimensional irregular packing problem,” Operations Research , 2022. [19] Y. Jiang, M. Lim, C. Zheng, and A. Saxena, “Learning to place new objects in a scene,” The International Journal of Robotics Research ,vol. 31, no. 9, pp. 1021–1043, 2012. [20] L. Wang, S. Guo, S. Chen, W. Zhu, and A. Lim, “Two natural heuristics for 3D packing with practical loading constraints,” in Pacific Rim International Conference on Artificial Intelligence . Springer, 2010, pp. 256–267. [21] L. Duan, H. Hu, Y. Qian, Y. Gong, X. Zhang, Y. Xu, and J. Wei, “A multi-task selected learning approach for solving 3D flexible bin packing problem,” arXiv preprint arXiv:1804.06896 , 2018. [22] J. Zhang, B. Zi, and X. Ge, “Attend2Pack: Bin packing through deep reinforcement learning with attention,” in 2021 International Conference on Machine Learning Workshops , 2021. [23] R. Verma, A. Singhal, H. Khadilkar, A. Basumatary, S. Nayak, H. V. Singh, S. Kumar, and R. Sinha, “A generalized reinforcement learning algorithm for online 3d bin-packing,” arXiv preprint arXiv:2007.00463 ,2020. [24] K. Sim, Q. Renau, and E. Hart, “Beyond the hype: Benchmarking llm-evolved heuristics for bin packing,” in Applications of Evolutionary Computation . Springer, 2025, pp. 386–402. [25] Y. You and H. Li, “Packinggpt: 3d packing agent for real furniture in last-mile delivery,” arXiv preprint arXiv:2608.01427 , 2026. [26] J. O. Berkey and P. Y. Wang, “Two-dimensional finite bin-packing algorithms,” Journal of the operational research society , vol. 38, no. 5, pp. 423–429, 1987. [27] Qwen Team, “Qwen3.5: Towards native multimodal agents,” February 2026. [Online]. Available: https://qwen.ai/blog?id=qwen3.5 [28] N. Carion, L. Gustafson, Y.-T. Hu, S. Debnath, R. Hu, D. Suris Coll-Vinent, C. Ryali, K. V. Alwala, H. Khedr, A. Huang et al. , “Sam 3: Segment anything with concepts,” in International conference on learning representations , vol. 2026, 2026, pp. 138 846–138 923.

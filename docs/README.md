@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-24</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-25</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-24 22:42:04 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-25 22:16:42 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,10 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-09-24 日报：6 篇论文聚焦多机器人协同与多智能体强化学习，精读 3 篇、速读 3 篇。最值得看的是 9.0 分的 CoRelNav，研究多机器人如何在空间受限环境中协同语义导航，其次是 8.0 分的 MultiPush，用车队式推手学习重排物体。普通读者可先从这两篇精读入手，若对模型底层感兴趣，再补读速读中的 D-JEPA 世界模型。</p>
+<p>今日共生成 5 篇推荐（精读 2 篇，速读 3 篇）</p>
+<p>精读：《Pairwise Approximation Can Select the Wrong Multi-Robot Plan》（8.0/10）, 《Safe Formation Control of Open Multi-Robot Systems with Connectivity-Preserving Reconfiguration》（8.0/10）</p>
+<p>速读：《WRAP: Fixtureless Wrench-aware Multi-Robot Assembly Planning》（7.0/10）, 《PackLab: A Comprehensive Framework for Developing, Training, and Evaluating MLLMs in Robotic Bin Packing》（6.0/10）, 《Fly, Drive, Reconfigure: A Modular Reconfigurable Aerial-Ground Platform for Field Operations》（6.0/10）</p>
+<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +74,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CoRelNav: Collaborative Relational Navigation for Multi-Robot Spatially Constrained Semantic Navigation">CoRelNav: Collaborative Relational Navigation for Multi-Robot Spatially Constrained Semantic Navigation</span></li><li><span class="dpr-home-dashboard-paper-title" title="MultiPush: Learning to Rearrange with Teams of Car-Like Pushers">MultiPush: Learning to Rearrange with Teams of Car-Like Pushers</span></li><li><span class="dpr-home-dashboard-paper-title" title="Controlling Collectives of AI Agents in Reasoning Space with Spatial Transformers">Controlling Collectives of AI Agents in Reasoning Space with Spatial Transformers</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Pairwise Approximation Can Select the Wrong Multi-Robot Plan">Pairwise Approximation Can Select the Wrong Multi-Robot Plan</span></li><li><span class="dpr-home-dashboard-paper-title" title="Safe Formation Control of Open Multi-Robot Systems with Connectivity-Preserving Reconfiguration">Safe Formation Control of Open Multi-Robot Systems with Connectivity-Preserving Reconfiguration</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -87,7 +90,7 @@
     <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="D-JEPA: A Decision-Aligned Latent World Model">D-JEPA: A Decision-Aligned Latent World Model</span></li><li><span class="dpr-home-dashboard-paper-title" title="Fully Byzantine-Resilient Multi-Agent Reinforcement Learning">Fully Byzantine-Resilient Multi-Agent Reinforcement Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Connectivity Preservation and Graph Stretching in Range-Only Swarm Dispersion">Connectivity Preservation and Graph Stretching in Range-Only Swarm Dispersion</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="WRAP: Fixtureless Wrench-aware Multi-Robot Assembly Planning">WRAP: Fixtureless Wrench-aware Multi-Robot Assembly Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="PackLab: A Comprehensive Framework for Developing, Training, and Evaluating MLLMs in Robotic Bin Packing">PackLab: A Comprehensive Framework for Developing, Training, and Evaluating MLLMs in Robotic Bin Packing</span></li><li><span class="dpr-home-dashboard-paper-title" title="Fly, Drive, Reconfigure: A Modular Reconfigurable Aerial-Ground Platform for Field Operations">Fly, Drive, Reconfigure: A Modular Reconfigurable Aerial-Ground Platform for Field Operations</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
