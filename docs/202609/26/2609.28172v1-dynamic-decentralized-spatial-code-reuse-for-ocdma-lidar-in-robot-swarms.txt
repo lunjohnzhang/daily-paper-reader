@@ -1,0 +1,356 @@
+Title: Dynamic, Decentralized Spatial Code Reuse for OCDMA LiDAR in Robot Swarms
+
+URL Source: https://arxiv.org/pdf/2609.28172v1
+
+Published Time: Thu, 24 Sep 2026 01:17:45 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Dynamic, Decentralized Spatial Code Reuse for OCDMA LiDAR in Robot Swarms 
+
+Mohammad Hani Alomari 
+
+Mechanical and Maintenance Engineering Department German Jordanian University Amman, Jordan Email: mohammad.hani@gju.edu.jo ORCID: https://orcid.org/0009-0006-7528-3289 
+
+Abstract —Robots in a LiDAR-equipped swarm mutually inter-fere when their optical ranging codes collide. Existing mitigations either assign codes statically – requiring L = N distinguishable codes for N robots – or react to detected interference without a scalable, coordinated assignment rule beneath them; prior work explicitly identifies the code-assignment scaling problem as unsolved. We propose a decentralized protocol in which robots dynamically reassign spatial reuse codes based on a live, beacon-maintained interference-neighborhood graph, and prove that the number of codes required grows as O(log N/ log log N )
+
+under constant robot density – an unbounded improvement over the Θ( N ) growth of static assignment. We validate this result under conditions substantially beyond the idealized proof – robot mobility, imperfect beacon-based detection, and reac-tive reassignment – via Monte Carlo simulation (30 seeds per condition, 95% confidence intervals): the advantage over static assignment widens from roughly 2× at 15 robots to 12 × at 120. Against a structurally faithful, fairly constructed model of an existing coordination-free approach, our protocol achieves both substantially greater code-reuse efficiency and 30–40% lower collision risk under an identical, constrained code budget, demonstrating that coordination – not merely reactivity – is what closes the scaling gap. 
+
+I. I NTRODUCTION 
+
+Light Detection and Ranging (LiDAR) sensors are a pri-mary means by which mobile robots perceive their surround-ings, and are increasingly deployed in multi-robot systems – warehouse fleets, agricultural swarms, coordinated exploration teams – where many robots share a common workspace. When multiple LiDAR-equipped robots operate in close proximity, pulses emitted by one robot can be received by another, producing spurious range readings or corrupting genuine re-turns: a phenomenon termed mutual interference . As deployed swarm sizes grow, so does the frequency and severity of this interference, motivating a substantial body of mitigation work. Existing mitigations fall into several mechanistic cate-gories. Post-hoc approaches filter corrupted returns after de-tection using spatio-temporal consistency across frames [1]. Waveform-domain approaches replace deterministic pulse pat-terns with pseudo-random signals, relying on statistical near-orthogonality rather than a designed codebook [2]. Time-domain approaches detect interference and desynchronize each robot’s duty cycle independently, without inter-robot coordi-nation [3]. Code-domain approaches, most directly related to this work, assign each robot a distinguishing optical code – typically from an orthogonal or carrier-hopping code family – so that interfering signals remain statistically distinguishable at the receiver [4]. Code-domain approaches share a structural limitation: ex-isting schemes, including patented zone-based reuse architec-tures, assign codes statically . A swarm of N robots therefore requires a code family supporting at least N simultaneously distinguishable codes, regardless of how many robots are ever within interference range of one another at once. This limitation is acknowledged explicitly, without being resolved, in the waveform-domain literature: “[t]he CDMA-based one may have limitation in assignment of orthogonal codes, when the number of sensors becomes big, such as autonomous vehicle application cases” [2]. We address this gap directly. Rather than assigning perma-nent codes, robots in our protocol dynamically reassign codes based on a live, locally-maintained interference-neighborhood graph, reusing a bounded code pool as robots separate and re-detecting conflicts as they converge. We emphasize that decentralization alone is not the source of novelty here – existing patented static reuse architectures already support decentralized assignment – the distinguishing axis is dynamic ,graph-driven reassignment versus static , pre-assigned codes. This paper makes four contributions: 1) A decentralized protocol in which robots dynamically reassign spatial reuse codes based on a live, beacon-maintained interference-neighborhood graph, requiring no permanent per-robot code assignment (Section IV). 2) A formal proof that the number of codes required grows as O(log N/ log log N ) under constant robot density, in contrast to the Θ( N ) growth required by static assign-ment (Section V). 3) A realistic Monte Carlo evaluation incorporating robot mobility, imperfect beacon-based neighbor detection, and reactive code reassignment, validating the theoreti-cal result under conditions substantially more adversarial than the idealized proof (Sections VI–VIII). 4) A fair, structurally-matched comparison against a sim-plified model of an existing coordination-free mitigation approach, demonstrating both greater code efficiency and lower collision risk under an identical resource budget (Section VIII). arXiv:2609.28172v1 [cs.RO] 23 Sep 2026 The remainder of this paper is organized as follows. Sec-tion IV specifies the protocol. Section V proves the scaling re-sult. Section VI characterizes collision behavior under realistic detection. Section VII describes the simulation methodology. Section VIII presents results. Related work and the formal system model precede the protocol section; a discussion of limitations and concluding remarks follow the results. II. R ELATED WORK 
+
+Existing LiDAR interference mitigation approaches can be organized by the mechanism used to distinguish or avoid conflicting signals, which we adopt below in place of achronological survey, since the mechanism – not publication date – determines whether an approach is structurally capable of the scaling behavior this paper targets. 
+
+A. Post-Hoc Detection 
+
+Robinson et al. [1] mitigate interference after the fact, filtering corrupted point-cloud returns using spatio-temporal consistency across consecutive frames, validated on physical hardware. This approach requires no code, zone, or timing coordination between robots at all, and is complementary to, rather than competing with, code-domain reuse: it addresses residual interference after assignment, not the assignment problem itself. 
+
+B. Waveform-Domain Randomization 
+
+Hwang and Lee [2] replace deterministic pulse sequences with a true-random analog signal, achieving statistical near-orthogonality through correlation-based detection rather than a designed codebook, with an analytically derived false-alarm probability and hardware validation via a laboratory prototype. As noted in Section I, this work explicitly identifies the code-assignment scaling problem as a limitation of code-domain approaches, without proposing or analyzing a solution – the direct motivation for this paper. 
+
+C. Decentralized Time-Domain Desynchronization 
+
+Rathnayake et al. [3] (D2SR) detect interference via a con-volutional network operating on depth-sensor output (reported precision ≈ 99% , recall ≈ 82 –83% ) and desynchronize each robot’s duty cycle independently in the time domain, requiring no beacon or neighbor information of any kind. This is the closest prior work to ours in spirit – reactive, decentralized adaptation rather than static assignment – but the underlying mechanism has no informed exclusion: a robot reacting to detected interference has no means of knowing which timing phases are already in use nearby. The source reports this directly: interference reduction falls from 70.3% at two LiDAR units to 3.5% at five, an explicit, measured failure to scale that we adopt as the structural basis for our baseline comparison in Section VII. 
+
+D. Static Code-Domain Reuse 
+
+Two-dimensional carrier-hopping prime codes (CHPC) [4] and Gold-code-based schemes augmented with a secondary static identifier layer [5] both assign codes from a fixed family without reassignment. CHPC cardinality equals chip length exactly, yielding L(N ) = N (Section V); the UID-augmentation approach reduces collision probability by a con-stant multiplier over a fixed code length rather than changing the underlying growth rate. Patented zone-based geographic reuse [6] similarly assigns codes statically by location and explicitly supports both centralized and distributed assignment architectures – the reason Section I identifies decentralization, rather than dynamic reassignment, as not the axis of novelty in this work. 
+
+E. Adjacent, Non-Competing Domains 
+
+Two recent lines of work address swarm coordination through different sensing modalities entirely, and are worth distinguishing explicitly rather than folding into a single dis-missive remark. Kaushal et al. [9] coordinate swarming behav-ior in a mobile robotic platform using short-range, color-coded visible-light signaling combined with a WiFi mesh for global information sharing; this is an inter-robot communication and behavior-coordination scheme, with no ranging function and no notion of a code assigned to avoid sensor interference. Chen et al. [10] (Infra-Swarm) achieve centimeter-level neigh-bor localization from narrowband near-infrared optical-flare photometry and explicitly target the scalability of a swarm’s 
+
+perception pipeline on resource-constrained hardware, not of 
+
+code assignment ; nothing in that system allocates a reusable identifying code of the kind bounded in Section V. Neither work performs LiDAR ranging or code assignment of any kind, and both were confirmed, during literature review, to be non-competing with the gap addressed here. 
+
+F. Summary of the Gap 
+
+Table I summarizes the preceding discussion. Every re-viewed approach is either (a) statically assigned, (b) dynamic but uncoordinated and empirically non-scaling, or (c) not a code-assignment scheme at all. No existing approach com-bines dynamic, informed reassignment; a live, coordinated interference-neighborhood graph; and a formal scaling proof – the combination this paper provides. III. S YSTEM MODEL 
+
+This section fixes notation and terminology used throughout the remainder of the paper. 
+
+A. Robots and Interference 
+
+We consider a swarm of N robots, each equipped with a LiDAR ranging sensor operating on a shared optical band. Robot i occupies a time-varying position pi(t), and two robots i, j are said to interfere whenever their separation 
+
+dij (t) = ∥pi(t) − pj (t)∥ falls within an interference range D,determined by transmit power, receiver sensitivity, and ranging waveform (parameter values are grounded against measured hardware in Table II, Section VI). TABLE I COMPARISON OF LIDAR INTERFERENCE MITIGATION APPROACHES                                                       
+
+> Approach Mechanism Assignment Coordination Detection error modeled? Scaling proof? Validation Robinson et al. [1] Post-hoc spatio-temporal filtering N/A – not a coding scheme N/A N/A N/A Hardware Hwang &Lee [2] True-random waveform +correlation detection N/A –statistical near-orthogonality N/A Yes, analytical No – names the gap, unsolved Hardware D2SR [3] Time-domain duty-cycle desync Dynamic, reactive to own state only None Yes, measured No –degrades
+> N=2 →5
+> Hardware CHPC [4] 2-D carrier-hopping codes Static ( L=Nexact) Either No No Simulation Shen et al. [5] Gold codes +static UID layer Static N/A No No Hardware Patent [6] Zone-based reuse Static, geographic Either No No N/A
+> This work Live-graph dynamic reuse Dynamic ,graph-driven
+> Decentralized ,beacon-coordinated
+> Yes , 3 types Yes Simulation
+
+B. Codes and the Interference Graph 
+
+Each robot holds, at every instant, a code ci(t) drawn from a code family of cardinality L; L itself is the central quantity bounded in Section V. We represent the swarm’s instanta-neous interference structure as a graph G(t) = ( V, E (t)) ,
+
+V = {1, . . . , N }, with an edge (i, j ) ∈ E(t) iff dij (t) ≤ D –a unit disk graph. A valid assignment satisfies ci(t)̸ = cj (t)
+
+for every (i, j ) ∈ E(t); equivalently, c(·, t ) is a proper vertex coloring of G(t) at every instant. 
+
+C. Collision and Conflict 
+
+We distinguish two events precisely, used throughout Sec-tions VI–VIII. A collision occurs when (i, j ) ∈ E(t) and 
+
+ci(t) = cj (t): the coloring constraint above is violated, corrupting both robots’ ranging measurements for the duration of the violation. A conflict is the corresponding control-plane event – robot i correctly detecting ci(t) = cj (t) for some j
+
+it believes to be a neighbor, and reacting via the resolution rule of Section IV. Under perfect, instantaneous neighbor knowledge, conflict detection and collision are simultaneous; a collision is precisely a conflict the protocol has not yet, or could not, detect. Section VI characterizes this gap under realistic, beacon-limited detection. 
+
+D. Design Objective 
+
+The protocol’s objective is to maintain a valid coloring of 
+
+G(t) as it evolves under robot motion, using the smallest code cardinality L that admits a valid coloring with high probability, without any single point of global coordination. Section V formalizes and bounds L under this objective for an idealized, instantaneous-knowledge setting; Sections VI –VIII evaluate how closely a decentralized, beacon-limited implementation approaches it in practice. IV. P ROTOCOL DESIGN 
+
+This section specifies the decentralized reuse protocol pre-cisely enough to implement and to analyze. The protocol has four components: a beacon-based neighbor discovery mechanism, a deterministic conflict-resolution rule, an ID-seeded code-selection rule, and a bounded fallback for local exhaustion. 
+
+A. Control Channel and Neighbor Discovery 
+
+Interference occurs on the LiDAR ranging channel itself, so coordination cannot use that channel. Each robot instead broadcasts on a separate, low-rate control channel every Tb
+
+seconds (the beacon period ), transmitting its identifier, posi-tion, current code, and code age: beacon i(t) = ( ID i, ˆpi(t), c i(t), age i(t)) . (1) Beaconing is synchronous: all robots share aligned broadcast slots, which admits a clean discrete-round analysis at the cost of requiring loose clock synchronization. Each robot maintains a locally observed, possibly imperfect neighbor set ˆNi(t),populated from received beacons, which may lag or omit the true neighbor set Ni(t) = {j̸ = i : dij (t) ≤ D} due to beacon loss or channel error (Section VI). 
+
+B. Conflict Detection and Seniority Resolution 
+
+Robot i locally computes the set of codes believed to be in use nearby, 
+
+Ui(t) = { cj (t) : j ∈ ˆNi(t) }, (2) and detects a conflict when ci(t) ∈ Ui(t). Resolution uses a 
+
+deterministic seniority rule rather than randomized backoff, which avoids the convergence-time uncertainty of randomized schemes given that unique identifiers are already available on every beacon: junior (i, j ) = 
+
+(
+
+i if age i(t) < age j (t)arg max( ID i, ID j ) if age i(t) = age j (t).
+
+(3) The junior robot vacates its code. Seniority minimizes churn: an established assignment is not disturbed by a newly arriving robot, which we report as a stability metric in Section VIII. C. ID-Seeded First-Fit Code Selection 
+
+A naive first-fit rule – selecting the lowest-numbered code not in Ui(t) – fails under symmetry: two robots with identical local views Ui ≈ Uj independently compute the same ”lowest available” code and collide again immediately. We resolve this with an ID-seeded rotation restricted to a small window sized to the robot’s own local exclusion set, which resolves symmet-ric ties while keeping code usage compact (Algorithm 1). Siz-ing the search window to |Ui(t)| rather than a large fixed pool is essential: an earlier implementation using a large, uniformly shuffled pool for every robot independently of local crowding caused code usage to spread across the entire pool even under light local crowding, undermining the reuse objective. This was caught by explicitly tracking peak simultaneous code usage as a diagnostic metric during simulation development, and is reported here as a methodological note relevant to any reactive, per-robot code-selection implementation. 
+
+Algorithm 1 ID-seeded first-fit code selection  
+
+> 1:
+
+function FIRST FIT (Ui, ID i, margin)  
+
+> 2:
+
+k ← | Ui| + margin  
+
+> 3:
+
+candidates ← (0 , 1, . . . , k − 1)  
+
+> 4:
+
+offset ← ID i mod k 
+
+> 5:
+
+rotated ← candidates rotated by offset  
+
+> 6:
+
+for c in rotated do  
+
+> 7:
+
+if c / ∈ Ui then  
+
+> 8:
+
+return c 
+
+> 9:
+
+end if  
+
+> 10:
+
+end for  
+
+> 11:
+
+return EXHAUSTION 12: end function 
+
+D. Local Exhaustion: Bounded Time-Duplex Fallback 
+
+If Ui(t) excludes every code in the current search window, no valid reassignment exists. Rather than allowing the code pool L to grow reactively – which would silently abandon the sub-linear scaling claim of Section V, since the entire result depends on L remaining fixed as N grows – the affected robots enter a bounded time-duplex share: alternating transmission frames with a guard interval sized to the LiDAR round-trip time. This degrades the affected robots’ ranging update rate by a factor of 1/m for m sharing robots, but is local, bounded, and does not perturb any other robot’s assignment. 
+
+E. Novelty With Respect to Static Reuse 
+
+We note explicitly that decentralization alone is not the source of novelty here: existing static, zone-based reuse schemes (e.g., patented geographic code reuse for automo-tive/robotic LiDAR) already support both centralized and dis-tributed assignment. The distinguishing axis is dynamic, live-graph-driven reassignment versus static, pre-assigned codes – decentralization is an engineering property of our design (avoiding a fleet-server single point of failure), not the claimed contribution. V. S CALING ANALYSIS 
+
+We now prove that the protocol of Section IV requires a number of codes that grows far more slowly than the swarm size, under a density-preserving growth model, and compare this exactly against a physically grounded static baseline. 
+
+A. Growth Regime and Density Model 
+
+We consider Regime A: robot density λ (robots per unit area) is held fixed as swarm size N grows, with operating area A = N/λ growing correspondingly – an expanding or exploring swarm, as opposed to a fixed-footprint swarm growing denser (Regime B, deferred to future work). Robot positions are modeled as a homogeneous Poisson point process of intensity λ over a toroidal (periodically wrapped) region, which isolates density effects from boundary effects; a real bounded floor’s boundary thinning is treated as an explicit, empirically-quantified limitation in Section VII. The interfer-ence graph G(t) is a unit disk graph: an edge exists between robots i, j iff dij (t) ≤ D.
+
+B. Code Demand as Greedy Coloring 
+
+The ID-seeded first-fit rule of Algorithm 1 is a sequential greedy graph coloring. Greedy coloring, independent of vis-itation order, never uses more colors than ∆( G) + 1 , where 
+
+∆( G) is the maximum vertex degree: 
+
+Lreuse (N ) ≥ ∆max (G(N )) + 1 . (4) Local vertex degree under a homogeneous Poisson process is itself Poisson-distributed with mean μ = λπD 2, a constant independent of N under Regime A. 
+
+Theorem 1 (Maximum degree under constant density) . For 
+
+N robots distributed as above with mean local degree μ held fixed, 
+
+∆max (N ) ∼ ln N
+
+ln ln N as N → ∞ . (5) This is a classical result on the maximum degree of sparse random graphs [7]; we restate it here in the form needed for our claim rather than re-derive it. Consequently, 
+
+Lreuse (N ) = O
+
+ log N
+
+log log N
+
+
+
+. (6) 
+
+C. A Finite-N Refinement 
+
+The asymptotic form of Theorem 1 converges slowly: at the swarm sizes tested in Section VIII, it underestimates simulated values by a roughly constant multiplicative factor. A tighter finite-N estimate solves directly for the smallest 
+
+k such that N · Pr[ Poisson (μ) ≥ k] ≤ 1, i.e., inverting the Poisson survival function rather than using the leading-order asymptotic term alone. We report both the asymptotic bound (the formal, citable claim) and this refined estimate (which matches simulated results closely) in Section VIII, and recommend the latter for any reader wishing to sanity-check finite-N simulation output against theory. D. Static Baseline 
+
+We compare against 2-D carrier-hopping prime codes (CHPC) [4], the established static baseline in automo-tive/robotic time-of-flight LiDAR OCDMA. This baseline is chosen not because it yields a different asymptotic growth rate than simpler code families (Gold codes are also Θ( N )), but because it is the physically validated, field-standard baseline directly from the closest prior art, and because it decouples code weight from code length more efficiently than one-dimensional alternatives, making it the strongest legitimate comparison rather than a weak strawman. Critically, CHPC cardinality equals chip length exactly – not Θ( √N ) or any other sublinear relationship – verified directly from the cited source: a CHPC of chip length N =31 supports exactly 31 sequences. Hence 
+
+LCHPC static (N ) = N (exact, not asymptotic). (7) 
+
+Corollary 1. 
+
+LCHPC static (N )
+
+Lreuse (N ) = Θ 
+
+ N log log N
+
+log N
+
+
+
+→ ∞ as N → ∞ . (8) The advantage of dynamic reuse over static assignment is therefore unbounded, not merely a constant-factor improve-ment. 
+
+E. Scope of the Proof 
+
+Theorem 1 and Corollary 1 bound code demand under the true, instantaneous interference graph G(t) – that is, under perfect, immediate neighbor knowledge. The protocol actually operates on the estimated graph derived from ˆNi(t), which lags and can err (beacon period Tb, missed-neighbor rate 
+
+pf n , phantom-neighbor rate pf p ). Lreuse (N ) as derived here is therefore a lower bound on the code demand actually required in practice; the gap between this bound and operational reality is quantified empirically in Sections VI–VIII, and is not claimed to be closed by this proof alone. VI. C OLLISION MODEL 
+
+Section V bounds code demand under idealized detection. We now characterize how imperfect, beacon-limited detection produces the collision events defined in Section III in practice – decomposing the gap between a conflict and the collision it fails to prevent into three distinct mechanisms. 
+
+A. Three Collision Types  
+
+> •
+
+Type I (silent miss): a true neighbor j ∈ Ni(t) is absent from ˆNi(t) due to beacon loss, probability pf n 
+
+per beacon.  
+
+> •
+
+Type II (detection lag): robot j enters range D of robot i
+
+at time t0; even with zero detection error, j / ∈ ˆNi(t) until the next successful beacon at t0 + τdet . This is structural: it persists even as pf n , p f p → 0, so long as Tb > 0. 
+
+> •
+
+Type III (handoff-transient): a robot reassigns to re-solve a detected conflict, and the newly selected code coincides with a third, previously unrelated robot outside its current detection horizon.               
+
+> TABLE II GROUNDED SIMULATION PARAMETERS
+> Parameter Value / range Source Robot speed ¯v1.5 m/s (top speed) AGV industry spec Beacon period Tb≥100 ms UWB ranging hardware Position noise σpos 0.025–3.78 m UWB LOS/NLOS studies
+> pf n , p f p swept 0–0.25 anchored NLOS incidence
+
+B. Encounter Duration 
+
+For two robots sharing a common aisle in the ware-house mobility model of Section VII, relative motion is one-dimensional, and the duration of a close encounter admits a simple closed form from vehicular-network connectivity-duration analysis [8]: 
+
+tc = 2D
+
+|∆v| , (9) where ∆v is the relative speed between the two robots. This governs the exposure window relevant to Type II. 
+
+C. Grounded Parameters 
+
+Table II reports the parameter values used throughout Sec-tions VII–VIII, each anchored to a measured source rather than an assumed or invented value, with the detection-error rate treated as a sensitivity sweep rather than a single point estimate given its documented dependence on deployment geometry. 
+
+D. Collision Probability 
+
+The per-robot, per-unit-time collision probability satisfies the union bound 
+
+Pcollision (t) ≤ PI (t) + PII (t) + PIII (t), (10) where PI and PII are approximated analytically from the neighbor-arrival rate and pf n respectively, and PIII is char-acterized empirically in Section VIII rather than bounded in closed form – the handoff-transient case depends on third-party state outside any single robot’s detection horizon, and we report this as an explicit, deliberate scope decision rather than an omission. VII. S IMULATION METHODOLOGY 
+
+To evaluate the protocol under realistic conditions, we implement a discrete-time simulator with four validated com-ponents: an interference-graph and code-assignment layer, a graph-constrained mobility layer, an imperfect-detection layer, and a Monte Carlo harness. Each component was individually validated against known ground truth before composition, described below along with two methodological corrections made during development, reported here in the interest of reproducibility. Fig. 1. Warehouse aisle layout: two main aisles, five cross aisles, ten graph nodes. Racking (gray) blocks direct motion between aisles. 
+
+A. Warehouse Layout 
+
+The environment is a 20 m×10 m rectangular tile: two main aisles along the long edges (10 m apart) and five cross aisles connecting them at 5 m intervals, forming a 2 × 5 grid of ten intersections (Fig. 1). Racking between aisles physically blocks direct motion, which is the justification for constraining robot mobility to this graph rather than open two-dimensional motion. For Regime A (Section V), the tile is repeated along its length, sharing boundary aisles between adjacent tiles, to grow operating area while holding local aisle density fixed. 
+
+B. Mobility Model 
+
+Robots move along aisle edges at fixed speed ¯v, selecting a random adjacent edge at each intersection – a graph-constrained analogue of random-waypoint motion, chosen over open-plane random waypoint because the latter is known to produce non-uniform spatial density (concentration toward the region center), which would conflict with the constant-density assumption of Section V. 
+
+C. Detection Error Model 
+
+Each robot’s belief about its neighbors updates only at beacon intervals Tb and is corrupted by pf n (a true neighbor is dropped from the update) and pf p (a phantom neighbor is added). During development, the simulation step size ∆t was initially set coarser than Tb, which caused the beacon to fire on every simulation step regardless of the configured period, silently erasing detection lag from the model; this was caught by observing that collision rate was statistically insensitive to pf n across its entire tested range, corrected by enforcing 
+
+∆t < T b, and confirmed by re-testing the sweep. 
+
+D. Monte Carlo Discipline 
+
+All reported results use ≥ 30 independent random seeds per condition, with 95% confidence intervals computed via the normal approximation. Step size ∆t was separately validated by convergence testing for every metric reported: collision counting was initially implemented as a per-check event tally, which does not converge as ∆t → 0 (a fixed-duration collision is counted once per check, so the tally scales as 1/∆t); this was corrected by tracking collision episodes (a transition into a colliding state) and total collision time (which converges to the true duration as ∆t shrinks) instead of a raw count. Peak simultaneous code usage, by contrast, is a running maximum and converges properly under refinement without correction, which was confirmed empirically before being relied upon as a metric. 
+
+E. Baseline Construction 
+
+We compare against a simplified, structurally faithful model of an existing decentralized, coordination-free interference-mitigation approach for LiDAR [3], rather than reproducing its full sensor-level detection pipeline, which is out of scope. The structural property that matters for comparison is the presence or absence of coordination: the baseline has no beacon and no neighbor list, only a per-robot self-diagnosis of whether it is currently experiencing interference, with detection reliability grounded in the source’s own reported recall ( ≈ 82 –83% ) and precision ( ≈ 99% , implying a ≈ 1% false-alarm rate). On de-tecting interference, the baseline reassigns blindly – a uniform random draw with no informed exclusion – in contrast to our protocol’s informed, exclusion-based selection. Both protocols share the identical warehouse layout, mobility model, and physical interference check, isolating the comparison to this one structural difference. An initial version of this comparison omitted the baseline’s false-alarm rate and allowed the two protocols an unequal effective code-search window, both of which favored the baseline artificially; both were corrected prior to the results reported in Section VIII. VIII. R ESULTS 
+
+A. Theory-Simulation Agreement 
+
+Fig. 2 confirms Theorem 1 and its finite-N refinement against simulated maximum degree across N ∈ [50 , 6400] , 30 seeds per point. The refined estimate matches simulated values closely; the leading-order asymptotic alone underestimates by a roughly constant multiplicative factor across this range, consistent with the known slow convergence of log / log log -type bounds. 
+
+B. Realistic Headline Result 
+
+Fig. 3 reports peak simultaneous code usage under full realism – mobility, worst-case detection error ( pf n =0 .25 ), and reactive reassignment – across N ∈ { 15 , 30 , 60 , 120 } (1, 2, 4, 8 warehouse tiles), 30 seeds per point. The gap between our protocol and the static baseline widens with N : a 2 ×
+
+reduction at N =15 grows to a 12 × reduction at N =120 ,consistent with the widening, unbounded gap of Corollary 1 under realistic conditions rather than only under the idealized theory of Section V. Fig. 2. Codes required: simulated (mean ± 1 std, 30 seeds), theoretical bounds, and static baseline, N ∈ [50 , 6400] . 
+
+> Fig. 3. Peak codes needed under full realism vs. swarm size, against the idealized theoretical reference and the static baseline.
+
+C. Comparison Against a Coordination-Free Baseline 
+
+Fig. 4 shows that the coordination-free baseline achieves little genuine reuse under a generous shared code pool, tracking close to the static baseline rather than our protocol. Fig. 5 shows that under an identical, constrained code budget matched to what our protocol requires, informed, coordinated selection yields consistently lower collision-time fraction than blind selection across the same swarm-size sweep. IX. D ISCUSSION AND LIMITATIONS 
+
+We identify five scope limitations of this work, each defin-ing a concrete direction for refinement rather than an open question left unaddressed. 
+
+Interference checking assumes line-of-sight. 
+
+Sections VII–VIII determine interference from Euclidean separation dij (t) ≤ D alone, without modeling whether racking between aisles would occlude the direct path between two robots. Given the 5 m cross-aisle spacing used throughout, robots in adjacent aisles remain plausibly within physical interference range regardless of intervening structure, but a full geometric line-of-sight model – resolving occlusion  
+
+> Fig. 4. Resource efficiency: peak codes/phases needed, generous shared pool.
+> Fig. 5. Collision-time fraction under an identical, constrained code budget.
+
+directly from rack placement in the warehouse graph – would tighten this assumption and is a natural simulator extension. 
+
+Only Regime A is analyzed. Section V proves the scaling result under constant robot density with growing operating area – an expanding or exploring swarm. The complementary regime, fixed operating area with growing density, character-istic of an increasingly crowded fixed footprint, requires a dis-tinct proof, since local vertex degree is no longer independent of N , and is left to future work. 
+
+One concrete warehouse layout. The aisle graph of Sec-tion VII is a single, representative instance of a standard main-aisle/cross-aisle design, not an exhaustive exploration of layout sensitivity. Alternative topologies – irregular aisle spacing, non-rectangular footprints, multiple main-aisle pairs – may alter the neighbor-arrival-rate constant left unresolved in Section VI, though the scaling result of Section V does not depend on this specific layout. 
+
+The baseline is a simplified, structurally faithful model, not a full reproduction. The coordination-free baseline of Section VII isolates the presence or absence of inter-robot coordination – the structural property relevant to this paper’s claim – using the source’s own reported detection reliability, rather than reimplementing its underlying sensor-level detec-tion pipeline, which operates at a different level of abstraction and is outside this paper’s scope. 
+
+Validation is simulation-only. All results in this paper are obtained via Monte Carlo simulation; no physical hardware validation is presented. This is standard for early-stage pro-tocol contributions at this venue, but physical deployment – subject to real beacon hardware, uncontrolled RF interference, and sensor noise beyond what is modeled in Table II – remains necessary before an operational deployment claim could be made. These limitations, together with the synchronous-beaconing assumption of Section IV, motivate the future directions out-lined in Section X. X. C ONCLUSION 
+
+We presented a decentralized protocol for dynamic, spa-tial code reuse in LiDAR-equipped robot swarms, replacing static, per-robot code assignment with reassignment driven by a live, beacon-maintained interference-neighborhood graph. We proved that the number of codes required grows as 
+
+O(log N/ log log N ) under constant robot density – an un-bounded improvement over the Θ( N ) growth required by static assignment – and validated this result under conditions substantially more adversarial than the idealized proof: robot mobility, imperfect beacon-based detection, and reactive re-assignment. Against a structurally faithful, fairly-constructed model of an existing coordination-free approach, our protocol achieved both greater code efficiency and lower collision risk under an identical resource budget, directly demonstrating that coordination – not merely reactivity – is what closes the scaling gap. The limitations identified in Section IX motivate several directions for future work:  
+
+> •
+
+Dense-swarm scaling (Regime B). A fixed operating footprint with growing robot density requires a distinct proof from the one presented here, and is planned as a direct follow-on to this work.  
+
+> •
+
+Asynchronous beaconing. Relaxing the synchronous, clock-aligned beacon assumption of Section IV toward event-driven coordination, more representative of a de-ployed swarm without hardware clock synchronization.  
+
+> •
+
+Refined environmental modeling. Full geometric line-of-sight occlusion and a broader sweep of warehouse layout topologies, both identified in Section IX.  
+
+> •
+
+Hardware validation. Deployment on physical robots, subject to real beacon hardware and uncontrolled RF conditions, as the natural next step toward an operational deployment claim.  
+
+> •
+
+Longer-horizon extensions. Adversarial, rather than average-case, detection failure; three-dimensional aerial swarms, which alter the underlying neighbor-graph de-gree scaling; and a learned, rather than fixed, reuse policy. ACKNOWLEDGMENT 
+
+The author used Claude (Anthropic) as an AI assistant in the preparation of this manuscript, including drafting of the manuscript text across all sections and implementation of the Python simulation code described in Section VII. All research design decisions, experimental configurations, execution of simulations, interpretation of results, and verification of cited sources against primary references were performed by the author. The author has reviewed and takes full responsibility for the accuracy, originality, and integrity of all content in this paper. REFERENCES [1] J. Robinson, M. Lovric, R. Woodman, D. Croft, and V. Donzella, ”Real-time mitigation of LiDAR mutual interference,” in Proc. IEEE Intelligent Vehicles Symposium (IV) , 2025. [2] I.-P. Hwang and C.-H. Lee, ”Mutual interferences of a true-random LiDAR with other LiDAR signals,” IEEE Access , 2020. [3] D. Rathnayake, H. Sabbella, M. Radhakrishnan, and A. Misra, ”D2SR: Decentralized detection, de-synchronization, and recovery of LiDAR interference,” in Proc. IEEE/RSJ IROS , 2024. [4] W. C. Kwong, G. C. Yang, W. Y. Lin, and I. Glesk, ”2-D optical-CDMA modulation in automotive time-of-flight LIDAR systems,” in
