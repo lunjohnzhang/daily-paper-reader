@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-09-27 <!--dpr-date:20260927-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/27/2609.27077v1-fast-direction-conditioned-reachability-for-motion-prediction-under-model-uncertainty" data-sidebar-item="{&quot;title&quot;: &quot;Fast Direction-Conditioned Reachability for Motion Prediction Under Model Uncertainty&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.27077v1-fast-direction-conditioned-reachability-for-motion-prediction-under-model-uncertainty&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;面向多智能体运动预测的方向条件可达性&quot;}">Fast Direction-Conditioned Reachability for Motion Prediction Under Model Uncertainty</a>
   * 2026-09-26 <!--dpr-date:20260926-->
     * 速读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/26/2609.21138v1-diverse-and-adaptable-arm-coordination-for-octopus-crawling-via-diffusion-based-uncertainty-aware-optimization" data-sidebar-item="{&quot;title&quot;: &quot;Diverse and Adaptable Arm Coordination for Octopus-Crawling via Diffusion-Based Uncertainty-Aware Optimization&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.21138v1-diverse-and-adaptable-arm-coordination-for-octopus-crawling-via-diffusion-based-uncertainty-aware-optimization&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;基于扩散的优化发现多样的手臂协调模式&quot;}">Diverse and Adaptable Arm Coordination for Octopus-Crawling via Diffusion-Based Uncertainty-Aware Optimization</a>
