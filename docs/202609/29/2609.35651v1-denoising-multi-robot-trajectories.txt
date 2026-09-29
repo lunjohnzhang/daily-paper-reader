@@ -1,0 +1,1179 @@
+Title: Denoising Multi-Robot Trajectories
+
+URL Source: https://arxiv.org/pdf/2609.35651v1
+
+Published Time: Tue, 29 Sep 2026 04:41:24 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+> IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 1
+
+# Denoising Multi-Robot Trajectories 
+
+Yuhao Zhang, Keisuke Okumura, Ajay Shankar, and Amanda Prorok 
+
+Abstract —Multi-robot trajectory planning is a fundamental problem in multi-robot coordination but remains computation-ally challenging due to its nonconvex, multimodal, and high-dimensional nature. This work builds upon D4 ORM , a dynamics-aware diffusion-denoising framework, and develops a family of planning architectures for diverse operational requirements. Unlike conventional numerical optimization methods, D4 ORM 
+
+employs sampling-based optimization to generate solution trajec-tories through massively parallel sampling, leveraging modern computing architectures such as GPUs. Its diffusion-denoising structure iteratively optimizes deformations to candidate control trajectories, providing an efficient and versatile paradigm for generating kinodynamically feasible and conflict-free trajectories. Using D4 ORM as the building block for advanced planners, we present a decoupled planner for improved scalability, an online receding-horizon planner with feedback control, and a distributed planner for resource-constrained settings. Evalua-tions with differential-drive and holonomic robots in 2D and 3D environments demonstrate that D4 ORM -based approaches find high-quality solutions faster and more reliably than other sampling-based optimization methods, such as MPPI, as well as a learned diffusion-model-based method. We further demonstrate zero-shot deployment on ten real quadrotors with obstacles, large-scale deconfliction with 100 simulated robots, and fully onboard distributed ‘lifelong’ operation with six ground robots. Overall, these results establish diffusion denoising as a scalable and reliable framework for multi-robot coordination. 
+
+Index Terms —sampling-based trajectory optimization, diffu-sion, multi-robot coordination, motion planning, deconfliction. 
+
+I. I NTRODUCTION 
+
+# TEAMS of robots are frequently required to occupy and operate in a shared workspace, and increasingly so in more modern applications. Settings such as those found in logistics, warehouse automation [1] and autonomous inter-section management for vehicles [2], are all realistic, and present novel challenges for team-level autonomy and effi-ciency. Planning collision-free, kinodynamically feasible tra-jectories that respect the constraints of the entire team is thus fundamental to realizing such coordination. However, finding such a feasible solution is, in general, computationally intractable [3], [4]. Furthermore, as these applications typi-cally require planning with a limited time budget, sometimes 
+
+Manuscript received: December 19, 2025; Revised: June 20, 2026; Ac-cepted: September 11, 2026. This work was supported in part by European Research Council (ERC) Project 949940 (gAIa), and by JST PRESTO (JPMJPR2513). This paper was recommended for publication by Editor Jason O’Kane upon evaluation of the Associate Editor and Reviewers’ comments. 
+
+(Corresponding author: Yuhao Zhang.) 
+
+The authors are with Department of Computer Science and Technology, University of Cambridge, U.K. (e-mail: yz981@cantab.ac.uk ; {ko393, as3233, asp45 }@cst.cam.ac.uk ). Keisuke Okumura is also with National Institute of Advanced Industrial Science and Technology (AIST), Japan. Code and video: https://github.com/proroklab/d4orm 
+
+involving a hundred robots or more, developing real-time and scalable methodologies presents one of the central challenges in the broader field of multi-robot research. Since a robot’s motion can typically be represented as a continuous-time dynamical system, conventional approaches to trajectory planning can readily apply continuous numerical optimization methods, such as gradient-based optimization or interior-point methods. These methods benefit from rich and mature mathematical tools with off-the-shelf solvers, providing practical solutions for synthesizing single-robot trajectories. However, the landscape is different for their multi-robot counterparts; three inter-related factors make it difficult to directly apply conventional numerical optimization methods: 
+
+(i) nonconvexity , arising from encoding inter-robot collision avoidance constraints, (ii) multimodality , where numerous equally good solutions exist, along with many local but infea-sible optima, and (iii) high dimensionality , resulting from the rapidly growing joint solution space as the number of robots increases, which obscures useful information needed to derive a solution efficiently (e.g., gradient dilution). Together, these factors pose significant computational challenges to deriving multi-robot trajectories reliably. Consequently, recent research efforts have disfavored solv-ing the problem in a fully joint, coupled manner that considers the state space of the entire team simultaneously. Instead, de-coupling the planning problem into subproblems for individual robots has become increasingly popular [5]–[8]. Such methods often build upon coupled trajectory optimization techniques while relaxing their formulations to reduce computational complexity and enhance tractability. While this strategy ex-hibits better real-time responsiveness and scalability, decou-pling prevents the discovery of tightly coordinated long-term behaviors due to the restricted solution space. In fact, the inability to coordinate beyond short-term collision avoidance can easily lead to deadlocks, livelocks, and congestion, which undermines the reliability of multi-robot systems. These limitations ultimately stem from the constraints of the underlying numerical optimization scheme. With a more ex-pressive and flexible optimization framework tailored to multi-robot trajectories, solving multi-robot planning problems could become more tractable. This motivates us to explore sampling-based optimization methods, which have increasingly attracted attention in challenging environments in recent years. This paradigm, of which a representative example is model predic-tive path integral control (MPPI) [9], employs a fundamentally different approach from conventional numerical optimization. In particular, it is underpinned by principles of population-based optimization and aims to directly sample solution tra-jectories through a large number of sampling attempts. This 
+
+© 2026 IEEE. Personal use of this material is permitted. Permission from IEEE must be obtained for all other uses, in any current or future media, including reprinting/republishing this material for advertising or promotional purposes, creating new collective works, for resale or redistribution to servers or lists, or reuse of any copyrighted component of this work in other works. arXiv:2609.35651v1 [cs.RO] 28 Sep 2026 2 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 
+
+denoising step →← iteration (a) 
+
+denoising step →← iteration (b) (c) 10 5 0 5 10 10 
+
+> 5
+> 0510
+
+(e) 100 robots 
+
+(d) Zero-shot deployment (f) Onboard deployment  
+
+> ⋆async target update
+
+Fig. 1: Overview of D4 ORM -based methods. (a) Denoising snapshots with three 2D holonomic robots. D4 ORM is a sampling-based optimization method that iteratively optimizes deformation ( ↓), where each iteration is conducted with diffusion denoising ( →). The snapshots show the sampled trajectories which gradually converge towards the collision-free, feasible ones as denoising proceeds. (b) Ten 2D holonomic robots with obstacles. Iterative deformation optimization is key to solving tightly coupled planning problems. This planning scheme can accommodate arbitrary and heterogeneous robot dynamics, e.g., (c) a team of 2D holonomic and differential-drive robots. 
+
+(d) Zero-shot deployment of deconflicted trajectories for ten multirotors under the presence of obstacles. (e) Trajectory planning for 100 holonomic robots in 2D workspace by D4 ORM -D, a decoupled version of D4 ORM . The planning takes approximately 30 s to optimize 
+
+2 (DoF) × 250 (horizon) × 100 (robots) variables. (f) Onboard distributed deployment with D-D4 ORM for an asynchronous, lifelong navigation task using six ground robots. 
+
+structure not only provides a practical solution to nonconvex optimization problems, but also benefits significantly from modern parallel computing architectures, including GPUs, culminating in real-time planning capabilities. While sampling-based optimization has been actively ap-plied to single-robot control [10], its use for coupled multi-robot control has yet remained under-explored. We attribute this primarily to the limited ability to extract informative search guidance for directing the sampling process in the very high-dimensional search spaces associated with multi-robot systems, which poses challenges analogous to those encountered in high-dimensional numerical optimization. In parallel, recent advances in generative modeling within the machine learning community have produced highly ca-pable methods, most notably diffusion models [11], [12], which extract structural information from pure noise through iterative denoising processes. Originally developed for image generation, diffusion models have recently gained popularity as powerful tools for robot trajectory planning [13]–[15] due to their ability to capture multimodal data structures in ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 3
+
+TABLE I: Summary of D4 ORM and its variants.              
+
+> §Description Advantage III-D D4 ORM [18] The base sampling-based optimization method that uses a joint state representation. VD4 ORM -D A semi-decoupled method that resolves conflicts iteratively for a subset of the team with D4 ORM .+Scalability VI D4 ORM -C2F A receding horizon framework that generates coarse references by D4 ORM -D, and tracks them with D4 ORM by generating fine trajectories. +Real-time responsiveness VII D-D4 ORM Distributed version, allowing for onboard execution with inter-robot communication. +Implementation flexibility
+
+high-dimensional spaces. While many of these studies learn priors from demonstration trajectories, more recent works on trajectory optimization [16], [17] draw a connection between diffusion-based denoising and sampling-based optimization, without any learning components. Although currently limited to single-robot applications, these studies demonstrate how dif-fusion structures can be leveraged to guide the sampling pro-cess and efficiently retrieve trajectory data in high-dimensional spaces, for example, in full-order locomotion behaviors. Building upon these insights, combining sampling-based optimization with diffusion denoising offers a promising di-rection toward addressing key challenges in multi-robot tra-jectory planning, including nonconvexity, multimodality, and high dimensionality. Recent work D4 ORM (“deform”) [18] provides a concrete instantiation of this idea through the opti-mization of dynamics-aware diffusion-denoised deformations .D4 ORM is an offline, centralized, coupled, full-horizon multi-robot trajectory optimizer that can accommodate arbitrary and mixed dynamical systems (e.g., double integrator, differen-tial drive). As shown in Fig. 1a–c, it iteratively optimizes 
+
+deformations of the joint control trajectories for the entire team—incremental updates to the current solution candidate— where the optimization is realized through diffusion denoising without requiring analytical gradients. Each denoising step is guided by an on-the-fly Monte Carlo gradient approximation that targets an interpretable optimization objective, and hence is also learning-free. Furthermore, D4 ORM exhibits an anytime 
+
+property, with solutions improving over time, and it benefits greatly from GPU-based parallelization. 
+
+Contributions: In this work, we view this coupled multi-robot trajectory optimization method D4 ORM as a founda-tional building block for more advanced planning approaches and explore how it can be extended to more challenging settings. We first analyze this method in detail, extending beyond [18], and reveal its limitations, including a scalability bottleneck caused by gradient dilution as the number of robots increases (Section IV). Next, as summarized in Table I, we introduce three variants of D4 ORM : (i) a decoupled variant, D4 ORM -D, which iteratively applies D4 ORM to subsets of the entire team to enhance scalability (Section V); (ii) an online receding-horizon variant, D4 ORM -C2F, which uses offline coarse trajectories generated by D4 ORM -D to guide online fine trajectory generation by D4 ORM (Section VI); and (iii) a dis-tributed version, D-D4 ORM , designed for resource-constrained environments, e.g., when GPUs are unavailable (Section VII). These extensions endow D4 ORM with desirable properties for trajectory planning—such as scalability, real-time respon-siveness, and implementation flexibility—from demonstrations involving a 100-robot problem, to lifelong asynchronous oper-ation in onboard distributed settings (Fig. 1e–f), as empirically shown in Section VIII. These results suggest that denoising multi-robot trajectories offers a new, practical, and promising instrument for solving various multi-robot planning problems. The remainder of this paper presents the theoretical foun-dations and practical aspects of D4 ORM -based methodologies. Section II situates D4 ORM within the context of multi-robot motion planning and planning with diffusion denoising. Sec-tion III provides the problem definition and introduces de-noising optimization, specifically called model-based diffusion 
+
+(MBD) [16], onto which D4 ORM builds, followed by D4 ORM 
+
+itself in Section III-D. Section IV onward contains the main contributions of this paper. 
+
+Difference from prior work: This paper substantially extends the work by Zhang et al. [18], which introduces the basic D4 ORM framework. Our work provides deeper insights into why iterative deformation with diffusion denois-ing successfully retrieves feasible, coordinated trajectories, going beyond other sampling-based optimization methods such as MPPI or MBD—a perspective that has received limited attention in prior work (Section IV-A). We further characterize the scalability limitations of vanilla D4 ORM in Section IV-B, motivating the extensions developed in this paper. With this improved understanding, we expand the denoising structure to support decoupled planning, receding horizon planning, and distributed computation, which is amenable to distributed onboard deployment. This comprehensive ecosystem, repre-senting a significant departure from the prior work, opens up a new possibility for diffusion denoising as a powerful paradigm for multi-robot systems operating in traditionally hard-to-access high-dimensional spaces. II. R ELATED WORK 
+
+A. Characteristics of Multi-Robot Planning 
+
+There exists a rich body of literature on multi-robot trajec-tory planning. To situate our contribution within the literature, we first outline a set of key axes that characterize methodolo-gies in this domain. 
+
+Planning Representation: Coupled approaches plan over the joint state of all robots, solving a high-dimensional but glob-ally consistent optimization problem. In contrast, decoupled 
+
+approaches split the problem into robot-wise subproblems, which improves scalability but may sacrifice global optimality. 4 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 
+
+When to Plan: Offline methods complete planning prior to robot motion, which enables thorough coordination but lacks reactivity. Online methods repeatedly plan during execution, allowing adaptation to dynamic environments but under a limited planning time budget. 
+
+Planning Horizon: Full-horizon planning computes complete trajectories from start to goal in a single run. By contrast, 
+
+receding-horizon approaches plan only a limited future horizon and replan continuously, enabling real-time execution but potentially sacrificing global foresight. 
+
+Who Plans: Centralized planning solves a single global problem assuming a central planner. Distributed approaches assign subproblems to multiple nodes. Decentralized methods are a special case of distributed planning, which let robots plan independently. Offboard planning assumes external com-putation, typically leveraging powerful compute infrastructure, while onboard methods push computation to each robot, often under tighter resource constraints, but are more amenable to decentralized deployment. We note that the original D4 ORM falls under coupled ,
+
+offline , full-horizon , and centralized offboard planning. This style can also serve as a core for developing alternative ap-proaches such as scalable decoupled methods, online receding-horizon planning, and distributed (potentially decentralized onboard ) planning, as summarized in Table I. In terms of planning technique, it builds on sampling-based optimization ,but enhances this framework with techniques from diffusion 
+
+generative modeling, which we discuss next. 
+
+B. Multi-Robot Trajectory Planning Methods 
+
+The abstracted problem for multi-robot trajectory planning is known as multi-agent pathfinding (MAPF) [19], which aims to find collision-free time-parametarized paths on a graph under a discrete spatio-temporal representation, typically a four-connected 2D grid. This abstraction naturally models warehouse automation [1], one of the most successful ap-plications of multi-robot systems. Motivated by its industrial importance, a wide range of powerful algorithms has been de-veloped. In particular, recent offline, full-horizon, centralized methods [20], [21] can solve instances with hundreds of agents almost instantly. However, this abstraction does not generate kinodynamically feasible trajectories, limiting its ability to design smooth and agile coordination that can be directly executed by real robots. To address trajectory planning with physical realism, two categories of approaches are commonly employed: sampling-based motion planning (SBMP) and numerical optimization .The former, SBMP, applies discrete combinatorial search over a roadmap approximation of the joint continuous configuration space, constructed by random sampling [22]–[25]. The latter reduces multi-robot deconfliction to a numerical optimization problem and then typically applies well-established solvers to obtain a solution [26]–[29]. However, both categories suffer from a steep increase in computational burden as the number of robots grows, due to the curse of dimensionality. This challenge has motivated a popular research thrust, particu-larly within numerical optimization methods, toward develop-ing fully decoupled, receding-horizon trajectory planning ap-proaches that ultimately aim to support decentralized onboard deployment [5]–[8]. Nevertheless, such approaches remain prone to miscoordination issues such as local deadlocks, livelocks, and congestion, which can significantly degrade overall navigation throughput. D4 ORM falls into a category orthogonal to SBMP and numerical optimization, which we call sampling-based op-timization . These methods directly sample solutions from high-dimensional spaces through massive sampling attempts. Unlike numerical optimization and SBMP, sampling-based optimization methods admit straightforward acceleration by parallelizing sampling attempts (e.g., with GPUs). A notable example is model predictive path integral control (MPPI) [9], which has been successfully applied to single-robot control in challenging environments. However, applying such methods to coupled multi-robot planning still faces the same dimension-ality challenge. In fact, existing sampling-based optimization methods for multi-robot setups rely on robot-wise decou-pled representations with limited planning horizon [30]–[33], thereby sacrificing global coordination capability. Moreover, even with such reduced planning spaces, these studies are generally limited to scenarios involving only about a dozen robots. In contrast, we aim to sample joint trajectories directly through diffusion denoising , a process that is better suited to handling high dimensionality, providing better scalability and real-time responsiveness. 
+
+C. Planning with Diffusions 
+
+Diffusion models, which first gained considerable attention in image generation [11], [12], [34], have recently emerged as a popular choice for learning-based robot motion gen-eration [13]–[15]. A key strength of diffusion models lies in their ability to capture structure in very high-dimensional spaces. They have also been applied in multi-agent contexts, such as trajectory prediction [35] and motion planning with constrained optimization [36]–[38]. While these diffusion-based generative methods primarily aim to imitate demonstra-tion trajectories, recent studies propose learning-free trajectory generation via Monte Carlo gradient approximation [16], [17], which bears a strong connection to MPPI, as discussed later in Section IV. In particular, Model-based diffusion (MBD) [16], described in detail in Section III-C, was originally designed for single-robot planning. D4 ORM extends it to multi-robot settings by introducing team-level cost functions and a key methodological innovation: the iterative optimization of defor-mation , defined below, to solve more challenging problems. This results in a capable optimization tool to design multi-robot coordination, which can also be extended to various multi-robot planning styles. III. P RELIMINARIES 
+
+In this section, we first define the multi-robot trajectory planning problem and provide a high-level illustration of the diffusion generative model. We then explain the single-robot trajectory optimization method called model-based diffusion 
+
+(MBD) [16], followed by its multi-robot extension D4 ORM .ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 5
+
+Throughout this paper, a braced superscript (e.g., {k}) is used to index robots. 
+
+A. Problem Definition 
+
+The system comprises a team R of K spherical-shaped robots, with each robot having a radius of Ra ∈ R>0. The motion of each robot is governed by the dynamical system, 
+
+˙x = fdyn (x, u ), where the state is denoted by x ∈ X ⊂ Rdx
+
+and the control input by u ∈ U ⊂ Rdu . Unless otherwise stated, we assume that the team consists of homogeneous robots ( Ra and fdyn are the same to all robots), although the D4 ORM methods apply to heterogeneous cases. Given joint initial and goal configurations S, T ∈ X K , the objective is to compute a solution τ , a list of trajectories for all K robots, ensuring each trajectory is collision-free and dy-namically feasible. Specifically, the trajectory τ {k} ∈ (X , U)H
+
+for each robot k ∈ R spans a finite horizon of H discrete time steps, with each step sampled at a fixed time interval 
+
+△t ∈ R>0. Then, the trajectories need to satisfy the following: 
+
+τ {k}[t + 1] = RK4 (τ {k}[t], f dyn , △t) (feasibility) 
+
+τ {k}[1] .x = S{k} (initial state) 
+
+τ {k}[H].x = T {k} (goal state) Dist (τ {k}[t], τ {l}[t]) > 2 · Ra (safety) (1) Here, Dist (·) denotes the Euclidean distance between the positional components of two robot states, and RK4 refers to the classical fourth-order Runge–Kutta integration method applied to the system dynamics. The quality of a feasible solution τ , i.e., the reward to be maximized, is evaluated in relation to the total travel time, represented in the following form: 
+
+1
+
+KH 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> t=0
+
+I
+
+h
+
+τ {k}[t].x = T {k}i
+
+(2) where I[·] = 1 if the condition is true; zero otherwise. Note that the full-state trajectory τ ∈ (X H )K , which represents a solution, is uniquely determined from a control trajectory U ∈ (UH )K for the team (i.e., a sequence of control commands) by rolling out the robots’ states using fdyn ,starting from the initial configuration S ∈ X K . Therefore, the optimization problem is, in fact, cast as optimizing for U
+
+rather than for τ . Given a solution candidate U , we denote a 
+
+deformation to it with ∆U , which has the same dimension as 
+
+U . We seek a new control sequence, U + ∆ U , that produces a full-state trajectory with a better objective score. 
+
+B. Diffusion Generative Models 
+
+Let p0 denote the target distribution of data τ , which may represent images, robot trajectories, or other high-dimensional structured data. Diffusion models [12], [39] are a class of probabilistic generative models designed to transform simple noise distributions into the target p0. They operate through two Markov chains: (i) a forward process that gradually corrupts the data by adding noise, and (ii) a reverse denoising process that iteratively removes noise to recover data samples. Mathematically, starting from a noise-free sample τ0 ∼ p0,Gaussian noise is sequentially added according to the schedule parameters αi, producing increasingly noisy samples τi and ultimately an isotropic Gaussian distribution pN :
+
+pi|i−1(τi | τi−1) = N (√αiτi−1, (1 − αi)I) . (3) The backward process pi−1|i(·) then reverses the forward process pi|i−1(·). When this backward distribution is available, one can reconstruct p0 through: 
+
+pi−1(τi−1) = 
+
+Z
+
+pi−1|i(τi−1|τi)pi(τi) dτ i, (4) 
+
+p0(τ0) = 
+
+Z
+
+pN (τN )
+
+> 1
+
+Y
+
+> i=N
+
+pi−1|i(τi−1|τi) dτ 1: N . (5) With the score-based formulation under reverse-time stochastic differential equation evolution [39], this backward process can be approximated by iteratively applying: 
+
+τi−1 = 1
+
+√αi
+
+
+
+τi + 1 − αi
+
+2 ∇τi log pi(τi)
+
+
+
++ √1 − αi ϵ (6) where ϵ ∼ N (0 , I ) [40]. Since the score function 
+
+∇τi log pi(τi) is generally intractable, it is commonly approx-imated by a neural network trained to predict it. 
+
+C. Trajectory Optimization with Diffusion Denoising 
+
+Unlike conventional diffusion models, model-based diffu-sion (MBD) [16] performs the backward process in an en-tirely learning-free and data-free manner to solve single-robot 
+
+trajectory optimization problems. The core idea of MBD is to cast trajectory optimization as the problem of sampling a high-reward trajectory. For now, we focus on the single-robot case. Let r(τ ) denote a reward function that evaluates the quality of a trajectory 
+
+τ . For example, it may encode whether the robot reaches its goal efficiently while avoiding collisions. Using a temperature parameter λ ∈ R>0, we define the target distribution p0 as: 
+
+p0(τ ) ∝ exp 
+
+ r(τ )
+
+λ
+
+
+
+. (7) In this formulation, p0 assigns higher probability density to trajectories with higher rewards. Thus, the problem of finding optimal trajectory reduces to sampling trajectories from p0.Since the exact form of p0 is generally intractable, we adopt generative modeling to optimize trajectories. MBD addresses this by attempting to sample trajectories from p0 through pro-gressive denoising, akin to standard diffusion models. Instead of relying on neural networks, MBD uses Monte Carlo score ascent , which approximates the score function as follows: 
+
+∇τi log pi(τi) ≈ − τi
+
+1 − ¯αi
+
++
+
+√¯αi
+
+1 − ¯αi
+
+¯τ0|i (8) where ¯αi = Qij=1 αj . The term ¯τ0|i denotes a reward-weighted average trajectory, defined as 
+
+¯τ0|i =
+
+P  
+
+> τ∈Γ
+
+p0(τ )τ
+
+P  
+
+> τ∈Γ
+
+p0(τ ) ≈ X 
+
+> τ∈Γ
+
+exp 
+
+ r(τ )
+
+> λ
+
+P  
+
+> τ′∈Γ
+
+exp 
+
+ r(τ ′)
+
+> λ
+
+ τ (9) 6 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 
+
+Algorithm 1 Denoising Optimization (MBD) [16]  
+
+> 1:
+
+UN ∼ N (0, I ) ▷ initialize control sequence  
+
+> 2:
+
+for i ← N to 1 do  
+
+> 3:
+
+Sample M control sequences: 
+
+Γu ∼ N 
+
+ Ui
+
+√¯αi
+
+,
+
+ 1¯αi
+
+− 1
+
+
+
+I
+
+ 
+
+> 4:
+
+Obtain M trajectories: Γ ← rollout (S, Γu) 
+
+> 5:
+
+Compute Monte Carlo estimation: 
+
+¯U ←
+
+P  
+
+> τ∈Γ
+
+p0(τ )( τ.u )
+
+P  
+
+> τ∈Γ
+
+p0(τ ) , p 0(τ ) ≈ exp 
+
+ r(τ )
+
+λ
+
+ 
+
+> 6:
+
+Estimate Score: ∇Ui log pi(τi) ≈ − Ui  
+
+> 1−¯αi
+
++ √ ¯αi 
+
+> 1−¯αi
+
+¯U .  
+
+> 7:
+
+Perform one-step denoising: 
+
+Ui−1 = 1
+
+√αi
+
+(Ui + (1 − ¯αi)∇Ui log pi(τi))  
+
+> 8:
+
+return rollout (S, U 0)
+
+where Γ is a set of trajectories sampled from a Gaussian distribution parameterized by τi and ¯αi:
+
+Γ ∼ N 
+
+ τi
+
+√¯αi
+
+,
+
+ 1¯αi
+
+− 1
+
+
+
+I
+
+
+
+. (10) Then, one can obtain noise-free trajectories using Eq. (6), with the approximated score function from Eq. (8). MBD further accelerates the denoising process by replacing Eq. (6) with 
+
+τi−1 = 1
+
+√αi
+
+(τi + (1 − ¯αi)∇τi log pi(τi)) , (11) where the score term is given by Eq. (8). An important issue not yet addressed is that a trajectory must be kinodynamically feasible, which requires states and controls to be consistent with the given dynamics fdyn . Thus, sampling states and controls independently is impractical, as the distribution would collapse to a Dirac delta function. Therefore, similar to MPPI, MBD samples control trajectories instead, and then recovers state–control trajectories by rolling out from the initial state, i.e., iteratively generating a state sequence with x[t + 1] = RK4 (x[t], u [t], f dyn , △t) given a control sequence. This rollout process over the trajectory batch 
+
+Γ can be efficiently parallelized (e.g., on GPUs). The resultant trajectory optimization scheme by MBD, referred to herein as the denoising optimization , is summarized in Alg. 1. The process begins with an initial noisy control sequence UN ∈ U H , sampled from a Gaussian distribution (Line 1). Based on this noisy trajectory, M control samples are generated (Line 3). These samples are then rolled out into tra-jectories (Line 4) and used to approximate the score (Line 6). An update is subsequently applied using Eq. (11) (Line 7). These operations are repeated until the number of denoising steps N is reached, and the final denoised control sequence is returned as a solution (Line 8). To improve stability during the denoising optimization process, rewards are normalized across the batch when computing the score [41]. Note that enforcing control constraints (actuator limits) can be achieved by action 
+
+Algorithm 2 Iterative Deformations (D4 ORM [18])  
+
+> 1:
+
+Initialize τ 
+
+> 2:
+
+while not interrupted do  
+
+> 3:
+
+Get a deformation control ∆U for fixed τ.U using Alg. 1  
+
+> 4:
+
+τ ← rollout (S, τ.U + ∆ U ) 
+
+> 5:
+
+return τ
+
+clamping during trajectory rollout, as commonly employed in MPPI implementations [9]. 
+
+D. D4 ORM for Multi-Robot Trajectories 
+
+We now provide an outline of D4 ORM [18] as the base coupled and full-horizon method that our work subsequently builds upon. D4 ORM extends the denoising optimization (Alg. 1) to multi-robot settings by introducing team-level fitness functions (i.e., reward) and, as a key methodological innovation, iteratively optimizing deformation vectors to ad-dress more challenging problems. In D4 ORM , the single-robot control sequence Ui ∈ U H
+
+becomes a joint control sequence Ui ∈ (UH )K that includes all K robots. The rollout procedure in Alg. 1 is then applied to this joint control sequence to compute the joint state sequence, yielding a joint trajectory of K robots, denoted as 
+
+τ ∈ RH×K(dx+du). The denoising process operates on this joint representation to obtain a solution τ that optimizes a specified reward r(τ ).Consistent with the objective function Eq. (2), a reward for the joint trajectory τ can now be defined as 
+
+r(τ ) = 1
+
+KH 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> t=1
+
+
+
+rgoal (τ {k}, t ) + rsafe (τ {k}, t )
+
+
+
+. (12) The goal reward rgoal encourages robot k to approach its target position p{k}T as early as possible, while the safety term rsafe 
+
+penalizes collisions with other robots: 
+
+rgoal (τ {k}, t ) = 1 − ∥p{k}[t] − p{k}T ∥∥p{k}[1] − p{k}T ∥ (13) 
+
+rsafe (τ {k}, t ) = 
+
+(
+
+−1, if ∥p{k}[t] − p{l}[t]∥ ≤ 2R a + ϵ
+
+0, otherwise (14) where ϵ ∈ R+ defines a safety margin, and l ∈ R \ { k}.This extension to a multi-robot setting is non-trivial in practice due to the larger scale and complexity of the problem, which makes selecting a preset number of denoising steps (N ) difficult. To address this, D4 ORM (Alg. 2) applies the denoising optimization of Alg. 1 iteratively. Instead of na¨ ıvely optimizing for a new control sequence from scratch each iteration, D4 ORM applies Alg. 1 with a small fixed N to opti-mize a deformation ∆U ∈ (UH )K that improves a candidate solution trajectory. The samples in Alg. 1 now correspond to 
+
+deformations (∆Usample ) that will be applied to the control sequence from the previous iteration (the candidate solution 
+
+τ.U ), and the set of sampled state trajectories is obtained by rolling out τ.U +∆ Usample . The candidate solution trajectory is updated as τ.U ← τ.U +∆ U only after a full run of Alg. 1 that yields the optimized ∆U . In other words, rather than directly ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 7
+
+modeling p0 of the final trajectory with MBD in a single pass, D4 ORM iteratively models the deformations to accommodate problems with varying complexity commonly encountered in multi-robot trajectory planning. Note that since each iteration refines τ closer towards the optimal trajectory, D4 ORM is an anytime algorithm (Line 2, Alg. 2). The termination criteria may vary based on the application: it is possible to stop as early as the first successful solution is found, or continue until some computational budget is exhausted. Our work utilizes this flexibility of D4 ORM .Nevertheless, as we will show in Section IV, using ∆U as the optimization target is not merely a desirable feature, but is in fact, instrumental to its correctness. Moreover, in contrast to standard diffusion models, which rely on data-driven neural networks and suffer from distribution shifts across changing environments and robot dynamics, D4 ORM naturally adapts to this through its model-based formulation. IV. A NALYSIS OF D4 ORM 
+
+While D4 ORM ’s optimization process yields a powerful trajectory optimization framework, as we will show, it has several limitations. Our objective in this work is to build upon the original algorithm, referred to as “vanilla” or “base” D4 ORM in this text, and broaden its applicability to more complex planning settings. Particularly in contrast with prior work, we are interested in tackling environments that contain obstacles as well as heterogeneous teams of robots. As such, we modify the reward term rsafe defined in Eq. (14) to assign an additional penalty of −1 whenever the corresponding state 
+
+τ {k}[t] involves a collision with the environment, or more generally, violates a state constraint. Heterogeneous settings are accommodated by performing rollouts under the respective dynamical systems f k 
+
+> dyn
+
+for each robot and by evaluating collisions based on robot-specific radii Rka.To unravel the difficulties in developing such extensions, we begin by establishing a deeper analysis of D4 ORM ’s characteristics. We first derive its mathematical connections to existing sampling-based methods such as MPPI and MBD, and provide new qualitative and quantitative evaluations on typical multi-robot trajectory planning problems. We also an-alyze the scalability limitations of D4 ORM , revealing a failure mode caused by gradient dilution and thereby motivating the development of more advanced methods. 
+
+A. Mathematical connections to MPPI and MBD 
+
+We now explain why D4 ORM is particularly well-suited for solving multi-robot trajectory planning, by clarifying its math-ematical foundations in comparison with MPPI and MBD. In short, D4 ORM uses the deformation-optimizing style of MPPI, but with diffusion-inspired noise annealing from MBD. Before proceeding, we clarify the terminology of step and 
+
+iteration . A step refers to a single sampling process followed by an update process. An iteration refers to a complete MBD optimization procedure consisting of N denoising steps. 
+
+1) MPPI to MBD: A popular sampling-based optimization method for trajectory planning is MPPI [9], which computes the optimal control sequence U ∗ according to: 
+
+U ∗ ← 1
+
+η
+
+X 
+
+> τ∈Γ
+
+exp 
+
+ r(τ )
+
+λ + I(τ )
+
+
+
+(τ.U ), (15) where Γ denotes a set of state–control trajectories obtained by rolling out control samples drawn from N ( ˆU , Σ) , with a reference control trajectory ˆU , a pre-specified noise parameter 
+
+Σ, and a normalization constant η. Here, I(τ ) represents an importance-sampling weight derived from an information-theoretic perspective, although it is often disabled in practice due to stability concerns [10]. By removing the I term, Eq. (15) reduces to: 
+
+U ∗ ← 1
+
+η
+
+X 
+
+> τ∈Γ
+
+exp 
+
+ r(τ )
+
+λ
+
+
+
+(τ.U ), (16) which is equivalent to MBD when N = 1 ; in other words, an MPPI update corresponds to a single denoising step, as discussed in [17]. A key distinction from MPPI, however, lies in the use of noise annealing in MBD, governed by the schedule of 
+
+αi, which facilitates convergence toward (locally) optimal solutions. Fig. 2 illustrates the behavioral differences be-tween MBD and MPPI on a synthetic, highly non-convex one-dimensional objective function with multiple local min-ima. By introducing a noise schedule, MBD achieves faster convergence, as the covariance of the sampling distribution  1¯αi − 1
+
+
+
+I decreases as i→1. This encourages wide explo-ration in the early stages and focused local search in the later, less-noisy stages for exploitation. In contrast, MPPI relies on a predefined and fixed covariance matrix for the sampling distribution; consequently, it may exhibit fluctuating behavior across steps when the covariance is too large. This motivates the use of MBD over vanilla MPPI in D4 ORM ,particularly since multi-robot trajectory planning inherently in-volves highly multimodal, nonconvex optimization problems. From an optimization perspective, MPPI can also be viewed as a multi-step deformation-optimizing algorithm. At each step, control trajectories are sampled from N (Ui, Σ) , which is equivalent to sampling perturbations ∆U ∼ N (0, Σ) and applying them to the current solution Ui. Each update therefore estimates a deformation ∆U ∗ of the current trajectory. In contrast, MBD cannot be directly interpreted as adeformation-optimizing method. Its sampling distribution is 
+
+N
+
+ Ui√ ¯αi ,
+
+ 1¯αi − 1
+
+
+
+I
+
+
+
+, which means that perturbations are applied to the scaled trajectory Ui√ ¯αi that depends on the current denoising step index, rather than directly to Ui. Such an optimization process is therefore coupled to the diffusion schedule and cannot be naturally decoupled into a sequence of deformation updates. As a result, MBD is inherently formu-lated as a single-iteration algorithm consisting of a predefined sequence of denoising steps. This motivates the development of D4 ORM , which instead performs iterative deformation optimization across multiple iterations. 8 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5                                         
+
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5
+
+MPPI 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5                                          
+
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5
+
+MBD / D4 ORM -reward                 
+
+> ←step  110 20 30 40 50
+> ×global min. ∼-reward func. •sample ▼solution
+> xx2101220 40 60 80 100 2101220 40 60 80 100
+> ←step MBD D4 ORM
+
+Fig. 2: Sampling-based optimization behavior over a complex, one-dimensional cost function. Top: Process visualizations for MPPI and MBD (i.e., one denoising optimization; equivalent to D4 ORM ). Unlike MPPI, MBD can converge to a locally optimal solution with the introduction of noise annealing. Bottom: Solution transition for multiple runs with different random seeds. The background heatmap represents the density of the solution samples. 
+
+2) MPPI to D4 ORM : While MBD is formulated as asingle-iteration algorithm that directly optimizes a control trajectory, we reinterpret the optimization process as solving for a deformation that can be applied iteratively. This leads to D4 ORM . Compared with MPPI, where each step computes a deformation through a single softmax update, D4 ORM 
+
+computes a deformation using an entire MBD diffusion-denoising process. In other words, MPPI performs one step per deformation update, whereas D4 ORM performs a complete MBD optimization to obtain each deformation before applying it to the current trajectory estimate. 
+
+3) MBD to D4 ORM : The iterative deformation, absent in MBD, provides practical benefits for multi-robot trajectory planning. As shown in Fig. 2 (top right), MBD can still become trapped in local optima regardless of the number of denoising steps. Consequently, a single denoising optimization may yield infeasible solutions, as demonstrated in Fig. 1b for the 10-robot 2D case. The iterative denoising in D4 ORM alleviates this issue by resetting the noise schedule at each iteration to re-enable exploration, while the optimization objective remains the deformation vector. In other words, D4 ORM instantiates multiple runs of MBD sequentially, with each iteration opti-mize a deformation over the result of previous iteration. It may be possible to use MBD iteratively by initializing a variable UN at Line 1 in Alg. 1 with the previously optimized result (i.e., U0). However, this does not provide an effective iterative refinement scheme, as it violates MBD’s assumption that UN is sampled from the normal distribution N (0 , 1) ,leading to a mismatch in the designed noise annealing; i.e., iterative MBD causes a distribution shift issue, especially the mean of the sampling distribution at first denoising step is further scaled by 1√ ¯αN (Line 3 in Alg. 1), hence iterative attempts do not improve the solution trajectory. Meanwhile, D4 ORM overcomes this issue, as it always optimizes defor-mation from a normal distribution, and each denoising attempt preserves MBD’s assumption. This structural difference will be empirically validated in Section IV-B2. 
+
+4) MPPI vs MBD vs D4 ORM : In summary, MPPI can be interpreted as a multi-step deformation-optimizing algorithm, whereas MBD is a single-iteration optimization algorithm. D4 ORM unifies these two perspectives by performing iterative deformation optimization across multiple iterations. Conse-quently, when each iteration consists of exactly one step, D4 ORM reduces to MPPI. When there is only one iteration, D4 ORM becomes equivalent to MBD. 
+
+B. Empirical evaluation of D4 ORM 
+
+We now establish the performance of the base D4 ORM 
+
+framework qualitatively and quantitatively using commonly employed metrics similar to prior work [18]. We extend the analysis to now consider obstacles and heterogeneous teams, and also compare it against a joint-space numerical optimization routine as well as a method based on learned diffusion models. We use the following kinodynamic models:  
+
+> •
+
+Differential Drive system that represents wheeled robots with state x = [ px, p y , θ, v ]⊤, control u = [ ω, a ]⊤, and 
+
+fdyn (x, u ) = [ v cos θ, v sin θ, ω, a ]T ; 
+
+> •
+
+2D Holonomic double-integrator system that represents ground robots with state x = [px, p y , v x, v y ]⊤, control 
+
+u = [ ax, a y ]⊤, and fdyn (x, u ) = [ vx, v y , a x, a y ]T ; 
+
+> •
+
+3D Holonomic double-integrator system, which is a 3D version of the 2D case;  
+
+> •
+
+Heterogeneous scenario including half differential-drive and half holonomic robots, with robot max acceleration set to different values. We refer to scenarios with circular obstacles as 2D Holo X Obs , where X denotes the number of obstacles. Visual illustration of such an instance is available in Fig. 7. All ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 9
+
+evaluations are carried out on a laptop PC with an Intel Core i9-13900HX CPU, equipped with an NVIDIA RTX 4080 GPU. Our implementation is based on the accompanying code of MBD [16] and is implemented in Python using the JAX 
+
+library [42] to streamline GPU acceleration. The planning horizon is set to H=100 , with M =1024 trajectory rollouts used to approximate gradients. 
+
+1) Qualitative Analysis: Fig. 1a–c presents a qualitative investigation of the intermediate steps of the denoising process for each system. Fig. 1c considers a navigation task involving eight heterogeneous robots, initially positioned around a circle, with their respective goals located at antipodal positions. Such scenarios are widely used as benchmarks in the multi-robot planning literature, as they inevitably force planners to make non-trivial deconfliction efforts. Fig. 1b illustrate the refinement across denoising steps, i.e., over i in Alg. 1, as well as iterations of Alg. 2. The figure shows that trajectories converge toward their targets while remaining collision-free as the denoising steps increase, despite the enormous number of optimization variables, i.e., du × H × K. In particular, Fig. 1a highlights how sampling attempts converge to high-quality solutions due to the noise annealing mechanism, an effect not observed in MPPI alone, as confirmed in Fig. 2. As seen in the 2D holonomic case with 2,000 variables (Fig. 1b), iterative deformation optimization compensates for incomplete trajectories and further improves solution quality by escaping local minima through resetting the diffusion noise scheduler. The generated trajectories by D4 ORM can be deployed on real robots in a zero-shot manner. Fig. 1d presents a deploy-ment snapshot of a team of ten multirotors [43] operating in the presence of obstacles. 
+
+2) Comparison with Sampling-based Optimization: Next, we compare D4 ORM with MPPI and MBD to gain empir-ical insight into how it differs from these sampling-based optimization methods. Following the strategy described in Section IV-A3, MBD is evaluated using its iterative variant denoted as i-MBD, which directly optimizes the trajectory initialized from the previous iteration, rather than optimiz-ing trajectory deformations as in D4 ORM . For evaluation, these methods are adapted to perform sampling in the joint control space. The rollout implementation is shared across methods, while the optimization update rules are implemented separately and efficiently in JAX. We use a temperature parameter of λ=0 .3, which is hand-tuned in the 2D holonomic environment and kept fixed across all other environments. We evaluate three key metrics of interest: (i) runtime , to quantify scalability against varying team sizes by measuring clock time for computing successful solutions, (ii) success rate , as defined previously, but measured against a given planning deadline, and (iii) reward , to quantify solution quality according to Eq. (2) when planning is allowed to continue for longer. Fig. 3 shows a complete overview of our comparisons over 50 runs. First, compared to MPPI, we observe that D4 ORM achieves a noticeable improvement in both runtime and success rate for all robot models and for all team sizes. In particular, the success rate plots show that for the 2D holonomic case, D4 ORM can always retrieve kinodynamically feasible and collision-free trajectories for 16-robot team in TABLE II: Runtime [s] of two methods to find feasible solutions in 2D Holonomic case.             
+
+> #robots 4812 16
+> IPOPT 1.12 ±0.526 6.33 ±2.284 35.32 ±11 .53 failed D4 ORM 0.12 ±0.002 0.13 ±0.002 0.30 ±0.217 1.25 ±1.016
+
+obstacle-free environments given a 3 s deadline. The average runtime is lower, ≈1.25 s , which is a near 2× improvement over MPPI. The reward plots show the ‘anytime planning’ nature using the number of steps, which serves as a metric for assessing runtime independently of computing environments. Recall that the reward is an indicator for solution quality, and as such, both methods converge to similar reward values given sufficient time for refinement. However, D4 ORM shows two key advancements. First, its reward curves show a steeper gradient during early steps, indicating that we obtain high-quality solutions faster. Second, as indicated by the solid dots on the curves, D4 ORM ’s high-quality solutions are successful (i.e., conflict-free) earlier than MPPI of similar quality. These improvements are owing to the ability of diffusion denoising to capture complicated, multimodal reward distributions in high-dimensional spaces. These findings remain consistent even in advanced scenarios, such as those involving obstacles and heterogeneous cases. An empirical comparison with cross entropy method (CEM) [44], another representative sampling-based optimization method, is provided in Fig. 14 of the Appendix and exhibits trends similar to those observed in the comparison between D4 ORM and MPPI. The second primary observation is that, as discussed in Section IV-A3, the iterative variant of MBD struggles to solve challenging deconfliction instances even with additional iterations, due to distribution shift. Indeed, as shown in the success rate and reward plots, increasing the number of itera-tions does not necessarily improve performance. Meanwhile, D4 ORM improves the success rate over iterations, presenting its structural advantage of optimizing deformation instead of directly optimizing control variables. We also provide a comparison with vanilla MBD (single-iteration with 10 ,000 
+
+steps) in Fig. 14 of the Appendix to demonstrate that a predefined number of denoising steps does not generalize efficiently across problems with different levels of complexity. 
+
+3) Comparison with Numerical Optimization Method: We next contrast D4 ORM with a naive numerical optimization approach. Specifically, we encode Eq. (1) using a direct collocation method [45] and solve it with the seminal off-the-shelf nonlinear optimization solver IPOPT [46], one of the most widely used approaches for trajectory optimization. Our IPOPT implementation first solves a warm-start trajectory that ignores collisions. The resulting solution is perturbed with small random noise, which we found improves solution diversity and reduces average computation time, and then used to initialize a collision-aware nonlinear optimization that refines the trajectories into a feasible deconflicted solution. We carefully align the objective functions and constraints implementation of both approaches, ensuring the comparison is conducted as fairly as possible. 10 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 
+
+Differential Drive 2D Holonomic 3D Holonomic 2D Holo 2 Obs Heterogeneous 8 10 12 14 16 0 2 4                              
+
+> 0.98 0.94 0.72 0.22 0.98 0.94 0.90 0.92
+> D4orm i-MBD MPPI 810 12 14 16 0 1 2 3
+> 0.98 0.90 0.74 0.32 810 12 14 16 0 2 4
+> 0.90 0.74 0.26 0.04 810 12 14 16 0 2 4
+> 0.98 0.92 0.96 0.66 0.42 0.12 0.98 0.90 810 12 14 16 0 1 2 3
+> 0.92 0.90 0.66 0.52 0.94 0.88
+> ← runtime [s]
+
+number of robots ( ×: scores obtained by excluding failed runs, accompanied by success rates, •: all runs succeeded) 0 4 80.0  0.5  1.0 D4orm i-MBD MPPI 0 4 80.0  0.5  1.0 0 4 80.0  0.5  1.0 0 4 80.0  0.5  1.0 0 4 80.0  0.5  1.0 
+
+> success rate  →
+
+planning time [s] 0 20 40 0.5  0.6  0.7 D4orm i-MBD MPPI 0 20 40 0.5  0.6  0.7 0 20 40 0.5  0.6  0.7 0 20 40 0.5  0.6  0.7 0 20 40 0.5  0.6  0.7 
+
+> reward  →
+
+number of total steps ( ×10 2)Fig. 3: Empirical results against baseline sampling-based optimization methods. The upper figures show the time required by each method to find initial feasible solutions over different numbers of agents. The middle ones show the planner’s ability to find a solution in the given time, focusing on the case of 16 robots. The bottom ones show how quickly each method finds plausible solutions, along with the total number of steps ( iters × N for D4 ORM ), using 16 robots each. Instance-wise, when to find the initial solution is marked with •. All methods use 1024 samples per step. 
+
+D4 ORM 
+
+t = 1 .25 s 
+
+MMD 
+
+t = 25 .12 s 
+
+Fig. 4: Comparison of D4 ORM and MMD in 2D holonomic environ-ment with 16 robots. t denotes elapsed planning time. 
+
+The results on the 2D holonomic case are summarized in Table II, which highlight the high efficiency of D4 ORM 
+
+compared to the standard numerical optimization approach. As the number of robots increases, the numerical optimization exhibits a steep rise in runtime, whereas D4 ORM maintains modest planning times. This is inherently due to the highly parallel structure of sampling-based optimization, which ben-efits from GPU acceleration. 
+
+4) Comparison with Learned Diffusion Method: We further compare D4 ORM against a method based on learned diffusion models. Notably, training diffusion models directly for multi-robot systems is challenging due to distribution shifts induced by changes in team size. Therefore, an existing coupled strategy called MMD (Multi-robot Multi-model planning Dif-fusion) [36] employs a learned diffusion model to generate collision-aware trajectories for individual robots, while iden-tifying and resolving inter-robot conflicts using combinato-rial search methods developed for discrete MAPF, such as Conflict-Based Search (CBS) [47]. While this design effec-tively mitigates the distribution shift associated with changing team sizes, it comes at the cost of significantly increased plan-ning times due to the repeated interaction between diffusion-model inference and search-based conflict management. In-deed, as shown in Fig. 4, D4 ORM achieves substantially lower runtime while generating smoother trajectories, highlighting the efficiency of sampling-based optimization and iterative deformation framework for centralized coupled planning. We additionally note that MMD requires substantial effort before the actual planning phase, as it relies on training models tailored to the target robot platform. This requirement further limits its applicability across different robot dynamics. 
+
+C. Limitation – Performance and Scale 
+
+Although D4 ORM ’s iterative refinement is highly effective in solving multi-robot trajectory planning, its performance degrades in settings with even larger team sizes. This limitation arises from two main reasons. First, as the number of robots increases, D4 ORM may allow a small number of robots to collide in order to maximize the overall team reward defined by Eq. (12), which it may priori-tize increasing the goal reward rgoal at the cost of reducing the safety reward rsafe . This occurs because D4 ORM optimizes tra-jectories to maximize the total team reward without imposing strict constraints to avoid collisions. If only a few robots are involved in collisions, their negative contribution to the total reward is small, reducing the planner’s incentive to resolve these conflicts. Simply increasing the penalty associated with ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 11 0.0 2.5 5.0 7.5 10.0 12.5 15.0 1         
+
+> 0123456
+> (Visualizing 10 sample trajectories optimized by 1 iter.)
+> 10 robots 30 robots 50 robots 70 robots 10 30 50 70 0.66  0.68 10 30 50 70 0 10  20
+> reward  →← iterations
+
+#robots Fig. 5: Trajectory generation for 2D holonomic robots by D4 ORM 
+
+without collision penalty rsafe . Top : The task is to obtain point-to-point trajectories for K robots simultaneously. Ten example trajectories op-timized by one iteration are plotted for each entry. Bottom : Trajectory reward by one denoising iteration and the number of deformation iterations required to obtain goal-reaching trajectories for all robots, while varying the number of robots. Together, these demonstrate the inherent scalability issue of vanilla D4 ORM .
+
+collisions does not help, as it can lead to overly conservative behavior in which robots avoid the risk of collision by failing to progress toward their goals. Second, the gradient information diminishes with increas-ing robots. Fig. 5 illustrates this phenomenon, which shows trajectories computed by D4 ORM , while ignoring collisions (i.e., dropping rsafe ). The task here is to find a robot-wise trajectory from point to point but in a joint manner. From a single-robot trajectory optimization perspective, the difficulty of the problem does not vary regardless of how many robots are involved. However, since D4 ORM performs a joint opti-mization, the reward gradient weakens with a large number of optimization variables involved. The consequence, shown in Fig. 5 (top), is a degradation of the trajectory quality obtained after the first iteration. The decrease in normalized reward for one iteration, as well as the number of iterations required to derive goal-reaching trajectories in Fig. 5 (bottom), also provide evidence of this issue. These inherent limitations of vanilla D4 ORM motivate us to develop its advanced versions to pursue scalable methods, which we introduce in the following sections. V. D4 ORM -D: F AILURE -A WARE DECOUPLING 
+
+In the previous section, we discussed two key limitations of vanilla D4 ORM , particularly when scaling to many robots: 
+
+(i) some robots tend to prioritize reaching their goals over avoiding collisions, and (ii) the gradient computed by Monte Carlo ascent becomes weaker, leading to slower convergence. A practical strategy to address these issues is to decouple 
+
+the planning representation from the full joint optimization problem. This section introduces D4 ORM -D, which iteratively refines the trajectories of subsets of the team to effectively 
+
+Algorithm 3 D4 ORM -D: Failure-Aware Decoupling  
+
+> 1:
+
+τ ← D4 ORM without considering inter-robot collisions  
+
+> 2:
+
+while not interrupted do  
+
+> 3:
+
+F ← groups of failed robots in τ if exists; or {R} 
+
+> 4:
+
+for G ∈ F do  
+
+> 5:
+
+Compute deformation ∆U {G} using Alg. 1  
+
+> 6:
+
+τ {G} ← rollout 
+
+
+
+S{G} , τ {G} .U + ∆ U {G} 
+
+ 
+
+> 7:
+
+return τ
+
+repair infeasible solutions, inspired by an advanced MAPF method [20]. Alg. 3 presents the pseudocode for D4 ORM -D, which repeatedly applies D4 ORM to failed robots. Given a potentially infeasible solution τ , we define a robot k as failed if τ {k}
+
+involves collisions or does not reach its goal. All failed robots are then grouped as F = {G 1, G2, . . . } based on mutual collisions: 
+
+collide (i, j ) ∀i, j ∈ G k, i ̸ = j, (17) 
+
+¬collide (i, j ) ∀i ∈ G k, j ∈ G l, k ̸ = l, (18) where collide denotes whether two trajectories in τ collide. Robots that only collide with obstacles or fail to reach their goals are assigned to singleton groups. This grouping is achieved by constructing an adjacency graph over robots based on collisions and extracting its connected components. We also augment each group using collision information from the previous iteration. Specifically, if a robot from a previous collision group is currently colliding with a robot outside that group, we reconnect it to its previous direct neighbors that are collision-free in the current iteration, as these robots are more likely to collide again and therefore benefit from joint optimization. The final collision groups are then defined as the connected components of this augmented graph. Once F is identified, we apply Alg. 1 to compute defor-mations for each group G. Each group’s trajectory is refined according to the rewards of its own robots only, without being influenced by rewards from other groups. D4 ORM -D repeats this identification and repair operation until a user-specified termination condition is met. Implementation-wise, once a feasible solution is obtained, it is stored, and subsequent iterations continue with fully joint optimization to further refine the solution, while the algorithm can still return the stored feasible solution at any time. Fig. 6 illustrates an example run of D4 ORM -D. In the first phase (a), we perform D4 ORM with just one iteration, yielding a single group that includes all robots, since they all pass through the center of the circle at the same time step. Subsequent refinements are then performed for each group in F using D4 ORM , with successful robots treated as dynamic obstacles. In this example, this decoupled replanning eventually produces collision-free trajectories in (d). The rationale of D4 ORM -D is that decoupling the team to isolate failed robots allows the denoising optimization to focus effectively on resolving their failures. Collision-based group-ing naturally divides a large team into smaller subgroups, en-abling more accurate reward-gradient approximation by Monte Carlo ascent. Moreover, iterative decoupling enables robots 12 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 3 2 1 0 1 2 33                     
+
+> 2
+> 1
+> 0123
+> (a) 32101233
+> 2
+> 1
+> 0123(b) 32101233
+> 2
+> 1
+> 0123(c) 32101233
+> 2
+> 1
+> 0123(d)
+
+Fig. 6: Visualization of D4 ORM -D trajectory generation over it-erations. × marks the step where a collision occurs. • indicates successful robots, other colors indicate failed robots belonging to the same group. 
+
+from different groups to be dynamically reassigned for joint optimization. Finally, soft constraints (i.e., collision penalty) adopted in the reward calculation facilitate the replanning of previously successful robots, enhancing the planner’s ability to escape highly constrained infeasible solutions. VI. D4 ORM -C2F: C OARSE -TO -F INE PLANNING 
+
+Although failure-aware decoupling offers greater capability in generating successful trajectories, it still encounters two primary limitations. First, decoupling speeds up D4 ORM ’s planning, but generating a successful trajectory for several robots still remains computationally intensive, enough to pre-vent real-time planning. Second, the approach operates in an open-loop manner, making it susceptible to disturbances and uncertainties in the actual environment and dynamics model, which limits its effectiveness in real-world scenarios. To address these challenges, we propose a coarse-to-fine planning strategy. This approach first generates a full-horizon but coarse joint trajectory, which reduces computational over-head and admitting a few potential collisions. Then, online planning is conducted along the coarse trajectory to generate an executable fine trajectory while dynamically avoiding col-lisions in a closed-loop manner. In this scheme, the coarse trajectory serves as a form of “guidance,” embedding long-term coordinated behaviors such as congestion mitigation [48] for a short-term, fine-grained, and reactive trajectory planner. Alg. 4 encapsulates the idea, termed D4 ORM -C2F, which is described in detail below. Fig. 7 illustrates its running example. 
+
+A. Coarse Trajectory Generation 
+
+The most computationally expensive component in the denoising optimization is the rollout. This involves simulating the control sequence over a horizon H (e.g., set to 100 in Section IV-B) and computing the corresponding reward. Since rolling out a single trajectory is a sequential process, reducing the horizon length H can significantly improve efficiency. To exploit this insight, we first use D4 ORM -D to compute a coarse trajectory for each robot. We reduce the rollout horizon and proportionally increase the time step ∆t as 
+
+Hcoarse =H/f coarse and ∆tcoarse =∆ t · fcoarse , where fcoarse is a parameter that controls the horizon length. In practice, fcoarse 
+
+is set to a small integer (e.g., set to 2 in Section VIII) so as not to introduce significant deviations from the actual solutions. To further reduce the overhead of computing the coarse trajectory, D4 ORM -C2F lowers the resolution of collision checking when identifying failed robots in D4 ORM -D by per-forming checks only every ocoarse steps. Even with this sparse 
+
+Algorithm 4 D4 ORM -C2F: Coarse-to-Fine Planning 
+
+Parameters: 
+
+H, ∆t ▷ Target planning horizon and time step 
+
+Hpredict , H execute ▷ Local predict and execute horizon 
+
+fcoarse ▷ Scaling factor for coarse time step 
+
+ocoarse ▷ Offset for coarse collision checking 
+
+m ▷ Index margin for subgoal selection (Coarse trajectory preparation)  
+
+> 1:
+
+Hcoarse ← H/f coarse ; ∆tcoarse ← ∆t · fcoarse  
+
+> 2:
+
+τcoarse ← D4 ORM -D with (Hcoarse , ∆tcoarse , o coarse ) 
+
+> 3:
+
+pcoarse ← interpolate (τcoarse .x, H ) 
+
+> 4:
+
+Refine τcoarse [ j+mfcoarse :] with (Hcoarse , ∆tcoarse , o =1) in the backend using latest available j and update pcoarse 
+
+(Online fine trajectory generation and execution)  
+
+> 5:
+
+while not all robots reach goal do  
+
+> 6:
+
+j ← ave. of the nearest subgoal indices in pcoarse for R 
+
+> 7:
+
+psubgoal ← pcoarse [j + m] 
+
+> 8:
+
+τpredict ← D4 ORM with (Hpredict , ∆t, p subgoal ) 
+
+> 9:
+
+Execute τpredict [1 , 2, . . . , H execute ].U 
+
+checking, all steps are still optimized under the original reward structure, thereby implicitly encouraging collision avoidance. Compared to alternative heuristics, such as relaxing collision constraints or reducing the weight of rsafe , this approach relaxes only the success criterion for the coarse trajectory, which we found to provide effective guidance. With these relaxations, D4 ORM -D generates a coarse trajec-tory τcoarse with Hcoarse steps (Line 2), where every ocoarse step is guaranteed to be collision-free (Fig. 7b). We then interpolate 
+
+τcoarse .x to obtain pcoarse (Fig. 7a), an H-step path that specifies robot positions with a time step of ∆t (Line 3). Although the unverified steps may still contain collisions, generating such coarse guidance provides a useful initial plan that can be refined during online execution. The impact of the choices of fcoarse and ocoarse is analyzed in Table III of the Appendix. 
+
+B. Local Refinement with Receding Horizon 
+
+Once we obtain the guidance path pcoarse , we initiate online planning with a receding-horizon scheme (Lines 5–9). At each control iteration, the first step is to identify a joint subgoal 
+
+psubgoal within pcoarse , determined by averaging the nearest waypoints of each robot and adding a small constant offset 
+
+m to ensure that all robots progress toward their destinations (Line 7). The subgoals are synchronized across robots in 
+
+pcoarse , thereby preserving the spatiotemporal coordination implied by the coarse guidance. The next step is to generate a joint collision-free trajectory 
+
+τpredict of horizon Hpredict with a time step of ∆t, where 
+
+Hpredict ≪ H. We invoke D4 ORM (-D) with the original reward structure in Eq. (12), but toward the subgoal psubgoal (Line 8). The predicted trajectory τpredict is then executed for Hexecute 
+
+steps, after which the next control loop begins (Line 9). Note that psubgoal serves only as a soft constraint, as these subgoals are not guaranteed to be collision-free. Instead, the responsibility for collision avoidance is assigned to the fine trajectory generation. Notably, D4 ORM used in this phase can exploit trajectories optimized in the previous iteration using a sliding window. As ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 13 3 2 1 0 1 2 33                             
+
+> 2
+> 1
+> 0123
+> (a) Initial Coarse Path 32101233
+> 2
+> 1
+> 0123(b) Verified Waypoints 32101233
+> 2
+> 1
+> 0123(c) Optimized Coarse Path 32101233
+> 2
+> 1
+> 0123(d) Executed Trajectories 010 20 30 40 50 60 70 80 Horizon Steps 0.00 0.02 0.04 0.06 0.08 0.10 0.12 Distance Mean ±1 STD
+> [m]
+> (e) Adjustments made in Coarse-to-Fine
+
+Fig. 7: Visualization of D4 ORM -C2F. The coarse trajectory τcoarse has a horizon of Hcoarse , while the guidance path pcoarse denotes its interpolated form with H waypoints of the positional components. (a) shows the initial guidance pcoarse while (b) displays waypoints verified as collision free. The optimized guidance pcoarse in the backend is presented in (c), which still contains collisions because the optimized coarse trajectory does not guarantee interpolated result pcoarse to be collision-free. Moreoever, it could be kinodynamically infeasible. (d) is the final executed trajectory by following pcoarse in a receding horizon framework, which eventually resolve collisions. (e) shows the difference between executed trajectory and pcoarse , indicating that online planning converts the guidance into a collision-free, executable trajectory with some minor deviations. 
+
+it synthesizes deformations , bootstrapping from the previous solution helps achieve faster convergence towards optimal trajectories while incorporating up-to-date state information. 
+
+C. Backend Global Refinement 
+
+While the coarse-to-fine approach helps minimize compu-tational overhead, it is sensitive to the quality of the coarse trajectory τcoarse and its consequence pcoarse to extract subgoals. In particular, if pcoarse incurs a large travel time, following it can lead to redundant motions in the executed trajectory. Therefore, we introduce a global refinement step that refines the coarse trajectory using D4 ORM , executed concurrently in the backend alongside online planning (Line 4). As robots ap-proach their goals, the coarse trajectory optimization becomes progressively easier as remaining planning horizon shortens. VII. D-D4 ORM : D ISTRIBUTED COMPUTATION 
+
+Although D4 ORM -D and D4 ORM -C2F provide viable op-tions for solving large-scale multi-robot trajectory planning, they share an inherent architectural limitation that all com-putation is performed on a single, centralized computational entity. In spite of the superior scaling performance exhibited by D4 ORM -C2F (Section IV-B), this dependency on central-ized computation can be prohibitive in resource-constrained environments. In particular, when the centralized system is not equipped with a highly-capable GPU, it becomes impractical to sample massive numbers of trajectories in real-time to approximate the reward gradient accurately. Luckily, we recog-nize that D4 ORM ’s sampling process can be easily distributed 
+
+across computational “nodes” (in the sense of a ‘cluster’ of computing devices). This would allow each node to execute D4 ORM with a smaller sample size, which can potentially even sidestep the need for GPUs. We therefore develop a distributed version, D-D4 ORM , in which multiple comput-ing nodes independently perform D4 ORM while exchanging information through broadcast communication over a fully connected network for all nodes. The distribution mechanism is designed to evenly split the workload, and can, in principle, accommodate any number of available nodes. Note that, while ideally each robot acts as a “node,” this is not a requirement. 
+
+Algorithm 5 D-D4 ORM : Distributed Planning 
+
+Each node independently runs:  
+
+> 1:
+
+Initialize τ 
+
+> 2:
+
+while not interrupted do  
+
+> 3:
+
+Refine τ with D4 ORM  
+
+> 4:
+
+Broadcast τ , collect trajectories from others  
+
+> 5:
+
+Γ ← the top-k reward trajectories received  
+
+> 6:
+
+τ ← pickup one from Γ randomly  
+
+> 7:
+
+return the best trajectory collected so far 
+
+Alg. 5 outlines the procedure of D-D4 ORM . After initial-izing a solution trajectory for all robots, each node inde-pendently runs D4 ORM with a different random seed. The resulting trajectories are then broadcast and collected by all nodes. Each node then selects the top-k trajectories according to their reward values, randomly chooses one of them as its base trajectory, and runs its next iteration of D4 ORM . This process is repeated for a specified number of iterations, or until some user-specified terminal conditions are met. While Alg. 5 uses D4 ORM (Line 3), it is straightforward to use its improved variants such as D4 ORM -D and D4 ORM -C2F. We adopt a top-k reward update (Line 5), which favors candidate solutions that have a high reward (i.e., promising) and yet maintain some diversity by picking randomly from this set (Line 6). In Section VIII-D, we empirically compared this approach against two alternatives: the max-reward update (k=1 in top-k), which improves exploitation at the cost of diversity, and the k-means update, which improves diversity at the cost of exploitation. 
+
+Distributed On-Robot Planning: As a notable application of D-D4 ORM , we extend it to the case where every robot in the team acts as a distributed computational node. Such an onboard implementation is natural, since robots are typ-ically equipped with computing devices, and those may be sufficiently powerful when the problem size shrinks by virtue of being distributed. Each robot then performs the rollout operation independently on its own device, and subsequently exchanges information with others only after at least one iter-ation of its denoising process. This is a practical design choice that avoids excessive frequent inter-robot communication. 14 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 
+
+Differential Drive 2D Holonomic Heterogeneous 3D Holonomic 2D Holo 4 Obs 2D Holo Random                                                    
+
+> ← runtime [ s]810 12 14 16 0 1 2D4orm D4orm-D D4orm-C2F 810 12 14 16 0 1 2810 12 14 16 0 1 2810 12 14 16 0 1 2810 12 14 16 0 2 4
+> 0.94 0.92 0.78 0.66 Obstacle 16 25 36 49 64 0 2 4 6← travel time [s] 810 12 14 16 5 6 7810 12 14 16 5 6 7810 12 14 16 5 6 7810 12 14 16 5 6 7810 12 14 16 5 6 7
+> 0.94 0.92 0.78 0.66 16 25 36 49 64 5 6 7 0.80
+
+number of robots ( ×: scores obtained by excluding failed runs, accompanied by success rates, •: all runs succeeded) Fig. 8: Comparison of D4 ORM , D4 ORM -D, and D4 ORM -C2F across different environments over 50 trials, using 1024 samples per step. The number indicates the success rate for configurations that include failures. Runtime for D4 ORM -C2F is the time required to compute the coarse trajectory. Travel time is the average time required for each robot in the team to reach the goal. 
+
+VIII. E VALUATION OF D4 ORM VARIANTS 
+
+We now evaluate variants of D4 ORM (D4 ORM -D, D4 ORM -C2F, D-D4 ORM ), and demonstrate that it serves as a promis-ing tool for solving various trajectory optimization problems, potentially involving large robot teams. Section VIII-C fur-ther offers an empirical reference that juxtaposes D4 ORM -D and AMSwarm [28], a representative decoupled multi-robot planning method based on numerical optimization. 
+
+A. Comparing D4 ORM , D4 ORM -D , and D4 ORM -C2F Fig. 8 presents the empirical performance of D4 ORM and its variants under the same experimental setup as in Sec-tion IV-B. We include challenging scenarios for D4 ORM such as 2D Holonomic 4 Obstacles , where D4 ORM often fails to derive feasible solutions with 16 robots, and 2D Holonomic Random , which assigns goal locations randomly, with up to 64 robots. The runtime report of D4 ORM -C2F includes both offline and online planning stages. Overall, both D4 ORM -D and D4 ORM -C2F enhance the real-time planning capability compared to the baseline D4 ORM . Notably, both extensions reliably generate full-horizon, collision-free trajectories for the 64-robot case within 
+
+2 s , despite the large-scale planning problem involving more than 10 4 optimization variables. D4 ORM -D achieves faster planning while maintaining a travel time (i.e., the average time for each robot to reach its goal) comparable to that of D4 ORM . In the 2D holonomic random scenario with a large number of robots, where co-ordination is less tightly coupled than in the circular setup, decoupling significantly reduces travel time by effectively alleviating the gradient dilution problem. In addition, the failure-aware replanning mechanism enables D4 ORM -D to consistently recover feasible solutions, particularly in the four-obstacle scenario. Its strong planning capability is further evidenced in Fig. 1e, where it resolves conflicts for 100 robots within 30 s , demonstrating scalability to very large teams. D4 ORM -C2F further accelerates planning speed through the combination of coarse guidance generation and receding-horizon online planning. Moreover, it achieves significantly lower travel time compared to the other variants. This can be attributed to two factors: (i) preparing the guidance path in a decoupled manner and refining it under a coupled representa-tion at the backend during execution, and (ii) online planning with a short horizon, which allows D4 ORM to optimize the executing trajectories more effectively. Typically, offline planning for 16 robots in the 2D holonomic case requires 
+
+≈0.2 s , while online planning runs in 0.03 s per control loop, which is sufficiently fast to enable feedback control. 
+
+B. Robustness against Perturbation 8 10 12 14 16 0.0 0.5 1.0 D4orm-D D4orm-C2F 
+
+2D Holo 3 Obs 8 10 12 14 16 0.0 0.5 1.0 D4orm-D D4orm-C2F 2D Holo 4 Obs number of robots success rate  →
+
+Fig. 9: Execution robustness against model noise. 
+
+As D4 ORM -C2F is an online planning method that con-tinuously incorporates state feedback, its execution is less sensitive to tracking errors during execution. Fig. 9 compares its execution success rate under perturbations introduced as random Gaussian noise applied to the executed controls. Whereas one-shot offline planning with D4 ORM -D often fails under such disturbances, D4 ORM -C2F successfully adapts by replanning at each control iteration, maintaining collision-free and goal-directed behavior. This property provides the empirical foundation for the onboard distributed execution, which we will demonstrate later. 
+
+C. Juxtaposing against AMSwarm 
+
+We now present an empirical reference that juxtaposes D4 ORM (-D) and AMSwarm [28], a representative multi-robot planning method based on numerical optimization. AMSwarm differs significantly from D4 ORM -D in that it adopts robot-wise decoupled, receding-horizon planning, where each robot uses neighbors’ previous trajectories as predictions. Thus, the ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 15 
+
+env 1 env 2 env 3 env 4 env 5 
+
+AMSwarm 
+
+runtime [ s] ↓
+
+makespan [ s] ↓
+
+jerk ↓3 2 1 0 1 2 3
+
+## ✓
+
+0.83 9.60 10.43 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ×
+
+N/A N/A N/A 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+0.88 9.10 11.05 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+0.81 8.70 10.08 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ×
+
+N/A N/A N/A 
+
+D4 ORM 
+
+runtime [ s] ↓
+
+makespan [ s] ↓
+
+jerk ↓3 2 1 0 1 2 3
+
+## ✓
+
+0.17 7.00 46.62 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+0.33 7.25 43.29 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+0.76 8.10 44.62 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+1.17 8.36 43.11 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+1.31 7.13 43.08 
+
+D4 ORM -D 
+
+runtime [ s] ↓
+
+makespan [ s] ↓
+
+jerk ↓3 2 1 0 1 2 3
+
+## ✓
+
+0.19 7.02 46.58 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+0.29 7.11 44.01 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+0.33 7.77 43.57 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+0.40 8.04 42.62 3 2 1 0 1 2 3
+
+> Obstacle
+
+## ✓
+
+0.35 7.38 42.33 Fig. 10: Juxtaposing trajectories from D4 ORM and D4 ORM -D against AMSwarm [28], a representative receding-horizon decoupled planning method, using ten 3D holonomic robots for five scenarios. The plots are top-down 2D projections. Symbols ✓ and × show whether each method has solved the instance. “jerk” represents the mean squared jerk. 
+
+comparison is not meant to be fair, and is rather meant to illustrate qualitative differences between these approaches. We use the publicly available AMSwarm implementation without any customizations, and only adjust parameters to match the configuration adopted by D4 ORM (-D). Fig. 10 presents five case studies with ten 3D holonomic robots and cylindrical obstacles (when present). Both D4 ORM 
+
+and D4 ORM -D solve all instances and achieve comparable metrics in easier environments. In contrast, AMSwarm can be unable to reason about global preferences of other robots and can get stuck in local minima that sometimes lead to failure (see env_2 and env_5 ). In general, we see that D4 ORM -D yields reliable and efficient solutions across all test cases with lower computation time and makespan (i.e., mission completion time). This is primarily because of the full-horizon planning performed by D4 ORM -D and its effective use of GPU acceleration. We further evaluate trajectory smoothness using mean squared jerk at ∆t=0 .1. AMSwarm generally performs better on this metric because D4 ORM (-D) does not include jerk minimization in the objective function. Instead D4 ORM (-D) prioritizes travel-time reduction and thus producing more direct, less circuitous trajectories. Notably, low jerk values can also be readily achieved in D4 ORM (-D) by adding jerk limits to the current robot dynamics. 
+
+D. Distributed Implementation Designs 
+
+We next investigate the behavior of D-D4 ORM , the dis-tributed variant of D4 ORM , using the same total number of samples ( =2048 ). Recall that in each computing node, Alg. 5 employs a top-k update strategy for its next iteration, selecting a solution from the pool of candidate solutions broadcast by other nodes in the previous iteration. However, as discussed earlier, it is possible to consider other selection strategies. Fig. 11 (upper) first compares the original D4 ORM (without distributed computation, with the same total number of sam-ples), D-D4 ORM with top-k update ( k=4 ), and two alternative 16 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 
+
+> ← iterations
+
+Differential Drive 8 10 12 14 16 0 5 10  15  D4orm Top-K Max K-Means 2D Holonomic 8 10 12 14 16 0 10  20 2D Heterogeneous 8 10 12 14 16 0 10  20 3D Holonomic 8 10 12 14 16 0 10  20 
+
+#robots ( : one centralized computing node, : #computing nodes equal to #robots)             
+
+> ← iterations 4812 16 0 5 10  15  Top-K Max 4812 16 0 10  20 4812 16 0 10  20 4812 16 0 5 10  15
+
+#computing nodes (fix #robots equal to 16 )Fig. 11: Evaluation of D-D4 ORM . The number of iterations required to obtain a feasible solution is shown for each environment. Each denoising optimization uses a total of 2,048 Monte Carlo samples. The top row illustrates the case when each robot is also a computing node, i.e., the size of the problem increases with the number of robots, while the number of samples at each node decreases (e.g., each robot has M =128 samples in the 16-robot case). The bottom row illustrates the effect of varying only the number of computing nodes for a problem that contains a fixed number of robots ( =16 ) (e.g., each node has M =256 samples in the 8-node case). 
+
+update schemes: “Max,” which selects only the single best candidate (i.e., top-1), and “ k-means,” which selects k diverse candidates based on k-means clustering, where the diversity is measured as the l2−norm between two candidate solutions. The results indicate that the top-k strategy, despite its simplic-ity, consistently achieves the best balance between exploitation and diversity, yielding superior overall performance compared to the other update rules. While D-D4 ORM typically requires more iterations than the original D4 ORM to find a solution under an equivalent total sample budget, distributed computa-tion enables greater flexibility in implementation and allows the total number of samples to scale with the number of participating nodes in practice. We are further interested in evaluating the impact of chang-ing the number of computing nodes while keeping the number of total Monte-Carlo samples constant. Fig. 11 (lower) shows this effect in the performance of D-D4 ORM with the top-
+
+k (k=4 ) and max strategies, by changing the number of nodes and keeping the total number of Monte Carlo samples fixed ( =2048 ). Intuitively, when the work is split evenly across nodes, every node solves a tiny problem quickly, but potentially at the expense of a slightly inferior solution quality. We see this evidenced in our evaluations: dividing the samples among a larger number of nodes leads to an increase in the required iterations for both strategies. The top-k strategy yet remains more effective than the ‘Max’ when #nodes is greater than k. We therefore posit that more sophisticated work distribution strategies can be employed if the situation demands, although that is out of the scope of our focus here. 
+
+E. Onboard Distributed Demonstration 
+
+Finally, we evaluate the most notable deployment strategy that employs all robots in a team as computing nodes to run D-D4 ORM . We use a team of Cambridge Robomas-ters [49], which are omnidirectional ground robots equipped with mecanum wheels. Each robot is modeled as a first-order 2D holonomic system, receives fixed-frame positioning data from a motion-capture system over Wi-Fi, and runs its local feedback-control stack onboard its NVIDIA Jetson ‘Orin’ System-on-Chip. The entire control and estimation stack is implemented in C++ over ROS2 middleware, and is containerized using Docker. We load an additional container on each robot that implements D-D4 ORM as a standalone ROS2 node in C++. This container interfaces to the robot’s controller via localhost (to execute trajectories), and to other robots via the Jetson’s default Wi-Fi modules. Our setting exploits multi-threading on the ARMv8 CPU. Fig. 1f shows a timelapse-snapshot from a distributed on-robot execution using six Robomaster platforms. The im-plementation showcases a ‘lifelong’ asynchronous mission update, where robots are continuously and asynchronously given new (random) targets in the workspace as soon as they complete the current mission. This creates a dynamism that is closer to real-world settings (e.g., in warehouses). Fig. 12 shows a detailed process visualization for the timeline of distributed computation and message exchange. The team is comprised of six robots that also act as computing nodes. A new problem is assigned to the team at time t=0 , and the first iteration lasts for ≈600 ms , at the end of which, all nodes exchange their candidate solutions. The best candidate is visualized in the top row. Note that a viable solution is found in the first iteration; however, to illustrate the anytime 
+
+nature of D4 ORM , we let the agents execute the full number of iterations ( =5 here). For each successive iteration, every agent picks a random candidate solution, shown as a solid black connector, from the top-k subset. At the end of the 5th iteration, the solution from Robot-5 is ranked the highest, and is the one that all robots execute. The process is successful in spite of variable latency and a lack of message synchro-nization in the inter-robot communication (over stock ROS2 DDS middleware). However, consequently, the agents spend ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 17 -2 0 2-3 -2 -1 0123                         
+
+> Iteration #: 1 From Robot: 6 Score Val: 0.6891
+> -2 02-3 -2 -1 0123
+> Iteration #: 2 From Robot: 2 Score Val: 0.7017
+> -2 02-3 -2 -1 0123
+> Iteration #: 3 From Robot: 1 Score Val: 0.6842
+> -2 02-3 -2 -1 0123
+> Iteration #: 4 From Robot: 2 Score Val: 0.6960
+> -2 02-3 -2 -1 0123
+> Iteration #: 5 From Robot: 5 Score Val: 0.7030
+> 0500 1000 1500 2000 2500 3000 3500
+> Robot-1 Robot-2 Robot-3 Robot-4 Robot-5 Robot-6
+
+time [ ms ]robot 123456execution Fig. 12: Process visualization for D-D4 ORM , the distributed onboard planner with six robots that also work as computational nodes, deployed in a real-world lifelong scenario. Over successive iterations, D-D4 ORM improves the solution by exchanging candidate solutions computed by each node (i.e., robot), even though a feasible solution is obtained in the first iteration. A problem is generated at time 
+
+t=0 , and the bottom row illustrates the planning process for each node and how messages are exchanged over time (light gray). The solution that a node selected for its next iteration (from top-k) is highlighted with black connectors. The top row visualizes the best intermediate solutions from each iteration. 
+
+≈720 ms not performing any computation (averaged across agents and then summed), which corresponds to ≈20 % of the interval in this illustration. These statistics are typical of stock DDS settings over general-purpose infrastructure Wi-Fi networks, and may be improved using customized protocols that are tuned appropriately for the task. IX. C ONCLUSION 
+
+This paper studied a multi-robot trajectory optimization framework with diffusion denoising. Given robot dynamics and a reward function, D4 ORM (an offline, coupled planning framework) iteratively applies a deformation vector to the current solution candidate of a joint trajectory for the team. This process is guided by a Monte Carlo gradient approx-imation. Despite the nonconvexity, multimodality, and high-dimensionality of deconfliction problems, both our theoreti-cal and empirical analyses suggest that this simple process successfully retrieves collision-free trajectories for the entire team within reasonable deadlines. We then use vanilla D4 ORM 
+
+as a building block to develop advanced variants, such as a decoupled planner D4 ORM -D to achieve scalability, the online planning scheme D4 ORM -C2F, and the distributed version D-D4 ORM for resource-constrained environments. Taken to-gether, the results of this study provide a toolkit for solving various types of multi-robot trajectory planning problems. This opens up the possibility of diffusion-based sampling optimization methods for multi-robot trajectory planning, an area that has been largely under-explored. While the D4 ORM series provides powerful and convenient solutions, we acknowledge several technical limitations. For example, D4 ORM itself remains a local collision-avoidance planner and is not designed to solve trajectory planning in obstacle-rich workspaces such as maze-like environments. In such cases, integration with discrete search, especially multi-agent pathfinding methods [19], would yield more practical ap-proaches. Another limitation is the assumption of fast collision checking to compute the reward (e.g., using sphere-like robot shapes). With non-convex robot shapes, collision checking would become a bottleneck and slow down the Monte Carlo rollout, thereby degrading the performance of D4 ORM . This will be an important consideration when adapting D4 ORM 
+
+series to more advanced dynamics, such as manipulators. Nevertheless, we envision that denoising optimization will in-spire a new class of multi-robot planning algorithms, enabling scalable, flexible, and robust frameworks that extend beyond the current D4 ORM styles. APPENDIX ADISCOVERING MULTIMODAL SOLUTIONS 
+
+In Section IV-A, we motivated the importance of captur-ing the multimodality of valid multi-robot trajectories. Since D4 ORM and its variants utilize a sampling-based diffusion-denoising scheme, we hypothesized that they can discover a diverse set of candidate solutions rather than converging to a limited number of modes. Here, we examine this capability through case studies comparing D4 ORM against numerical trajectory optimization (i.e., a direct collocation) with IPOPT 
+
+used in Section IV-B3. In Fig. 13, we empirically investigate this ability using sample problems with 2D holonomic robots. The left panel 18 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 10 5 0 5 10 10  
+
+> 5
+> 0510
+
+D4orm IPOPT 
+
+e1
+
+e2 • D4 ORM • IPOPT 
+
+123456Obstacle 
+
+Cluster 6 Obstacle 
+
+Cluster 5 Obstacle 
+
+Cluster 4 Obstacle 
+
+Cluster 3 Obstacle 
+
+Cluster 2 Obstacle 
+
+Cluster 1 10 5 0 5 10 10  
+
+> 5
+> 0510 D4orm IPOPT
+
+e1
+
+e2 • D4 ORM • IPOPT 
+
+abcd
+
+a b
+
+c d
+
+Fig. 13: PCA visualization of multimodal solution modes. Left : Two 2D holonomic robots swap their positions, yielding six distinct solution classes. The PCA visualization of trajectories generated by D4 ORM and IPOPT clearly reveals these six modes. Right : The same analysis for an 8-robot scenario, which admits a substantially larger number of solution classes. D4 ORM discovers a broader range of solution modes, whereas IPOPT converges to only two dominant modes. 
+
+Differential Drive 2D Holonomic 3D Holonomic 8 10 12 14 16 0 2 4 6        
+
+> 0.98 0.92 0.92
+> D4orm CEM MBD 810 12 14 16 0 1 2 3810 12 14 16 0 2 4 6
+> ← runtime [s]
+
+#robots ( ×: exclude failed runs, w/success rates; •: all runs succeeded) 
+
+Fig. 14: D4 ORM ’s performance against CEM and MBD. The number of denoising steps N is set to 100 for D4 ORM and 10 ,000 for MBD. For a fair comparison, all methods evaluate whether the current trajectory is successful every 100 steps. 
+
+illustrates a relatively simple multimodal setting, where two robots and their goals are at antipodal points of a circle, the center of which contains one obstacle. As illustrated, this problem admits six distinct solution classes. We run D4 ORM 
+
+and IPOPT 100 times using different seeds and initial guesses, and project the resultant trajectory features (2D positions) onto two principal components using PCA. The visualization clearly reveals these six clusters, and both methods success-fully recover all six solution classes. In more challenging scenarios, however, D4 ORM ’s capacity to uncover diverse, multimodal solutions becomes particularly apparent. Fig. 13 (right) shows the same trajectory-feature plot for a problem that involves eight robots. The increased complexity of this setting gives rise to a substantially larger set of feasible solutions, and D4 ORM is able to discover a broader range of them compared to IPOPT .APPENDIX BCOMPARISON WITH CEM AND MBD In addition to the comparison with MPPI and i-MBD presented in Section IV-B, we further compare D4 ORM against CEM [44] and vanilla MBD (single-iteration) [16]. For CEM, the elite fraction is set to 5%. For MBD, we use a large number of denoising steps ( N =10 ,000 ) to ensure sufficient steps for all test cases, while D4 ORM keeps N =100 for each iteration and runs iteratively. All methods use 1,024 samples per step and evaluate trajectory feasibility every 100 steps. As shown in Fig. 14, D4 ORM achieves higher success rates and lower runtimes than both methods. MBD is particularly 1e-2 2e-2 3e-2 4e-2 5e-2 1e-5 5e-5 1e-4 5e-4 1e-3                                                                     
+
+> 1.00 0.98 0.90 0.90 0.84 1.00 1.00 0.96 0.88 0.88 1.00 1.00 0.94 0.92 0.90 0.98 1.00 0.92 0.94 0.94 1.00 0.98 0.94 0.92 0.96
+> 1e-2 2e-2 3e-2 4e-2 5e-2
+> 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 0.98 0.98 1.00 0.96 1.00 0.96 1.00 0.98 1.00 1.00 0.96 0.98 1.00 1.00 0.98 0.96
+> 1e-2 2e-2 3e-2 4e-2 5e-2
+> 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00
+> 0.0 0.2 0.4 0.6 0.8 1.0
+
+Differential Drive 2D Holonomic 3D Holonomic 
+
+> β1
+
+βT
+
+Fig. 15: D4 ORM ’s sensitivity over β1 and βT in terms of success rates across different dynamics models. The evaluations are on environments with 16 robots without obstacles, under a fixed budget of iterations ( =50 ). 
+
+slow for smaller robot teams, indicating that a fixed number of denoising steps does not generalize well across problems of varying complexity. This stems from its noise schedule, whose covariance depends on the fraction of completed steps rather than their absolute number. In contrast, D4 ORM -family methods use iterative deformation to adapt more efficiently to varying problem complexity. APPENDIX CADDITIONAL SENSITIVITY ANALYSES 
+
+A. Noise Schedule 
+
+Fig. 15 shows the impact of a varying noise schedule. Fol-lowing the standard diffusion model notation, we express the schedule in terms of βt, with αt = 1 − βt and ¯αi = Qij=1 αj .A larger β1 injects more noise early in the forward process (late in reverse denoising), whereas a larger βT injects more noise late in the forward process (early in reverse denoising). The variation in performance is generally small, indicating that the iterative refinement is able to adapt to different noise schedules by expending more iterations. The difference is most observable in the differential drive case, where starting with a high βT is likely to produce infeasible trajectories. 
+
+B. Coarse Trajectory for D4 ORM -C2F Table III evaluates the impact of the hyperparameters in D4 ORM -C2F using 2D holonomic scenarios with four ZHANG et al. : DENOISING MULTI-ROBOT TRAJECTORIES 19 
+
+TABLE III: Sensitivity of D4 ORM -C2F to the coarse-guidance parameters under 2D Holo 4 Obs, using 16 robots. 
+
+fcoarse ocoarse runtime [ s] average travel time [ s] makespan [ s]1 1 0.75 6.23 7.23 2 1 0.37 (-0.38) 6.27 (+0.04) 7.31 (+0.08) 3 1 0.32 (-0.43) 6.35 (+0.12) 7.52 (+0.29) 4 1 0.23 (-0.52) 6.42 (+0.19) 7.62 (+0.39) 1 5 0.57 (-0.18) 6.31 (+0.08) 7.49 (+0.26) 1 10 0.43 (-0.32) 6.36 (+0.13) 7.58 (+0.35) Parenthesized values indicate absolute differences from the base setting (fcoarse =1 and ocoarse =1 ). 
+
+obstacles. We focus on the time-scaling factor fcoarse and the collision-check interval ocoarse , both of which determine the granularity of the generated coarse trajectory. For both parameters, larger values indicate coarser guidance, resulting in faster solution discovery, as shown in the result. However, excessively coarse guidance also degrades solution quality, leading to increased average travel time of each robot and makespan. This highlights a trade-off between computational overhead and execution efficiency: coarser trajectories enable faster planning but yield less effective guidance, resulting in longer mission completion times. Moreover, the runtime improvements exhibit diminishing returns as fcoarse and ocoarse 
+
+continue to increase. These results suggest that moderately coarse guidance provides the most favorable balance between planning overhead and solution quality. ACKNOWLEDGMENT 
+
+The authors would like to thank the anonymous reviewers and the editor for their insightful comments, and Lorenzo Magnino for his assistance with the robot deployment. REFERENCES [1] P. R. Wurman, R. D’Andrea, and M. Mountz, “Coordinating hundreds of cooperative, autonomous vehicles in warehouses,” AI Mag. , vol. 29, no. 1, pp. 9–9, 2008. [2] L. Chen and C. Englund, “Cooperative intersection management: A survey,” IEEE Trans. Intell. Transp. Syst. , vol. 17, no. 2, pp. 570–586, 2015. [3] J. E. Hopcroft, J. T. Schwartz, and M. Sharir, “On the complexity of motion planning for multiple independent objects; PSPACE-hardness of the warehouseman’s problem,” Int. J. Robot. Res. , vol. 3, no. 4, pp. 76–88, 1984. [4] P. Spirakis and C. K. Yap, “Strong NP-hardness of moving many discs,” 
+
+Inf. Process. Lett. , vol. 19, no. 1, pp. 55–59, 1984. [5] C. E. Luis and A. P. Schoellig, “Trajectory generation for multiagent point-to-point transitions via distributed model predictive control,” IEEE Robot. Autom. Lett. , vol. 4, no. 2, pp. 375–382, 2019. [6] J. Tordesillas and J. P. How, “MADER: Trajectory planner in multiagent and dynamic environments,” IEEE Trans. Robot. , vol. 38, no. 1, pp. 463– 476, 2021. [7] X. Zhou, X. Wen, Z. Wang, Y. Gao, H. Li, Q. Wang, T. Yang, H. Lu, Y. Cao, C. Xu et al. , “Swarm of micro flying robots in the wild,” Sci. Robot. , vol. 7, no. 66, p. eabm5954, 2022. [8] B. S ¸ enbas ¸lar, W. H¨ onig, and N. Ayanian, “RLSS: real-time, decen-tralized, cooperative, networkless multi-robot trajectory planning using linear spatial separations,” Auton. Robots , vol. 47, no. 7, pp. 921–946, 2023. [9] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Trans. Robot. , vol. 34, no. 6, pp. 1603– 1622, 2018. [10] B. Vlahov, J. Gibson, M. Gandhi, and E. A. Theodorou, “MPPI-Generic: A cuda library for stochastic trajectory optimization,” arXiv preprint arXiv:2409.07563 , 2024. [11] J. Sohl-Dickstein, E. Weiss, N. Maheswaranathan, and S. Ganguli, “Deep unsupervised learning using nonequilibrium thermodynamics,” in Proc. Int. Conf. Mach. Learn. , 2015. [12] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” in Adv. Neural Inf. Process. Syst. , 2020. [13] M. Janner, Y. Du, J. B. Tenenbaum, and S. Levine, “Planning with diffusion for flexible behavior synthesis,” in Proc. Int. Conf. Mach. Learn. , 2022. [14] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” Int. J. Robot. Res. , vol. 44, no. 10-11, pp. 1684–1704, 2023. [15] J. Carvalho, A. T. Le, M. Baierl, D. Koert, and J. Peters, “Motion plan-ning diffusion: Learning and planning of robot motions with diffusion models,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. , 2023. [16] C. Pan, Z. Yi, G. Shi, and G. Qu, “Model-based diffusion for trajectory optimization,” in Adv. Neural Inf. Process. Syst. , 2024. [17] H. Xue, C. Pan, Z. Yi, G. Qu, and G. Shi, “Full-order sampling-based mpc for torque-level locomotion control via diffusion-style annealing,” in Proc. IEEE Int. Conf. Robot. Autom. , 2025. [18] Y. Zhang, K. Okumura, H. Woo, A. Shankar, and A. Prorok, “D4orm: Multi-robot trajectories with dynamics-aware diffusion denoised defor-mations,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. , 2025. [19] R. Stern, N. Sturtevant, A. Felner, S. Koenig, H. Ma, T. Walker, J. Li, D. Atzmon, L. Cohen, T. Kumar et al. , “Multi-agent pathfinding: Definitions, variants, and benchmarks,” in Proc. Int. Symp. Comb. Search , 2019. [20] J. Li, Z. Chen, D. Harabor, P. J. Stuckey, and S. Koenig, “MAPF-LNS2: Fast repairing for multi-agent path finding via large neighborhood search,” in Proc. AAAI Conf. Artif. Intell. , 2022. [21] K. Okumura, “Engineering LaCAM*: Towards real-time, large-scale, and near-optimal multi-agent pathfinding,” in Proc. Int. Conf. Auton. Agents Multiagent Syst. , 2024. [22] K. Solovey, O. Salzman, and D. Halperin, “Finding a needle in an exponential haystack: Discrete RRT for exploration of implicit roadmaps in multi-robot motion planning,” Int. J. Robot. Res. , vol. 35, no. 5, pp. 501–513, 2016. [23] I. Solis, J. Motes, R. Sandstr¨ om, and N. M. Amato, “Representation-optimal multi-robot motion planning using conflict-based search,” IEEE Robot. Autom. Lett. , vol. 6, no. 3, pp. 4608–4615, 2021. [24] J. Kottinger, S. Almagor, and M. Lahijanian, “Conflict-based search for multi-robot motion planning with kinodynamic constraints,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. , 2022. [25] K. Okumura and X. D´ efago, “Quick multi-robot motion planning by combining sampling and search,” in Proc. Int. Joint Conf. Artif. Intell. ,2023. [26] F. Augugliaro, A. P. Schoellig, and R. D’Andrea, “Generation of collision-free trajectories for a quadrocopter fleet: A sequential convex programming approach,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. , 2012. [27] A. Kushleyev, D. Mellinger, C. Powers, and V. Kumar, “Towards a swarm of agile micro quadrotors,” Auton. Robots , vol. 35, no. 4, pp. 287–300, 2013. [28] V. K. Adajania, S. Zhou, A. K. Singh, and A. P. Schoellig, “AMSwarm: An alternating minimization approach for safe motion planning of quadrotor swarms in cluttered environments,” in Proc. IEEE Int. Conf. Robot. Autom. , 2023. [29] A. Tajbakhsh, L. T. Biegler, and A. M. Johnson, “Conflict-based model predictive control for scalable multi-robot motion planning,” in Proc. IEEE Int. Conf. Robot. Autom. , 2024. [30] L. Streichenberg, E. Trevisan, J. J. Chung, R. Siegwart, and J. Alonso-Mora, “Multi-agent path integral control for interaction-aware motion planning in urban canals,” in Proc. IEEE Int. Conf. Robot. Autom. , 2023. [31] E. Trevisan and J. Alonso-Mora, “Biased-MPPI: Informing sampling-based model predictive control by fusing ancillary controllers,” IEEE Robot. Autom. Lett. , vol. 9, no. 6, pp. 5871–5878, 2024. [32] C. Jiang, “Distributed sampling-based model predictive control via belief propagation for multi-robot formation navigation,” IEEE Robot. Autom. Lett. , vol. 9, no. 4, pp. 3467–3474, 2024. [33] S. Dergachev and K. Yakovlev, “Decentralized uncertainty-aware multi-agent collision avoidance with model predictive path integral,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. , 2025. [34] R. Rombach, A. Blattmann, D. Lorenz, P. Esser, and B. Ommer, “High-resolution image synthesis with latent diffusion models,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. , 2022. 20 IEEE TRANSACTIONS ON ROBOTICS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2026 
+
+[35] C. Jiang, A. Cornman, C. Park, B. Sapp, Y. Zhou, D. Anguelov et al. ,“MotionDiffuser: Controllable multi-agent motion prediction using dif-fusion,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. , 2023. [36] Y. Shaoul, I. Mishani, S. Vats, J. Li, and M. Likhachev, “Multi-robot motion planning with diffusion models,” in Proc. Int. Conf. Learn. Represent. , 2025. [37] J. Liang, J. K. Christopher, S. Koenig, and F. Fioretto, “Simultaneous multi-robot motion planning with projected diffusion models,” in Proc. Int. Conf. Mach. Learn. , 2025. [38] J. Liang, S. Koenig, and F. Fioretto, “Discrete-guided diffusion for scalable and safe multi-robot motion planning,” arXiv preprint arXiv:2508.20095 , 2025. [39] Y. Song, J. Sohl-Dickstein, D. P. Kingma, A. Kumar, S. Ermon, and B. Poole, “Score-based generative modeling through stochastic differ-ential equations,” in Proc. Int. Conf. Learn. Represent. , 2021. [40] S. Chan et al. , “Tutorial on diffusion models for imaging and vision,” 
+
+Found. Trends Comput. Graph. Vis. , vol. 16, no. 4, pp. 322–471, 2024. [41] S. Ioffe and C. Szegedy, “Batch normalization: accelerating deep net-work training by reducing internal covariate shift,” in Proc. Int. Conf. Mach. Learn. , 2015. [42] J. Bradbury et al. , “JAX: composable transformations of Python+NumPy programs,” 2018. [Online]. Available: http://github.com/jax-ml/jax [43] H. Woo, K. R. I. Sanim, K. Okumura, G. Yang, A. Shankar, and A. Pro-rok, “Sanity: An agile brushless quadrotor for multi-agent experiments,” OpenReview: https://openreview.net/forum?id=i5dKOANPZZ, 2025. [44] Z. I. Botev, D. P. Kroese, R. Y. Rubinstein, and P. L’Ecuyer, “The cross-entropy method for optimization,” in Handbook of Statistics . Elsevier, 2013, vol. 31, pp. 35–59. [45] M. Kelly, “An introduction to trajectory optimization: How to do your own direct collocation,” SIAM Rev. , vol. 59, no. 4, pp. 849–904, 2017. [46] A. W¨ achter and L. T. Biegler, “On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming,” 
+
+Math. Program. , vol. 106, no. 1, pp. 25–57, 2006. [47] G. Sharon, R. Stern, A. Felner, and N. R. Sturtevant, “Conflict-based search for optimal multi-agent pathfinding,” Artif. Intell. , vol. 219, pp. 40–66, 2015. [48] T. Kato, K. Okumura, Y. Sasaki, and N. Yokomachi, “Congestion mitigation path planning for large-scale multi-agent navigation in dense environments,” IEEE Robot. Autom. Lett. , vol. 10, no. 10, pp. 9742– 9749, 2025. [49] J. Blumenkamp, A. Shankar, M. Bettini, J. Bird, and A. Prorok, “The cambridge robomaster: An agile multi-robot research platform,” in Proc. Int. Symp. Distrib. Auton. Robot. Syst. , 2024.

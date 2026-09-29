@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-28</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-29</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 13 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>7</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-29 00:05:19 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-29 22:49:05 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日汇总4篇机器人论文，精读3篇、速读1篇，多机器人规划成为焦点。最值得看的是两篇9分精读：MR. POP多机器人并行优化规划器，以及网格及更广场景的无碰撞移动。普通读者可优先读这两篇，再速览6分的LLM多机器人系统中受操纵主张的行为级联控制。</p>
+<p>今日扫完13篇推荐（精读6、速读7），焦点落在多智能体协同、路径规划与去噪决策。</p>
+<p>最值得先看两篇9分精读：《Decentralized Master-Mind》的迭代意图去噪，以及《Residual Denoising》的样本高效多智能体协同。</p>
+<p>普通读者可先读这两篇，再按兴趣选速读中的通信感知异构图任务分配（8.0）或机器人操作世界动作排练（6.0）。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MR. POP: Multi-Robot Parallel Optimizing Planner for Almost-Surely Asymptotically Optimal Planning">MR. POP: Multi-Robot Parallel Optimizing Planner for Almost-Surely Asymptotically Optimal Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Collision-free Movement on Grids and Beyond">Collision-free Movement on Grids and Beyond</span></li><li><span class="dpr-home-dashboard-paper-title" title="MA-WAM: Multi-Agent World-Action Model for Test-Time Planning">MA-WAM: Multi-Agent World-Action Model for Test-Time Planning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Decentralized Master-Mind: Joint Action Refinement through Iterative Intent Denoising in Multi-Agent Pathfinding">Decentralized Master-Mind: Joint Action Refinement through Iterative Intent Denoising in Multi-Agent Pathfinding</span></li><li><span class="dpr-home-dashboard-paper-title" title="Residual Denoising Enables Sample-Efficient Multi-Agent Coordination on Demand">Residual Denoising Enables Sample-Efficient Multi-Agent Coordination on Demand</span></li><li><span class="dpr-home-dashboard-paper-title" title="Hierarchical Multi-agent Reinforcement Learning for Warehouse Robot Coordination under Communication Loss">Hierarchical Multi-agent Reinforcement Learning for Warehouse Robot Coordination under Communication Loss</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">7 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Containing Behavioral Cascades from Manipulated Claims in LLM-Powered Multi-Robot Systems">Containing Behavioral Cascades from Manipulated Claims in LLM-Powered Multi-Robot Systems</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Communication-Aware Heterogeneous Graph Learning for Decentralized Multi-Human Multi-Robot Task Allocation">Communication-Aware Heterogeneous Graph Learning for Decentralized Multi-Human Multi-Robot Task Allocation</span></li><li><span class="dpr-home-dashboard-paper-title" title="MA-FPPO: Multi-Agent Flow-Pretrained Policy Optimization">MA-FPPO: Multi-Agent Flow-Pretrained Policy Optimization</span></li><li><span class="dpr-home-dashboard-paper-title" title="World Action Agent: Harnessing VLMs for Robot Manipulation via World Action Rehearsal">World Action Agent: Harnessing VLMs for Robot Manipulation via World Action Rehearsal</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>7</strong></span></div>
 </section>
 </div>
 
