@@ -1,0 +1,558 @@
+Title: Containing Behavioral Cascades from Manipulated Claims in LLM-Powered Multi-Robot Systems
+
+URL Source: https://arxiv.org/pdf/2609.30523v1
+
+Published Time: Mon, 28 Sep 2026 00:20:46 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Containing Behavioral Cascades from Manipulated Claims in LLM-Powered Multi-Robot Systems 
+
+Waleed Bin Khalid and Byung-Cheol Min 
+
+Abstract — Large language model (LLM)-powered multi-robot systems are vulnerable to semantic manipulation: an ac-cepted false world-state claim can trigger a fleet-wide behavioral cascade, causing unnecessary replanning, increased path costs, congestion, or apparent mission infeasibility. Conditioning on a successful manipulation, we propose an active verification framework that contains its downstream effects before they propagate across the fleet. A dedicated verification module generates a structured Verify–Adapt–Hold plan: selected robots inspect consequential regions, a limited subset provisionally adapts when necessary, and the remaining robots retain their trusted plans. We evaluate the framework in a multi-robot transportation environment using injected false obstacle claims across different impacts and team sizes. Evaluation measures cascade containment, Sum-of-Costs, makespan, and coverage ratio. Results show that treating post-compromise verification as a team-level planning problem, rather than a binary trust decision, effectively limits the cascading physical consequences of semantic manipulation. Additional materials are available at https://sites.google.com/view/vahframework. 
+
+I. I NTRODUCTION 
+
+Large language models (LLMs) increasingly serve as high-level robotic planners that translate natural-language instruc-tions and world-state descriptions into structured task and coordination decisions [1]–[4]. In multi-robot systems, LLM-based planners can decompose tasks, form robot coalitions, allocate tasks across the fleet, and generate structured multi-robot plans [5]. However, malicious inputs or compromised external obser-vations can manipulate the reasoning and actions of LLM-based systems [6]–[8]. When such a system serves as a robot planner, the resulting decisions can alter the behavior of one or more robots. In a shared reservation-based planner, the effects may then propagate beyond robots whose trajectories intersect the claimed region: rerouting one robot can alter the feasible paths available to robots planned after it. We call this fleet-wide propagation of claim-induced behavior a 
+
+behavioral cascade . Such cascades can cause unnecessary replanning, increased path costs, and mission infeasibility. Semantic manipulation can arise through direct or indi-rect prompt injection [6, 7], malicious triggers introduced through external observations [8], adversarial perturbations to language inputs [9], cyber attacks that corrupt or disrupt communication in multi-robot systems [10, 11], or operator error. Despite their different origins, these mechanisms can 
+
+Waleed Bin Khalid and Byung-Cheol Min are with the SMART Lab, Department of Computer Science, Luddy School of Informatics, Computing, and Engineering, Indiana University Bloomington, Bloomington, IN, USA. Corresponding authors: Waleed Bin Khalid and Byung-Cheol Min (e-mail: 
+
+{wakhalid,minb }@iu.edu). LLM                              
+
+> False obstacle report Compromised operator O(LLM) Obstacle set X
+> (unverified)
+> (a) Naive replan: behavioral cascade (b) Verify-Adapt-Hold (ours)
+> Claimed X
+> G1 G2 G3
+> R1 R2 R3
+> Replan Replan Replan
+> All robots replan with Xas walls. Shared reservations also displace R3, whose path never even touches X.
+> u
+> G1 G2 G3
+> R1 R2 R3
+> Verify Adapt Hold
+> R1 scans Xfrom stand-off uand then continues. R2 detours provisionally until the scan resolves X
+> R3 keeps its trusted path.
+> Nominal path Replanned Verify Adapt Hold
+> !
+
+Fig. 1: (a) Under Naive Replan, all robots treat the false obstacle claim X as blocked and replan, propagating route changes even to robots whose paths do not intersect X .(b) Under Verify–Adapt–Hold, a selected robot verifies the claim from a stand-off, threatened robots provisionally adapt around unresolved claimed cells, and unaffected robots retain their trusted trajectories until physical evidence resolves the claim. 
+
+introduce incorrect information into downstream decision making. In a coupled multi-robot planning system, the re-sulting effects propagate beyond the directly affected robot. Existing language-model security research has charac-terized manipulation and jailbreak vulnerabilities [12] and proposed or benchmarked defenses against them [13, 14]. However, the downstream response after a semantic ma-nipulation succeeds remains underexplored. In particular, it remains unclear how a robot team should acquire physical evidence while continuing its mission and limiting unneces-sary behavioral propagation. Figure 1 illustrates the behavioral cascade and our pro-posed response. Instead of either accepting and replanning or ignoring an untrusted claim, we formulate the response as a team-level planning problem. Our Verify–Adapt–Hold 
+
+framework treats the claim as provisional: selected robots verify consequential regions, robots whose trusted trajecto-ries conflict with unresolved claims provisionally adapt, and unaffected robots continue their existing plans. This paper conditions on a successful manipulation of the high-level LLM planner and focuses on its consequences. The main contributions of this paper are:  
+
+> •
+
+We formulate post-compromise handling of manipulated world-state claims in LLM-powered multi-robot sys-tems as a team-level planning problem and introduce a 
+
+Verify–Adapt–Hold framework that jointly coordinates verification and mission execution.  
+
+> •
+
+We develop a decision-relevance-aware verification arXiv:2609.30523v1 [cs.RO] 24 Sep 2026 strategy that uses LLM reasoning to select verification actions based jointly on the potential mission impact of claimed regions and current robot trajectories. This prioritizes consequential claims while minimizing dis-ruption to ongoing mission execution.  
+
+> •
+
+We extensively evaluate the framework across mul-tiple team sizes and claim-impact scenarios against immediate-replanning and verification-first baselines. Using cascade containment, mission cost, makespan, and coverage, the results show that the framework contains behavioral cascades while preserving mission progress and verification coverage. II. RELATED WORK 
+
+Foundation Models in Robot Planning: Foundation models serve as direct policy generators or high-level rea-soners for robotic execution [1, 2, 15], translating natural-language instructions into structured plans or executable programs [3, 16, 17]. In multi-robot systems, LLM-based planning has been explored under centralized, decentralized, and collaborative coordination architectures [5, 18]–[20]. Large-scale warehouse systems similarly require fleet-level task, routing, and coordination mechanisms [21, 22]. Our framework adopts a centralized high-level operator for task allocation and A∗ for trajectory execution, augmented by a verification module at the planning level that leaves alloca-tion logic unchanged. 
+
+Semantic Manipulation: Foundation-model planners are vulnerable to adversarial inputs that redirect their reason-ing [6, 7, 9], including direct and indirect prompt injec-tion through malicious instructions or externally supplied content [6, 7]. LLM-based agents are also vulnerable to malicious triggers appearing in user queries or intermediate observations returned by the environment [8]. Existing work has characterized jailbreak vulnerabilities [12] and proposed or benchmarked defenses such as randomized input perturbation and prompt-injection countermeasures [13, 14]. These defenses reduce, but do not eliminate, successful manipulation. Our work complements them by containing the physical consequences after a false claim has been accepted. 
+
+Authority-Framed Manipulation: Recent work shows that LLMs are susceptible to persuasive framing, including appeals to authority and expert endorsement, which can increase compliance with otherwise restricted requests [23, 24]. Authority cues can therefore constitute a manipulation surface when an unverified claim is presented as originating from a credible expert or official. Related work has further demonstrated authority-citation-driven jailbreak attacks that exploit LLMs’ tendency to assign greater trust to apparently authoritative information [25]. In this work, we instantiate this threat by presenting a false obstacle report as originating from an apparent safety authority. We condition on the operator accepting the claim and study containment of its downstream physical effects. 
+
+Behavioral Cascades in Multi-Robot Systems: Multi-robot path planning couples robot trajectories through collision-avoidance constraints, so the feasible path of one robot can depend on the paths assigned to others [26, 27]. In our shared reservation-based planner, this coupling creates a mechanism through which replanning one robot can constrain robots planned afterward, including robots whose trajectories do not directly intersect the perturbed region. LLM-based multi-robot planning has also demonstrated the ability to coordinate decisions across multiple robots [18, 19]. However, the downstream propagation of behavior after a high-level operator accepts a manipulated world-state claim remains underexplored, and our work targets this gap. 
+
+Verification, Trust, and Active Perception: Runtime-assurance frameworks can monitor safety conditions during execution and switch from high-performance components to verified-safe behavior when necessary [28]. Related formal-safety work has studied formally verified exploration [29] and formal specification of learned components [30]. Active perception directs sensing and motion to reduce uncertainty about the environment [31]. Our work combines these ideas by directing robots toward unverified claim regions, gener-ating structured assignments that preserve mission progress, and re-invoking the module only when new physical evidence arrives. III. P ROBLEM FORMULATION 
+
+The mission is a multi-robot warehouse transportation task in which each robot collects an assigned resource from a pickup location and delivers it to a designated drop-off. The mission only succeeds when all robots deliver their resources. 
+
+A. Environment and Fleet 
+
+The warehouse is a finite two-dimensional grid of cells with width W and height H, represented by G =
+
+{0, . . . , W − 1} × { 0, . . . , H − 1}. A ground-truth occupancy map labels each cell c as either free floor or physically occupied by a boundary wall, shelf, or pillar: 
+
+Gtrue (c) = 
+
+(
+
+0, if c is free ,
+
+1, if c is physically occupied . (1) The set of free cells is F = {c ∈ G : Gtrue (c) = 0 }.Pickup and drop-off cells are represented by P and D,respectively, where P, D ⊆ F. Multiple robots share a pickup location, but each robot has its own unique drop-off location. Both pickup and drop-off cells are traversable free cells. Time advances in discrete steps indexed by t.The fleet consists of N homogeneous robots, R =
+
+{R0, . . . , R N −1}, with positions pi(t) ∈ F , where pi(t)̸ =
+
+pj (t) for all i̸ = j. Motion is 4-connected, with waiting allowed and no diagonal motion. Each robot can carry one resource during its journey. A robot Ri can observe a cell c
+
+only if ∥c − pi(t)∥∞ ≤ ρ, where ρ is the Chebyshev sensing radius, and the line of sight from pi(t) to c is unobstructed. For robot Ri, let si ∈ P denote its assigned pickup location and gi ∈ D its assigned drop-off location. Hence, its nominal mission at t = 0 is pi(0) → si → gi.B. Shared Space-Time Planner 
+
+Let γi = (( pi(t0), t 0), . . . , (pi(tf ), t f )) denote robot Ri’s planned space-time trajectory from time t0 to tf . The fleet uses one shared reservation table Z = ( ZV , ZE ), which records occupied cell-time pairs and transitions: 
+
+ZV = {(pj (t), t ) | γj has been reserved } ,
+
+ZE = {(pj (t), p j (t + 1) , t ) | γj has been reserved } . (2) These sets include all states and consecutive transitions of the reserved trajectories. Robots are planned sequentially, and Z<i denotes the contents of the shared table immediately before Ri is planned, where < i refers to planning order rather than robot index. The table is initially empty for the nominal plan, and each generated trajectory is reserved be-fore planning the next robot. During replanning, trajectories that remain fixed are reserved first. Let ai denote robot Ri’s assignment, including its pickup 
+
+si, drop-off gi, current role, and stand-off when applicable. Let Fplan  
+
+> i
+
+denote the cells currently treated as traversable. Let STP denote the shared space-time planner. Starting at 
+
+pi(t0), the planner returns, when feasible, 
+
+γi = STP 
+
+
+
+(pi(t0), t 0), a i, Fplan  
+
+> i
+
+, Z<i 
+
+
+
+. (3) The returned trajectory satisfies the remaining assignment and existing reservations. Its states and transitions satisfy 
+
+pi(t) ∈ Fplan  
+
+> i
+
+and ∥pi(t + 1) − pi(t)∥1 ≤ 1, allowing 4-neighbor movement or waiting. Conflicts with reserved trajectories are prevented by requiring (pi(t), t ) /∈ Z V<i and 
+
+(pi(t + 1) , p i(t), t ) /∈ ZE<i . The planner determines only trajectory geometry and timing; it does not modify ai and reports failure if no feasible trajectory is found. 
+
+C. Compromised Operator and Threat Model 
+
+A language-model operator O has two roles in managing the shared world state. At t = 0 , it produces the mission allo-cation by assigning each robot Ri a resource type τ , a pickup location si ∈ P , and a drop-off location gi ∈ D . Because the allocation is not the object of study, one matching is fixed and reused across all methods and iterations. At a later time 
+
+tH , O receives and responds to incoming messages, creating a channel through which malicious inputs can compromise its behavior [6]–[8]. Although manipulation can occur through multiple chan-nels, we instantiate it using an authority-framed prompt that asserts, without supporting physical evidence, a finite set of obstacle cells X ⊂ F . We condition on successful manipulation so the operator accepts the claim. The planner treats X as blocked when replanning against the claim, but 
+
+X is never written to Gtrue . Physical scans return Gtrue (c),allowing any robot that observes a claimed cell to provide evidence. 
+
+D. Claim Clusters and Impact 
+
+X is partitioned into maximal 4-connected clusters Q,where each q ∈ Q receives a binary impact value based on the remaining jobs at tH : I(q) = 1 if q intersects a remaining trajectory, and I(q) = 0 otherwise. Clusters with I(q) = 1 
+
+are prioritized for inspection. A cluster is marked seen when all its cells have been observed. IV. M ETHODOLOGY 
+
+After the operator O accepts a manipulated claim at tH ,our objective is to contain the physical consequences of its compromised belief while preserving mission progress. We treat X as a provisional obstacle set and coordinate its verification with the remaining transportation tasks. Robots receive one of three roles: Verify robots gather physical evidence to resolve claimed cells in X ; Adapt robots pro-visionally reroute around unresolved claimed cells when necessary to maintain mission progress; and Hold robots continue their trusted trajectories when immediate replanning is unnecessary. These roles allow verification and mission execution to proceed together while limiting unnecessary changes across the fleet. Let V denote the verification module that produces the Verify–Adapt–Hold assignments. The original external mes-sage is received only by O and is not passed directly to 
+
+V. This separation limits direct exposure to that message but does not guarantee correct verification assignments. Figure 2 shows the overall framework. 
+
+A. Unresolved Claims and Physical Evidence 
+
+The sets X and Q retain the original claimed cells and their clusters. Let Xt ⊆ X contain the claimed cells that remain unobserved after the scans at time t. Let St ⊆ X 
+
+contain the claimed cells observed by at least one robot at that time, according to the sensing range and line-of-sight conditions in Sec. III. Then 
+
+Xt =
+
+(
+
+X \ S t, t = tH ,
+
+Xt−1 \ S t, t > t H . (4) Each scan supplies Gtrue (c), and its evidence is committed before any new role decision. In the evaluated setting, X ⊆ F, so observed claimed cells are confirmed free and their provisional blocking status is removed. The claim itself never changes Gtrue .The unresolved clusters are Qt = {q ∈ Q : q ∩ X t̸ = ∅}.For a cluster q, only the cells in q∩X t still require inspection. Its original identity and impact I(q) are retained; it leaves Qt
+
+only when all its cells have been observed. Thus, Xt shrinks as cells are scanned, while Qt shrinks as clusters are fully resolved. 
+
+B. Verify–Adapt–Hold Assignment 
+
+Each call to V uses a fresh prompt with no chat history. Let X obs  
+
+> t
+
+= X \ X t denote the claimed cells observed up to time t. Let Lt denote the available robot scans and Ct
+
+denote the candidate stand-off information, including the unresolved cells visible from each stand-off, its reachability, and its geometric A∗ distance for each robot. Reachability is computed with Xt and parked robots treated as walls. For the current call, let Rupd  
+
+> t
+
+⊆ R denote the robots re-quiring assignment updates, and let anew  
+
+> i
+
+denote the returned assignment for robot Ri. For a robot assigned Verify , let 
+
+ui ∈ F \ X t denote its assigned stand-off and Wi ⊆ X t
+
+its watch set, containing the unresolved claimed cells it is assigned to observe. Its returned assignment is 
+
+anew  
+
+> i
+
+= ( si, g i, Verify , u i, Wi). (5) Malicious input:  prompting the addition of fake obstacles                                                   
+
+> Compromised Operator (LLM):
+> • generates a one-time mission allocation, fixed for all methods
+> • accepts the claim and proposes as an occupancy set
+> (successful manipulation is assumed)
+> •is never written to
+> Clusters and impact :is split into maximal 4-
+> connected clusters with a binary impact
+> :— on a remaining trajectory
+> :— off every remaining trajectory
+> :— on a remaining trajectory
+> Prompt to (fresh each call, no history)
+> •: claimed cells proposed by
+> •: claimed cells already observed
+> •: unresolved clusters and their impact
+> •: remaining trajectories and assignments
+> •: robot scans and inspection progress
+> •: stand-offs, visible cells, reachability, distances
+> •: steps before a trusted path reaches
+> •: robots to be (re)assigned
+> Verification Module (LLM)
+> Reasons over physical evidence gathered by the robots, the fleet’s mission state, and the
+> claimed cells to produce a Verify–Adapt–Hold assignment
+> VERIFY — inspector
+> stand-off , watch set
+> HOLD — keep the trusted path
+> continue ; requires
+> ADAPT — provisional reroute
+> replan with blocked;
+> REST — stay in place
+> reserved for the close event (E3)
+> Assignment
+> • Initial call: so every robot receives a Verify, Adapt or Hold role
+> • Later calls: contains only the robots that triggered the event
+> Sample Output of :one role per robot
+> Verify rows also name a stand-off and a watch
+> set
+> Robot Role Why this robot gets this role
+> Verify is the stakeholder of the unseen
+> cluster () and has a
+> reachable stand-off 3 steps away;
+> Adapt would enter before can
+> inspect it ( ), so it reroutes
+> around
+> Hold ’s remaining path never touches (
+> ), so it keeps its trusted
+> trajectory
+> Hold ’s only nearby cluster is off every
+> path ( ); deferred to close
+> rather than pulling off its job
+> Environment and Fleet
+> Evidence Commit and Events
+> (checked every step)
+> E0: Incidental scan
+> E1: Verify watch resolved
+> E2: Robot drop-off
+> E3: Close
+> Space-time
+> A* planner
+> malicious message
+> proposed occupancy set
+> clusters
+> prompt
+> assignment
+> E1 / E3 call
+> sensing information
+> trajectories
+> task allocation (fixed)
+
+Fig. 2: Overview of the proposed framework: A malicious input leads the compromised operator O to accept fake obstacles X and propose them as an occupancy set, which is never written to the trusted map. The verification module V, reasons over available physical evidence to produce a Verify–Adapt– Hold assignment (with Rest reserved for the close step). The initial call assigns every robot a verify, adapt or hold role and later calls reassign only the robots that triggered an event. A space-time A∗ planner executes the assignment. 
+
+Assignments for the other roles retain si and gi and specify the selected role without a verification stand-off or watch set. The module produces 
+
+V
+
+
+
+X , X obs 
+
+t , {(q, I (q)) }q∈Q t ,
+
+{(γi, a i)}Ri∈R , Lt, Ct, Rupd 
+
+t
+
+
+
+= {anew 
+
+i }Ri∈R upd 
+
+> t
+
+.
+
+(6) Initially, Rupd 
+
+t = R; subsequent calls update only the robots associated with the triggering event. 
+
+Verify. The assigned stand-off ui must be reachable by robot 
+
+Ri, and stand-offs assigned to different verifiers must be distinct. Every cell in Wi must lie within sensing range of ui
+
+and have an unobstructed line of sight from it. On the initial call, each unresolved cluster q ∈ Q t with I(q) = 1 receives a dedicated verifier satisfying q ∩ X t ⊆ W i ⊆ X t. Resolved clusters require no verifier, while clusters with I(q) = 0 are deferred to the close event. 
+
+Hold and Adapt. At a decision time t, let k ≥ 0 index the remaining integer steps on a robot’s trusted trajectory γi. The number of steps before that trajectory first reaches an unre-solved claimed cell is Ki = min {k ≥ 0 : pi(t + k) ∈ X t}.Set Ki = ∞ when the set is empty. Let T denote the longest travel time to a stand-off among the selected inspectors, with T = 0 when no inspector is required. For robots not assigned Verify , the timing conditions are Hold : Ki > T 
+
+and Adapt : Ki ≤ T .
+
+Hold preserves the trusted trajectory. If Ki is finite, this choice also requires the relevant unresolved cells to be as-signed for inspection. Adapt continues the remaining mission along a replanned trajectory that treats Xt as blocked. Thus, holding means continuing the trusted plan, while adaptation introduces a provisional detour. 
+
+C. Event-Driven Role Updates 
+
+After the initial assignment, the program checks four events at each step. Let Jt ⊆ R denote the robots whose pickup-and-delivery tasks remain incomplete at time t. Scan evidence and the resulting occupancy update are processed before any event-driven model call. Only E1 and E3 call V.Throughout a robot’s current Verify assignment, its watch set 
+
+Wi is retained, while Wi ∩X t tracks the cells that still require observation. 
+
+E0: Incidental scan. Any robot, whether assigned Verify ,
+
+Hold , or Adapt , can provide new evidence through its scans. Using the observed-cell set St, new evidence about the claim is obtained when St ∩ X t−1̸ = ∅. This means that at least one previously unresolved claimed cell has been observed. If these observations complete no active verifier’s watch set, the update is handled as E0. The remaining trajectories are replanned using the updated occupancy state, with every assignment ai preserved and no call to V. If a verifier’s watch set is completed, E1 applies to that verifier, regardless of which robot supplied the observations. 
+
+E1: Verify watch resolved. For a robot currently assigned 
+
+Verify , its watch is resolved when Wi ∩ X t = ∅. The observations may come from the inspector itself or another robot. The module is called for that inspector, with Rupd 
+
+t =
+
+{Ri}. The returned assignment anew 
+
+i assigns it Adapt to resume any unfinished part of its stored mission. 
+
+E2: Robot drop-off. A holding or adapting robot completes its task while other tasks remain when Ri ∈ J t−1 \ J t and 
+
+Jt̸ = ∅. It then becomes idle without a model call. Off-path clusters are left for the close event instead of immediately dispatching the completed robot. 
+
+E3: Close. Let J blocked 
+
+t ⊆ Jt contain robots whose remaining pickup-and-delivery route is unreachable when 
+
+Xt is treated as walls. This concerns spatial reachability; temporary space-time reservation conflicts are handled by the planner. The close event applies when Xt̸ = ∅ and 
+
+(Jt = ∅ or J blocked 
+
+t̸ = ∅).This allows inspection after delivery is complete or inspec-tion needed to release a mission blocked by an unresolved claim, such as a sealed drop-off. The module is called with the robots requiring closing assignments in Rupd  
+
+> t
+
+. Idle robots are assigned first; if none are available, the enclosed robots inspect the region themselves. At the close step, at most one robot is assigned to an unresolved cluster with I(q) = 0 .
+
+Rest is an additional role available only at the close event and is assigned to robots that are not sent for verification. After each model call, the returned assignments are merged with the retained assignments and validated before execution. For each Ri ∈ R upd  
+
+> t
+
+, the current assignment ai
+
+is replaced by anew  
+
+> i
+
+. All other robots retain their existing assignments. 
+
+D. Execution with the Shared Planner 
+
+We implement the space-time planner using A∗. Following the initial assignment, Hold trajectories are reserved first. The planner then generates trajectories for Verify and Adapt 
+
+robots, treating unresolved claimed cells as blocked for those roles. After an assignment change, only the affected robots receive new trajectories; all other trajectories are fixed and reserved first. Following a scan that changes Xt,all remaining trajectories are replanned against the updated occupancy state. An Adapt detour can therefore shorten as false claims are resolved. If repeated reservations prevent progress, the planner re-tries the same assignments with a different planning order. An assignment that remains infeasible under the current obstacles and reservations is returned to the module, which may propose another assignment for a bounded number of attempts. The planner changes trajectory geometry and timing; it never changes the assignment ai itself. V. E XPERIMENTS 
+
+Table I summarizes the experimental setup. The mission allocation generated by O remains fixed throughout each experimental run. Figure 3 shows a layout of the warehouse at time tH for N = 12 .                     
+
+> TABLE I: Experimental setup.
+> Parameter Configuration
+> Team size N∈ { 3,6,9,12 }
+> Warehouse layout Fixed across all experiments Grid Size 48 by 28
+> Pickup locations |P| = 3
+> Drop-off locations |D| =N, with one unique drop-off per robot Resources per pickup N/ 3
+> Sensing ρ= 2
+> Operator model gpt-oss-120b
+> Verification model gpt-oss-120b
+
+Claim Categories. We consider four claim categories span-ning a controlled impact range: Low , High , Mixed , and Kill .Each (N, category ) combination has M = 15 successful repetitions. Let Tnom denote the nominal makespan, defined as the number of steps required to complete all jobs without a claim. The injection time tH is sampled uniformly from 
+
+{1, . . . , ⌊Tnom /5⌋} , corresponding to the first fifth of the nominal mission. At tH , the false obstacle set X is generated and injected. This window allows a behavioral cascade to develop and each method to respond. Within each repetition, all methods use the same state and X .           
+
+> Fig. 3: Warehouse simulation environment at time tHfor N= 12 .S0,
+> S1, and S2denote the pickup stations, with four robots assigned to each station. Robots labeled with a letter have already collected their assigned resource. Red cells marked with ×represent the claimed obstacle set X.Each robot’s drop-off location is indicated by the same color as the robot.
+
+1) Low. One isolated obstacle cell is placed on the trajec-tories of k ∼ Unif {1, . . . , N } robots selected without replacement. 2) High. One straight obstacle stick of length ℓ ∼
+
+Unif {2, . . . , 5} is placed on every robot’s trajectory. 3) Mixed. The claim combines on-trajectory isolated ob-stacles and sticks with off-trajectory obstacles. The numbers of isolated obstacles and sticks, (ks, k m), are sampled uniformly from the admissible integer pairs satisfying 0 ≤ ks, k m ≤ ⌈ N/ 2⌉ and 1 ≤ ks + km ≤ N .It also includes mn ∼ Unif {1, . . . , ⌈N/ 2⌉} near-path obstacles and mf ∼ Unif {0, . . . , ⌈N/ 2⌉} far, wall-adjacent obstacles. Near-path obstacles may constrain passage, whereas far obstacles affect no remaining trajectory. By combining consequential and nonconse-quential obstacles, this category tests whether a method prioritizes verification of mission-threatening obstacles. Figure 3 shows an instance of mixed obstacles injection. 4) Kill. A count k ∼ Unif {1, . . . , N } is sampled, and 
+
+k robots with undelivered jobs are selected without replacement. Their drop-off goals are then sealed by claimed obstacle cells. 
+
+A. Baselines 
+
+Every method is evaluated from the same fleet state at tH ,with same X , and remaining mission. 
+
+Nominal. This is the no-claim reference. Each robot finishes its mission without incorporating X .
+
+Naive Replan. This method accepts all claimed cells as walls, setting Fplan  
+
+> i
+
+= F \X for every robot. Figure 3 shows the rerouting around X under naive replan. 
+
+Verification-First. This method selects inspectors through greedy set cover over the candidate stand-offs. Let Vis( u) ⊆X denote the claimed cells visible from stand-off u under the sensing model, and let di(u) denote the geometric A∗
+
+distance from robot Ri to u.Let U contain the cells not yet covered by the selected inspection assignments. Initially, U = XtH , so claimed cells already observed from the robots’ current positions require no dispatch. At each greedy step, the method selects a feasible robot–stand-off pair satisfying 
+
+(Ri, u i) ∈ arg max  
+
+> (Rj,u ) feasible
+
+|Vis( u) ∩ U| . (7) Ties are broken by shorter A∗ distance and then by lower robot index. After selecting the pair, the uncovered set is updated: 
+
+U ← U \ Vis( ui). (8) This update records planned inspection coverage. The un-resolved set Xt changes only when cells are physically observed. We consider two variants: 
+
+Verify-Min. Let nV ≤ N denote the number of robots selected by the greedy cover. Only these nV robots are dispatched for verification, while the remaining N − nV
+
+robots halt until verification completes. Inspectors perform verification before resuming their remaining missions. 
+
+Verify-All. All N robots are dispatched for verification. Each receives a stand-off ui satisfying Vis( ui)̸ = ∅, even if its visible cells are already covered by another inspection assignment. The robots perform verification before resuming their missions. 
+
+Rule-based VAH. This method uses the same inspector set as Verify-Min and assigns the remaining robots using a fixed rule. For each non-inspecting robot Ri, let Bi contain the claimed cells on its remaining trajectory: 
+
+Bi = {c ∈ X : ∃ t ≥ tH , (c, t ) ∈ γi} . (9) Let fi = 1 if all remaining pickup-and-delivery legs are reachable in F \X , and let fi = 0 otherwise. These quantities are evaluated at tH . The role component of ai is selected as 
+
+role( ai) = 
+
+
+
+Hold , Bi = ∅,
+
+Adapt , Bi̸ = ∅, f i = 1 ,
+
+Stop , Bi̸ = ∅, f i = 0 .
+
+(10) A holding robot retains its trusted trajectory. An adapting robot reroutes with X treated as walls. A stopped robot pauses its unfinished mission until verification of the block-ing region is performed. The initial role decision is made once and is not changed throughout. The verification-first baselines select inspectors by ge-ometric coverage. Rule-based VAH additionally considers trajectory intersection and remaining-mission reachability. These baselines do not use any way to defer unnecessary adaptation or revise role assignments. 
+
+B. Metrics 
+
+Each method is evaluated from tH onward against the 
+
+Nominal and Naive Replan references. 
+
+Sum of Costs (SOC). For a method π, let c(πi) denote the number of cells traversed by robot Ri. The fleet-level cost is 
+
+SOC = PN −1 
+
+> i=0
+
+c(πi). Waiting does not contribute, so SOC measures the total distance traveled by the fleet. 
+
+Makespan. Makespan is the maximum number of time steps from tH until the last robot completes its remaining job. Unlike SOC, it includes time spent waiting. 
+
+Coverage. Coverage is the fraction of claimed cells observed by at least one robot, distinguishing methods that physically resolve the claim from those that merely route around it. SOC, makespan, and coverage are computed per run and averaged over the M runs of each (N, category ) condition. 
+
+Cascade Containment Ratio. For a single run m, the addi-tional distance traveled by method π relative to Nominal is 
+
+Dm(π) = PN −1 
+
+> i=0
+
+max(0 , c (πi) − c(πnom  
+
+> i
+
+)) . Because Naive Replan accepts the claim outright, Dm(πnaive ) represents the full cascade cost induced by the claim. CCR is computed for each (N, category ) condition by summing the costs over its 
+
+M runs before taking their ratio: 
+
+CCR = 1 −
+
+PMm=1 Dm(π)
+
+PMm=1 Dm(πnaive ) . (11) CCR measures the fraction of Naive Replan’s aggregate excess travel avoided by a method. A value of 1 indicates no positive per-robot excess travel relative to Nominal, while 0
+
+indicates the same aggregate excess travel as Naive Replan. CCR is bounded above by 1 but can be negative. It is undefined when the denominator is zero or a required Naive Replan cost is unavailable. Two times are relevant: TM , when every remaining job has been delivered, and TV , when every claimed cell has been scanned. Costs and CCR are evaluated at TM , while coverage is evaluated at max( TM , T V ), since verification may continue after mission completion. Thus, the main SOC and CCR results quantify travel up to mission completion and exclude any verification travel performed afterward. VI. R ESULTS 
+
+Figure 4 shows that our method closely tracks the Nominal SOC under Low, High, and Mixed impact, with its largest deviation under Mission Kill. It achieves the lowest mean SOC in nearly every condition and remains close to the lowest otherwise. All verification baselines exceed Nominal, with Verify-All consistently incurring the greatest cost, and their gap from our method generally grows with team size under High and Mixed impact. Our method limits this cost by allowing non-inspecting robots to continue their jobs and rerouting only those threatened by unresolved claims. Scanning a claimed cell as free immediately shortens unnecessary detours, concentrating verification cost among selected inspectors rather than propagating it across the fleet. Mission Kill is the main exception because sealed drop-offs require additional inspection travel before delivery. Figure 5 compares SOC at mission completion, TM , and verification completion, TV , under Mixed impact. For all verification baselines, SOC( TM ) > SOC( TV ), and the gap grows with team size. For our method, the values nearly coincide at smaller sizes, while SOC( TM ) < SOC( TV )
+
+becomes clearer at larger sizes. This shows that our method can complete the mission before verification by resolving consequential clusters first and deferring off-path cells until robots are no longer required for delivery. The makespan results follow a similar pattern. Our method remains close to Nominal under Low, High, and Mixed im-pact and achieves the lowest or near-lowest mean makespan outside Mission Kill. Verification-first increases makespan by halting non-inspecting robots, while Rule-based VAH is 3 6 9 12 0100 200 300 400 500 600 700 800 900 1000                           
+
+> SOC
+> Low
+> 36912
+> High
+> 36912
+> Mixed
+> 36912
+> Kill
+> 36912
+> Team Size
+> 025 50 75 100 125 150 175 200
+> Makespan
+> 36912
+> Team Size
+> 36912
+> Team Size
+> 36912
+> Team Size Nominal (reference) Naive Replan Verify-Min Verify-All Rule based VAH assignment Ours
+
+Fig. 4: Sum of costs and Makespan variations across different scenarios and team sizes. 3 6 9 12             
+
+> Team Size
+> 0100 200 300 400 500 600 700 800 900
+> SOC
+> Verify-Min
+> 36912
+> Team Size
+> Verify-All
+> 36912
+> Team Size
+> 0100 200 300 400 500 600 700 800 900
+> SOC
+> Rule based VAH assignment
+> 36912
+> Team Size
+> Ours
+> at TVat TM
+
+Fig. 5: SOC at mission completion TM and verification completion TV
+
+under Mixed-impact claims. 
+
+slowest in almost every condition despite having an SOC similar to Verify-Min. Its fixed roles cause workers and inspectors to contend for corridors, serializing their move-ments. Our selective, revisable assignments instead overlap verification with mission execution. Under Mission Kill, Verify-Min inspects sealed drop-offs immediately, whereas our method defers inspection until the close event determines that the remaining jobs are infeasible. Ours is nonetheless fastest at N = 3 , where the enclosed robots inspect for themselves almost at once, and at N = 12 , where an idle robot is free the moment the close event fires; Verify-Min leads at N = 6 and N = 9 , where enough goals are sealed to delay completion but too few robots are free to inspect them concurrently. Table II reports coverage at N = 12 , the largest fleet size. Every explicit-verification method, including ours, achieves full coverage under all conditions except one. Our method under Mixed impact reaches 98% . This shortfall results from the method’s inspection prioritization. Off-path clusters are deferred until the close event. In this run, all remaining unknown cells at the time of closure belonged to clusters 
+
+TABLE II: Coverage results for N = 12 at max( TM , T V ).                         
+
+> Scenario Naive Verify-Min Verify-All Rule Based VAH Ours Low 87% 100% 100% 100% 100%
+> High 72% 100% 100% 100% 100%
+> Mixed 62% 100% 100% 100% 98%
+> Kill —100% 100% 100% 100%
+
+that could no longer affect the mission. The module there-fore deemed them not worth a dispatch and assigned the idle robots to Rest . Thus, the method prioritizes mission relevance over exhaustive coverage. Every mission-relevant cluster was inspected throughout the study, and the off-path clusters were also scanned in nearly every run. Naive Replan never achieves full coverage because it observes cells only incidentally. It has no Mission Kill entry because sealed goals are infeasible when claimed cells are treated as walls. Finally, Table III shows that our method contains most of the cascade in every reported condition except High impact at N = 3 , where its CCR is −0.65 . On all other occasions, CCR remains between 0.60 and 1.00 , whereas every verification baseline remains negative, incurring more behavioral cascade than Naive Replan. The High-impact result at N = 3 reflects the cost of inspection in a fleet too small to absorb it: every trajectory intersects the claim, so one robot must be sent to a stand-off to view the full sticks while the other two wait or reroute, and with only three robots that verification travel exceeds what Naive Replan spends detouring around the sticks. 
+
+TABLE III: Cascade containment ratio (CCR) results.                                                         
+
+> Scenario NVerify-Min Verify-All Rule Based VAH Ours Low 3−3.89 −5.14 −4.06 1.00
+> 6−1.31 −5.32 −1.89 1.00
+> 9−1.36 −17 .18 −2.22 0.98
+> 12 −1.16 −6.56 −2.37 0.96
+> High 3−5.49 −8.90 −5.47 −0.65
+> 6−1.25 −2.41 −1.51 0.81
+> 9−0.50 −0.91 −0.67 0.89
+> 12 −0.05 −0.47 −0.17 0.83
+> Mixed 3−16 .60 −22 .10 −16 .63 0.60
+> 6−4.12 −5.94 −4.18 0.83
+> 9−3.22 −5.01 −3.35 0.86
+> 12 −3.87 −5.42 −4.26 0.95
+
+VII. C ONCLUSION 
+
+This work shows that the physical consequences of a successfully manipulated LLM operator can be contained through decision-relevant team verification. The proposed 
+
+Verify–Adapt–Hold framework kept SOC and makespan near nominal in most conditions, achieved high cascade contain-ment for larger fleets, and inspected every mission-relevant claim cluster while allowing unaffected robots to continue their tasks—demonstrating that post-compromise verification can prevent a false claim from causing fleet-wide disruption. Future work will evaluate different manipulation channels, distribute role assignment across onboard LLMs in a decen-tralized fashion, validate the framework with larger fleets and real robots, and extend it to heterogeneous teams, limited communication, and partially valid claims. ACKNOWLEDGEMENT 
+
+Generative AI tools, including Cursor, ChatGPT, and Claude, assisted with implementation, visualization, lan-guage refinement, and literature organization. The authors developed and validated the research methodology, experi-ments, analysis, and final manuscript. REFERENCES [1] D. Driess, F. Xia, M. S. Sajjadi, C. Lynch, A. Chowdhery, B. Ichter, A. Wahid, J. Tompson, Q. Vuong, T. Yu, et al. , “Palm-e: An embodied multimodal language model,” arXiv preprint arXiv:2303.03378 , 2023. [2] M. Ahn, A. Brohan, N. Brown, Y. Chebotar, O. Cortes, B. David, C. Finn, C. Fu, K. Gopalakrishnan, K. Hausman, et al. , “Do as i can, not as i say: Grounding language in robotic affordances,” arXiv preprint arXiv:2204.01691 , 2022. [3] J. Liang, W. Huang, F. Xia, P. Xu, K. Hausman, B. Ichter, P. Florence, and A. Zeng, “Code as policies: Language model programs for embodied control,” in 2023 IEEE International conference on robotics and automation (ICRA) , pp. 9493–9500, IEEE, 2023. [4] N. Wake, A. Kanehira, K. Sasabuchi, J. Takamatsu, and K. Ikeuchi, “Gpt-4v (ision) for robotics: Multimodal task planning from human demonstration,” IEEE Robotics and Automation Letters , vol. 9, no. 11, pp. 10567–10574, 2024. [5] S. S. Kannan, V. L. Venkatesh, and B.-C. Min, “Smart-llm: Smart multi-agent robot task planning using large language models,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pp. 12140–12147, IEEE, 2024. [6] F. Perez and I. Ribeiro, “Ignore previous prompt: Attack techniques for language models,” arXiv preprint arXiv:2211.09527 , 2022. [7] K. Greshake, S. Abdelnabi, S. Mishra, C. Endres, T. Holz, and M. Fritz, “Not what you’ve signed up for: Compromising real-world llm-integrated applications with indirect prompt injection,” in 
+
+Proceedings of the 16th ACM workshop on artificial intelligence and security , pp. 79–90, 2023. [8] W. Yang, X. Bi, Y. Lin, S. Chen, J. Zhou, and X. Sun, “Watch out for your agents! investigating backdoor threats to llm-based agents,” Advances in Neural Information Processing Systems , vol. 37, pp. 100938–100964, 2024. [9] K. Zhu, J. Wang, J. Zhou, Z. Wang, H. Chen, Y. Wang, L. Yang, W. Ye, Y. Zhang, N. Gong, et al. , “Promptrobust: Towards evaluating the robustness of large language models on adversarial prompts,” in 
+
+Proceedings of the 1st ACM workshop on large AI systems and models with privacy and safety analysis , pp. 57–68, 2023. [10] S. Lee and B.-C. Min, “Distributed control of multi-robot systems in the presence of deception and denial of service attacks,” arXiv preprint arXiv:2102.00098 , 2021. [11] D. Yeke, K. A. Pant, M. O. Ozmen, H. Kim, J. M. Goppert, I. Hwang, A. Bianchi, and Z. B. Celik, “Automated discovery of semantic attacks in multi-robot navigation systems,” in 34th USENIX Security Symposium (USENIX Security 25) , pp. 3959–3978, 2025. [12] A. Wei, N. Haghtalab, and J. Steinhardt, “Jailbroken: How does llm safety training fail?,” Advances in neural information processing systems , vol. 36, pp. 80079–80110, 2023. [13] A. Robey, E. Wong, H. Hassani, and G. J. Pappas, “Smoothllm: Defending large language models against jailbreaking attacks,” arXiv preprint arXiv:2310.03684 , 2023. [14] Y. Liu, G. Deng, Y. Li, K. Wang, Z. Wang, X. Wang, T. Zhang, Y. Liu, H. Wang, Y. Zheng, et al. , “Prompt injection attack against llm-integrated applications,” arXiv preprint arXiv:2306.05499 , 2023. [15] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, X. Chen, K. Choro-manski, T. Ding, D. Driess, A. Dubey, C. Finn, et al. , “Rt-2: Vision-language-action models transfer web knowledge to robotic control,” 
+
+arXiv preprint arXiv:2307.15818 , 2023. [16] C. H. Song, J. Wu, C. Washington, B. M. Sadler, W.-L. Chao, and Y. Su, “Llm-planner: Few-shot grounded planning for embodied agents with large language models,” in Proceedings of the IEEE/CVF international conference on computer vision , pp. 2998–3009, 2023. [17] K. Rana, J. Haviland, S. Garg, J. Abou-Chakra, I. Reid, and N. Suenderhauf, “Sayplan: Grounding large language models using 3d scene graphs for scalable robot task planning,” arXiv preprint arXiv:2307.06135 , 2023. [18] Y. Chen, J. Arkin, Y. Zhang, N. Roy, and C. Fan, “Scalable multi-robot collaboration with large language models: Centralized or decentralized systems?,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) , pp. 4311–4317, IEEE, 2024. [19] Z. Mandi, S. Jain, and S. Song, “Roco: Dialectic multi-robot col-laboration with large language models,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) , pp. 286–299, IEEE, 2024. [20] H. Zhang, W. Du, J. Shan, Q. Zhou, Y. Du, J. B. Tenenbaum, T. Shu, and C. Gan, “Building cooperative embodied agents modularly with large language models,” in International Conference on Learning Representations , vol. 2024, pp. 19373–19401, 2024. [21] P. R. Wurman, R. D’Andrea, and M. Mountz, “Coordinating hundreds of cooperative, autonomous vehicles in warehouses,” AI magazine ,vol. 29, no. 1, pp. 9–9, 2008. [22] G. Fragapane, R. De Koster, F. Sgarbossa, and J. O. Strandhagen, “Planning and control of autonomous mobile robots for intralogistics: Literature review and research agenda,” European journal of opera-tional research , vol. 294, no. 2, pp. 405–426, 2021. [23] Y. Zeng, H. Lin, J. Zhang, D. Yang, R. Jia, and W. Shi, “How johnny can persuade llms to jailbreak them: Rethinking persuasion to challenge ai safety by humanizing llms,” in Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pp. 14322–14350, 2024. [24] L. Meincke, D. Shapiro, A. L. Duckworth, E. Mollick, L. Mollick, C. Van den Bulte, and R. Cialdini, “Persuading large language models to comply with objectionable requests,” Proceedings of the National Academy of Sciences , vol. 123, no. 21, p. e2535868123, 2026. [25] X. Yang, X. Tang, J. Han, and S. Hu, “The dark side of trust: Authority citation-driven jailbreak attacks on large language models,” 
+
+arXiv preprint arXiv:2411.11407 , 2024. [26] R. Stern, N. Sturtevant, A. Felner, S. Koenig, H. Ma, T. Walker, J. Li, D. Atzmon, L. Cohen, T. K. Kumar, et al. , “Multi-agent pathfinding: Definitions, variants, and benchmarks,” in Proceedings of the international symposium on combinatorial search , vol. 10, pp. 151–158, 2019. [27] J. Li, A. Tinka, S. Kiesel, J. W. Durham, T. S. Kumar, and S. Koenig, “Lifelong multi-agent path finding in large-scale warehouses,” in 
+
+Proceedings of the AAAI Conference on Artificial Intelligence , vol. 35, pp. 11272–11281, 2021. [28] A. Desai, S. Ghosh, S. A. Seshia, N. Shankar, and A. Tiwari, “Soter: programming safe robotics system using runtime assurance,” arXiv preprint arXiv:1808.07921 , 2018. [29] G. Anderson, A. Verma, I. Dillig, and S. Chaudhuri, “Neurosymbolic reinforcement learning with formally verified exploration,” Advances in neural information processing systems , vol. 33, pp. 6172–6183, 2020. [30] S. A. Seshia, A. Desai, T. Dreossi, D. J. Fremont, S. Ghosh, E. Kim, S. Shivakumar, M. Vazquez-Chanlatte, and X. Yue, “Formal specification for deep neural networks,” in International Symposium on Automated Technology for Verification and Analysis , pp. 20–34, Springer, 2018. [31] R. Bajcsy, Y. Aloimonos, and J. K. Tsotsos, “Revisiting active per-ception,” Autonomous Robots , vol. 42, no. 2, pp. 177–196, 2018.
