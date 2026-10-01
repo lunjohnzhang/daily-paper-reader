@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-10-01 <!--dpr-date:20261001-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202610/01/2609.35047v1-empiric-experiment-driven-learning-of-residual-world-models-for-robot-planning" data-sidebar-item="{&quot;title&quot;: &quot;EMPIRIC: Experiment-Driven Learning of Residual World Models for Robot Planning&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.35047v1-empiric-experiment-driven-learning-of-residual-world-models-for-robot-planning&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;通过实验学习残差世界模型以支持机器人规划&quot;}">EMPIRIC: Experiment-Driven Learning of Residual World Models for Robot Planning</a>
   * 2026-09-30 <!--dpr-date:20260930-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/30/2609.35267v1-guardpibt-counterfactually-gated-neural-guidance-for-ultra-large-scale-3d-multi-agent-path-finding" data-sidebar-item="{&quot;title&quot;: &quot;GuardPIBT: Counterfactually Gated Neural Guidance for Ultra-Large-Scale 3D Multi-Agent Path Finding&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.35267v1-guardpibt-counterfactually-gated-neural-guidance-for-ultra-large-scale-3d-multi-agent-path-finding&quot;, &quot;score&quot;: &quot;10.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;面向超大规模三维多智能体路径规划，增强PIBT求解器。&quot;}">GuardPIBT: Counterfactually Gated Neural Guidance for Ultra-Large-Scale 3D Multi-Agent Path Finding</a>
