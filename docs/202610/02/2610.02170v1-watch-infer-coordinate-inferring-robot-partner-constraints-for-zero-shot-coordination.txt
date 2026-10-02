@@ -1,0 +1,468 @@
+Title: Watch, Infer, Coordinate: Inferring Robot Partner Constraints for Zero-Shot Coordination
+
+URL Source: https://arxiv.org/pdf/2610.02170v1
+
+Published Time: Fri, 02 Oct 2026 02:17:36 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# WATCH , INFER , COORDINATE : INFERRING ROBOT 
+
+# PARTNER CONSTRAINTS FOR ZERO -S HOT COORDINA -
+
+# TION 
+
+Suyu Ye 1,2† Zheyuan Zhang 1,2† Vaishnav Tadiparthi 1 Hossein Nourkhiz Mahjoub 1
+
+Ehsan Moradi Pari 1 Tianmin Shu 2 Homanga Bharadhwaj 2 Nakul Agarwal 11Honda Research Institute USA 2Johns Hopkins University 
+
+## ABSTRACT 
+
+Robots operating in the physical world will increasingly need to coordinate with other robots, particularly in manipulation tasks where an object may be too large or heavy for a single robot to carry alone. Physical limitations caused by hardware degradation or actuator faults can restrict the actions a robot can reliably execute, yet these limitations may be unknown to its partner. We study whether a helper can infer a robot partner’s physical constraints from observing it coordinate with another robot, then use the inferred capability to coordinate with the same partner on a new task. This is difficult because a demonstration shows what the con-strained robot did, but not what it could have done. In physically coupled tasks, the other robot may also compensate for its limitations, making those limitations difficult to identify from the constrained robot’s behavior alone. Our key insight is that these constraints shape the joint behavior of the team, making the actions of both robots informative about the constrained partner’s capability. We intro-duce Watch, Infer, Coordinate, a benchmark spanning three physically coupled manipulation settings, together with an inference approach that scores candidate constraints using observed joint behavior. Across all three settings, our method substantially improves constraint inference and zero-shot coordination, approach-ing an oracle with access to the true constraints. Watch  
+
+> Collaborative Demonstration
+
+Coordinate 
+
+> New Task, Same Partner
+
+Infer   
+
+> Joint
+> Position
+> Limit
+> Joint
+> Velocity
+> Limit
+> Base
+> Direction
+> Limit
+> Demonstrator Constrained Agent Helper
+> Partner Constraints
+> I need to coordinate with a new teammate, but I don't
+> know what it can (cannot) physically do.
+> I’ll watch how it coordinates with another robot to find out.
+
+Figure 1: Overview of our problem setting. A helper must coordinate with a constrained partner whose physical capabilities are initially unknown. Rather than interacting with the partner directly, the helper first watches it coordinate with another robot and uses this demonstration to infer con-straints on its low-level actions, such as joint position, joint velocity, or base-direction limits. The helper then replaces the demonstrator and must coordinate with the same constrained partner on a new task. Although the required coordination changes between tasks, the partner’s physical con-straints remain the same, allowing the helper to transfer what it learned about the partner’s capabili-ties to the new task. 
+
+> †
+
+Work done during an internship at Honda Research Institute USA. Project page: https://watch-infer-coordinate.github.io/ 
+
+1arXiv:2610.02170v1 [cs.RO] 1 Oct 2026 1 INTRODUCTION 
+
+As robots move from controlled laboratories into the physical world, they will increasingly need to not only adapt to their environment, but also to learn to coordinate with one another. Some manip-ulation tasks naturally require multiple robots, for example when transporting objects that are too large or heavy for a single robot to handle alone (Farivarnejad & Berman, 2022). In such physically coupled tasks, the robots’ actions jointly determine the motion of the shared object, requiring closely coordinated movements, often in decentralized settings in which robots cannot access one another’s plans (Pandit et al., 2025b; Doshi et al., 2026; Yang & Mavrogiannis, 2025; Shi et al., 2026). In practice, a robot’s physical capabilities may also change over time due to hardware degradation or actuator faults. Such failures can reduce actuator effectiveness or restrict the motion of individual joints, changing the set of actions the robot can reliably execute (Lewis & Maciejewski, 1997; Tin´ os et al., 2007). In this work, we consider a helper that must coordinate with a robot, which we call the 
+
+constrained agent , subject to unknown constraints on its low-level physical actions, such as position or velocity limits on individual joints. Existing methods do not directly address how a helper could learn these constraints from observ-ing prior coordination. Partner-aware assistance approaches have inferred properties such as goals or task-level capabilities (Puig et al., 2021; Cao et al., 2024; Du et al., 2024), while methods for physically coupled coordination typically adapt to a partner’s behavior without explicitly inferring persistent constraints on the actions that partner can execute (Yang & Mavrogiannis, 2025; Pandit et al., 2025b; Doshi et al., 2026). We therefore ask whether a helper can infer a partner’s physical constraints by observing it coordinate with another robot, and then use that knowledge to coordinate with the same partner on a new task. As illustrated in Figure 1, the helper first observes a demon-strator coordinate with the constrained agent, then takes the demonstrator’s place on a different task. Because the helper has not observed how the constrained agent coordinates on this new task before deployment, we refer to this as zero-shot coordination .Inferring these constraints from watching prior coordination is difficult because a demonstration shows what the constrained agent did, but not what it could have done. If the constrained agent does not take a particular action, that action may be physically infeasible or simply unnecessary for the task. Physical coupling makes this ambiguity more subtle, as the demonstrator may compensate for the constrained agent’s limitations. This can make the constraint difficult to identify from the task outcome or the constrained agent’s actions alone. Our key insight is that a partner’s physical constraints shape the joint behavior of the team, so the actions of both agents can be used to reason about them. Because these low-level constraints belong to the agent rather than a particular task, they can also provide a capability model that remains useful when the task changes. We study these ideas in simulation settings with varying levels of complexity, allowing us to systematically vary physical constraints across different coordination problems. We introduce Watch, Infer, Coordinate , a framework for studying coordination under unknown partner constraints. As shown in Figure 2, Watch, Infer, Coordinate includes a benchmark spanning three joint-carrying settings of increasing physical complexity, with obstacle-free demonstrations followed by a new task at test time in which obstacles block the direct path to the goal and require different coordinated motions. The benchmark includes 2D rod carrying, fixed-base dual-UR5 carry-ing, and mobile dual-UR5 carrying, spanning a low-dimensional abstraction to increasingly complex robotic manipulation. We also propose an inference approach that uses the observed actions of both agents to determine which candidate constraints are most consistent with their coordination. We use the resulting capability estimate to support zero-shot coordination with the constrained agent on the new task. To summarize, our main contributions are fourfold. (1) We formulate the problem of inferring a robot partner’s persistent low-level physical constraints from prior multi-agent coordination and using them for zero-shot coordination on a new task. (2) We introduce the Watch, Infer, Coordinate benchmark, spanning three joint-carrying settings of increasing physical complexity. (3) We propose an inference approach that uses the actions of both agents to infer the constrained agent’s physical constraints from observed coordination. (4) We show that our approach improves both constraint inference and downstream task success across all three settings, approaching the performance of an oracle that is given the true constraints. 22 RELATED WORKS 
+
+Table 1: Comparison with related work. Prior-Trajectory Inference indicates that episode-specific information is inferred from trajectories observed before the downstream task. Multi-Agent Trajec-tories indicates that the trajectories used for inference contain behavior from multiple interacting agents. Low-Level Partner Constraints indicates that the inferred quantity specifies low-level con-straints such as limits on the partner’s joint positions, joint velocities, or allowable motion directions, rather than task-level capabilities such as reachable height or liftable weight. Continuous Control indicates continuous-valued physical control rather than symbolic or macro actions. Physically Cou-pled Manipulation indicates that multiple agents jointly manipulate the same object such that their actions mechanically combine to determine its motion. Transfer to New Task indicates that the in-ferred information is subsequently used on a distinct task or goal requiring different behavior. Work Prior-Trajectory Inference Multi-Agent Trajectories Low-Level Partner Constraints Continuous Control Physically Coupled Manipulation Transfer to New Task CHORUS (Doshi et al., 2026) ✗ ✗ ✗ ✓ ✓ ✗                                                            
+
+> Watch-and-Help (Puig et al., 2021) ✓✗✗✗✗✗
+> TICC-POMDP (Lee et al., 2020) ✗✗✗✗✗✓
+> Smart Help (Cao et al., 2024) ✗✗✗✗✗✗
+> CHAIC (Du et al., 2024) ✗✗✗✗✓✗
+> CE-CM-Div (Tisnikar et al., 2026) ✓✓✗✗✗✓
+> CAMO (Tisnikar et al., 2024) ✓✗✓✓✗✓
+> GRACE (Liu et al., 2025) ✗✗✓✓✗✓
+> ICRL Benchmark (Liu et al., 2022) ✓✗✗✓✗✗
+> MACL (Zhang et al., 2026) ✓✓✗✓✗✓
+> Ours ✓✓✓✓✓✓
+
+Physically Coupled Robot Collaboration. Prior work has studied physically coupled robot collab-oration in both human-robot and robot-robot teams. Human-robot methods adapt to the partner’s cur-rent behavior, for example by inferring intent from joint motion (Yang & Mavrogiannis, 2025), using language to revise motion plans (Shi et al., 2026), or learning cooperative policies from human-human demonstrations (Ng et al., 2023). Multi-robot methods learn decentralized controllers using shared (Pandit et al., 2025a;b; Doshi et al., 2026), or agent-specific policies (He et al., 2025; Dong et al., 2025). These methods span model-based planning (Stouraitis et al., 2020; Kennel-Maushart & Coros, 2024; Jaafar et al., 2024; Yang & Mavrogiannis, 2025), reinforcement learning (Nachum et al., 2020; Zhang et al., 2020; Shibata et al., 2023; Aljalbout et al., 2023; Pandit et al., 2025a;b), diffusion policies (Dong et al., 2025; Ng et al., 2023; He et al., 2025), and VLM/VLA-based policies (Song et al., 2025; Doshi et al., 2026). However, they do not explicitly infer a persistent physical constraint on the actions that a particular partner can execute. Ability-aware controllers can account for differences in robots’ actuation limits, but assume those limits are known (Yan et al., 2021). Our work instead infers the constrained agent’s feasible action set from prior physically coupled demon-strations and uses the inferred model to coordinate with the same agent in a new environment. 
+
+Partner-Aware Assistance. The watch-and-help challenge proposed the problem of observing an agent, inferring its goal, and then helping it achieve that goal (Puig et al., 2021). Subsequent work has developed methods for inferring and updating the agent’s goal online (Puig et al., 2023; Zhi-Xuan et al., 2020). More broadly, partner-aware assistance methods has modeled other properties that shape an agent’s behavior, including its beliefs about environment dynamics (Reddy et al., 2018), and its latent strategy across repeated interactions (Xie et al., 2021). Capability-aware meth-ods instead reason about what the partner can do, but often represent capability through task-level properties or high-level actions. TICC-POMDP models capability through action success probabil-ities (Lee et al., 2020). Smart Help estimates semantic capabilities such as reachable height and liftable weight (Cao et al., 2024), while CHAIC uses VLM and LLM based helpers to infer a part-ner’s goals and physical limitations online and reasons about these limitations through task-level actions and assistance plans (Du et al., 2024). CE-CM-Div infers domain-specific capabilities de-fined over symbolic and macro actions (Tisnikar et al., 2026). Our work instead infers a partner’s low-level physical action constraints, such as joint and velocity limits, from demonstrations of the partner collaborating with another agent. A new helper then uses this capability model to plan joint motion with the partner, zero-shot, on a new task. 32D Rod Carrying  Fixed-Base UR5 Carrying  Mobile UR5 Carrying 
+
+> (a) Obstacle-free demonstrations
+> (b) New task during test time
+
+Figure 2: Overview of our physically coupled partner-adaptation benchmark. (A) During the observation stage, the helper watches a demonstrator coordinate with the constrained agent on an obstacle-free task. The labels show physical constraints on the action space of the constrained agent, which are dependent on the setting. (B) At test time, the helper replaces the demonstrator and co-ordinates zero-shot with the same constrained agent on a new task with obstacles. The benchmark includes three settings of increasing physical complexity: 2D rod carrying, fixed-base dual-UR5 carrying, and mobile dual-UR5 carrying. Across all settings, the constrained agent’s physical con-straints remain fixed while the task and helper change. 
+
+Constraint Inference from Demonstrations. The goal of constraint inference from demonstra-tions is to recover unknown constraints on an agent or its environment from observed behavior (Chou et al., 2018; Scobee & Sastry, 2019; Malik et al., 2021). Optimization-based methods search for lower-cost alternatives to the demonstrated trajectory, relying on the idea that if the demonstra-tion is optimal, these alternatives must violate an unknown constraint (Chou et al., 2018; 2020). Other methods infer constraints by finding those that make the observed demonstrations most likely (Scobee & Sastry, 2019; Malik et al., 2021). However, much of this work focuses on environmental constraints, such as hidden obstacles and forbidden regions, that are directly reflected in a single agent’s trajectory. Prior work on agent centric constraint inference either observes the agent acting on its own (Tisnikar et al., 2024; Liu et al., 2025) or models capability as domain-specific restrictions on which tools or task-level actions the agent can use (Tisnikar et al., 2026). Recent work has also inferred constraints from multi-agent demonstrations, but focuses on interaction constraints between agents rather than the physical limits of a particular partner (Zhang et al., 2026). Our work instead infers a partner’s low-level physical limits from cooperative, physically coupled team demonstra-tions, where the helper may compensate for the constrained partner, and the resulting team motion can hide the partner’s limitations. 
+
+## 3 WATCH , I NFER , C OORDINATE : P ROBLEM SETUP AND BENCHMARK 
+
+3.1 PROBLEM SETUP 
+
+We consider a helper that must coordinate with a robot whose low-level physical capabilities are initially unknown. We refer to this robot as the constrained agent . Its physical actions are restricted by constraints, such as joint position limits, velocity limits, or allowable motion directions. During the observation stage, the helper watches the constrained agent coordinate with another robot, which 4we call the demonstrator . The helper knows the goal of each demonstration and observes the states and actions of both agents, but not the constrained agent’s physical constraints. At test time, the helper replaces the demonstrator and must coordinate with the same constrained agent on a new task without first observing how it behaves on that task. The constraints remain fixed while the task and required coordinated motions change, requiring the helper to infer a transferable model of the constrained agent’s physical capability from prior coordination. 3.2 WHY COORDINATED BEHAVIOR IS INFORMATIVE 
+
+A demonstration shows what the constrained agent did, but not what it could have done. If it does not take a particular action, that action may be physically infeasible or simply unnecessary for the task. Inferring its constraints therefore requires reasoning about how the constraints affect the ob-served behavior. In physically coupled tasks, the demonstrator can help resolve this ambiguity. A constraint on the constrained agent may require the demonstrator to compensate so that the ob-ject they are jointly carrying still follows the intended trajectory. This compensation can make the constraint difficult to identify from the constrained agent’s actions alone, while the demonstrator’s actions provide information about the underlying limitation. Our key insight is that the constrained agent’s physical capability shapes the joint behavior of both robots, so both agents’ actions provide information for capability inference. 3.3 WATCH , I NFER , C OORDINATE BENCHMARK 
+
+To evaluate this problem, we construct a benchmark with three joint-carrying settings of increasing physical complexity: 2D rod carrying, fixed-base dual-UR5 carrying, and mobile dual-UR5 carry-ing. In each setting, the two agents must jointly transport an object from an initial position to a goal. As shown in Figure 2, demonstrations are collected on obstacle-free tasks requiring different coor-dinated motions. At test time, obstacles block the direct path to the goal, requiring motions that may not have appeared in the demonstrations. For each setting, we define a fixed set of demonstration tasks and use the same tasks regardless of the constrained agent’s physical constraints. The tasks require a range of coordinated motions so that different constraints can affect the observed behavior. Because physical capability cannot be inferred from arbitrary behavior, we assume a model of how the agents choose their actions. We model the demonstrator and constrained agent as boundedly rational agents coordinating toward a shared task objective (McKelvey & Palfrey, 1995; Lindig-Le´ on et al., 2021). Formally, let D denote the demonstrator, P the constrained agent, and c its capability. At state s, the agents choose actions aD and aP . Each setting defines an action-pair score Qc(s, a D , a P ), computed using the known transition model to score how good the two agents’ actions are for completing the carrying task from state s.We model the agents using the regularized shared objective 
+
+Jc(πD , π P ; s) = EaD ∼πD 
+
+> aP∼πP
+
+Qc(s, a D , a P ) − τD DKL (πD ∥uD ) − τP DKL (πP ∥uP ), (1) where DKL denotes the Kullback-Leibler divergence (Kullback & Leibler, 1951), uD and uP are uniform over each agent’s available actions, and τD and τP control how strongly the agents favor higher-valued actions. This objective gives the mutual soft responses                          
+
+> π⋆D(aD|s, c )∝uD(aD) exp EaP∼π⋆P[Qc(s, a D, a P)]
+> τD
+> !
+> ,π⋆P(aP|s, c )∝uP(aP) exp EaD∼π⋆D[Qc(s, a D, a P)]
+> τP
+> !
+
+(2) The two policies depend on one another. Restricting the constrained agent’s feasible actions changes both its own behavior and how the demonstrator is expected to respond, capturing the compensatory behavior described above. Together with the physical feasibility rules of each setting, these policies define a distribution ρc(aD , a P | s) over action pairs, which we use to generate demonstrations under the true capability. At test time, the helper replaces the demonstrator while the constrained agent retains the same capa-bility and behavioral model. The agents choose their actions simultaneously, and the resulting action pair is executed according to the dynamics and feasibility rules of the setting. We provide details on computing the mutual responses in Appendix A.1.1. 5Algorithm 1 Watch, Infer, Coordinate overview 
+
+Input: demonstrations D, candidate capabilities C, prior p(c), test task  
+
+> 1:
+
+for each capability c ∈ C do  
+
+> 2:
+
+Compute S(c, D) from the observed actions of both agents  
+
+> 3:
+
+L(c) ← log p(c) + S(c, D) 
+
+> 4:
+
+end for  
+
+> 5:
+
+b(c | D ) ← softmax c∈C L(c) 
+
+> 6:
+
+Plan with the constrained agent using b(c | D )
+
+The benchmark spans three joint-carrying settings of increasing physical complexity. We begin with 2D rod carrying, where two agents apply forces at opposite ends of a rigid rod and jointly determine its translation and rotation. The constrained agent is limited to a continuous range of force directions, and we consider 2,665 candidate force-direction constraints. We then move to fixed-base dual-UR5 carrying, where two robot arms grasp opposite ends of a rigid beam and the constrained agent is subject to joint position and joint velocity limits. Because the joint motion required to move the beam depends on the robot’s posture, the same beam motion may be feasible in one configuration and infeasible in another. This setting contains 172 candidate capabilities over individual and paired joint limitations. Finally, mobile dual-UR5 carrying adds mobile bases to the two arms, introducing constraints on both arm and base motion. Combining the possible arm and base constraints gives 475 candidate capabilities. In each setting, we use three fixed physical-constraint cases for final evaluation. Additional benchmark specifications and evaluation details are provided in Appendix A.2. 
+
+## 4 METHOD 
+
+4.1 OVERVIEW 
+
+We infer the constrained agent’s capability by treating each candidate capability as a hypothesis about which actions the agent can execute. At each observed state, a candidate changes the con-strained agent’s feasible actions and, in turn, how the demonstrator is expected to respond. Using the boundedly rational behavioral model, we predict the joint behavior of the two agents under each candidate and score how well it matches the observed actions across demonstrations. These scores are used to form a belief over the constrained agent’s capability. In the low-dimensional setting, we can compute this score explicitly. In the more complex settings, evaluating the behavioral model for every observed state and candidate becomes too expensive, so we use learned models to estimate how well each candidate explains the observed coordination. Formally, let D denote the observed demonstrations and C the set of candidate capabilities. We define S(c, D) as the score measuring how well candidate c explains the observed coordination across all demonstrations. Let p(c) denote the prior probability assigned to candidate capability c
+
+before observing the demonstrations. We combine this prior with the demonstration score to obtain 
+
+L(c) = log p(c) + S(c, D), b(c | D ) = softmax c∈C L(c), (3) where b(c | D ) is the resulting belief over the constrained agent’s capability. Algorithm 1 summa-rizes the overall procedure. To compute S(c, D), we measure how likely the observed actions of both agents are under candidate capability c. At each observed state, the behavioral model defines a distribution ρc,τ (aD , a P | s)
+
+over their joint actions, where τ = ( τD , τ P ) contains the agents’ behavior temperatures. We evaluate the probability assigned to each observed action pair and combine these probabilities across all states and demonstrations:          
+
+> S(c, D) = log X
+> τ
+> exp
+> "X
+> d∈D
+> X
+> t∈d
+> log ρc,τ
+> 
+> aDt, a Pt|st
+> 
+> + log p(τ)
+> #!
+> .(4)
+
+A candidate therefore receives a high score when it predicts both the constrained agent’s actions and the demonstrator’s response well. 64.2 COMPUTING CAPABILITY SCORES 
+
+Computing the score in Eq. 4 exactly requires solving the behavioral model at every observed state for every candidate capability. This becomes prohibitively expensive as the state and action spaces grow. We therefore train learned models offline on simulated coordination where the constrained agent’s capability is known. At inference time, the true capability is hidden, and the models receive the observed coordination together with a candidate capability to estimate how well that candidate explains the demonstrations. Across all three settings, we use the same capability-scoring idea, but vary how much of the compu-tation is approximated by a learned model. In the 2D rod setting, we learn the action values predicted by the behavioral model for both agents, convert them into action distributions, and compute the ca-pability score explicitly from the likelihood of the observed actions. In the fixed-base dual-UR5 setting, we predict each observed step’s contribution to the same capability score directly and com-bine these predictions across the demonstration. The mobile dual-UR5 setting further increases the complexity and introduces both arm and base constraints, so we predict scores at the demonstration level and combine the contributions of the arm and base components when evaluating a candidate capability. The resulting scores are combined into the capability belief used for test-time planning. 4.3 PLANNING WITH THE INFERRED CAPABILITY 
+
+At test time, the helper must coordinate with the constrained agent on a new task that may require motions not seen in the demonstrations. Rather than transferring a demonstrated coordination strat-egy, we use the inferred capability to constrain the partner behavior considered during planning. Within a model predictive control (MPC) framework, we use the cross-entropy method (CEM) to optimize the helper’s action sequence (Rubinstein, 1999; Rubinstein & Kroese, 2004). For each can-didate helper sequence, the planner rolls out how the constrained agent is expected to respond under its inferred capability. During each rollout, the constrained agent is limited to actions that are fea-sible under the inferred capability. The planner therefore searches over coordination strategies that are compatible with what the constrained agent can physically execute, allowing the helper to plan for a new task without observing prior coordination on that task. We provide additional derivations and implementation details in Appendix A.1. 
+
+## 5 EXPERIMENTS AND RESULTS 
+
+We evaluate whether our method can accurately infer the constrained agent’s physical constraints from prior coordination and whether the inferred capability supports zero-shot coordination on a new task. We study both questions across the 2D rod, fixed-base dual-UR5, and mobile dual-UR5 settings. 5.1 EXPERIMENTAL SETUP 
+
+For capability inference, we vary the number of observed demonstrations over N ∈ { 1, 2, 4, 8} and measure normalized Hamming distance between the inferred and true constraints, where lower is better. For zero-shot coordination, all inference-based methods use N = 8 demonstrations. We evaluate performance on the new tasks with obstacles and additionally report results on obstacle-free control tasks to separate failures in basic coordination from failures that arise when the new task requires different motions. We compare against four baselines that isolate different sources of performance. CE-CM-Div (Tis-nikar et al., 2026) is a prior capability-inference method that estimates task-invariant partner capa-bilities from multi-agent trajectories and serves as our primary inference baseline. Capacity-blind CEM uses the same planner as our method but receives no information about the constrained agent’s capability, testing whether capability information is necessary for planning. Oracle CEM receives the true physical constraints and provides a reference for performance with perfect capability infor-mation. Behavioral cloning directly learns from the observed demonstrations, allowing us to test whether reproducing demonstrated coordination is sufficient when the task changes. 7For planning, we report task success and Success weighted by Number of Actions (SNA) (Chen et al., 2021). Failed episodes receive an SNA of zero. For successful episodes, SNA is the ratio between the reference number of actions and the larger of the executed and reference numbers of ac-tions, so higher SNA indicates more efficient successful coordination. Success and SNA are reported as percentages, with higher values indicating better performance. All results are reported as mean and standard error over three random seeds. All CEM-based methods use the same planner and dif-fer only in the capability information provided to it. Additional details on baseline implementations, evaluation tasks, training, and planner hyperparameters are provided in Appendix A.2. 5.2 CONSTRAINT INFERENCE 
+
+We first measure constraint-inference accuracy from prior coordination across all three settings and demonstration budgets. Table 2 shows that our method outperforms CE-CM-Div across all three settings and demonstration budgets. Additional demonstrations are especially helpful in the mobile dual-UR5 setting, where error decreases from 0.190 at N = 1 to 0.009 at N = 8 .We also perform an ablation to test whether observing the demonstrator improves capability infer-ence. For this ablation, we retrain the inference model using only the constrained agent’s behavior. As shown in Table 2, using both agents’ behavior roughly halves inference error in the fixed-base dual-UR5 setting across all demonstration budgets and reduces error in the mobile dual-UR5 setting at every budget. In the 2D rod setting, the demonstrator’s behavior substantially improves inference when only one or two demonstrations are available. These results support our key insight that phys-ical coupling makes the demonstrator’s response informative about constraints that may be difficult to identify from the constrained agent’s behavior alone. Table 2: Constraint-inference accuracy at N ∈ { 1, 2, 4, 8} demonstrations. We report normalized Hamming distance between the inferred and true constraints. “Ours, partner only” uses only the constrained agent’s behavior for inference and excludes the demonstrator’s behavior. Values are mean ± standard error; lower is better. Bold indicates the best result within each robot setting and row, including ties. 2D Rod Fixed-Base Dual-UR5 Mobile Dual-UR5                                                                                                              
+
+> NCE-CM-Div Ours, partner only Ours CE-CM-Div Ours, partner only Ours CE-CM-Div Ours, partner only Ours 10.304 ±0.038 0.104 ±0.015 0.058 ±0.017 0.074 ±0.000 0 .068 ±0.006 0.031 ±0.012 0.306 ±0.028 0.201 ±0.045 0.190 ±0.060
+> 20.340 ±0.041 0.031 ±0.009 0.003 ±0.002 0.074 ±0.000 0 .037 ±0.000 0.019 ±0.000 0.278 ±0.028 0.148 ±0.042 0.130 ±0.060
+> 40.348 ±0.031 0.002 ±0.002 0.002 ±0.002 0.074 ±0.000 0 .037 ±0.000 0.019 ±0.000 0.250 ±0.000 0.090 ±0.006 0.069 ±0.005
+> 80.302 ±0.011 0.000 ±0.000 0.002 ±0.002 0 .074 ±0.000 0 .043 ±0.006 0.019 ±0.011 0.250 ±0.000 0.042 ±0.000 0.009 ±0.000
+
+5.3 ZERO -S HOT COORDINATION 
+
+We next evaluate whether the inferred capability supports coordination on the new tasks with ob-stacles. As shown in Table 3, our method achieves success rates of 92 .6% , 85 .2% , and 63 .0% in the 2D rod, fixed-base dual-UR5, and mobile dual-UR5 settings, respectively, approaching Oracle CEM at 96 .3% , 88 .9% , and 70 .4% . CE-CM-Div performs substantially worse across all three set-tings, showing that more accurate capability inference translates into better coordination when the task changes. The remaining baselines highlight why capability information must transfer beyond the demon-strated behavior. Capacity-blind CEM performs worse when successful planning depends on ac-counting for the constrained agent’s limitations, while behavioral cloning fails on all three new tasks despite nonzero performance on the obstacle-free controls. On the obstacle-free control tasks, our method closely matches Oracle CEM across all three settings. 5.4 QUALITATIVE EXAMPLES 
+
+Figure 3 provides qualitative examples of how the inferred capability affects test-time coordination. Panel A shows successful trajectories across all three benchmark settings, where the helper coor-dinates with the constrained agent to navigate the jointly carried object around obstacles. Panel B illustrates how the inferred constraint changes the planner’s behavior. When the partner’s constraint 8Table 3: Planning performance on the obstacle-free control and new tasks with obstacles. Our method, CE-CM-Div, and behavioral cloning use N = 8 demonstrations. Capacity-blind CEM uses no demonstrations, while Oracle CEM receives the true constraints. Success and SNA are percentages reported as mean ± standard error over three seeds; higher is better. Bold indicates the best non-oracle result for each task and metric, including ties. 2D Rod Fixed-Base Dual-UR5 Mobile Dual-UR5 Task Method Success ↑ SNA ↑ Success ↑ SNA ↑ Success ↑ SNA ↑
+
+Obstacle-free control Capacity-blind + CEM 100.0 ± 0.0 91 .4 ± 0.9 0.0 ± 0.0 0.0 ± 0.0 66 .7 ± 0.0 55 .2 ± 0.0
+
+CE-CM-Div + CEM 100.0 ± 0.0 90 .4 ± 1.6 55 .6 ± 11 .1 30 .5 ± 8.3 66 .7 ± 0.0 54 .3 ± 0.0
+
+Behavioral cloning 66 .7 ± 0.0 52 .5 ± 6.1 22 .2 ± 11 .1 7.5 ± 3.8 66 .7 ± 0.0 31 .1 ± 0.0
+
+Oracle + CEM 100 .0 ± 0.0 91 .4 ± 0.2 100 .0 ± 0.0 44 .8 ± 1.8 100 .0 ± 0.0 80 .2 ± 0.0
+
+Ours + CEM 100.0 ± 0.0 92.4 ± 0.4 100.0 ± 0.0 43.9 ± 0.8 100.0 ± 0.0 80.2 ± 0.0 
+
+New tasks with obstacles Capacity-blind + CEM 51 .9 ± 3.7 44 .4 ± 2.8 0.0 ± 0.0 0.0 ± 0.0 25 .9 ± 9.8 14 .2 ± 5.4
+
+CE-CM-Div + CEM 55 .6 ± 0.0 46 .1 ± 0.7 44 .4 ± 0.0 16 .9 ± 1.5 37 .0 ± 3.7 19 .7 ± 1.8
+
+Behavioral cloning 0.0 ± 0.0 0.0 ± 0.0 0.0 ± 0.0 0.0 ± 0.0 0.0 ± 0.0 0.0 ± 0.0
+
+Oracle + CEM 96 .3 ± 3.7 76 .0 ± 2.0 88 .9 ± 6.4 31 .3 ± 1.9 70 .4 ± 3.7 38 .4 ± 2.5
+
+Ours + CEM 92.6 ± 3.7 72.0 ± 3.3 85.2 ± 3.7 31.1 ± 0.8 63.0 ± 7.4 34.5 ± 4.4 
+
+is ignored, the planner selects a motion that requires the constrained agent to reach a natural but infeasible pose. Using the inferred constraint, the planner instead selects a feasible alternative that respects the partner’s physical limitations. Fixed Base Dual-UR5 Carrying  
+
+> Mobile Dual-UR5 Carrying
+> 2D Rod Carrying
+> Time
+> A) Successful Trajectories with our method B) Inferred constraints change the planned trajectory
+> Ignoring the partner's
+> constraint leads the
+> planner to a pose the
+> partner cannot reach.
+> Using the inferred
+> constraint, the planner
+> selects a feasible
+> alternative.
+
+Figure 3: Qualitative examples of zero-shot coordination using our method. (A) Representative successful trajectories for 2D rod carrying, fixed-base dual-UR5 carrying, and mobile dual-UR5 carrying, shown from left to right over time. (B) Example of how an inferred physical constraint changes test-time planning. Ignoring the constrained agent’s limitation leads to a pose it cannot reach, while incorporating the inferred constraint causes the planner to select a feasible alternative. 
+
+## 6 CONCLUSION AND LIMITATIONS 
+
+In summary, we formulate the problem of inferring a robot partner’s low-level physical constraints from prior multi-agent coordination and using them for zero-shot coordination on a new task. We introduce Watch, Infer, Coordinate, a benchmark spanning three physically coupled carrying set-tings, and show how the joint behavior of both agents can be used to infer a partner’s physical constraints. Our experiments show that the inferred constraints improve zero-shot coordination and achieve performance close to an oracle with access to the true constraints. As a first step, we intentionally assume a known behavioral model, goals and dynamics, full observa-tions, and a finite constraint set to isolate the core challenge of constraint inference and coordination without introducing additional sources of uncertainty. Relaxing these assumptions is an important next step toward broader generalization. Moreover, directly comparable baselines are limited, as 9existing approaches use different capability representations or observations. We will release bench-mark code and evaluation scripts to support broader evaluations across tasks, constraints, and partner behaviors, and future extensions to heterogeneous teams, including human-robot coordination. 
+
+## REFERENCES 
+
+Elie Aljalbout, Maximilian Karl, and Patrick van der Smagt. Clas: Coordinating multi-robot manip-ulation with central latent action spaces. In Learning for Dynamics and Control Conference , pp. 1152–1166. PMLR, 2023. 3 Zhihao Cao, Zidong Wang, Siwen Xie, Anji Liu, and Lifeng Fan. Smart help: Strategic opponent modeling for proactive and adaptive robot assistance in households. In 2024 IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition (CVPR) , pp. 18091–18101. IEEE, 2024. 2, 3Changan Chen, Sagnik Majumder, Al-Halah Ziad, Ruohan Gao, Santhosh Kumar Ramakrishnan, and Kristen Grauman. Learning to set waypoints for audio-visual navigation. In ICLR , 2021. 8 Glen Chou, Dmitry Berenson, and Necmiye Ozay. Learning constraints from demonstrations. In 
+
+International Workshop on the Algorithmic Foundations of Robotics , pp. 228–245. Springer, 2018. 4Glen Chou, Necmiye Ozay, and Dmitry Berenson. Learning parametric constraints in high dimen-sions from demonstrations. In Conference on robot learning , pp. 1211–1230. PMLR, 2020. 4 Dayi Dong, Maulik Bhatt, Seoyeon Choi, and Negar Mehr. Mimic-d: Multi-modal imitation for multi-agent coordination with decentralized diffusion policies. arXiv preprint arXiv:2509.14159 ,2025. 3 Ria Doshi, Tian Gao, Annie Chen, Chelsea Finn, and Jeannette Bohg. Chorus: Decentralized multi-embodiment collaboration with one vla policy. arXiv preprint arXiv:2606.12352 , 2026. 2, 3 Weihua Du, Qiushi Lyu, Jiaming Shan, Zhenting Qi, Hongxin Zhang, Sunli Chen, Andi Peng, Tian-min Shu, Kwonjoon Lee, Behzad Dariush, et al. Constrained human-ai cooperation: An inclusive embodied social intelligence challenge. Advances in neural information processing systems , 37: 44526–44553, 2024. 2, 3 Hamed Farivarnejad and Spring Berman. Multirobot control strategies for collective transport. An-nual Review of Control, Robotics, and Autonomous Systems , 5(1):205–219, 2022. 2 Chengyang He, Gadiel Mark Sznaier Camps, Xu Liu, Mac Schwager, and Guillaume Adrien Sar-toretti. Latent theory of mind: A decentralized diffusion architecture for cooperative manipu-lation. In Joseph Lim, Shuran Song, and Hae-Won Park (eds.), Proceedings of The 9th Con-ference on Robot Learning , volume 305 of Proceedings of Machine Learning Research , pp. 392–405. PMLR, 27–30 Sep 2025. URL https://proceedings.mlr.press/v305/ he25a.html . 3 Hussein Ali Jaafar, Cheng-Hao Kao, and Sajad Saeedi. Mr. cap: Multi-robot joint control and planning for object transport. IEEE Control Systems Letters , 8:139–144, 2024. 3 Florian Kennel-Maushart and Stelian Coros. Payload-aware trajectory optimisation for non-holonomic mobile multi-robot manipulation with tip-over avoidance. IEEE Robotics and Au-tomation Letters , 9(9):7669–7676, 2024. 3 Solomon Kullback and Richard A Leibler. On information and sufficiency. The annals of mathe-matical statistics , 22(1):79–86, 1951. 5 Joshua Lee, Jeffrey Fong, Bing Cai Kok, and Harold Soh. Getting to know one another: Calibrating intent, capabilities and trust for human-robot collaboration. In 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pp. 6296–6303. IEEE, 2020. 3 Christopher L Lewis and Anthony A Maciejewski. Fault tolerant operation of kinematically redun-dant manipulators for locked joint failures. IEEE Transactions on Robotics and Automation , 13 (4):622–629, 1997. 2 10 Cecilia Lindig-Le´ on, Gerrit Schmid, and Daniel A Braun. Bounded rational response equilibria in human sensorimotor interactions. Proceedings of the Royal Society B: Biological Sciences , 288 (1962):20212094, 2021. 5 Guiliang Liu, Yudong Luo, Ashish Gaurav, Kasra Rezaee, and Pascal Poupart. Benchmarking con-straint inference in inverse reinforcement learning. arXiv preprint arXiv:2206.09670 , 2022. 3 Ziang Liu, Yuanchen Ju, Yu Da, Tom Silver, Pranav N Thakkar, Jenna Li, Justin Guo, Kather-ine Dimitropoulou, and Tapomayukh Bhattacharjee. Grace: Generalizing robot-assisted caregiv-ing with user functionality embeddings. In 2025 20th ACM/IEEE International Conference on Human-Robot Interaction (HRI) , pp. 686–695. IEEE, 2025. 3, 4 Shehryar Malik, Usman Anwar, Alireza Aghasi, and Ali Ahmed. Inverse constrained reinforcement learning. In International conference on machine learning , pp. 7390–7399. PMLR, 2021. 4 Richard D McKelvey and Thomas R Palfrey. Quantal response equilibria for normal form games. 
+
+Games and economic behavior , 10(1):6–38, 1995. 5 Ofir Nachum, Michael Ahn, Hugo Ponte, Shixiang (Shane) Gu, and Vikash Kumar. Multi-agent ma-nipulation via locomotion using hierarchical sim2real. In Leslie Pack Kaelbling, Danica Kragic, and Komei Sugiura (eds.), Proceedings of the Conference on Robot Learning , volume 100 of 
+
+Proceedings of Machine Learning Research , pp. 110–121. PMLR, 30 Oct–01 Nov 2020. URL 
+
+https://proceedings.mlr.press/v100/nachum20a.html . 3 Eley Ng, Ziang Liu, and Monroe Kennedy. Diffusion co-policy for synergistic human-robot collab-orative tasks. IEEE Robotics and Automation Letters , 9(1):215–222, 2023. 3 Bikram Pandit, Ashutosh Gupta, Mohitvishnu S. Gadde, Addison Johnson, Aayam Kumar Shrestha, Helei Duan, Jeremy Dao, and Alan Fern. Learning decentralized multi-biped control for payload transport. In Pulkit Agrawal, Oliver Kroemer, and Wolfram Burgard (eds.), Proceedings of The 8th Conference on Robot Learning , volume 270 of Proceedings of Machine Learning Research ,pp. 1021–1034. PMLR, 06–09 Nov 2025a. URL https://proceedings.mlr.press/ v270/pandit25a.html . 3 Bikram Pandit, Aayam Kumar Shrestha, and Alan Fern. Multi-quadruped cooperative object trans-port: Learning decentralized pinch-lift-move. arXiv preprint arXiv:2509.14342 , 2025b. 2, 3 Xavier Puig, Tianmin Shu, Shuang Li, Zilin Wang, Yuan-Hong Liao, Joshua B. Tenenbaum, Sanja Fidler, and Antonio Torralba. Watch-and-help: A challenge for social perception and human-{ai }
+
+collaboration. In International Conference on Learning Representations , 2021. URL https: //openreview.net/forum?id=w_7JMpGZRh0 . 2, 3 Xavier Puig, Tianmin Shu, Joshua B. Tenenbaum, and Antonio Torralba. Nopa: Neurally-guided online probabilistic assistance for building socially intelligent home assistants. In 2023 IEEE International Conference on Robotics and Automation (ICRA) , pp. 7628–7634, 2023. doi: 10. 1109/ICRA48891.2023.10161352. 3 Sid Reddy, Anca Dragan, and Sergey Levine. Where do you think you’re going?: Inferring beliefs about dynamics from behavior. Advances in Neural Information Processing Systems , 31, 2018. 3 Reuven Rubinstein. The cross-entropy method for combinatorial and continuous optimization. 
+
+Methodology and computing in applied probability , 1(2):127–190, 1999. 7 Reuven Y Rubinstein and Dirk P Kroese. The cross-entropy method: a unified approach to com-binatorial optimization, Monte-Carlo simulation, and machine learning , volume 133. Springer, 2004. 7 Dexter RR Scobee and S Shankar Sastry. Maximum likelihood constraint inference for inverse reinforcement learning. arXiv preprint arXiv:1909.05477 , 2019. 4 Haojun Shi, Suyu Ye, Katherine M Guerrerio, Jianzhi Shen, Yifan Yin, Daniel Khashabi, Chien-Ming Huang, and Tianmin Shu. Safe and interpretable multimodal path planning for multi-agent cooperation. arXiv preprint arXiv:2602.19304 , 2026. 2, 3 11 Kazuki Shibata, Tomohiko Jimbo, and Takamitsu Matsubara. Deep reinforcement learning of event-triggered communication and consensus-based control for distributed cooperative transport. 
+
+Robotics and Autonomous Systems , 159:104307, 2023. 3 Kun Song, Gaoming Chen, Shentao Ma, Ninglong Jin, Guangbao Zhao, Mingyu Ding, Zhenhua Xiong, and Jia Pan. Collabot: Vision-language guided simultaneous collaborative manipulation. 
+
+arXiv preprint arXiv:2508.03526 , 2025. 3 Theodoros Stouraitis, Iordanis Chatzinikolaidis, Michael Gienger, and Sethu Vijayakumar. Online hybrid motion planning for dyadic collaborative manipulation via bilevel optimization. IEEE Transactions on Robotics , 36(5):1452–1471, 2020. 3 Renato Tin´ os, Marco Henrique Terra, and Marcel Bergerman. A fault tolerance framework for cooperative robotic manipulators. Control Engineering Practice , 15(5):615–625, 2007. 2 Peter Tisnikar, Gerard Canal, and Matteo Leonetti. Probabilistic inference of human capabilities from passive observations. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pp. 8779–8785. IEEE, 2024. 3, 4 Peter Tisnikar, Maja Swieczkowska, Benteng Ma, Gerard Canal, and Matteo Leonetti. Part-ner capability estimation for task-agnostic adaptation in ad-hoc teamwork. arXiv preprint arXiv:2607.27177 , 2026. 3, 4, 7 Annie Xie, Dylan Losey, Ryan Tolsma, Chelsea Finn, and Dorsa Sadigh. Learning latent representa-tions to influence multi-agent interaction. In Conference on robot learning , pp. 575–588. PMLR, 2021. 3 Lei Yan, Theodoros Stouraitis, and Sethu Vijayakumar. Decentralized ability-aware adaptive control for multi-robot collaborative manipulation. IEEE Robotics and Automation Letters , 6(2):2311– 2318, 2021. 3 Elvin Yang and Christoforos Mavrogiannis. Implicit communication in human-robot collaborative transport. In 2025 20th ACM/IEEE International Conference on Human-Robot Interaction (HRI) ,pp. 23–33. IEEE, 2025. 2, 3 Lin Zhang, Yufeng Sun, Andrew Barth, and Ou Ma. Decentralized control of multi-robot system in cooperative object transportation using deep reinforcement learning. IEEE access , 8:184109– 184119, 2020. 3 Zhouyu Zhang, Chih-Yuan Chiu, and Glen Chou. Constraint learning in multi-agent dynamic games from demonstrations of local nash interactions. IEEE Robotics and Automation Letters , 11(6): 6696–6703, 2026. 3, 4 Tan Zhi-Xuan, Jordyn Mann, Tom Silver, Josh Tenenbaum, and Vikash Mansinghka. Online bayesian goal inference for boundedly rational planning agents. Advances in neural information processing systems , 33:19238–19250, 2020. 3 
+
+## A APPENDIX 
+
+A.1 METHOD DETAILS 
+
+A.1.1 BEHAVIORAL MODEL 
+
+The capability score in Eq. 4 requires predicting how the two agents would behave under a candidate capability c. We now describe the behavioral model used to construct this prediction. Intuitively, a candidate capability determines which actions the constrained agent can take. Given these feasible actions, each agent favors actions that lead to good joint outcomes, without assuming perfectly optimal action selection. The agents’ predicted actions are interdependent: the demonstrator chooses actions based on what the constrained agent can do, while the constrained agent’s preferred actions depend on how the demonstrator is expected to respond. We therefore update their predicted policies iteratively to obtain a model of their joint behavior. 12 Let D denote the demonstrator and P the constrained agent. At state s, the agents choose actions 
+
+aD and aP . Each setting defines a shared action-pair value 
+
+Qc(s, a D , a P ),
+
+which measures the value of taking the joint action (aD , a P ) and continuing from the resulting state. The candidate capability c determines the feasible action set AP (s, c ) for the constrained agent. Thus, different candidate capabilities can produce different predicted behavior even at the same state. We model both agents as boundedly rational under the shared regularized objective 
+
+Jc(πD , π P ; s) = EaD ∼πD , a P ∼πP
+
+Qc(s, a D , a P ) − τD DKL (πD ∥uD ) − τP DKL (πP ∥uP,c ), (5) where uD is the uniform distribution over the demonstrator’s available actions and uP,c is the uni-form distribution over the constrained agent’s actions that are feasible under capability c. The tem-peratures τD and τP determine how strongly the agents favor high-value actions. Smaller temper-atures place more probability on the highest-value actions, while larger temperatures allow a wider range of actions. The two agents’ policies are coupled because whether an action is useful for one agent depends on what the other agent is expected to do. We therefore compute the expected value of each action by averaging over the other agent’s current policy: 
+
+¯QD (s, a D ) = EaP ∼πP
+
+Qc(s, a D , a P ) , ¯QP (s, a P ) = EaD ∼πD
+
+Qc(s, a D , a P ) . (6) For example, ¯QD (s, a D ) measures how good demonstrator action aD is on average given what we currently expect the constrained agent to do. We convert these expected action values into soft action distributions: 
+
+eπD (aD ) = uD (aD ) exp   ¯QD (s, a D )/τ D
+
+P 
+
+> aD′
+
+uD (aD′) exp   ¯QD (s, a D′)/τ D
+
+ , (7) and 
+
+eπP (aP ) = uP,c (aP ) exp   ¯QP (s, a P )/τ P
+
+P  
+
+> aP′
+
+uP,c (aP ′) exp   ¯QP (s, a P ′)/τ P
+
+ . (8) These distributions assign greater probability to actions with higher expected joint value. Because 
+
+uP,c places probability only on actions that are feasible under capability c, infeasible constrained-agent actions receive no probability. The two soft responses depend on one another. Changing the constrained agent’s policy changes the demonstrator’s expected action values, which can change the demonstrator’s policy, and vice versa. We therefore compute the policies iteratively. Starting from uniform policies, we first update the demonstrator based on the constrained agent’s current policy and then update the constrained agent based on the newly updated demonstrator policy. To make these updates more stable, we move each policy partway toward its newly computed soft response. For the demonstrator, this update is 
+
+log π(m) 
+
+> D
+
+= lognormalize 
+
+
+
+(1 − η) log π(m−1)  
+
+> D
+
++ η log eπ(m)
+
+> D
+
+
+
+, (9) and the constrained agent is updated analogously: 
+
+log π(m) 
+
+> P
+
+= lognormalize 
+
+
+
+(1 − η) log π(m−1)  
+
+> P
+
++ η log eπ(m)
+
+> P
+
+
+
+, (10) where η = 0 .5 and lognormalize( x) = x − logsumexp( x). Algorithm 2 summarizes the complete procedure. After the iterative updates, we compute one final soft response for each agent using the final policy of the other agent. We denote these resulting policies by πD and πP . Together, they define the capability-conditioned joint-action distribution 
+
+ρc,τ (aD , a P | s) = πD (aD | s, c, τ ) πP (aP | s, c, τ ), (11) where τ = ( τD , τ P ). Changing the candidate capability c therefore changes the constrained agent’s feasible actions and, through the coupled policies, can also change the demonstrator’s predicted behavior. 13 Algorithm 2 Mutual soft-response computation 
+
+Input: state s, candidate capability c, joint-action values Qc, temperatures τD , τ P 
+
+> 1:
+
+Initialize π(0)  
+
+> D
+
+← uD and π(0)  
+
+> P
+
+← uP,c  
+
+> 2:
+
+for m = 1 , . . . , M do  
+
+> 3:
+
+Compute ¯Q(m) 
+
+> D
+
+using π(m−1)  
+
+> P
+
+and Eq. 6  
+
+> 4:
+
+Compute eπ(m) 
+
+> D
+
+using Eq. 7  
+
+> 5:
+
+Update π(m) 
+
+> D
+
+using Eq. 9  
+
+> 6:
+
+Compute ¯Q(m) 
+
+> P
+
+using π(m) 
+
+> D
+
+and Eq. 6  
+
+> 7:
+
+Compute eπ(m) 
+
+> P
+
+using Eq. 8  
+
+> 8:
+
+Update π(m) 
+
+> P
+
+using Eq. 10  
+
+> 9:
+
+end for  
+
+> 10:
+
+Compute a final soft response πD using π(M ) 
+
+> P
+> 11:
+
+Compute a final soft response πP using π(M )
+
+> D
+
+Return: πD , π P
+
+A.1.2 CAPABILITY INFERENCE DETAILS 
+
+Across all three settings, capability inference follows the same basic procedure. For each candidate capability, we compute a score measuring how well that candidate explains the observed coordi-nation. Candidates that are physically inconsistent with the demonstrations are excluded, and the remaining scores are combined with a capability prior and normalized to form the belief used for planning. The settings differ only in how we compute the score. In the 2D rod setting, the action space is small enough to score candidates from the predicted actions directly. For each observed state and candidate capability, the learned critic predicts values for the 64 possible force directions of both the demonstrator and constrained agent. We convert these values into action distributions and evaluate how much probability they assign to the two actions that were actually observed. Because the recorded actions are continuous directions, we interpret each discrete action probability as a density over its corresponding angular interval. We additionally mix the density with a small uniform component of weight 0.02 so that a single unusual action does not assign zero likelihood to an otherwise plausible candidate. We sum the log probabilities of both agents’ observed actions over all steps and demonstrations to obtain a score for each candidate. The behavioral temperatures of the two agents are not assumed to be known. We therefore evaluate seven possible temperatures for each agent, 
+
+{0.001 , 0.002 , 0.005 , 0.01 , 0.02 , 0.05 , 0.1},
+
+giving 49 temperature pairs. A single temperature pair is shared across all selected demonstrations, and we marginalize over these 49 possibilities when computing the final candidate score. The re-sulting scores are combined with the capability prior and normalized across candidates. For the UR5 settings, explicitly constructing these action distributions at every observed state for every candidate would require substantially more computation. We therefore learn the candidate score directly. In the fixed-base setting, a candidate-conditioned critic assigns a scalar score to each observed step using the state, the actions of both agents, their resulting motion, and the candidate capability. We sum these step scores over each demonstration and then combine them across all selected demonstrations. A separate physical-consistency check removes candidates whose joint position or velocity limits are incompatible with the observed motion. We then add a sparsity prior that favors capabilities with fewer active joint constraints and normalize the resulting scores over the 172 candidates. The mobile setting uses the same candidate-scoring idea, but scores complete observed sequences rather than individual steps. A recurrent critic processes each demonstration and produces a score from the resulting sequence representation. Because a mobile capability contains both an arm con-straint and a base-motion constraint, the critic scores these two components separately and then combines their contributions when evaluating a complete candidate. As in the fixed-base setting, an independent physical-consistency check removes candidates that cannot reproduce the observed mo-14 tion before the learned scores are normalized. This produces a distribution over the 475 composite capabilities. A.1.3 PHYSICAL CONSISTENCY AND TEST -T IME PLANNING 
+
+At test time, the inferred capability is used inside CEM-MPC to predict which coordinated motions are physically possible for the constrained agent. For each candidate helper action sequence, the planner predicts the constrained agent’s response while restricting it to actions that are feasible under the capability being considered. The resulting joint motion is rolled forward and scored for progress toward the test-task goal. In the rod and fixed-base settings, planning accounts for uncertainty over multiple candidate capabilities from the inferred belief, while the mobile setting plans with the highest-scoring capability. The helper executes the first action of the selected sequence and replans from the resulting observed state. Proposed motions must also satisfy the physical constraints of the setting. In the UR5 settings, the planner checks whether a motion is compatible with the candidate capability as well as the robot kinematics, workspace, and collision constraints. In the rod setting, proposed motions are similarly checked for collisions. Motions that violate these constraints are treated as infeasible rather than modified into a different executable motion. Within each setting, all CEM-based methods use the same planner and planning budget. They differ only in the capability information supplied to the planner: our method uses its inferred capabil-ity, CE-CM-Div uses its inferred capability, Capacity-blind CEM receives no demonstration-based capability information, and Oracle CEM receives the true capability. A.2 EXPERIMENT IMPLEMENTATION DETAILS 
+
+Across all three settings, we evaluate capability inference using N ∈ { 1, 2, 4, 8} obstacle-free demonstrations and use N = 8 demonstrations for zero-shot coordination. Each setting contains three fixed physical-constraint cases for final evaluation. Planning is evaluated on three new tasks with obstacles and one obstacle-free control task, using three evaluation seeds. A.2.1 2D R OD CARRYING 
+
+In the 2D rod setting, the state consists of the rod center and orientation, (x, y, θ ). The two agents apply unit forces at opposite ends of the rod, jointly determining its translation and rotation. Each agent acts over 64 force directions. The demonstrator can apply force in any direction, while the constrained agent is limited to a continuous angular range specified by its capability. The candidate set contains 2,665 such constraints, and the three evaluation cases use angular ranges centered at 0◦
+
+with widths of 30 ◦, 45 ◦, and 65 ◦. Demonstrations are generated on obstacle-free goal-reaching tasks using the behavioral model described above. For N = 1 , 2, 4, 8, we use increasingly larger subsets of the same fixed demonstration sequence, so additional demonstrations are added without changing the earlier ones. To make inference efficient, we train a neural network to predict the action values produced by the behavioral model for both agents. The model uses three hidden layers of width 256 and is trained on 98,304 simulated examples pairing rod states and candidate capabilities with action-value targets from the behavioral model. A.2.2 FIXED -B ASE DUAL -UR5 C ARRYING 
+
+The fixed-base dual-UR5 setting is simulated in Isaac Sim with two UR5e arms grasping oppo-site ends of a rigid beam. Demonstrations represent the coordinated end-effector motion using the beam’s y and z position and yaw orientation. Each agent selects from 257 possible three-dimensional beam-velocity commands, and the two proposals are combined into a shared beam motion. A capa-bility describes possible restrictions on the six robot joints: each joint can have a reduced velocity limit, a tighter lower position limit, or a tighter upper position limit. This gives 18 possible indi-vidual restrictions. The 172 candidate capabilities include the unrestricted robot, each of the 18 individual restrictions, and every pair of restrictions. The three evaluation cases use a velocity re-striction on the first joint, a lower position restriction on the third joint, and the combination of those two restrictions. The obstacle-free demonstrations cover six different beam motions, with N = 8 
+
+using eight demonstrations drawn from these motions. Capability scoring uses a neural network 15 conditioned on both the observed coordination and a candidate capability. It produces a score for each observed step, and these scores are combined across the demonstrations. The model is trained with AdamW for 12,000 updates using demonstrations generated under known capabilities. A.2.3 MOBILE DUAL -UR5 C ARRYING 
+
+The mobile dual-UR5 setting extends the same manipulation task with planar mobile bases. The state has 22 dimensions and contains the beam pose, both base poses, and both six-joint arm con-figurations. Each agent selects a four-dimensional motion command controlling translation and yaw from a set of 1,281 possible actions. A capability combines a constraint on the directions in which the base can move with a constraint on arm motion. We consider 25 base constraints and 19 arm constraints, producing 475 possible combinations. Each evaluation case is paired with eight fixed obstacle-free demonstrations totaling 100 observed steps. Six demonstrations emphasize arm mo-tion while the bases remain stationary, and two emphasize base motion while the arms are held fixed. For N = 1 , 2, 4, we use fixed subsets of these eight demonstrations. Capability scoring uses a recurrent neural network that processes an entire demonstration at once. It scores the arm and base components of each candidate and combines them to obtain a score for the complete capability. The model uses a one-layer GRU with hidden width 48 and is trained on 25 capability cases, with three additional cases used for validation. A.2.4 BASELINE IMPLEMENTATIONS 
+
+CE-CM-Div is our primary capability-inference baseline. It receives the same obstacle-free demon-strations as our method but infers capability from the observed state trajectories rather than the actions of both agents. For each candidate capability, it generates possible trajectories and compares them with the observed trajectory, then projects the resulting estimate onto the same candidate set used by our method. The inferred capability is passed to the same setting-specific CEM-MPC plan-ner used by our method. In the mobile setting, the arm and base components are inferred separately and then combined into a complete capability. Capacity-blind CEM uses the same planner but receives no information from the demonstrations about the constrained agent’s capability. It therefore plans from a fixed, task-independent capability assumption defined for each setting. This corresponds to an unrestricted force-direction model in the rod setting, the fixed capability prior in the fixed-base setting, and the nominal composite capability in the mobile setting. Oracle CEM instead receives the true capability while using the same planner and planning budget, providing a reference for performance with perfect capability information. Behavioral cloning directly predicts the helper’s action from the N = 8 obstacle-free demonstra-tions. For each setting, we train a three-layer width-256 policy to predict the helper action in that setting’s action space. At test time, the policy acts directly without capability inference or CEM-MPC planning. For the partner-only comparison, we train separate inference models using only the constrained agent’s behavior. These models use the same capability candidates and evaluation demonstrations as the full method but exclude the demonstrator’s behavior when inferring the constraint. A.2.5 EVALUATION PROTOCOL 
+
+Capability inference is evaluated using normalized Hamming distance between the inferred and true constraint representations. For binary representations bz, z ∈ { 0, 1}m, we compute 
+
+dH (bz, z ) = 1
+
+m
+
+> m
+
+X
+
+> j=1
+
+1[bzj̸ = zj ]. (12) For the 2D rod, the representation indicates feasible motion over 72 fixed force directions. For the fixed-base dual-UR5, it indicates which of the 18 possible joint restrictions are active. For the mobile dual-UR5, we compute Hamming distance separately for the base-direction and arm constraints and give the two components equal weight. Lower values indicate more accurate constraint inference. Zero-shot coordination is evaluated using task success and Success weighted by Number of Actions (SNA). A trial is successful if the robots reach the goal within the setting’s action limit. If n is the 16 number of actions executed and nref is the reference action count for the same task and physical constraint, we compute 
+
+SNA = 1[success] nref 
+
+max( n, n ref ) . (13) Failed trials therefore receive an SNA of zero, while successful trials receive higher scores when they complete the task using fewer actions. The reference trajectories use the true physical constraint and are used only for evaluation. Table 4 summarizes the CEM-MPC parameters used in each setting. All CEM-based methods within a setting use the same planner configuration. The setting-specific CEM hyperparameters were cho-sen to keep planning runtime approximately comparable across the three environments. Table 4: CEM-MPC hyperparameters used for zero-shot coordination. Setting Horizon Population Elites Iterations 2D Rod 32 64 8 3Fixed-Base Dual-UR5 4 16 2 2Mobile Dual-UR5 4 4 1 1Each setting uses three fixed physical-constraint cases for final evaluation. Planning evaluates each constraint on three new tasks with obstacles and one obstacle-free control task using seeds 42, 43, and 44. This gives 27 obstacle-task trials and 9 obstacle-free trials per method and setting. We first average performance across the constraint cases and tasks within each seed, then report the mean and standard error across the three seed-level results. Every scheduled evaluation trial is retained after one attempt, without outcome-dependent filtering or replacement. 17
