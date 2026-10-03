@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-02</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-03</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 14 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-02 23:09:38 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-03 22:02:11 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-10-02 日报精选 14 篇，精读 6 篇、速读 8 篇，多智能体规划与路径优化成为今日主线。最值得看的是两项 9.0 分工作：LaCAM 求解多智能体推箱子，以及地图不确定下的信念感知多智能体路径规划。普通读者可先读这两篇精读，再按兴趣扫读车辆路径与多机器人任务分配等速读方向。</p>
+<p>今日完成5篇论文速读筛选，未进入精读，焦点落在多智能体协调与机器人导航。</p>
+<p>最值得看的是LLM智能体分布式协调、以及用基础设施相机/社交安全世界模型增强机器人导航这三篇（均6.0分）。</p>
+<p>普通读者可先扫这三篇的摘要与场景设定，判断是否与自己的多智能体或机器人应用相关，再决定是否深入。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Solving Multi-Agent Sokoban via LaCAM">Solving Multi-Agent Sokoban via LaCAM</span></li><li><span class="dpr-home-dashboard-paper-title" title="Belief-Aware Multi-Agent Path Finding under Map Uncertainty">Belief-Aware Multi-Agent Path Finding under Map Uncertainty</span></li><li><span class="dpr-home-dashboard-paper-title" title="DuoMind: Enabling Distributed Multi-Robot Coordination with Semantic Communication">DuoMind: Enabling Distributed Multi-Robot Coordination with Semantic Communication</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">8 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="HALO: Heterogeneous Allocation Via Localized Observations for the Vehicle Routing Problem">HALO: Heterogeneous Allocation Via Localized Observations for the Vehicle Routing Problem</span></li><li><span class="dpr-home-dashboard-paper-title" title="Communication-Free Distributed Multi-Robot Task Allocation under Partial Observations Using Labeled Multi-Bernoulli Filtering">Communication-Free Distributed Multi-Robot Task Allocation under Partial Observations Using Labeled Multi-Bernoulli Filtering</span></li><li><span class="dpr-home-dashboard-paper-title" title="DORA: Divergence-Oriented Data-Relay Algorithm for Partially Connected Robot Teams">DORA: Divergence-Oriented Data-Relay Algorithm for Partially Connected Robot Teams</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Symbolic Guidance for LLM Agents in Distributed Multiagent Coordination">Symbolic Guidance for LLM Agents in Distributed Multiagent Coordination</span></li><li><span class="dpr-home-dashboard-paper-title" title="InfraVLA: Extending Vision-Language-Action Navigation with Infrastructure Cameras">InfraVLA: Extending Vision-Language-Action Navigation with Infrastructure Cameras</span></li><li><span class="dpr-home-dashboard-paper-title" title="Social-WM: Safety-Aware Latent World Models for Robot Social Navigation">Social-WM: Safety-Aware Latent World Models for Robot Social Navigation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>8</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 </div>
 
