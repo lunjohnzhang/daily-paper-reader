@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-03</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-04</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-03 22:02:11 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-04 21:53:39 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日完成5篇论文速读筛选，未进入精读，焦点落在多智能体协调与机器人导航。</p>
-<p>最值得看的是LLM智能体分布式协调、以及用基础设施相机/社交安全世界模型增强机器人导航这三篇（均6.0分）。</p>
-<p>普通读者可先扫这三篇的摘要与场景设定，判断是否与自己的多智能体或机器人应用相关，再决定是否深入。</p>
+<p>今日速读3篇世界模型与多机器人协作论文，均获6.0分。值得关注的是世界-动作表征重构与潜在空间图关系建模这两个世界模型方向。普通读者可先挑其中一篇速读，留意表征与图结构如何提升环境建模效果。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -86,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">5 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Symbolic Guidance for LLM Agents in Distributed Multiagent Coordination">Symbolic Guidance for LLM Agents in Distributed Multiagent Coordination</span></li><li><span class="dpr-home-dashboard-paper-title" title="InfraVLA: Extending Vision-Language-Action Navigation with Infrastructure Cameras">InfraVLA: Extending Vision-Language-Action Navigation with Infrastructure Cameras</span></li><li><span class="dpr-home-dashboard-paper-title" title="Social-WM: Safety-Aware Latent World Models for Robot Social Navigation">Social-WM: Safety-Aware Latent World Models for Robot Social Navigation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Rethinking Representations for World-Action Modeling">Rethinking Representations for World-Action Modeling</span></li><li><span class="dpr-home-dashboard-paper-title" title="World-as-Graph: Relational World Modeling Through Latent Space Graphs">World-as-Graph: Relational World Modeling Through Latent Space Graphs</span></li><li><span class="dpr-home-dashboard-paper-title" title="Real-Time Human-Adaptive Task Allocation for Multi-Human Multi-Robot Supervision">Real-Time Human-Adaptive Task Allocation for Multi-Human Multi-Robot Supervision</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 </div>
 
