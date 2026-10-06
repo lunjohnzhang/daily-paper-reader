@@ -41,7 +41,7 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-04</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-06</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 3 篇</strong>
@@ -51,7 +51,7 @@
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-04 21:53:39 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-06 00:46:32 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读3篇世界模型与多机器人协作论文，均获6.0分。值得关注的是世界-动作表征重构与潜在空间图关系建模这两个世界模型方向。普通读者可先挑其中一篇速读，留意表征与图结构如何提升环境建模效果。</p>
+<p>今日速读 3 篇多智能体论文，均获 7.0 分，无精读。最值得看的是安全控制器合成与测试时多智能体协调两个方向，前者用分布式 k-hop 观测保障离散线性系统安全，后者以分解价值梯度流提升协调效果。普通读者可先挑这两篇读摘要和实验，再决定是否跟进 Transformer 策略中动作坍缩那篇。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -87,7 +87,7 @@
     <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Rethinking Representations for World-Action Modeling">Rethinking Representations for World-Action Modeling</span></li><li><span class="dpr-home-dashboard-paper-title" title="World-as-Graph: Relational World Modeling Through Latent Space Graphs">World-as-Graph: Relational World Modeling Through Latent Space Graphs</span></li><li><span class="dpr-home-dashboard-paper-title" title="Real-Time Human-Adaptive Task Allocation for Multi-Human Multi-Robot Supervision">Real-Time Human-Adaptive Task Allocation for Multi-Human Multi-Robot Supervision</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Communication-aware Synthesis of Safe Controllers for Discrete-Time Linear Multi-Agent Systems with Distributed k-Hop Observation">Communication-aware Synthesis of Safe Controllers for Discrete-Time Linear Multi-Agent Systems with Distributed k-Hop Observation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Test-time Multi-agent Coordination by Decomposed Value Gradient Flow">Test-time Multi-agent Coordination by Decomposed Value Gradient Flow</span></li><li><span class="dpr-home-dashboard-paper-title" title="Permutation Robustness Is Not Enough: Action Collapse in Multi-Agent Transformer Policies">Permutation Robustness Is Not Enough: Action Collapse in Multi-Agent Transformer Policies</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
