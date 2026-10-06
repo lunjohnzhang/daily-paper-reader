@@ -44,14 +44,14 @@
       <span class="dpr-home-dashboard-kicker">2026-10-06</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 14 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-06 00:46:32 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-06 23:45:14 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读 3 篇多智能体论文，均获 7.0 分，无精读。最值得看的是安全控制器合成与测试时多智能体协调两个方向，前者用分布式 k-hop 观测保障离散线性系统安全，后者以分解价值梯度流提升协调效果。普通读者可先挑这两篇读摘要和实验，再决定是否跟进 Transformer 策略中动作坍缩那篇。</p>
+<p>今天日报共14篇（精读3篇、速读11篇），重点筛出多智能体协调与多机器人连续轨迹规划两篇9.0分工作。</p>
+<p>最值得看的是《Test-time Multi-agent Coordination by Decomposed Value Gradient Flow》和《GAMBIT: Learning to Plan Continuous Multi-Robot Trajectories》，均9.0/10；速读7分方向还覆盖安全控制器合成、物流运行数据集与多智能体Transformer动作坍缩。</p>
+<p>普通读者可先读这两篇9分摘要，再按“协调—规划—安全/数据”线索挑一篇速读跟进。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Test-time Multi-agent Coordination by Decomposed Value Gradient Flow">Test-time Multi-agent Coordination by Decomposed Value Gradient Flow</span></li><li><span class="dpr-home-dashboard-paper-title" title="GAMBIT: Learning to Plan Continuous Multi-Robot Trajectories">GAMBIT: Learning to Plan Continuous Multi-Robot Trajectories</span></li><li><span class="dpr-home-dashboard-paper-title" title="Towards Robust Prehensile Manipulation in Open-Ended Environments">Towards Robust Prehensile Manipulation in Open-Ended Environments</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Communication-aware Synthesis of Safe Controllers for Discrete-Time Linear Multi-Agent Systems with Distributed k-Hop Observation">Communication-aware Synthesis of Safe Controllers for Discrete-Time Linear Multi-Agent Systems with Distributed k-Hop Observation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Test-time Multi-agent Coordination by Decomposed Value Gradient Flow">Test-time Multi-agent Coordination by Decomposed Value Gradient Flow</span></li><li><span class="dpr-home-dashboard-paper-title" title="Permutation Robustness Is Not Enough: Action Collapse in Multi-Agent Transformer Policies">Permutation Robustness Is Not Enough: Action Collapse in Multi-Agent Transformer Policies</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Communication-aware Synthesis of Safe Controllers for Discrete-Time Linear Multi-Agent Systems with Distributed k-Hop Observation">Communication-aware Synthesis of Safe Controllers for Discrete-Time Linear Multi-Agent Systems with Distributed k-Hop Observation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Autonomous mobile robot operations logistics: a dataset of jobs, dispatch events and robot states">Autonomous mobile robot operations logistics: a dataset of jobs, dispatch events and robot states</span></li><li><span class="dpr-home-dashboard-paper-title" title="Permutation Robustness Is Not Enough: Action Collapse in Multi-Agent Transformer Policies">Permutation Robustness Is Not Enough: Action Collapse in Multi-Agent Transformer Policies</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>11</strong></span></div>
 </section>
 </div>
 
