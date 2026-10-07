@@ -1,0 +1,562 @@
+Title: Safe Multi-Robot Collaborative Transport Using Density Functions
+
+URL Source: https://arxiv.org/pdf/2610.08441v1
+
+Published Time: Wed, 07 Oct 2026 01:38:40 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Safe Multi-Robot Collaborative Transport Using Density Functions 
+
+Jagannath Prasad Sahoo, Sriram S. K. S. Narayanan, and Umesh Vaidya 
+
+Abstract — This paper presents a hierarchical density-based model predictive control framework for safe collaborative ma-nipulation by multiple quadrupedal robots. The framework enables a team of robots to push a shared object to adesired pose using only the initial and goal poses, without requiring a precomputed reference trajectory. A centralized box-level MPC optimizes contact forces while enforcing acontrol-density constraint for goal convergence and obstacle avoidance. Each robot then solves its own distributed robot-level whole-body MPC, under a stated shared-information assumption, to track its moving contact location while ac-counting for static obstacles and the time-varying positions of neighboring robots. The approach is evaluated in MuJoCo using whole-body contact dynamics for two and three Unitree Go2 quadrupeds collaboratively pushing rigid objects through narrow passages. Comparisons with matched Control Barrier Function and RRT* based tracking baselines demonstrate the effectiveness of the proposed density-based formulation for push-only, force- and torque-coupled manipulation tasks. Im-plementation videos are available at https://jaggu2606. github.io/go2-density-mpc-pushing/ .
+
+I. Introduction Quadrupedal teams can support exploration, inspection, and search-and-rescue [1], [2], where coordinated, collision-free motion is essential in cluttered environments [3], [4]. Tasks such as debris removal and material transport may also require teams to manipulate objects beyond a single robot’s capacity. Collaborative pushing requires the robots to coordinate their contact forces while avoiding collisions with one another, the object, and surrounding obstacles [5]. This is especially challenging in push-only manipulation, where the contact forces couple the object’s translation and rotation. Collaborative pushing has been approached through plan-ning, optimization-based control, and learned coordination. Sampling-based planners such as RRT* generate collision-free paths, but these plans must still be converted into feasible object motions and robot actions [6]. For contact-rich loco-manipulation, a hierarchical MPC for a single quadruped jointly optimizes contact forces and configuration while coordinating with whole-body locomotion control, using a prescribed object trajectory [7]. Related methods address uncertain object mass and friction through adaptive force regulation [5], and unmodeled payloads through CLF-constrained MPC [8]. At the team level, hierarchical multi-agent reinforcement learning has been used to coordinate                  
+
+> Jagannath Prasad Sahoo is with the Center for Artificial Intel-ligence and Robotics, Indian Institute of Technology Mandi, India
+
+email: s23118@students.iitmandi.ac.in . Sriram S. K. S. Narayanan and Umesh Vaidya are with the Department of Mechanical Engineering, Clemson University, Clemson, SC 29630, USA email: sriramk@clemson.edu, uvaidya@clemson.edu .
+
+quadruped pushing through high-level subgoals and decen-tralized execution [9], and collaborative pushing scenarios have been included in multi-agent quadruped benchmarks [10]. These approaches demonstrate coordinated pushing, but do not provide formal guarantees of collision safety for the robots and shared object during execution. Formal safety constraints have also been incorporated into robot control. Control barrier functions provide conditions for forward invariance of safe sets and have been used in MPC [11]; distributed barrier-based controllers further address safety and convergence in multi-agent navigation [12]. These methods offer formal guarantees under their stated assumptions, but do not address the coupled problem of optimizing multiple push-only contact forces on a shared object while coordinating robot-level motion around moving contact targets and neighboring robots. Density functions provide a complementary dual-space formulation of safety and convergence, based on conditions on the evolution of trajectory density [13]. Related ideas have been applied to formation stabilization [14], safe navigation and data-driven planning [15]–[17], and learned transfer-operator models for off-road and legged locomotion [18], [19]. Control density functions have been used to formulate convex and robust safety constraints for quadratic-program controllers [20], [21], and have been applied to safe motion planning and control of robotic systems [22]–[24]. These formulations are primarily developed for continuous-time systems. More recently, control density functions have been incorporated into MPC with tunable safety margins [25]. However, existing density-based safety methods have focused primarily on single-agent systems and do not directly address predictive safety in multi-agent settings. This paper presents a hierarchical density-constrained MPC framework for collaborative manipulation by multiple quadrupedal robots, consisting of a single centralized box-level MPC coupled with 𝑁 distributed robot-level MPCs. A box-level MPC selects the contact forces that drive the shared object toward a desired pose while accounting for static obsta-cles. Each robot then solves its own robot-level whole-body MPC locally to track its moving contact location and enforce additional safety constraints with respect to obstacles and neighboring robots, under the shared-information assumption stated in Section II. The main contributions are:  
+
+> •
+
+A hierarchical multi-agent MPC framework for collabora-tive pushing that couples a centralized object-level MPC for push-only contact-force optimization with distributed robot-level MPCs for tracking moving contact locations, enabling goal-directed transport without a prescribed object trajectory. arXiv:2610.08441v1 [cs.RO] 6 Oct 2026 Fig. 1: Hierarchical architecture of the proposed framework with box-level density MPC and robot-level density MPC.  
+
+> •
+
+A discrete-time safety constraint based on density func-tions, established in Theorem 2 and integrated into both MPC layers to enforce safe predictive control for obstacle avoidance and inter-agent separation.  
+
+> •
+
+MuJoCo validation of collaborative transport with two and three Unitree Go2 quadruped robots, including comparisons against matched CBF-MPC [11] and RRT* based tracking baselines [6]. II. Preliminaries and Problem Formulation 
+
+A. Notation and Discrete-Time Dynamics 
+
+Let R𝑛 denote the 𝑛 -dimensional Euclidean space and let 
+
+X ⊂ R𝑛 denote a bounded state space. The state and input of a discrete-time dynamical system are denoted by 𝑥 ∈ X 
+
+and 𝑢 ∈ U ⊂ R𝑚 , respectively. Let X0, X𝑇 , and X𝑢 denote the initial, target, and unsafe sets. The safe set is defined as 
+
+X𝑠 := X \X 𝑢 . The spaces L1 (X) and C𝑘 (X) denote the spaces of integrable functions and 𝑘 -times continuously differentiable functions on X, respectively. The notation 𝑚 (A) denotes the Lebesgue measure of a measurable set A ⊂ X , and 1A (𝑥 )
+
+denotes its indicator function. We use M (X) to denote the space of measures on X. Let B𝛿 (X 𝑇 ) denote a 𝛿 -neighborhood of the target set. We define X1 := X \ B 𝛿 (X 𝑇 ). The forward-difference operator is defined as Δ𝜌 (𝑥 (𝑘 ), 𝑢 (𝑘 )) := 𝜌 (𝑥 (𝑘 +
+
+1)) − 𝜌 (𝑥 (𝑘 )) . For a differentiable map 𝐹 , 𝐷𝐹 (𝑥 ) denotes its Jacobian matrix at 𝑥 , and det (·) denotes the determinant. The symbols | · | and ∥ · ∥ denote the absolute value and Euclidean norm, respectively Consider the discrete-time system 
+
+𝑥 (𝑘 + 1) = 𝐹 (𝑥 (𝑘 ), 𝑢 (𝑘 )) =: 𝐹 𝑢 (𝑘 ) (𝑥 (𝑘 )) , (1) where 𝐹 : X × U → X is a continuous state-transition map. 
+
+Assumption 1 (Input-Wise Invertibility): For each individ-ually fixed value 𝑢 ∈ U the system mapping 𝐹 𝑢 := 𝐹 (· , 𝑢 ) is assumed to be invertible and hence nonsingular on X.Assumption 1 is a regularity property of the dynamics 𝐹 
+
+itself, required below to pull a density back through 𝐹 𝑢 . The input actually applied to the system, 𝑢 (𝑘 ), is in general time-varying and is generated in closed loop by the receding-horizon controllers of Section IV. 
+
+B. Perron–Frobenius Operator 
+
+Under Assumption 1, for an invertible differentiable map 
+
+𝐹 𝑢 evaluated at a particular 𝑢 ∈ U as in Eqn. (1), the Perron– Frobenius (P-F) operator propagates densities 𝜑 ∈ L 1 (X) as 
+
+[P𝑢 𝜑 ] ( 𝑥 ) = 𝜑 (𝐹 −1 
+
+> 𝑢
+
+(𝑥 )) det 𝐷𝐹 −1 
+
+> 𝑢
+
+(𝑥 ) . (2) where 𝜑 is the state-space density. The absolute determinant accounts for local volume changes. The Jacobian determinant accounts for changes in state-space volume. This density-transport perspective underlies occupancy-based formulations of safe navigation [13], [16]. In the MPC realization used here, 
+
+𝑢 is not held fixed over time: P𝑢 is applied pointwise, at the particular input realized at each prediction stage, to obtain the stage-wise density condition Eqn. (21) enforced inside the receding-horizon problems Eqn. (23) and Eqn. (26). Because that condition is re-imposed at every stage of every solve, it constrains the actual, time-varying closed-loop trajectory, not a hypothetical constant-input one. 
+
+C. Safe Set 
+
+Let ℎ 𝑗 : X → R be a continuous safety function associated with obstacle 𝑗 , where 𝑗 = 1, . . . , 𝐿 . The individual safe sets are defined as S𝑗 = 𝑥 ∈ X : ℎ 𝑗 (𝑥 ) ≥ 0 . The overall safe and unsafe sets are then 
+
+S =
+
+> 𝐿
+
+Ù
+
+> 𝑗 =1
+
+S𝑗 , X𝑢 = X \ S .
+
+Equivalently, S = 𝑥 ∈ X : ℎ 𝑗 (𝑥 ) ≥ 0, 𝑗 = 1, . . . , 𝐿 . The safety functions used at the object and robot levels are constructed from their respective safety requirements. D. Control Density Functions 
+
+Control density functions characterize safe navigation through the transport of density [13], [21]. We use 𝜌 (𝑥 ) =Φ(𝑥 )/ 𝑉 (𝑥 ) 𝛼 , 𝛼 > 0, where 𝑉 measures goal error and the nonnegative bump function Φ vanishes on the unsafe set. Under the regularity and density-divergence conditions es-tablished in [21], this framework provides almost-everywhere safety and convergence, allowing exceptions only for a set of initial conditions of zero Lebesgue measure. 
+
+E. Box and Robot Dynamics 
+
+Consider a rigid box manipulated by a team of 𝑁 
+
+quadrupedal robots. The box position and heading are denoted by 𝑝 𝑏 = [ 𝑝 𝑏,𝑥 , 𝑝 𝑏,𝑦 ]⊤ ∈ R2 and 𝜓 𝑏 ∈ R, respectively. The corresponding translational and angular velocities are denoted by 𝑣 𝑏 = [𝑣 𝑏,𝑥 , 𝑣 𝑏,𝑦 ]⊤ and 𝜔 𝑏 . The box state is 
+
+𝑥 𝑏 = 𝜓 𝑏 𝑝 𝑏,𝑥 𝑝 𝑏,𝑦 𝜔 𝑏 𝑣 𝑏,𝑥 𝑣 𝑏,𝑦 
+
+⊤ ∈ X 𝑏 ⊂ R6.
+
+Each robot applies a nonnegative force along the box body-frame push direction. The box dynamics are modeled as 
+
+¤𝑝 𝑏 = 𝑣 𝑏 , 𝑚 𝑏 ¤𝑣 𝑏 =
+
+> 𝑁
+
+∑︁ 
+
+> 𝑖 =1
+
+𝑅 (𝜓 𝑏 )
+
+ 𝑓 𝑐,𝑖 
+
+0
+
+
+
++ 𝑓 𝜇 (𝑣 𝑏 ),
+
+¤𝜓 𝑏 = 𝜔 𝑏 , 𝐼 𝑏 ¤𝜔 𝑏 = −
+
+> 𝑁
+
+∑︁ 
+
+> 𝑖 =1
+
+𝑓 𝑐,𝑖 𝑑 𝑖 ,
+
+(3) where 𝑚 𝑏 and 𝐼 𝑏 are the box mass and planar moment of inertia, 𝑅 (𝜓 𝑏 ) ∈ 𝑆𝑂 (2) is the planar rotation matrix, 𝑓 𝜇 (𝑣 𝑏 )
+
+represents the box-ground friction force, and 𝑑 𝑖 is the fixed lateral contact offset of robot 𝑖 from the box centerline. The contact-force constraints are 0 ≤ 𝑓 𝑐,𝑖 ≤ 𝑓 𝑐, max , 𝑖 ∈ I 𝑁 , where 
+
+I𝑁 := {1, . . . , 𝑁 }. After discretization with sampling time 𝑇 𝑠 ,the box dynamics are written as 
+
+𝑥 𝑏 (𝑘 + 1) = 𝐹 𝑏 
+
+ 𝑥 𝑏 (𝑘 ), 𝑓 𝑐 (𝑘 ); 𝑑 1: 𝑁 
+
+, (4) where 𝑓 𝑐 (𝑘 ) =  𝑓 𝑐, 1 (𝑘 ) · · · 𝑓 𝑐, 𝑁 (𝑘 )⊤ . For robot 𝑖 ∈ I 𝑁 ,let 𝑥 𝑖 ∈ X 𝑖 ⊂ R𝑛 𝑖 denote its whole-body state and let 𝑢 𝑖 ∈U𝑖 ⊂ R𝑚 𝑖 denote its control input. The robot dynamics are 
+
+𝑥 𝑖 (𝑘 + 1) = 𝐹 𝑖 
+
+ 𝑥 𝑖 (𝑘 ), 𝑢 𝑖 (𝑘 ), 𝑢 𝑖 (𝑘 ) ∈ U 𝑖 . (5) The contact location assigned to robot 𝑖 is determined by the current box state: 
+
+𝑝 𝑐,𝑖 (𝑥 𝑏 ) = 𝑝 𝑏 + 𝑅 (𝜓 𝑏 )
+
+ 0
+
+𝑑 𝑖 
+
+
+
+. (6) Because 𝑑 𝑖 is fixed, the contact location moves with the box but does not change independently during the maneuver. 
+
+F. Problem Statement 
+
+Consider 𝑁 robotic agents collaboratively manipulating a shared object in an environment with static obstacles. Let 
+
+𝜉 𝑏 (𝑘 ) = 𝑝 𝑏 (𝑘 )⊤ 𝜓 𝑏 (𝑘 )⊤ denote the object pose, and let 
+
+𝜉 ★𝑏 = [( 𝑝 ★𝑏 )⊤ 𝜓 ★𝑏 ]⊤ be the desired pose. Given the object and robot dynamics in Eqn. (4) and Eqn. (5), the initial object and robot states, the obstacle ge-ometry, and the contact geometry, design object-level contact forces 𝑓 𝑐 (𝑘 ) and robot-level feedback laws 
+
+𝑢 𝑖 (𝑘 ) = 𝜋 𝑖 
+
+
+
+𝑥 𝑖 (𝑘 ), 𝑥 𝑏 (𝑘 ), {𝑥 𝑗 (𝑘 )} 𝑗 ≠𝑖 
+
+
+
+, 𝑖 ∈ I 𝑁 , (7) such that the agents collaboratively transport the object to its desired pose while satisfying 1) object convergence: 𝜉 𝑏 (𝑘 ) −→ 𝜉 ★𝑏 ;2) object- and agent-level safety, namely 𝑥 𝑏 (𝑘 ) ∈ S 𝑏 and 
+
+𝑥 𝑖 (𝑘 ) ∈ S 𝑖 for all 𝑖 ∈ I 𝑁 , while each robot tracks its assigned moving contact location 𝑝 𝑐,𝑖 (𝑥 𝑏 ); and 3) admissible inputs: 𝑓 𝑐 (𝑘 ) ∈ F 𝑐 , 𝑢 𝑖 (𝑘 ) ∈ U 𝑖 , 𝑖 ∈ I 𝑁 .The proposed hierarchical controller addresses these objec-tives through an object-level density MPC for contact-force regulation and a robot-level density MPC for moving contact-point tracking and obstacle and inter-agent avoidance. The feedback law Eqn. (7) lets robot 𝑖 depend on the states {𝑥 𝑗 (𝑘 )} 𝑗 ≠𝑖 of every other robot. The next assumption states precisely how that dependence is realized and fixes the resulting computational architecture. 
+
+Assumption 2 (Information Availability): At each sam-pling instant 𝑘 , the object state 𝑥 𝑏 (𝑘 ) and every robot state 
+
+𝑥 𝑗 (𝑘 ), 𝑗 ∈ I 𝑁 , are available from a single shared state, so that robot 𝑖 ’s controller receives its own state 𝑥 𝑖 (𝑘 ), the object-level MPC’s contact-force reference 𝑓 𝑐 (𝑘 ) and predicted contact target 𝑝 𝑐,𝑖 (𝑥 𝑏 ), and {𝑥 𝑗 (𝑘 )} 𝑗 ≠𝑖 , with zero delay and zero estimation error. Under Assumption 2, the object-level problem Eqn. (23) is solved once, centrally, over the joint contact-force vector 𝑓 𝑐 (𝑘 ),while the 𝑁 robot-level problems Eqn. (26) are each solved independently, one per robot, using only the locally available information above. The resulting architecture is centralized at the object level and distributed at the robot level. 
+
+Remark 1 (Communication and Consensus): The robot-level MPCs are distributed in computation and coordinated through contact-force and motion references supplied by the centralized object-level MPC. Since each robot tracks a distinct contact target, an explicit consensus protocol is not required. Assumption 2 supplies the teammate states needed for local prediction and inter-agent constraints, realized here through shared simulator states. Future work will explore consensus-based state estimation over local communication networks [26], [27] and robust density constraints to accommodate estimation and communication uncertainty [21]. III. Construction of Density Functions This section summarizes the density construction used for object-level and robot-level safety. Following [13], [21], [25], each unsafe region is represented using an implicit function, converted into a smooth bump function, and combined with a goal-error function to form a control density. 
+
+A. Unsafe Sets and Smooth Bump Functions 
+
+Let 𝑞 ∈ R𝑛 𝑞 denote the position or configuration variables used for collision checking. An unsafe region associated with obstacle 𝑗 is defined by X𝑢, 𝑗 = 𝑞 : ℎ 𝑗 (𝑞 ) ≤ 0 , where 
+
+ℎ 𝑗 : R𝑛 𝑞 → R is a continuous implicit safety function. A sensing region is defined using 𝑠 𝑗 : R𝑛 𝑞 → R as X𝑠, 𝑗 =𝑞 : 𝑠 𝑗 (𝑞 ) ≤ 0 \ X 𝑢, 𝑗 . Following the smooth construction in [22], define 
+
+𝑓 (𝜏 ) =
+
+
+
+exp 
+
+
+
+− 1
+
+𝜏 
+
+
+
+, 𝜏 > 0,
+
+0, 𝜏 ≤ 0,
+
+and ¯𝑓 (𝜏 ) = 𝑓 (𝜏 )
+
+𝑓 (𝜏 ) + 𝑓 (1 − 𝜏 ) .
+
+The bump function associated with obstacle 𝑗 is 
+
+Ψ𝑗 (𝑞 ) =
+
+
+
+0, ℎ 𝑗 (𝑞 ) ≤ 0,
+
+¯𝑓 
+
+ ℎ 𝑗 (𝑞 )
+
+ℎ 𝑗 (𝑞 ) − 𝑠 𝑗 (𝑞 )
+
+
+
+, ℎ 𝑗 (𝑞 ) > 0, 𝑠 𝑗 (𝑞 ) ≤ 0,
+
+1, 𝑠 𝑗 (𝑞 ) > 0.
+
+(8) Thus, Ψ𝑗 is zero in the unsafe region, transitions smoothly from zero to one in the sensing region, and equals one outside the sensing region. For 𝐿 unsafe regions, 
+
+Φ(𝑞 ) =
+
+> 𝐿
+
+Ö
+
+> 𝑗 =1
+
+Ψ𝑗 (𝑞 ). (9) A density function is then constructed as 
+
+𝜌 (𝑥 ) = Φ(𝑞 (𝑥 )) 
+
+𝑉 (𝑥 ) 𝛼 , 𝛼 > 0, (10) where 𝑉 (𝑥 ) measures the error relative to the desired target. This density construction has previously been used to synthe-size safety controllers by enforcing a continuous-time density-divergence condition, including the safety-QP formulation in [20]. In particular, we have the following theorem. 
+
+Theorem 1 ( [20]): For a continuous time control dynami-cal system ¤𝑥 = 𝑓 (𝑥, 𝑢 ), the almost everywhere safe navigation problem of steering the system from the initial set to final set while avoiding the unsafe set X𝑢 if there exists 𝑢 = 𝑢 (𝑥 ) such that ∇ · ( 𝑓 (𝑥, 𝑢 )𝜌 ) > 0. In this work, we establish a discrete-time safety condition in Theorem 2 and incorporate it into the proposed density-MPC framework for collaborative transport. 
+
+B. Object-Level Density 
+
+At the object level, obstacle geometry is defined with respect to the complete object footprint. Let Φ𝑏 ( 𝑝 𝑏 ) denote the aggregate bump function constructed from the footprint-aware obstacle representations. The object-level density is 
+
+𝜌 𝑏 (𝑥 𝑏 ) = Φ𝑏 ( 𝑝 𝑏 )
+
+𝑉 𝑏 (𝑥 𝑏 ) 𝛼 𝑏 , (11) where 𝑉 𝑏 (𝑥 𝑏 ) = ∥ 𝑝 𝑏 − 𝑝 ★𝑏 ∥2 +𝑤 𝜃 (𝜓 𝑏 −𝜓 ★𝑏 )2. Here, ( 𝑝 ★𝑏 , 𝜓 ★𝑏 ) is the desired object pose and 𝑤 𝜃 > 0 weights the orientation er-ror. The object-level density therefore combines goal-directed motion with obstacle avoidance. A cuboidal unsafe region is approximated by the sublevel set {𝑞 ∈ R3 : ℎcuboid (𝑞 ) ≤ 0},where 
+
+ℎcuboid (𝑞 ) =
+
+> 3
+
+∑︁ 
+
+> ℓ=1
+
+𝑞 ℓ − 𝑐 ℓ
+
+𝑎 ℓ
+
+> 𝑝
+
+− 1. (12) 
+
+Fig. 2: Panels (a) and (b) show the density and corresponding navigation field for a circular region, (c) and (d) show the corresponding construction for a rectangular region. Here, 𝑐 ℓ and 𝑎 ℓ > 0 denote the center coordinate and half-length along axis ℓ, respectively. Larger even values of 𝑝 yield a closer approximation to an axis-aligned cuboid. Figure 2(c)– (d) illustrates the density and corresponding navigation field for a two-dimensional rectangular region. 
+
+C. Robot-Level Multi-Agent Density 
+
+For robot 𝑖 , let 𝑞 𝑖 = Π 𝑖 𝑥 𝑖 denote the configuration variables used for collision checking. Pairwise robot safety is described by ℎ𝑖 𝑗 (𝑞 𝑖 , 𝑞 𝑗 ) = ∥𝑞 𝑖 − 𝑞 𝑗 ∥2 − 𝑑 2 
+
+> 𝑖 𝑗
+
+, where 𝑑 𝑖 𝑗 > 0 is the desired separation between robots 𝑖 and 𝑗 . More general pairwise functions can be used for ellipsoidal, rectangular, or configuration-dependent robot representations. For a fixed configuration of the neighboring robots, the agent-induced unsafe set for robot 𝑖 is 
+
+Xagent  
+
+> 𝑢,𝑖
+
+(𝑘 ) =
+
+Ø
+
+> 𝑗 ≠𝑖
+
+𝑞 𝑖 : ℎ𝑖 𝑗 
+
+ 𝑞 𝑖 , 𝑞 𝑗 (𝑘 ) < 0 . (13) Including environmental obstacles, the complete robot-level unsafe set is 
+
+X𝑢,𝑖 (𝑘 ) = O𝑖 (𝑘 ) ∪ X agent  
+
+> 𝑢,𝑖
+
+(𝑘 ). (14) The robot-level density uses the moving contact location as its target: 
+
+𝜌 𝑖 (𝑥 𝑖 , 𝑥 𝑏 ; 𝑘 ) = Φ𝑖 ( 𝑝 𝑖 ; 𝑘 )
+
+𝑉 𝑖 (𝑥 𝑖 , 𝑥 𝑏 ) 𝛼 𝑖 , (15) where 𝑉 𝑖 (𝑥 𝑖 , 𝑥 𝑏 ) = ∥ 𝑝 𝑖 − 𝑝 𝑐,𝑖 (𝑥 𝑏 )∥ 2. The bump function 
+
+Φ𝑖 ( 𝑝 𝑖 ; 𝑘 ) includes both environmental obstacles and the time-varying safety envelopes of neighboring robots. Its parameters are updated online as the multi-agent configuration changes. 
+
+Remark 2 (Planar Robot-to-Robot Safety): In this work, quadrupedal navigation and inter-agent collision checking are performed in the planar workspace. Each neighboring robot is therefore represented by a circular safety envelope 
+
+B𝑗 (𝑥 𝑗 (𝑘 )) =
+
+n
+
+𝑞 𝑖 ∈ R2 : ∥𝑞 𝑖 − 𝑝 𝑗 (𝑘 )∥ 2 ≤ 𝑟 2
+
+> 𝑖 𝑗
+
+o
+
+,where 𝑝 𝑗 (𝑘 ) is the planar base position of robot 𝑗 and 𝑟 𝑖 𝑗 
+
+includes the robot footprint and safety margin. IV. Safety Using Discrete-Time Density Constraints Existing density-based safety results, including [18], [21], are developed for continuous-time systems and use the divergence condition ∇ · ( 𝑓 (𝑥, 𝑢 )𝜌 (𝑥 )) > 0 (Theorem 1), with 𝜌 (𝑥 ) as in Eqn. (10). Since the NMPC formulation here is discrete-time, Theorem 2 derives the corresponding discrete-time condition from this continuous-time divergence condition. 
+
+Theorem 2 (Discrete-time density safety condition): 
+
+Consider the continuous-time control system ¤𝑥 = 𝑓 (𝑥, 𝑢 ),
+
+and let 𝜌 ∈ 𝐶 2 (X) be a nonnegative density satisfying 
+
+∇ ·  𝜌 (𝑥 ) 𝑓 (𝑥, 𝑢 ) > 0. Consider its Euler discretization with sampling time 𝑇 𝑠 > 0, 𝑥 + = 𝐹 𝑢 (𝑥 ) := 𝑥 + 𝑇 𝑠 𝑓 (𝑥, 𝑢 ). Suppose that 𝐹 𝑢 is nonsingular on the domain of interest. Then, for sufficiently small 𝑇 𝑠 ,
+
+𝜌 (𝐹 𝑢 (𝑥 )) | det 𝐷𝐹 𝑢 (𝑥 )| − 𝜌 (𝑥 ) > 0. (16) Equivalently, using the Perron–Frobenius operator P𝑢 associ-ated with 𝐹 𝑢 , 𝜌 (𝑦 ) − [ P𝑢 𝜌 ] ( 𝑦 ) > 0, 𝑦 = 𝐹 𝑢 (𝑥 ).
+
+Proof: For the Euler map 𝑥 + = 𝐹 𝑢 (𝑥 ) := 𝑥 + 𝑇 𝑠 𝑓 (𝑥, 𝑢 ),we have 𝐷𝐹 𝑢 (𝑥 ) = 𝐼 + 𝑇 𝑠 𝐷 𝑥 𝑓 (𝑥, 𝑢 ). For sufficiently small 𝑇 𝑠 ,det 𝐷𝐹 𝑢 (𝑥 ) = 1 + 𝑇 𝑠 ∇ · 𝑓 (𝑥, 𝑢 ) + 𝑂 (𝑇 2 
+
+> 𝑠
+
+). (17) Similarly, Taylor expansion of the density gives 
+
+𝜌 (𝐹 𝑢 (𝑥 )) = 𝜌 (𝑥 ) + 𝑇 𝑠 ∇𝜌 (𝑥 )⊤ 𝑓 (𝑥, 𝑢 ) + 𝑂 (𝑇 2 
+
+> 𝑠
+
+). (18) Multiplying Eqn. (17) and Eqn. (18) yields 
+
+𝜌 (𝐹 𝑢 (𝑥 )) | det 𝐷𝐹 𝑢 (𝑥 )| − 𝜌 (𝑥 )
+
+= 𝑇 𝑠 
+
+∇𝜌 (𝑥 )⊤ 𝑓 (𝑥, 𝑢 ) + 𝜌 (𝑥 )∇ · 𝑓 (𝑥, 𝑢 ) + 𝑂 (𝑇 2 
+
+> 𝑠
+
+)
+
+= 𝑇 𝑠 ∇ ·  𝜌 (𝑥 ) 𝑓 (𝑥, 𝑢 ) + 𝑂 (𝑇 2 
+
+> 𝑠
+
+). (19) Hence, under ∇ · ( 𝜌 (𝑥 ) 𝑓 (𝑥, 𝑢 )) > 0 the right-hand side is positive for sufficiently small 𝑇 𝑠 , establishing Eqn. (16). Now let 𝑦 = 𝐹 𝑢 (𝑥 ). By the definition of the Perron–Frobenius operator, 
+
+[P𝑢 𝜌 ] ( 𝑦 ) = 𝜌 (𝐹 −1 
+
+> 𝑢
+
+(𝑦 )) det 𝐷𝐹 −1 
+
+> 𝑢
+
+(𝑦 ) = 𝜌 (𝑥 )|det 𝐷𝐹 𝑢 (𝑥 )| .
+
+(20) Dividing Eqn. (16) by |det 𝐷𝐹 𝑢 (𝑥 )| > 0 gives 𝜌 (𝑦 ) − [P𝑢 𝜌 ] ( 𝑦 ) > 0, which proves the result. Motivated by Theorem 2, define the discrete-time density constraint used in the MPC as 
+
+D𝜌 (𝑥 +, 𝑥, 𝑢 ) := 𝜌 (𝑥 +) − [ P𝑢 𝜌 ] ( 𝑥 +) ≥ 0. (21) At each prediction stage 𝑗 , we write the density constraint as 
+
+D𝑏, 𝑗 := D𝜌 𝑏 (𝑥 𝑏,𝑘 + 𝑗 +1| 𝑘 , 𝑥 𝑏,𝑘 + 𝑗 | 𝑘 , 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 ),
+
+D𝑖, 𝑗 := D𝜌 𝑖 (𝑥 𝑖,𝑘 + 𝑗 +1| 𝑘 , 𝑥 𝑖,𝑘 + 𝑗 | 𝑘 , 𝑢 𝑖,𝑘 + 𝑗 | 𝑘 ),
+
+using the object-level density 𝜌 𝑏 of Eqn. (11) and the robot-level density 𝜌 𝑖 of Eqn. (15), respectively. These are exactly the density-safety constraints D𝑏, 𝑗 ≥ 0 and D𝑖, 𝑗 ≥ 0imposed in the object-level MPC Eqn. (23) and robot-level MPC Eqn. (26). For robot 𝑖 , the density is evaluated using the predicted contact target at each stage and the neighboring-robot safety parameters updated at time 𝑘 ; these dependencies are suppressed for brevity. 
+
+Remark 3: Theorem 2 converts the continuous-time density-divergence condition used in [21] into a one-step discrete-time condition. At each prediction stage, the input is held constant over the finite sampling interval 𝑇 𝑠 (zero-order hold), defining the one-step flow map. Integrating the continuous-time condition over this interval yields the stated Perron–Frobenius inequality. Thus, the fixed input in the theorem is local to each one-step map; it does not assume a constant input over the full closed-loop trajectory. In MPC, the density condition is enforced pointwise using the input chosen at each stage and is re-imposed whenever the object-level and robot-level controllers re-solve. 
+
+A. Object-Level Density MPC 
+
+The object-level MPC in Eqn. (23) optimizes the contact-force sequence F𝑐,𝑘 = { 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 }𝑁 𝑏 −1 
+
+> 𝑗 =0
+
+with cost 
+
+𝐽 𝑏 (F𝑐,𝑘 ; 𝑥 𝑏 (𝑘 )) = 
+
+> 𝑁 𝑏 −1
+
+∑︁ 
+
+> 𝑗 =0
+
+ℓ𝑏 (𝑥 𝑏,𝑘 + 𝑗 | 𝑘 , 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 )+ 𝑉 𝑓 𝑏 (𝑥 𝑏,𝑘 +𝑁 𝑏 | 𝑘 ),
+
+(22) where ℓ𝑏 and 𝑉 𝑓 𝑏 are the stage and terminal costs. Concretely, 
+
+ℓ𝑏 (𝑥 𝑏,𝑘 + 𝑗 | 𝑘 , 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 ) = 𝑅 𝑓 𝑐 ∥ 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 − 𝑓 nom  
+
+> 𝑐
+
+∥2
+
++ 𝑅 diff (Δ 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 − Δ 𝑓 nom  
+
+> 𝑐
+
+)2
+
++ 𝑅 ¤𝑓 𝑐 ∥ 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 − 𝑓 𝑐,𝑘 + 𝑗 −1| 𝑘 ∥2
+
++ 𝑅 ¤diff ( ¤ Δ 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 )2 + 12 𝑤 𝑠 𝐶 2    
+
+> 𝑘 +𝑗 |𝑘
+
+,
+
+with Δ 𝑓 𝑐 := 𝑓 𝑐, 1 − 𝑓 𝑐, 2, 𝐶 𝑘 + 𝑗 | 𝑘 ≥ 0 the density-rate slack of Eqn. (21). The weights 𝑅 𝑓 𝑐 , 𝑅 diff , 𝑅 ¤𝑓 𝑐 , 𝑅 ¤diff , 𝑤 𝑠 and other MPC related paramteres are listed in Table I. Here, 1𝑛 denotes the 𝑛 -dimensional vector of ones. The box-level MPC is presented below. Note that there is no state-tracking term used at the object-level MPC, and the goal convergence is enforced by the density constraint D𝑏, 𝑗 ≥ 0, and the cost ℓ𝑏 regulates only the contact force sequence. 
+
+Box-Level Density MPC: 
+
+min 
+
+> F𝑐,𝑘
+
+𝐽 𝑏 (F𝑐,𝑘 ; 𝑥 𝑏 (𝑘 )) 
+
+s.t. 𝑥 𝑏,𝑘 + 𝑗 +1| 𝑘 = 𝐹 𝑏 (𝑥 𝑏,𝑘 + 𝑗 | 𝑘 , 𝑓 𝑐,𝑘 + 𝑗 | 𝑘 ; 𝑑 1: 𝑁 ),
+
+D𝑏, 𝑗 ≥ 0,
+
+0 ≤ 𝑓 𝑐,𝑖,𝑘 + 𝑗 | 𝑘 ≤ 𝑓 𝑐, max ,𝑥 𝑏,𝑘 | 𝑘 = 𝑥 𝑏 (𝑘 ).
+
+(23) 
+
+𝑗 = 0, . . . , 𝑁 𝑏 − 1, 𝑖 ∈ I 𝑁 .The first optimal force vector 𝑓 𝑐 (𝑘 ) = 𝑓 ★𝑐,𝑘 | 𝑘 supplies the robot interaction-force references. The predicted object trajectory determines the moving contact targets 
+
+𝑝 𝑐,𝑖,𝑘 + 𝑗 | 𝑘 = 𝑝 ★𝑏,𝑘 + 𝑗 | 𝑘 + 𝑅 (𝜓 ★𝑏,𝑘 + 𝑗 | 𝑘 ) [ 0, 𝑑 𝑖 ]⊤. (24) B. Robot-Level Density MPC 
+
+Robot 𝑖 optimizes U𝑖,𝑘 = {𝑢 𝑖,𝑘 + 𝑗 | 𝑘 }𝑁 𝑖 −1 
+
+> 𝑗 =0
+
+with cost 
+
+𝐽 𝑖 (U𝑖,𝑘 ; 𝑥 𝑖 (𝑘 )) = 
+
+> 𝑁 𝑖 −1
+
+∑︁ 
+
+> 𝑗 =0
+
+ℓ𝑖 (𝑥 𝑖,𝑘 + 𝑗 | 𝑘 , 𝑢 𝑖,𝑘 + 𝑗 | 𝑘 , 𝑝 𝑐,𝑖,𝑘 + 𝑗 | 𝑘 )+ 𝑉 𝑓 𝑖 (𝑥 𝑖,𝑘 +𝑁 𝑖 | 𝑘 , 𝑝 𝑐,𝑖,𝑘 +𝑁 𝑖 | 𝑘 ),
+
+(25) where ℓ𝑖 and 𝑉 𝑓 𝑖 are the stage and terminal costs for the assigned contact targets. The stage and terminal costs are 
+
+ℓ𝑖 = ∥𝑥 𝑖,𝑘 + 𝑗 | 𝑘 − 𝑥 𝑖, ref ,𝑘 + 𝑗 | 𝑘 ∥2 
+
+> 𝑄 𝑖
+
++ ∥ 𝑢 𝑖,𝑘 + 𝑗 | 𝑘 ∥2 
+
+> 𝑅 𝑖
+
+,𝑉 𝑓 𝑖 = ∥𝑥 𝑖,𝑘 +𝑁 𝑖 | 𝑘 − 𝑥 𝑖, ref ,𝑘 +𝑁 𝑖 | 𝑘 ∥2 
+
+> 𝑄 𝑖
+
+,
+
+where 𝑥 𝑖, ref ,𝑘 + 𝑗 | 𝑘 combines the robot pose reference associated with the assigned contact location 𝑝 𝑐,𝑖,𝑘 + 𝑗 | 𝑘 and the nominal locomotion references for the remaining state components. The terminal cost uses the same weight 𝑄 𝑖 as the stage cost. The robot-level MPC is presented below. 
+
+Robot-Level Density MPC: 
+
+min 
+
+> U𝑖,𝑘
+
+𝐽 𝑖 (U𝑖,𝑘 ; 𝑥 𝑖 (𝑘 )) 
+
+s.t. 𝑥 𝑖,𝑘 + 𝑗 +1| 𝑘 = 𝐹 𝑖 (𝑥 𝑖,𝑘 + 𝑗 | 𝑘 , 𝑢 𝑖,𝑘 + 𝑗 | 𝑘 ),
+
+D𝑖, 𝑗 ≥ 0,𝑢 𝑖,𝑘 + 𝑗 | 𝑘 ∈ U 𝑖 ,𝑥 𝑖,𝑘 | 𝑘 = 𝑥 𝑖 (𝑘 ).
+
+(26) 
+
+𝑗 = 0, . . . , 𝑁 𝑖 − 1. 
+
+Remark 4 (Active Constraint Set for 𝑁 > 2 agents): 
+
+For the two-robot team, Eqn. (13) involves a single other robot and is instantiated directly. For the three-robot team, the robot-level NMPC exposes one inter-agent avoidance parameter slot per robot. Rather than instantiate all 𝑁 − 1pairwise constraints in Eqn. (13) simultaneously, each robot’s controller is given the position of only its nearest other robot at that instant, re-selected every control step. Every teammate state remains available under Assumption 2. Only the active 
+
+constraint is restricted to the nearest teammate. Instantiating every pairwise constraint in Eqn. (13) simultaneously for larger teams is a straightforward generalization. The first optimal input 𝑢 𝑖 (𝑘 ) = 𝑢 ★𝑖,𝑘 | 𝑘 is applied through the whole-body controller. At each sampling instant, the controller measures the object and robot states, solves the object-level MPC, and generates interaction-force references and predicted contact targets. Each robot then updates its obstacle and inter-agent safety parameters, and solves its local MPC. V. Multi Robot Collaborative Transport We evaluate the proposed framework in MuJoCo using articulated Unitree Go2 models with simulated robot–ground and robot–object contacts. Two scenarios are considered: two robots pushing a 0 .5×1.2×0.5-m, 5-kg rectangular box through a 1 .90-m gap, and three robots pushing a heavier T-shaped object through a 2 .50-m gap. In both scenarios, two circular obstacles form a narrow passage within a bounded workspace. The controller combines the object-level and robot-level MPC formulations in Eqn. (23) and Eqn. (26), using fixed contact offsets without a prescribed object trajectory. Performance is TABLE I: MPC parameters for object-level and robot-level controllers.                                                                                           
+
+> Parameter Value
+> Object-Level Density MPC (box)
+> Prediction horizon 𝑁 𝑏 15
+> Discretization interval 𝑇 𝑠 0.05 s ( 20 Hz) Box–ground friction 𝜇 0.5
+> Contact-force bounds [𝑓 𝑐, min , 𝑓 𝑐, max ][0,45 ]NDensity exponent 𝛼 1.0
+> Orientation weight 𝑤 𝜃 0.3
+> Density cap 𝜌 max 20 .0
+> Object-Level Cost Weights
+> Force tracking 𝑅 𝑓 𝑐 1×10 −2
+> Force-differential tracking 𝑅 diff 5×10 −1
+> Force-rate 𝑅 ¤𝑓 𝑐 1×10 −3
+> Differential-rate 𝑅 ¤diff 2×10 −2
+> Density-constraint slack penalty 1×10 4
+> Robot-Level Density NMPC (per robot)
+> Prediction horizon 𝑁 𝑖 12
+> Discretization interval 0.02 sGround friction 𝜇 0.5
+> Per-leg GRF bounds [𝑓 min , 𝑓 max ][0,147 .3]N
+> Robot-Level Cost Weights
+> State tracking diag (𝑄 𝑖 )(0,0,1500 ,200 1⊤
+> 3,500 ,500 ,0,
+> 20 ,20 ,50 ,300 1⊤
+> 3,50 ,10 1⊤
+> 5)
+> Input regulation diag (𝑅 𝑖 )(10 −4,10 −4,10 −5,10 −31⊤
+> 3)
+> Physical Parameters
+> Box mass, dimensions 5kg, 0.5×1.2×0.5mRobot mass (Unitree Go2) 15 .019 kg
+
+evaluated over 10 trials with random initial-pose perturbations of up to ±0.05 m in position and ±3◦ in orientation. Evaluation metrics are goal attainment, simulated completion time, and minimum recorded object–obstacle clearance, measured from the rotated object footprint to the physical obstacle boundaries. Simulations run on an AMD Ryzen 9 5900X processor with a MuJoCo integration step of 2 ms. The object-level MPC is implemented in CasADi and solved using IPOPT, with a 15-step prediction horizon and a 0 .05-s discretization interval. Each robot-level MPC uses acados with sequential quadratic programming (SQP), a 12-step prediction horizon, and a 0 .02-s discretization interval. The object- and robot-level controllers update at 20 and 100 Hz, respectively, in simulation time. Additional parameters are listed in Table I. Both teams successfully transport the object through the passage and reach the desired pose (Figs. 3 and 4). Across 10 trials, the proposed controller achieves full task success, with completion times of 38 .6 ± 0.8 s for box pushing and 28 .5±1.0 s for T-shape pushing. The representative trajectories complete in 38 .50 and 28 .92 s, with minimum recorded object– obstacle clearances of 0 .02 and 0 .04 m, respectively, indicating separation throughout the sampled trajectories (Table II). The results demonstrate coordinated transport from a desired object pose without a prescribed trajectory. The object-level MPC Eqn. (23) generates the motion, while the moving contact locations Eqn. (24) provide tracking references for the robot-level controllers. Both tested team sizes and object geometries use the same hierarchical formulation with scenario-specific parameters. With solver reuse and state warm-starting, Successful object-level MPC solves took 15 .55 ± 2.39 ms for box pushing and 16 .98 ± 2.25 ms for T-shape pushing, across 449 and 377 successful solves, respectively. The corresponding per-(a) Two quadrupeds transporting a rectangular box. 
+
+(b) Three quadrupeds transporting a T-shaped object. 
+
+Fig. 3: Collaborative manipulation using the proposed density MPC framework evaluated in MuJoCo, from the initial configuration (A) to the goal configuration (E). 
+
+Fig. 4: Comparison of Density MPC, CBF MPC, and RRT with tracking for box (left) and T-shaped object (right) pushing: (a,b) object trajectories; (c,d) distance to goal; (e,f) minimum object–obstacle clearance. robot MPC computation times were 1 .54 ± 0.26 ms and 1.47 ± 0.25 ms for the two-robot team, and 1 .56 ± 0.24 ms, 1.50 ± 0.24 ms, and 1 .50 ± 0.23 ms for the three-robot team. The measured computation times support the target implementation with object-level MPC at 20 Hz and robot-level MPC at 100 Hz. 
+
+Comparison with Baselines. We compare density MPC with CBF MPC and RRT* based tracking MPC using the same dynamics and MPC setup. CBF MPC replaces the object-level density constraint with obstacle CBF constraints in the object-level and robot-level MPC (decay parameter, 𝛾 = 0.7, with all other parameters fixed), while RRT* plans through inflated obstacles and provides a pure-pursuit reference with density avoidance disabled. RRT* computes a single collision-free path offline (step size 0 .4 m, goal-sampling bias 0 .15, up to 4000 iterations, goal tolerance 0 .25 m, obstacles inflated TABLE II: Baseline comparisons.                                          
+
+> Method Success Completion Time (s) Min. Clearance (m)
+> Box pushing ( 𝑛 =2)
+> Density MPC 10 /10 38 .6±0.80.006 ±0.009
+> CBF MPC [11] 5/10 48 .0±0.70.000 ±0.002
+> RRT*+track [6] 0/10 –−0.001 ±0.000
+> T-shape pushing ( 𝑛 =3)
+> Density MPC 10 /10 28 .5±1.00.040 ±0.017
+> CBF MPC 10 /10 31 .1±0.80.049 ±0.022
+> RRT*+track 0/10 –−0.001 ±0.000
+
+by the box footprint plus a 0 .05 m safety pad), smoothed with random shortcutting; the resulting path is converted into a moving reference via pure-pursuit tracking (lookahead 1.0 m) and executed by the same robot-level MPC controllers, with the density constraint disabled. In the deterministic runs, density MPC reduces completion time relative to CBF MPC by 22 .5% for box pushing and 6 .3% for T-shape pushing, while maintaining comparable or larger clearance (Table II). Density MPC succeeds in all trials, whereas CBF MPC succeeds in 5/10 box-pushing trials and 10 /10 T-shape trials, indicating fragility only in the tighter box-pushing passage (Fig. 4). RRT* based tracking reduces the initial goal distance by only 38% and 41% before stalling because of heading drift and diminishing pushes, reflecting the mismatch between geometric reference tracking and push-only, force–torque-coupled actuation; it fails to reach the goal in both scenarios (see Fig. 4). 
+
+Effect of Gait Synchronization. To assess gait synchro-nization, we compare the default phase-locked gaits with a half-cycle offset. Push-force variability, measured as CV 𝐹 =
+
+100 𝜎 𝐹 /𝜇 𝐹 (%), increased from 78 .1% to 84 .5%, while mean step-to-step force change rose from 13 .09 to 13 .89 N. Completion time changed little (38 .50 vs. 37 .90 s), with no failures observed in these tests. Thus, phase locking modestly improved force smoothness but was not essential for successful pushing in this scenario. This suggests that phase locking helps coordinate contact loading, although broader tests are needed to determine its benefits. This may be more consequential for a shared payload carried atop the robots, where gait-induced relative motion could affect payload stability. Limitations and Future Work. Validation is limited to simulated box and T-shape pushing with two and three robots, fixed contacts, and planar safety envelopes. Larger teams require evaluation of computational scalability, while arbitrary object geometries and complex or dynamic environments require richer collision representations beyond the current bounding-size margin. Future work will quantify minimum robot-envelope clearances, account for estimation and geo-metric uncertainty near small clearance margins, and validate contact-force tracking and real-time execution on hardware. VI. Conclusions We presented a hierarchical density-constrained MPC framework for multi-quadruped collaborative pushing with-out a prescribed object trajectory. Object-level contact-force optimization is coupled with robot-level tracking and density-based obstacle and inter-agent constraints. MuJoCo exper-iments with box and T-shape pushing demonstrated goal attainment with positive recorded object-footprint clearances. Compared with matched CBF MPC, density MPC reduced completion time by 22 .5% and 6 .3% in the two scenarios, while RRT* based tracking MPC failed to complete either task. The current validation is limited to simulated two- and three-robot teams, fixed contacts, and planar safety envelopes; future work will address computational scalability, dynamic environments, uncertainty, and real-time hardware validation. References 
+
+[1] T. H. Chung, V. Orekhov, and A. Maio, “Into the robotic depths: Analysis and insights from the DARPA subterranean challenge,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 6, pp. 477–502, 2023. [2] J. Pe˜ na Queralta, J. Taipalmaa, B. Can Pullinen, V. K. Sarker, T. Nguyen Gia, H. Tenhunen, M. Gabbouj, J. Raitoharju, and T. Wester-lund, “Collaborative multi-robot search and rescue: Planning, coordina-tion, perception, and active vision,” IEEE Access , vol. 8, pp. 191 617– 191 643, 2020. [3] K.-K. Oh, M.-C. Park, and H.-S. Ahn, “A survey of multi-agent formation control,” Automatica , vol. 53, pp. 424–440, 2015. [4] K.-C. Hsu, H. Hu, and J. F. Fisac, “The safety filter: A unified view of safety-critical control in autonomous systems,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 7, pp. 47–72, 2024. [5] M. Sombolestan and Q. Nguyen, “Hierarchical adaptive loco-manipulation control for quadruped robots,” in 2023 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2023, pp. 12 156–12 162. [6] S. Karaman and E. Frazzoli, “Sampling-based algorithms for optimal motion planning,” The international journal of robotics research ,vol. 30, no. 7, pp. 846–894, 2011. [7] A. Rigo, Y. Chen, S. K. Gupta, and Q. Nguyen, “Contact optimization for non-prehensile loco-manipulation via hierarchical model predictive control,” in 2023 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2023, pp. 9945–9951. [8] M. V. Minniti, R. Grandia, F. Farshidian, and M. Hutter, “Adaptive CLF-MPC with application to quadrupedal robots,” IEEE Robotics and Automation Letters , vol. 7, no. 1, pp. 565–572, 2022. [9] Y. Feng, C. Hong, Y. Niu, S. Liu, Y. Yang, W. Yu, T. Zhang, J. Tan, and D. Zhao, “Learning multi-agent loco-manipulation for long-horizon quadrupedal pushing,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2025, pp. 14 441–14 448. [10] Z. Xiong, B. Chen, S. Huang, W.-W. Tu, Z. He, and Y. Gao, “MQE: Unleashing the power of interaction with multi-agent quadruped envi-ronment,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2024, pp. 5918–5924. [11] J. Zeng, B. Zhang, and K. Sreenath, “Safety-critical model predictive control with discrete-time control barrier function,” in 2021 American Control Conference (ACC) . IEEE, 2021, pp. 3882–3889. [12] P. Mestres, C. Nieto-Granda, and J. Cort´ es, “Distributed safe navigation of multi-agent systems using control barrier function-based controllers,” 
+
+IEEE Robotics and Automation Letters , vol. 9, no. 7, pp. 6760–6767, 2024. [13] A. Rantzer and S. Prajna, “On analysis and synthesis of safe control laws,” in 42nd Allerton Conference on Communication, Control, and Computing , 2004, pp. 1468–1476. [14] D. V. Dimarogonas and K. J. Kyriakopoulos, “An application of rantzer’s dual lyapunov theorem to decentralized formation stabilization,” in 2007 European Control Conference (ECC) . IEEE, 2007, pp. 882–888. [15] S. G. Loizou and A. Jadbabaie, “Density functions for navigation-function-based systems,” IEEE Transactions on Automatic Control ,vol. 53, no. 2, pp. 612–617, 2008. [16] U. Vaidya, “Optimal motion planning using navigation measure,” 
+
+International Journal of Control , vol. 91, no. 5, pp. 989–998, 2018. [17] H. Yu, J. Moyalan, U. Vaidya, and Y. Chen, “Data-driven optimal control of nonlinear dynamics under safety constraints,” IEEE Control Systems Letters , vol. 6, pp. 2240–2245, 2022. [18] J. Moyalan, Y. Chen, and U. Vaidya, “Convex approach to data-driven off-road navigation via linear transfer operators,” IEEE Robotics and Automation Letters , vol. 8, no. 6, pp. 3278–3285, 2023. [19] J. Moyalan, A. Zheng, S. S. Narayanan, and U. Vaidya, “Off-road navigation of legged robots using linear transfer operators,” IFAC-PapersOnLine , vol. 56, no. 3, pp. 613–618, 2023. [20] J. Moyalan, S. S. Narayanan, A. Zheng, and U. Vaidya, “Synthesizing controller for safe navigation using control density function,” in 2024 American Control Conference (ACC) . IEEE, 2024, pp. 3397–3402. [21] J. Moyalan, S. S. K. S. Narayanan, and U. Vaidya, “Control den-sity function for robust safety and convergence,” arXiv preprint arXiv:2407.05133 , 2024. [22] A. Zheng, S. S. Narayanan, and U. Vaidya, “Safe navigation using density functions,” IEEE Robotics and Automation Letters , pp. 1–8, 2023. [23] S. S. Narayanan, A. Zheng, and U. Vaidya, “Safe motion planning for quadruped robots using density functions,” in 2023 Ninth Indian Control Conference (ICC) . IEEE, 2023, pp. 263–268. [24] S. S. Narayanan, J. Moyalan, A. Zheng, and U. Vaidya, “Density functions for dynamic safe navigation of robotic systems,” in 2025 American Control Conference (ACC) . IEEE, 2025, pp. 3694–3699. [25] S. S. K. S. Narayanan, S. Ahmadi, J. Mohammadpour Velni, and U. Vaidya, “Safety critical model predictive control using discrete-time control density functions,” ASME Letters in Dynamic Systems and Control , vol. 6, no. 1, p. 011014, 2025. [26] R. Olfati-Saber and R. M. Murray, “Consensus problems in networks of agents with switching topology and time-delays,” IEEE Transactions on Automatic Control , vol. 49, no. 9, pp. 1520–1533, 2004. [27] W. Ren and R. W. Beard, Distributed Consensus in Multi-Vehicle Cooperative Control . London, UK: Springer, 2008.

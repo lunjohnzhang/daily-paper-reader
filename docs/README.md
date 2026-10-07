@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-06</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-07</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 14 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-06 23:45:14 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-07 23:55:25 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今天日报共14篇（精读3篇、速读11篇），重点筛出多智能体协调与多机器人连续轨迹规划两篇9.0分工作。</p>
-<p>最值得看的是《Test-time Multi-agent Coordination by Decomposed Value Gradient Flow》和《GAMBIT: Learning to Plan Continuous Multi-Robot Trajectories》，均9.0/10；速读7分方向还覆盖安全控制器合成、物流运行数据集与多智能体Transformer动作坍缩。</p>
-<p>普通读者可先读这两篇9分摘要，再按“协调—规划—安全/数据”线索挑一篇速读跟进。</p>
+<p>今天扫读 7 篇多机器人协作论文，精读 2 篇、速读 5 篇，聚焦运动规划、协同搬运与容错通信。</p>
+<p>最值得看的是《Multi-Robot Multi-Goal Motion Planning with Stochastic Skills》（9.0）和《Safe Multi-Robot Collaborative Transport Using Density Functions》（8.0），前者解决技能不确定下的多目标规划，后者用密度函数保障协同搬运安全。</p>
+<p>普通读者可先读这两篇精读了解&quot;不确定性+安全&quot;这一主线，再按兴趣挑速读里的去中心化协作或通信受限定位方向延伸。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Test-time Multi-agent Coordination by Decomposed Value Gradient Flow">Test-time Multi-agent Coordination by Decomposed Value Gradient Flow</span></li><li><span class="dpr-home-dashboard-paper-title" title="GAMBIT: Learning to Plan Continuous Multi-Robot Trajectories">GAMBIT: Learning to Plan Continuous Multi-Robot Trajectories</span></li><li><span class="dpr-home-dashboard-paper-title" title="Towards Robust Prehensile Manipulation in Open-Ended Environments">Towards Robust Prehensile Manipulation in Open-Ended Environments</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Multi-Robot Multi-Goal Motion Planning with Stochastic Skills">Multi-Robot Multi-Goal Motion Planning with Stochastic Skills</span></li><li><span class="dpr-home-dashboard-paper-title" title="Safe Multi-Robot Collaborative Transport Using Density Functions">Safe Multi-Robot Collaborative Transport Using Density Functions</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">11 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Communication-aware Synthesis of Safe Controllers for Discrete-Time Linear Multi-Agent Systems with Distributed k-Hop Observation">Communication-aware Synthesis of Safe Controllers for Discrete-Time Linear Multi-Agent Systems with Distributed k-Hop Observation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Autonomous mobile robot operations logistics: a dataset of jobs, dispatch events and robot states">Autonomous mobile robot operations logistics: a dataset of jobs, dispatch events and robot states</span></li><li><span class="dpr-home-dashboard-paper-title" title="Permutation Robustness Is Not Enough: Action Collapse in Multi-Agent Transformer Policies">Permutation Robustness Is Not Enough: Action Collapse in Multi-Agent Transformer Policies</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CoRE: Learning Collaboration-Role Experts for Decentralized Collaborative Manipulation with One Policy">CoRE: Learning Collaboration-Role Experts for Decentralized Collaborative Manipulation with One Policy</span></li><li><span class="dpr-home-dashboard-paper-title" title="Communication-Free Obstacle Localization from Aggregate Wrench Measurements in Leader--Follower Cooperative Transport">Communication-Free Obstacle Localization from Aggregate Wrench Measurements in Leader--Follower Cooperative Transport</span></li><li><span class="dpr-home-dashboard-paper-title" title="Budget-Constrained Fault-Tolerant Mutual Visibility for Autonomous Robots under the Mobility Fault Model">Budget-Constrained Fault-Tolerant Mutual Visibility for Autonomous Robots under the Mobility Fault Model</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>11</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 </div>
 
