@@ -1,0 +1,726 @@
+Title: Distributed Relative Localization for Homogeneous Multi-Robot Systems through UWB Ranging and Limited Communications
+
+URL Source: https://arxiv.org/pdf/2610.11308v1
+
+Published Time: Fri, 09 Oct 2026 01:04:32 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+> IEEE PREPRINT, 2025 1
+
+# Distributed Relative Localization for Homogeneous Multi-Robot Systems through UWB Ranging and Limited Communications 
+
+Zhiqiang Cao , Ran Liu , Senior Member, IEEE , Billy Pik Lik Lau , Senior Member, IEEE ,Chau Yuen , Fellow, IEEE , U-Xuan Tan , Senior Member, IEEE 
+
+Abstract —Accurate and reliable relative localization is crucial for multi-robot applications like exploration, search, and rescue missions. LiDAR-based solutions offer high accuracy in localiz-ing surrounding objects; however, distinguishing homogeneous robots with similar appearances remains challenging due to the lack of distinctive identification features. In this paper, we propose a fully distributed relative pose estimation approach by integrating LiDAR, UWB, and odometry measurements, allowing each robot to accurately and continuously localize its teammates without external infrastructure. Specifically, potential anonymous teammate robot clusters from LiDAR scans are tracked by a dynamic tracker. We then identify teammate robots from these tracked anonymous clusters using a joint matching strategy, ensuring reliable data association between robots and clusters. Finally, by combining the corresponding LiDAR observations, UWB ranging, and odometry measurements, each robot precisely localizes others while minimizing data exchange. The system requires only odometry data exchange through onboard UWB, eliminating the need for additional communication infrastruc-ture like WiFi routers or mesh networks. Extensive simulation and real-world experiments demonstrate the effectiveness and reliability of the proposed relative localization approach. 
+
+Index Terms —Distributed relative localization, Multi-robot system, Teammate identification, Sensor fusion 
+
+I. I NTRODUCTION 
+
+# MULTI-ROBOT systems have gained significant inter-est in the robotics research community over the past decades due to their superior applicability and efficiency com-pared against single robot systems in various applications, such as exploration, search, and rescue missions [1]-[3]. To execute these multi-robot cooperative tasks in unknown scenarios, each robot must be capable of reliably and accurately estimating the relative position of others with respect to itself [4]-[6]. This is essential for maintaining formation, preventing collisions, and coordinating actions seamlessly. To date, the majority of multi-robot research depends on external sensing devices, such as global positioning systems (GPS) [7], motion capture systems [8], and infrastructure-based Ultra-WideBand (UWB) [9], to achieve relative local-ization between robots. Although these mature techniques can 
+
+Z. Cao and U-X. Tan are with the Engineering Product Develop-ment, Singapore University of Technology and Design, Singapore 487372. zhiqiang cao@mymail.sutd.edu.sg and uxuan tan@sutd.edu.sg. R. Liu, B. P. L. Lau, and C. Yuen are with the School of Electrical and Electronic Engineering, Nanyang Technological University, Singapore 639798. {ran.liu, billy.laupl, chau.yuen }@ntu.edu.sg. (Corresponding author: Chau Yuen) Robot 1 trajectory Robot 2 trajectory Robot 3 trajectory Anonymous clusters UWB comm. network 
+
+Fig. 1: Illustration of the relative localization problem considered in this paper, from Robot 1’s perspective. Robot 1 attempts to localize others in its local frame under the following conditions: unknown initial pose correspondence, anonymous LiDAR clusters, and possible occlusions during movement. Additionally, data transmission relies solely on the UWB communication network, mounted on the robot, without any external communication devices. Each robot in the multi-robot system independently executes the same relative localization procedure. 
+
+provide precise localization, they require information fusion with a centralized system, making them sensitive to single-point-of-failure. In addition, GPS signals are often impeded by structural obstructions and susceptible to multipath effects, limiting its effectiveness in indoor environments. Both motion capture systems and infrastructure-based UWB positioning systems require the installation of external anchors, which restrict their applicability in unknown environments. Recently, LiDAR and visual odometry techniques have been widely studied [10]-[12] due to their capability to enable infrastructure-free self-localization in unknown environments. However, unknown initial pose correspondence among robots raises a challenge for precise relative localization in multi-robot systems. Moreover, pose drift is inevitable during long-time running, and it tends to be more severe in 2D LiDAR-based configurations due to the sparsity of planar geomet-ric features. Although SLAM techniques can correct drift through loop closure, this mechanism is not always avail-able in weakly textured environments or before the robot revisits previously explored areas. Another well-known rel-ative localization approach is matching common features in LiDAR scans or camera images, shared between robots. This approach demands high computational resources and commu-nication bandwidth, making it impractical in communication-constrained and weak-textured environments. Direct robot-to-arXiv:2610.11308v1 [cs.RO] 8 Oct 2026 IEEE PREPRINT, 2025 2
+
+robot observations using LiDAR and cameras offer another so-lution for relative position estimation. However, these sensors encounter difficulties with anonymous detection results due to the similar structure of objects (i.e., data association prob-lem) and their dependence on line-of-sight (LOS) conditions [13][14]. In contrast, wireless sensors, like UWB, demon-strate greater resilience to non-line-of-sight (NLOS) situations. Meanwhile, it is able to provide accurate range measurements with unique identification, effectively eliminating data asso-ciation ambiguity [15][16]. Furthermore, UWB supports dual functionality, serving as a communication module for transmit-ting a small amount of data to the surrounding UWB nodes while concurrently performing ranging [17]. Nonetheless, the practicality of UWB in relative localization is limited due to the lack of bearing information among UWB nodes. Leveraging the complementary strengths of odometry, Li-DAR, and UWB, we propose a fully distributed relative local-ization approach for a homogeneous multi-robot system that operates effectively under challenging conditions, as illustrated in Fig. 1. Particularly, UWB ranging and LiDAR clusters generated by the adaptive clustering algorithm [18] are first processed to eliminate outliers. Then, a dynamic tracker is designed to track these filtered anonymous LiDAR clusters within the robot’s own global frame. Subsequently, we identify teammate robots from these tracked LiDAR clusters based on a joint matching strategy. Once the teammate robot is identified and meets the cumulative displacement criteria, a separate teammate tracker is assigned for continuous relative pose estimation. All communication demands in the proposed system are fulfilled by the tailored UWB communication net-work, without external communication devices. In summary, the contributions of this paper are as follows:  
+
+> •
+
+We propose a robust teammate identification approach based on a joint matching strategy, ensuring reliable data association between teammate robots and LiDAR clus-ters. Our approach eliminates the need for appearance-based modification, such as the addition of visual mark-ers or other physical alterations, to identify the robots, thereby enhancing the scalability of multi-robot systems.  
+
+> •
+
+We present a fully distributed relative localization system that fuses LiDAR, odometry, and UWB ranging mea-surements without requiring external infrastructure. The system is built upon the UWB communication network used to transmit odometry data among robots, with each message containing only 8 Bytes per robot, while ensur-ing reliable and efficient localization.  
+
+> •
+
+To evaluate the performance of the proposed approach, we conducted several experiments in simulation and real-world environments. The results demonstrate that our approach achieved high relative localization accuracy while incurring minimal data exchange, limited to 0.48 KB/s at a transmission frequency of 20 Hz in a three-robot system. The rest of this paper is structured as follows: The related works are introduced in Section II. Subsequently, we present the proposed distributed relative localization system in Section III. Section IV shows the experimental setups and results. TABLE I: Comparison of related works on relative localization in multi-robot systems.                                         
+
+> Work Sensors Markers Data Exchanged Initial Pose
+> [19] LiDAR + Camera + IMU N/A Ego state, Feature descriptors Unknown [20][21] Camera + IMU N/A Ego state Known [13] LiDAR + IMU Reflective taps Ego state, Mutual observations Unknown [23] Camera + UWB + IMU + IR LEDs LED coded boards IMU, Mutual observations Unknown [24] LiDAR + UWB N/A UWB ranging meas. Unknown [25][26] Four UWBs N/A N/A Unknown [27] UWB + Odom. N/A Odometry Unknown [14] Camera + IMU + UWB N/A Ego state, Visual obs., Map-based meas. Unknown
+> Ours LiDAR + UWB + Odom. N/A Odometry Unknown
+
+Finally, this paper is concluded and future works are discussed in Section VI. II. R ELATED WORKS 
+
+Relative localization for a multi-robot system operating in GPS-denied and communication-constrained environments without any external infrastructure has emerged as a significant research focus in the robotics community. This section covers the existing studies on relative pose estimation in multi-robot systems based on LiDAR, cameras, and wireless sensors. In recent years, LiDAR-based and visual-based solutions have gained popularity in the robotics community. Lajoie et al. 
+
+[19] presented a two-stage matching approach for constructing inter-robot loop closure (i.e., relative pose between robots) by exchanging the features extracted from the image and LiDAR point cloud among robots. However, a substantial communication load is needed for exchanging features, and feature matching requires high computational resources. To relieve communication and computational load, Weinstein et al. [20] and Lusk et al. [21] acquire the relative pose between robots by sharing the robot’s ego-state generated by Visual-Inertial Odometry (VIO) [22]. These methods assume a known initial pose correspondence among robots and are prone to drift over time, which is an inherent limitation in VIO. In addition, LiDAR-based or visual-based object detection methods have emerged as promising alternatives for accurate relative position estimation. However, associating the detection results with specific teammate robots remains a challenge for a group of homogeneous robots due to their similar structures or appearances. Zhu et al. [13] addressed data association by implementing trajectory matching between the tracked anonymous LiDAR clusters and odometry trajectories received from other robots, in which each robot was attached with reflective taps for LiDAR detection. Xun et al. [23] used active infrared LEDs to encode drone ID, allowing for straightforward identification of each teammate drone. These methods require customized platforms, which may restrict their applications in practical deployment. Cao et al. [24] addressed the data association problem between teammate robots and LiDAR clusters through a subgraph matching approach. Although this approach requires little data exchange and performs effectively in normal scenarios, it can fail when robots form completely symmetrical structures and is computationally inefficient. Moreover, LiDAR or visual-based solutions may be limited by LOS conditions. In this paper, the data association problem can be solved by the proposed joint IEEE PREPRINT, 2025 3Robot 1 
+
+... 
+
+Robot N
+
+Robot 1 
+
+... 
+
+Robot N
+
+> Potential teammate detection
+
+Input 
+
+> 2D LiDAR Wheel Odom
+> 50Hz 10Hz
+> 50Hz
+> UWB outlier rejection Dynamic tracker
+
+Output  
+
+> YTeammate identification Teammate identification Extrinsic transf. estimation UWB Odometry from other robots at 20Hz Cum. disp. > threshold ? Teammate tracker Relative pose Relative pose UWB comm. network UWB comm. network NSection III-A
+> Data preprocessing Section III-B Section III-C Section III-D Section III-E
+
+Robot 1 
+
+... 
+
+Robot N
+
+> Potential teammate detection
+
+Input 
+
+> 2D LiDAR Wheel Odom
+> 50Hz 10Hz
+> 50Hz
+> UWB outlier rejection Dynamic tracker
+
+Output  
+
+> YTeammate identification Extrinsic transf. estimation UWB Odometry from other robots at 20Hz Cum. disp. > threshold ? Teammate tracker Relative pose UWB comm. network NSection III-A
+> Data preprocessing Section III-B Section III-C Section III-D Section III-E
+
+Fig. 2: Architecture of the proposed fully distributed relative localization approach, comprising five core modules. The data preprocessing module eliminates outlier UWB and LiDAR observations. The dynamic tracker module tracks the anonymous LiDAR clusters. The extrinsic transformation estimation and teammate identification module addresses the unknown initial pose correspondence and data association problem. The teammate tracker module enables continuous localization of teammate robots by fusing UWB, LiDAR, and odometry data. All the communications among robots rely solely on the UWB communication network module. 
+
+matching strategy without necessitating any changes to the robot’s structure and visual appearance, while the continuity of the state estimation is kept by efficient fusion of multiple sensing modalities data. Compared to LiDAR and visual camera, wireless sensors such as UWB can offer ID information, thereby avoiding the data association problem, and are suitable in NLOS scenarios. Cao et al. [25] proposed a relative localization method only relying on several UWB nodes equipped on the robot. Subse-quently, Fishberg et al. [26] improved its performance through an advanced optimization method. Although fully distributed, these methods have limited accuracy and are unsuitable for small robots due to their UWB node array requirement. Liu 
+
+et al. [27] fused short-term UWB ranging and odometry measurements to achieve relative localization between robots. However, this method requires multiple samples to generate a coarse initial guess for subsequent non-linear optimization. Xu et al. [14] integrated UWB ranging, IMU, map-based measurements, and visual detections using YOLOv3-tiny [28] to enhance the performance of localization. Nonetheless, this approach requires broadcasting a large volume of information, including ego state, landmark feature descriptors, and visual detections, which exceeds the maximum communication ca-pacity of UWB. Moreover, visual detection is a learning-based method, which typically requires additional costs to prepare the training dataset. In this paper, we propose an out-of-the-box method that requires neither data labeling nor customiz-ing platforms, which effectively resolves the data association problem and provides a precise initial guess for subsequent nonlinear optimization. Further details are provided in Section III. Table I presents a comprehensive comparison of relevant studies in the field of relative localization for multi-robot systems. III. P ROPOSED RELATIVE LOCALIZATION FRAMEWORK 
+
+In this section, we introduce key notations and problem for-mulation studied in this paper. Following this, we describe the proposed relative localization framework, involving five key components: (i) Data preprocessing in Section III-A, which rejects the abnormal UWB ranging measurements and LiDAR clusters, (ii) Dynamic tracker in Section III-B, which tracks the filtered anonymous LiDAR clusters within the robot’s own global frame, (iii) Extrinsic transformation estimation 
+
+and teammate identification in Section III-C, which address the unknown initial pose correspondence problem by estimat-ing the transformation between trajectories and identifying teammate robots, (iv) Teammate tracker in Section III-D, capable of continuously localizing teammate robots within the robot’s own global frame, and (v) UWB communication network in Section III-E, designed to broadcast the odometry measurements to nearby robots within communication range. An overview of the proposed system framework is illustrated in Fig. 2. Let us consider a multi-robot system of N robots with similar appearance, each one carries a LiDAR, UWB, and wheel odometry. We assign an index i to each robot, which is consistent with the UWB ID on the robot, i ∈ { 1, 2, · · · , N }.Each robot has its own global frame Gi and local frame bi.At a given time t, Robot i can observe the ego motion state, which is represented by a SE (2) transformation matrix, i.e.,  
+
+> Gi
+
+xti = ( Gi pti, Gi Rti), based on odometry measurements in its own global frame Gi. Gi pti = Gi xti, Gi yti
+
+ ∈ R2 is the translation vector and Gi Rti ∈ SO (2) refers to the rotation matrix of heading Gi θti . The raw UWB ranging measurement between Robot i and Robot j at time t, measured by Robot 
+
+i, is represented as rti,j , i, j ∈ { 1, 2, · · · , N } and i̸ = j,while ˇrti,j denotes the filtered UWB ranging measurement.  
+
+> bi
+
+Ct = bi ct
+
+> 1
+
+, bi ct
+
+> 2
+
+, · · · , bi ctm indicates the set of LiDAR clusters generated by Robot i at time t, where bi ctm ∈ R2
+
+represents the position of the m-th LiDAR cluster in Robot 
+
+i’s local frame bi. The set of filtered LiDAR clusters is denoted as bi ˇCt. The relative pose of Robot j with respect to Robot i at time t in Robot i’s local frame is represented as bi xti,j , thus the pose of Robot j in Robot i’s global frame can be represented as Gi xtj = Gi xti × bi xti,j . For clarity, the remainder of this section is presented from the perspective of Robot i.Note that throughout this paper, no universal world global frame is assumed for the multi-robot system. Each robot defines its own global frame, fixed at its initial point, while the local frame dynamically follows the robot’s motion. Moreover, the initial pose correspondence among robots is unknown. 
+
+A. Data Preprocessing 
+
+To ensure that our proposed method is not affected by severely noisy measurements, we perform data pre-processing IEEE PREPRINT, 2025 4024680 50 100 150 200 UWB Ranging (m) Time (s) raw range      
+
+> fi ltered range
+> (a) Ranging from Robot 1 to Robot 2 02468050 100 150 200 Time (s) raw range
+> fi ltered range UWB Ranging (m) (b) Ranging from Robot 1 to Robot 3
+
+Fig. 3: Illustration of raw and filtered UWB ranging data, as measured by Robot 1. (a) UWB ranging measurements of Robot 2.(b) UWB ranging measurements of Robot 3.
+
+prior to the implementation of the main algorithm. 
+
+1) UWB outlier rejection: In practical applications, raw UWB ranging measurements are often susceptible to multipath effects and electromagnetic interference, especially in complex environments. This results in unpredictable outliers, degrading the system’s overall performance. Thus, effectively recogniz-ing and removing these outliers is essential. Each robot moves continuously in an environment, the UWB ranging measurements at two consecutive timestamps, 
+
+rt−1 
+
+> i,j
+
+and rti,j , should not exhibit large variation. The ranging measurements are expected to remain smooth over time. To enhance measurement reliability, we employ a low-pass filter [29] to smooth raw UWB ranging data and eliminate outliers. Initially, the mean and variance of the raw UWB ranging data within a short temporal window are computed. If the variance is below a preset threshold, the UWB ranging data is considered as valid and the mean is utilized to initialize the low-pass filter; otherwise, the data is discarded. After initialization, the low-pass filter will be updated only if the latest UWB ranging is within a bound of the previous filtered UWB ranging, which is determined by the robot’s maximum speed; otherwise, it remains unchanged. The low-pass filter will be reinitialized if it has not been updated for a period of time. Fig. 3 illustrates examples of raw and filtered UWB ranging data. 
+
+2) Potential teammate detection: We employ the advanced adaptive clustering algorithm [18], a lightweight and robust point cloud clustering method, to cluster objects around the robot within the LiDAR range. The set of these LiDAR clusters bi Ct, generated by Robot i at time t, may consist of surrounding obstacles as well as teammate robots. Each LiDAR cluster provides positional information in Robot i’s local frame, along with a 2D bounding box reflecting the size of the detected object. However, these clusters remain anonymous to Robot i, lacking identity information. To reduce the number of cluster candidates for teammate identification in subsequent modules, we pre-filter out clusters by comparing UWB ranging with the cluster position.  
+
+> bi
+
+ˇCt =
+
+nbi ctm ∈ bi Ct min  
+
+> j∈N
+> bi
+
+ctm − ˇrti,j ≤ 1.0
+
+o
+
+, (1) where ∥.∥ indicates the Euclidean distance, while |.| denotes the absolute value. The 1.0m threshold was chosen empirically to balance robustness and accuracy. Then, we remove the clusters with large sizes from the filtered bi ˇCt, as they are different from the actual robot’s size. The remaining clusters are considered as potential teammate robot clusters for subse-quent processing. 
+
+B. Dynamic Tracker 
+
+The remaining LiDAR clusters generated from Section III-A2 do not contain ID information. To associate clusters stemming from the same object across consecutive times-tamps, we present a dynamic tracker to effectively track each cluster within the robot’s own global frame. In particular, each LiDAR cluster is assigned an independent dynamic tracker. The state vector of the m-th LiDAR cluster’s dynamic tracker consists of 2D position Gi 
+
+> c
+
+ptm ∈ R2 and heading Gi 
+
+> c
+
+θtm. When a new untracked LiDAR cluster bi ctm
+
+is generated, we allocate a new independent dynamic tracker. This tracker is initialized by the cluster’s position measurement in Robot i’s global frame, Gi 
+
+> c
+
+ptm = Gi ctm = Gi xti × bi ctm,and a random heading 0 ≤ Gi 
+
+> c
+
+θtm ≤ 2π. This is because the LiDAR cluster provides only relative position measurements, without heading information. After initialization, the dynamic tracker predicts its state vector using a random velocity model. Subsequently, the predicted tracker is associated with the most recently generated LiDAR cluster, which has the minimum Euclidean distance to the predicted position. For a valid association, the distance must be below a preset threshold; otherwise, the association fails. If a valid association occurs, the dynamic tracker is corrected using the position of the corresponding LiDAR cluster, represented in Robot i’s global frame; otherwise, the tracker is propagated to the next step. The tracker will be terminated if it is propagated for too many steps without correction. The trajectories of all tracked LiDAR clusters will be applied for teammate identification in the subsequent subsection. 
+
+C. Extrinsic Transformation Estimation and Teammate Iden-tification 
+
+In this subsection, we aim to identify teammate robots from a set of anonymous LiDAR clusters tracked by the dynamic tracker depicted in Section III-B. To achieve this, we utilize a joint matching strategy, combining trajectory matching and distance matching, as described in Section III-C2. Before delving into the teammate identification process, it is important to note that trajectory matching is a shape-based comparison, which requires the two trajectories to be aligned for a fair com-parison. In our case, the initial pose correspondence among robots is unknown, thus we have to compute the extrinsic transformation Gi Ttj,m ∈ SE (2) , including a translation vector and a rotation matrix, to align the odometry trajectory of Robot j with the trajectory of the m-th LiDAR cluster tracked by Robot i. Moreover, this extrinsic transformation can also provide a coarse initial guess for the subsequent optimization problem in Section III-D. 
+
+1) Extrinsic transformation estimation: We compute the optimal extrinsic transformation between trajectories based on the Kabsch algorithm [30] by minimizing the root mean squared error. To reduce computational cost while preserving the trajectory’s geometric properties, we retain a fixed-length window of the most recent measurements and apply down-sampling to extract a set of s + 1 evenly spaced measurements for extrinsic transformation estimation. Algorithm 1 details the procedure for computing the extrinsic transformation IEEE PREPRINT, 2025 5
+
+Algorithm 1: Extrinsic transformation estimation 
+
+Input: Trajectory of the m-th LiDAR cluster tracked by Robot i, Gi 
+
+> c
+
+pt−s,t m , and odometry trajectory shared by Robot j, Gj pt−s,t j .
+
+Output: Extrinsic transformation, Gi Ttj,m = ( p, R). 
+
+> 1
+
+Step 1: compute centroids of Gi 
+
+> c
+
+pt−s,t m and Gj pt−s,t j . 
+
+> 2
+
+¯pm = 1
+
+> s
+
+Ptl=t−s Gi 
+
+> c
+
+plm; 
+
+> 3
+
+¯pj = 1
+
+> s
+
+Ptl=t−s Gj plj . 
+
+> 4
+
+Step 2: translate the centroids to the origin.   
+
+> 5Gi
+> c
+
+´plm = Gi 
+
+> c
+
+plm − ¯pm;  
+
+> 6Gj
+
+´plj = Gj plj − ¯pj . l ∈ { t − s, · · · , t − 1, t }. 
+
+> 7
+
+Step 3: compute covariance matrix H. 
+
+> 8
+
+H = Ptl=t−s (Gi 
+
+> c
+
+´plm)T × Gj ´plj . 
+
+> 9
+
+Step 4: singular value decomposition of H. 
+
+> 10
+
+H = UΣV T . 
+
+> 11
+
+Step 5: compute rotation matrix of Gi Ttj,m . 
+
+> 12
+
+R = VU T . 
+
+> 13
+
+Step 6: check reflection.  
+
+> 14
+
+if |R| < 0 then  
+
+> 15
+
+V.col (1) = V.col (1) × − 1; 
+
+> 16
+
+R = VU T . 
+
+> 17
+
+Step 7: compute translation vector of Gi Ttj,m . 
+
+> 18
+
+p = ¯ pj − R¯pm. 
+
+> 19
+
+Reture Gi Ttj,m . 
+
+> Gi
+
+Ttj,m between odometry trajectory of Robot j, Gj pt−s,t j =Gj pt−sj , · · · , Gj pt−1 
+
+> j
+
+, Gj ptj , and the trajectory of the m-th LiDAR cluster, Gi 
+
+> c
+
+pt−s,t m = Gi 
+
+> c
+
+pt−sm , · · · , Gi 
+
+> c
+
+pt−1 
+
+> m
+
+, Gi 
+
+> c
+
+ptm .It is important to note that the singular value decomposition (SVD) in Step 4 (lines 9-10) may encounter a reflection issue of the rotation matrix, causing an incorrect rotation estimation. To avoid this issue, we assess the determinant of the obtained rotation matrix to determine whether it is a reflection. If the determinant is negative, meaning a reflection occurs. Then, we adjust the second column of V by multiplying it by −1,thereby ensuring that the obtained rotation matrix is correct. 
+
+2) Teammate identification: Ensuring correct data associa-tion between LiDAR clusters and teammate robots is crucial for accurate relative localization. Due to the structural similar-ity among robots and the absence of ID markers, directly iden-tifying nearby robots from these tracked anonymous LiDAR clusters is not feasible. In this subsection, we introduce a joint matching strategy, combining trajectory matching and distance matching, to effectively identify teammate robots from a set of tracked anonymous LiDAR clusters. Specifically, a tracked LiDAR cluster becomes eligible for the teammate identification process once it accumulates sufficient data. We maintain a buffer containing the most recent measurements and uniformly sparsify it to obtain 
+
+s + 1 measurements, arranged in the form of time series. These sparsified measurements are utilized in the subsequent matching task. Trajectory matching and distance matching calculate trajectory dissimilarity and distance dissimilarity, based on the principle of dynamic time warping (DTW) [31]. To account for variations in sequence length and en-sure meaningful comparisons, the dissimilarities need to be normalized based on the length of the measurements. For trajectory matching, the odometry trajectory of each teammate robot is compared with the trajectories of all eligible LiDAR clusters. To guarantee fairness, each trajectory pair needs to be aligned through the latest extrinsic transformation obtained in Section III-C1. For simplicity, we utilize the function 
+
+T rajectory M (Gi Ttj,m Gj pt−s,t j , Gi 
+
+> c
+
+pt−s,t m ) to quantify the trajectory dissimilarity between Robot j’s odometry and the trajectory of the m-th LiDAR cluster tracked by Robot i,which can be calculated by 
+
+T rajectory M (.) = Dt(s, s )2( s + 1) , (2) where Dt ∈ R(s+1) ×(s+1) is a cost matrix, where each element represents the cumulative cost of aligning a point from  
+
+> Gi
+
+Ttj,m Gj pt−s,t j and a point from Gi 
+
+> c
+
+pt−s,t m . The elements of the cost matrix Dt are computed recursively as follows: 
+
+Dt(0 , 0) = Gi Ttj,m Gj ptj −Gi 
+
+> c
+
+ptm , (3) 
+
+Dt(l, 0) = Dt(l − 1, 0) + Gi Ttj,m Gj pt−lj − Gi 
+
+> c
+
+ptm , (4) 
+
+Dt(0 , h ) = Dt(0 , h − 1) + Gi Ttj,m Gj ptj − Gi 
+
+> c
+
+pt−hm , (5) 
+
+Dt(s, s ) = min (Dt(s − 1, s ), Dt(s, s − 1) , Dt(s − 1, s − 1)) + Gi Ttj,m Gj pt−sj − Gi 
+
+> c
+
+pt−sm , (6) where l = 1 , 2, · · · , s and h = 1 , 2, · · · , s .For distance matching, each teammate robot’s UWB ranging set is compared with the distance sets of all eligible tracked LiDAR clusters. The function Distance M (ˇ rt−s,t i,j , zt−s,t m )
+
+denotes the distance dissimilarity between Robot j’s UWB ranging set ˇrt−s,t i,j = ˇrt−si,j , · · · , ˇrt−1 
+
+> i,j
+
+, ˇrti,j , i̸ = j, and the m-th tracked LiDAR cluster’s distance set zt−s,t m =zt−sm , · · · , z t−1 
+
+> m
+
+, z tm . Similarly, the distance dissimilarity can be computed by 
+
+Distance M (.) = Dd(s, s )2( s + 1) . (7) The elements of the corresponding cost matrix Dd can be computed recursively as follows: 
+
+Dd(0 , 0) = ˇrti,j − ztm , (8) 
+
+Dd(l, 0) = Dd(l − 1, 0) + ˇrt−li,j − ztm , (9) 
+
+Dd(0 , h ) = Dd(0 , h − 1) + ˇrti,j − zt−hm , (10) 
+
+Dd(s, s ) = min (Dd(s − 1, s ), Dd(s, s − 1) , Dd(s − 1, s − 1)) + ˇrt−si,j − zt−sm , (11) The m-th tracked LiDAR cluster’s distance value ztm can be modeled as: 
+
+ztm = Gi pti − Gi 
+
+> c
+
+ptm . (12) To enhance the robustness and accuracy of teammate iden-tification, we use a joint dissimilarity metric to evaluate each teammate robot and eligible cluster pair:  
+
+> Gi
+
+JD tj,m = T rajectory M (.) × Distance M (.), (13) where Gi JD tj,m denotes a joint dissimilarity between the m-th LiDAR cluster tracked by Robot i and teammate Robot j
+
+at time t. The joint dissimilarity set of all eligible clusters for Robot j at time t is defined as Gi JD tj , j ∈ N and j̸ = i.IEEE PREPRINT, 2025 6
+
+After that, we identify teammate Robot j from these tracked anonymous LiDAR clusters according to the following rule: 
+
+Robot j ←
+
+ identif ied cluster, if min( Gi JD tj ) ≤ λnot identif ied, otherwise (14) If the minimum joint dissimilarity in Gi JD tj is smaller than a joint dissimilarity threshold λ, the corresponding cluster is identified as Robot j; otherwise, not identified. When teammate Robot j is identified, its relative position in Robot 
+
+i’s local frame can be derived from the corresponding dynamic tracker m, defined as bi ˜pti,j = ( Gi xti)−1 × Gi 
+
+> c
+
+ptm.Robot j 
+
+> Robot i
+
+Gi
+
+> t
+> t
+> t-1
+> t-1
+> t-2
+> t-2 t-3
+> t-3
+> t-k
+> t-k
+
+Fig. 4: Illustration of the teammate tracker based on pose graph optimization, demonstrating how Robot i localizes Robot j within its own global frame. The constraints include odometry measurements of two robots (black line), UWB ranging measurements (red line), and LiDAR detection (blue line). An initial guess is used to determine the initial poses of Robot j’s trajectory for each optimization. 
+
+D. Teammate Tracker 
+
+In this subsection, we introduce the teammate tracker to track the teammate robot within the robot’s own global frame, integrating UWB ranging, LiDAR, and odometry measure-ments. Each teammate robot is assigned a separate teammate tracker, which becomes active when the teammate robot is identified and its cumulative displacement over a period of time exceeds a preset threshold of 2.5m, chosen empiri-cally. The cumulative displacement condition ensures that the rotation matrix of the extrinsic transformation estimated in Section III-C1 is proper. In this paper, we adopt a pose graph optimization-based method for the teammate tracker, as illustrated in Fig. 4, wherein the vertex indicates the robot’s pose and the edge denotes the constraints between vertices. Given the highly nonlinear nature of the underly-ing optimization problem, directly integrating the measure-ments without an appropriate initial guess is nearly infeasible. To achieve effective optimization results, previous methods typically rely on repeated random sampling and select the candidate with the lowest cost as the initial guess for the optimization, like [14][27]. Instead, we provide an initial guess for each optimization by transforming the teammate robot’s odometry trajectory into the robot’s global frame using the latest extrinsic transformation computed from Section III-C1. For instance, when the m-th cluster was identified as teammate Robot j, the initial guess of Robot j’s tra-jectory in Robot i’s global frame is set as Gi xt−k,t j =
+
+Gi Ttj,m Gj xt−kj , · · · , Gi Ttj,m Gj xt−1 
+
+> j
+
+, Gi Ttj,m Gj xtj . Consid-ering the limited computational resources, we retain a fixed-length window of the most recent measurements and apply sparsification to obtain k evenly spaced measurements for optimization. The problem is formulated as follows: minimize   
+
+> Gixt−k,t iGixt−k,t j
+
+X  
+
+> Gixli∈Gixt−k+1 ,t i
+
+ρ( Gi xli − Gi xl−1 
+
+> i
+
+× ∆Gi xl−1,l i
+
+> 2
+> p
+
+)
+
+| {z }
+
+> odom. constraints f rom local Robot i
+
++ X   
+
+> Gixlj∈Gixt−k+1 ,t j
+
+ρ( Gi xlj − Gi xl−1 
+
+> j
+
+× ∆Gj xl−1,l j
+
+> 2
+> p
+
+)
+
+| {z }
+
+> odom. constraints f rom teammate Robot j
+
++ X   
+
+> bi˜pli,j ∈bi˜pt−k,t i,j
+
+ρ( Gi plj − Gi pli − Gi Rli × bi ˜pli,j 
+
+> 2
+
+)
+
+| {z }
+
+> LiDAR detection constraints
+
++ X 
+
+> ˇrli,j ∈ˇrt−k,t i,j
+
+ρ( Gi xli − Gi xlj p − ˇrli,j 
+
+> 2
+
+)
+
+| {z }
+
+> U W B ranging constraints
+
+,
+
+(15) where bi ˜pt−k,t i,j represents the set of LiDAR detection con-straints from time t − k to t obtained from the teammate identification module in Section III-C2. Note that although the LiDAR-based constraint may be unavailable under occlusion, the teammate tracker can still operate reliably using only odometry and UWB ranging measurements. ∥.∥p denotes the Euclidean distance of the translation component. ∆( .)
+
+indicates the displacement between consecutive timestamps, measured by odometry. To reduce the impact caused by the possible outliers in constraints, Huber norm ρ(.) is utilized, with thresholds set empirically to 0.025m, 0.5m, and 1.0m for odometry, LiDAR, and UWB ranging constraints, respectively. The g2o optimization library [32] is adopted to solve Eq. 15. The corresponding information matrices are computed as the inverse of covariance matrices, which are empirically determined based on fixed standard deviations: 0.005m and 0.005rad for odometry, 0.1m for LiDAR detection, and 0.2m for UWB ranging. Then, we can obtain the pose of Robot j in Robot i’s global frame at time t. Afterward, the relative pose of Robot j with respect to Robot i at time t can be calculated by a coordinate transformation, bi xti,j = ( Gi xti)−1 × Gi xtj .A point worth noting is that the inter-robot constraints lack the heading information, owing to the inherent limitations of LiDAR and UWB ranging measurements. 
+
+E. UWB Communication Network 
+
+Each robot only broadcasts its odometry measurement to others solely based on a UWB communication network, with-out the need for any external communication devices, such as WiFi router. The UWB sensor utilized in our system supports Byte-level data transmission when performing ranging, with a maximum payload of approximately 100 Bytes. However, this limited bandwidth is insufficient for transmitting high-dimensional information, such as point clouds or feature descriptors. To minimize communication bandwidth usage while ensuring reliability and accuracy, we represent each odometry measurement using only 8 Bytes. Fig. 5 illustrates the message structure employed in the UWB communication IEEE PREPRINT, 2025 70x82 0x66 0x09 0x66 0x02 0x7f 0xff 0x00 0x82 0x66 0x09 0x66 0x02 0x7f 0xff 0x00                              
+
+> Integer Decimal Integer Decimal Integer Decimal Integer Decimal Integer Decimal Integer Decimal
+> Start Odometry x Odometry y Heading End
+> 8 Bytes
+> Integer Decimal Integer Decimal Integer Decimal
+> Start Odometry x Odometry y Heading End
+> 8 Bytes
+> Example: position (-2.4, 9.4) heading (2.5)
+> Integer Byte Decimal Byte 1: negative
+> 0: positive
+> value value Integer Byte Decimal Byte 1: negative
+> 0: positive
+> value value
+> -2.4 9.4 2.5
+
+Fig. 5: The message structure employed in the UWB communication network. Only odometry information is broadcasted within our multi-robot system. 
+
+network. Particularly, the first and last Byte serve as starting and ending markers, respectively. Since our system is imple-mented in a 2D environment, only 2D position and heading information are transmitted. Each value is encoded using two consecutive Bytes: one for the integer part and the other for the decimal part, with a resolution of approximately 0.004. The transmissible position range spans from -127.996m to 127.996m. The heading is expressed in radian to cover the full range from 0 to 2π. This lightweight data exchange is fundamental to sustaining reliable relative pose estimation. IV. E XPERIMENTAL RESULTS 
+
+A. Experimental Setup 
+
+To validate the performance of the proposed approach, we have conducted experiments in an indoor environment with three homogeneous TurtleBot2 robots. As shown in Fig. 6, each robot was equipped with one UWB node (Nooploop LinkTrack, maximum range of 100m, ranging frequency of 50Hz, maximum data transmission of 100 Bytes at frequency of 20Hz) and LiDAR (Velodyne VLP-16, maximum range of 100m with horizontal field of view of 360 ◦ at frequency of 10Hz). Notably, since this study focuses on 2D scenarios, only a single LiDAR scan channel is used in the experiment, which aligns with the 2D nature of the state estimation and the wheel odometry employed in our system. Each robot was controlled to randomly move at a maximum speed of 0.2m/s and provide odometry measurements with a sampling frequency of 50Hz. The proposed approach is evaluated on a computing unit with an E5-2620 v4 CPU, running Robot Operating System (ROS) Noetic. During the experiments, the initial correspondence among robots is undisclosed, and odometry measurement is broadcast via the UWB communication network depicted in Section III-E. Adaptive Monte Carlo Localization 1 was applied to each robot to obtain the ground truth based on a prior occupancy grid map. For visualization and comparison purposes, all trajectories were manually transformed into a common reference frame in the offline processing stage, as illustrated in Fig. 7. Each robot’s odometry measurements experience considerable drift. 
+
+B. Evaluation of Teammate Identification 
+
+Accurately identifying teammate robots from the anony-mous LiDAR clusters is critical to the proposed system, as  
+
+> 1AMCL: https://wiki.ros.org/amcl Robot 3
+> Odom
+> UWB Velodyne LiDAR Robot 2
+> Robot 1
+> Box
+> Robot 3
+> Odom
+> UWB Velodyne LiDAR Robot 2
+> Robot 1
+> Box
+
+Fig. 6: Three mobile robots moved randomly in the environment with a size of 17.1m ×6.2m, and the initial correspondence among them is unknown. The box is used for controllable LiDAR detection, ensuring a more systematic performance evaluation. Notably, only a single LiDAR scan channel is used for 2D perception. 
+
+Fig. 7: Ground truth and odometry measurements of three different robots in the experiment. 
+
+it directly influences the performance of subsequent modules. We define those erroneous associations as outliers, while the correct associations are regarded as inliers. We varied the joint dissimilarity threshold λ from 0.1 to 0.0005 to examine the performance of the proposed teammate identification method. As shown in Fig. 8, a higher joint dissimilarity threshold 
+
+λ results in more associations; however, the proportion of outliers is also substantial, which reduces the identification accuracy. When the threshold λ reduces to 0.005, the outliers are fully excluded, while the number of inliers remains virtu-ally unaffected. As λ is gradually reduced, although the stricter criterion effectively eliminates outliers, the number of inliers also decreases, indicating that some valid associations are also discarded along with erroneous associations. Additionally, we evaluate teammate identification using dif-ferent methods, namely pure distance matching, pure trajectory matching, and joint matching (i.e., distance matching + trajec-tory matching), as depicted in Section III-C2. We set the dis-tance and trajectory dissimilarity threshold to 0.3 and fixed the joint dissimilarity threshold λ to 0.005. Table II summarizes the experimental results of teammate identification under dif-ferent matching methods from the perspective of Robot 1. As shown in this table, the pure distance matching-based approach produces a lot of outliers for Robot 2 and Robot 3. In pure trajectory matching, Robot 3 is particularly prone to outliers because its odometry trajectory is less distinctive compared to those of the other LiDAR cluster objects. Note that distance matching does not require communication, whereas trajectory matching relies on the shared odometry measurements from other teammate robots. In contrast, the joint matching strategy (distance matching + trajectory matching) outperforms the individual matching methods, effectively avoiding false iden-IEEE PREPRINT, 2025 8
+
+TABLE II: Evaluation of teammate identification under different teammate identification methods from Robot 1’s perspective: number of identified teammates and translational error (in meters).                          
+
+> Approach Robot 2 Robot 3 No. of Inliers No. of Outliers Trans. error (m) No. of Inliers No. of Outliers Trans. error (m) Distance matching 1579 80 0.15 806 259 1.08 Trajectory matching 1579 00.08 806 279 1.01 Joint matching ( Ours )1579 00.08 806 00.13
+
+Fig. 8: Evaluation of teammate identification using various joint dissimilarity thresholds λ.
+
+tifications. The average relative translational error for Robot 2 and Robot 3 is 0.08m and 0.13m, respectively. However, it is worth noting that the LiDAR cluster of the teammate robot may not always be available due to occlusion. Moreover, the random movement of each robot created variable occlusion conditions, resulting in differences in the number of inliers. 
+
+C. Evaluation of Teammate Tracker 
+
+In this subsection, we evaluate the performance of the teammate tracker in Section III-D. In our experiment, Robot 1 and Robot 3 moved first, followed by Robot 2 after around 40 seconds. Fig. 9 illustrates the estimated trajectory of Robot 2 and Robot 3 with respect to Robot 1, produced by the teammate tracker with different constraint conditions. For trajectory visualization, the estimated trajectories of Robot 2 and Robot 3 are obtained by adding the estimated relative poses to the ground truth trajectory of the observer Robot 1. As observed from Fig. 9, when only odometry constraint is available, the performance of the teammate tracker might degrade over time; however, it will recover after a while. This recovery occurs as the corresponding extrinsic transformation is periodically updated, providing a better initial guess for the optimization. The accuracy is improved with the inte-gration of UWB and LiDAR constraints, as shown in Fig. 9. Table III lists the average time consumption per operation for the teammate tracker, as well as the relative localization accuracy under varying constraint conditions. Computational time tends to increase as the constraint conditions become more informative. Each teammate robot is localized using an independent teammate tracker, with all trackers executed in parallel to ensure scalability and computational efficiency. As a result, the average time consumption per teammate tracker is approximately 50 ms. In addition, it is worthy of note that the initial estimations for Robot 2 and Robot 3 occurred at different moments. This is because each teammate robot began moving at different timestamps and required sufficient cumulated displacement to trigger the respective teammate 0 2 4 6 8 10 12        
+
+> X (m)
+> 1
+> 012
+> Y (m)
+> Ground Truth Only Odom constraints Odom + UWB constraints Odom + UWB + LiDAR constraints
+> (a) Estimated trajectory of Robot 2 0246810 12 14
+> X (m)
+> 1
+> 0123
+> Y (m)
+> Ground Truth Only Odom constraints Odom + UWB constraints Odom + UWB + LiDAR constraints
+> (b) Estimated trajectory of Robot 3
+
+Fig. 9: The estimated trajectory of Robot 2 and Robot 3 with respect to Robot 1, generated by the teammate tracker with an initial guess based on the latest extrinsic transformation for each optimization under different combinations of constraints (dark blue line: odom; purple line: odom+UWB; pink line: odom+UWB+LiDAR). 27 27 
+
+(a) Robot 1 localizes others 27 27 
+
+(b) Robot 2 localizes others 27 27 
+
+(c) Robot 3 localizes others 
+
+Fig. 10: Evaluation of different approaches with identical com-munication requirements: the average relative translational error (in meters) and relative rotational error (in degrees) in our experiment. 
+
+tracker. This point can be found in our attached video. After that, the teammate robots could be continuously estimated, even in the presence of occlusions. IEEE PREPRINT, 2025 9
+
+TABLE III: Evaluation of the teammate tracker with different constraint conditions from Robot 1’s perspective: relative translational error (in meters), relative rotational error (in degrees), and average computational time (in milliseconds). mean is the average value, and std represents the standard deviation value. 
+
+Odom constraints Odom + UWB constraints Odom + UWB + LiDAR constraints 
+
+Trans. error Rot. error Time (ms) Trans. error Rot. error Time (ms) Trans. error Rot. error Time (ms) mean std mean std mean std mean std mean std mean std Robot 2 0.15 0.13 3.82 2.73 33.1 0.11 0.07 3.76 2.22 49.5 0.09 0.05 2.95 1.39 50.5 Robot 3 0.31 0.18 4.72 2.29 34.3 0.21 0.13 3.34 1.99 50.4 0.14 0.06 3.20 1.50 51.1 
+
+TABLE IV: Packet loss rate in our experiment using the UWB communication network. One packet corresponds to one message consisting of 8 Bytes. 
+
+What should be received What has received Loss rate (%) # of packets Size (KB) # of packets Size (KB) Robot 1 9597 76.776 9536 76.288 0.64% Robot 2 9595 76.760 9564 76.512 0.32% Robot 3 9596 76.768 9551 76.408 0.47% 
+
+D. Comparison with Existing Approach 
+
+We evaluate the proposed approach against two representa-tive methods. The first baseline [27] estimates relative poses by combining short-term UWB ranging and odometry, with-out requiring initial pose correspondence among robots. The second is SLAM Toolbox [33], a LiDAR–odometry SLAM framework, where relative poses can be derived by exchanging self-localization results, under the assumption of known initial pose correspondence. All baselines incur communication costs similar to our approach. Fig. 10 demonstrates a compari-son of the relative translational error and relative rotational error across the different approaches, in which the relative localization is conducted from each robot’s perspective. As can be observed from this figure, our approach achieves the average translational error of 0.126m and rotational error of 2.275 ◦. Compared with all methods, our approach attains the highest translational accuracy and exhibits a low stan-dard deviation, indicating strong robustness and reliability. In terms of rotational accuracy, the proposed method significantly outperforms pure odometry and the approach in [27]. In contrast, SLAM Toolbox [33] benefits from LiDAR’s strong angular observability, which enables more reliable orientation corrections and thus yields higher rotational accuracy than our approach. This outcome is expected, as the proposed approach lacks explicit orientation constraints. 
+
+E. Evaluation of Communication Efficiency 
+
+In the proposed system, broadcasting odometry measure-ment only relies on the UWB communication network, without external communication devices. In this experiment with three robots, the total communication bandwidth required is only 0.48KB/s at a communication frequency of 20Hz, i.e., message size (8 Bytes) × broadcast frequency (20Hz) × number of robots (3), resulting in a total data exchange of 115.2KB for 240s duration of our experiment. Table IV reports the packet loss rate for each robot in our experiment, using the UWB communication network presented in Section III-E. The results show that the average packet loss rate is around 0.476% across three robots during this experiment. The proposed approach enables relative localization for a group of robots with instanta-neous UWB ranging and communication, which is well-suited for the coordination and formation of miniaturized vehicles with limited onboard resources. Robot 3     
+
+> Robot 2 Robot 1
+> Dynamic obstacle Dynamic obstacle Dynamic obstacle Static obstacle Static obstacle
+> Robot 3
+> Robot 2 Robot 1
+> Dynamic obstacle Dynamic obstacle Dynamic obstacle Static obstacle Static obstacle
+
+Fig. 11: Three mobile robots moved randomly in a 14.2m ×14.2m unstructured environment containing dynamic and static obstacles. 2 0 2 4 6 8 10 X (m) 10       
+
+> 8
+> 6
+> 4
+> 2
+> 02Y (m)
+> Robot 2 - GT Robot 2 - Odom Robot 2 - Est Start Point 20246810 X (m) 10
+> 8
+> 6
+> 4
+> 2
+> 02Y (m)
+> Robot 3 - GT Robot 3 - Odom Robot 3 - Est Start Point
+
+(a) Robot 1 perspective 2 0 2 4 6 8 10 X (m) 10        
+
+> 8
+> 6
+> 4
+> 2
+> 02Y (m)
+> Robot 1 - GT Robot 1 - Odom Robot 1 - Est Start Point 20246810 X (m) 10
+> 8
+> 6
+> 4
+> 2
+> 02Y (m)
+> Robot 3 - GT Robot 3 - Odom Robot 3 - Est Start Point
+
+(b) Robot 2 perspective 2 0 2 4 6 8 10 X (m) 10        
+
+> 8
+> 6
+> 4
+> 2
+> 02Y (m)
+> Robot 1 - GT Robot 1 - Odom Robot 1 - Est Start Point 20246810 X (m) 10
+> 8
+> 6
+> 4
+> 2
+> 02Y (m)
+> Robot 2 - GT Robot 2 - Odom Robot 2 - Est Start Point
+
+(c) Robot 3 perspective 
+
+Fig. 12: Visualization of pose estimation from different observing robots’ viewpoints. Trajectories are obtained by transferring the estimated relative pose to the ground truth of the observing robot. 
+
+V. D ISCUSSION 
+
+In prior experiment, the proposed approach achieved high accuracy and stability in a structured environment. Here, to more comprehensively evaluate its practicality and reliability, we investigate its performance in both complex and unstruc-tured scenarios and discuss its scalability through simulations. 
+
+A. Evaluation in a Complex Environment 
+
+We conducted the experiment in an unstructured environ-ment with a size of 14.2m ×14.2m, using three mobile robots configured similarly to those described in Section IV-A. Fig. 11 depicts the experimental scenario, including various static obstacles, randomly moving pedestrians, and mobile robots. The experiment was conducted over a duration of 360 seconds, during which the robots encountered potential inference from both static obstacles and moving pedestrians. In the last 30 seconds, Robot 1 first returned to its initial position and remained stationary, while Robot 2 and Robot 3 continued moving. The trajectories of pose estimation are visualized in Fig. 12. The observing robot is able to continuously localize its IEEE PREPRINT, 2025 10 16m 
+
+> 10 Robots
+
+(a) Simulation environment (b) Ground truth and odometry trajectory 
+
+Fig. 13: Simulation environment and trajectories of ten robots. (a) Gazebo-based simulation environment with a size of 16m ×16m. (b) Ground truth and odometry trajectories. 
+
+teammate robots. The proposed approach obtained an average translational error of 0.11m and rotational error of 2.12 ◦.The results indicate that the performance in the complex environment is consistent with that obtained in the previous experiment conducted in Section IV, showing the reliability of the proposed approach. Due to space limitations, additional performance details are provided in the attached video. 
+
+B. Scalability Analysis 
+
+To discuss the scalability of the proposed approach, we conducted simulations with different team sizes varying from 3 to 10 identically configured TurtleBot3 robots. All trials were performed in the same Gazebo environment to ensure fair comparison, as shown in Fig. 13. Table V lists the relative localization accuracy for four experimental trials, with team sizes of 3, 5, 7, and 10 robots, respectively. Due to space limitations, only results from Robot 1’s perspective are pre-sented. The results indicate that the proposed approach scales effectively to a 10-robot team while maintaining consistent relative localization accuracy with that observed in smaller teams. However, scaling the team size from 3 to 10 robots increases communication bandwidth usage from 0.48KB/s to 1.6KB/s and prolongs the average time consumption of team-mate identification from 6.3ms to 66.7ms. The communication bandwidth usage increases primarily due to the larger number of robots participating in the data exchange, as calculated from the formulation in Section IV-E. Similarly, the rise in teammate identification time results from the greater number of candidate associations that must be processed during the identification procedure with a larger team size. Nevertheless, these increases remain acceptable. Moreover, the performance of other modules is minimally impacted, benefiting from the system’s distributed design. VI. C ONCLUSION AND FUTURE WORKS 
+
+In this paper, we present a distributed relative localization method for a group of homogeneous robots using only on-board UWB communication network, enabling flexible and robust multi-robot cooperation in communication-limited sce-narios, such as post-disaster search and rescue or unknown-environment exploration, even without prior knowledge of initial correspondence among robots. Particularly, we identify teammate robots from the tracked anonymous LiDAR clusters by a joint matching strategy. Subsequently, a teammate tracker is employed to continuously localize the teammate robot in a distributed manner. The robustness and feasibility of the TABLE V: Relative pose estimation accuracy (i.e., translational error and rotational error) of our approach from Robot 1’s perspective. Trials 1–4 correspond to teams of 3, 5, 7, and 10 robots, respectively. ’-’ denotes robot absent from the trial.                                                                                             
+
+> Average relative translational error (in meters) and rotational error (in degrees) with respect to Robot 1 Trial 1 Trial 2 Trial 3 Trial 4 Robot 2 Trans. error 0.09±0.05 0.11±0.09 0.11±0.09 0.14±0.09 Rot. error 2.86±2.58 2.34±1.64 2.48±1.97 2.01±1.35 Robot 3 Trans. error 0.18±0.12 0.16±0.11 0.16±0.10 0.21±0.13 Rot. error 3.10±2.01 2.78±1.88 2.78±1.60 3.47±2.10 Robot 4 Trans. error -0.08±0.05 0.08±0.05 0.08±0.04 Rot. error -1.48±1.11 1.59±1.32 2.77±2.67 Robot 5 Trans. error -0.13±0.06 0.11±0.05 0.11±0.04 Rot. error -2.35±1.43 2.42±1.54 2.49±1.29 Robot 6 Trans. error --0.10±0.06 0.13±0.06 Rot. error --1.75±1.07 2.26±1.44 Robot 7 Trans. error --0.11±0.10 0.09±0.06 Rot. error --1.90±1.60 2.39±1.86 Robot 8 Trans. error ---0.07±0.04 Rot. error ---1.49±1.07 Robot 9 Trans. error ---0.12±0.06 Rot. error ---2.88±1.76 Robot 10 Trans. error ---0.12±0.06 Rot. error ---2.41±1.66
+> Mean error across robots Trans. error 0.14 0.12 0.11 0.12 Rot. error 2.98 2.24 2.15 2.46
+
+proposed approach were validated through experiments with three homogeneous robots in an indoor environment. The results demonstrate that our approach achieves an average relative translational error of approximately 0.12m and relative rotational error of approximately 2.20 ◦, with data exchange of only 0.48KB/s at a communication frequency of 20Hz in a three-robot system, while maintaining robust performance. In future work, we will extend our method to 3D scenarios by replacing wheel odometry with an IMU to enable 3D ego-state estimation while enhancing scalability for larger multi-robot systems. Moreover, we aim to apply our relative localization approach to support the exploration and formation tasks for robot swarm in both indoor and outdoor environments. REFERENCES [1] J. P. Queralta, J. Taipalmaa, B. Can Pullinen, V. K. Sarker, T. Nguyen Gia, H. Tenhunen, M. Gabbouj, J. Raitoharju, and T. Westerlund, ”Collaborative Multi-Robot Search and Rescue: Planning, Coordination, Perception, and Active Vision,” in IEEE Access , vol. 8, pp. 191617-191643, 2020. [2] Z. Feng, G. Hu, Y. Sun, and J. Soon, ”An overview of collaborative robotic manipulation in multi-robot systems,” in Annual Reviews in Control , vol. 49, pp. 113-127, 2020. [3] K. Pongsirijinda, Z. Cao, B. Pik Lik Lau, R. Liu, C. Yuen and U. -X. Tan, ”MEF-Explore: Communication-Constrained Multi-Robot Entropy-Field-Based Exploration,” in IEEE Transactions on Automation Science and Engineering , vol. 22, pp. 16062-16078, 2025. [4] A. Eskandarian, C. Wu, and C. Sun, ”Research Advances and Challenges of Autonomous and Connected Ground Vehicles,” in IEEE Transactions on Intelligent Transportation Systems , vol. 22, no. 2, pp. 683-711, Feb. 2021. [5] P. Stegagno, M. Cognetti, L. Rosa, P. Peliti, and G. Oriolo, ”Relative localization and identification in a heterogeneous multi-robot system,” 
+
+2013 IEEE International Conference on Robotics and Automation ,Karlsruhe, Germany, 2013, pp. 1857-1864. [6] K. M. Kabore and S. G¨ uler, ”Distributed Formation Control of Drones With Onboard Perception,” in IEEE/ASME Transactions on Mechatron-ics , vol. 27, no. 5, pp. 3121-3131, Oct. 2022. [7] A. Jaimes, S. Kota, and J. Gomez, ”An approach to surveillance an area using swarm of fixed wing and quad-rotor unmanned aerial vehicles UAV(s),” 2008 IEEE International Conference on System of Systems Engineering , Monterey, CA, USA, 2008, pp. 1-6. [8] J. A. Preiss, W. Honig, G. S. Sukhatme, and N. Ayanian, ”Crazyswarm: A large nano-quadcopter swarm,” 2017 IEEE International Conference on Robotics and Automation (ICRA) , Singapore, 2017, pp. 3299-3304. [9] A. Ledergerber, M. Hamer, and R. D’Andrea, ”A robot self-localization system using one-way ultra-wideband communication,” 2015 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,Hamburg, Germany, 2015, pp. 3131-3137. IEEE PREPRINT, 2025 11 
+
+[10] J. Zhang and S. Singh, ”LOAM: Lidar odometry and mapping in real-time,” in Robotics: Science and systems , vol. 2, no. 9, pp. 1-9, Jul. 2014. [11] C. Zheng, Q. Zhu, W. Xu, X. Liu, Q. Guo, and F. Zhang, ”FAST-LIVO: Fast and Tightly-coupled Sparse-Direct LiDAR-Inertial-Visual Odometry,” 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , Kyoto, Japan, 2022, pp. 4003-4009. [12] Z. Yuan, Q. Wang, K. Cheng, T. Hao, and X. Yang, ”SDV-LOAM: Semi-Direct Visual–LiDAR Odometry and Mapping,” in IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 45, no. 9, pp. 11203-11220, 1 Sept. 2023. [13] F. Zhu, Y. Ren, F. Kong, H. Wu, S. Liang, N. Chen, W. Xu, and F. Zhang, ”Swarm-LIO: Decentralized Swarm LiDAR-inertial Odometry,” 2023 IEEE International Conference on Robotics and Automation (ICRA) ,London, United Kingdom, 2023, pp. 3254-3260. [14] H. Xu, Y. Zhang, B. Zhou, L. Wang, X. Yao, G. Meng, and S. Shen. ”Omni-Swarm: A Decentralized Omnidirectional Visual–Inertial–UWB State Estimation System for Aerial Swarms,” in IEEE Transactions on Robotics , vol. 38, no. 6, pp. 3374-3394, Dec. 2022. [15] R. Liu, C. Yuen, T. N. Do, M. Zhang, Y. L. Guan, and U. -X. Tan, ”Cooperative positioning for emergency responders using self IMU and peer-to-peer radios measurements,” Information Fusion , vol. 56, pp. 93-102, 2020. [16] Y. Wang, M. Lin, X. Xie, Y. Gao, F. Deng, and T. L. Lam, ”Asymptoti-cally Efficient Estimator for Range-Based Robot Relative Localization,” in IEEE/ASME Transactions on Mechatronics , vol. 28, no. 6, pp. 3525-3536, Dec. 2023. [17] I. Oppermann, M. H¨ am¨ al¨ ainen, and J. Iinatti, ”UWB: theory and applications,” John Wiley & Sons , 2004. [18] Z. Yan, T. Duckett, and N. Bellotto, ”Online learning for 3D LiDAR-based human detection: Experimental analysis of point cloud clustering and classification methods,” Autonomous Robots , vol. 44, pp. 147-164, 2020. [19] P. -Y. Lajoie and G. Beltrame, ”Swarm-SLAM: Sparse Decentralized Collaborative Simultaneous Localization and Mapping Framework for Multi-Robot Systems,” in IEEE Robotics and Automation Letters , vol. 9, no. 1, pp. 475-482, Jan. 2024. [20] A. Weinstein, A. Cho, G. Loianno and V. Kumar, ”Visual Inertial Odom-etry Swarm: An Autonomous Swarm of Vision-Based Quadrotors,” in 
+
+IEEE Robotics and Automation Letters , vol. 3, no. 3, pp. 1801-1807, July 2018. [21] P. C. Lusk, X. Cai, S. Wadhwania, A. Paris, K. Fathian and J. P. How, ”A Distributed Pipeline for Scalable, Deconflicted Formation Flying,” in IEEE Robotics and Automation Letters , vol. 5, no. 4, pp. 5213-5220, Oct. 2020. [22] M. Bloesch, S. Omari, M. Hutter and R. Siegwart, ”Robust visual inertial odometry using a direct EKF-based approach,” 2015 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,Hamburg, Germany, 2015, pp. 298-304. [23] Z. Xun, J. Huang, Z. Li, Z. Ying, Y. Wang, C. Xu, F. Gao, and Y. Cao, ”CREPES: Cooperative Relative Pose Estimation System.” 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , Detroit, MI, USA, 2023, pp. 5274-5281. [24] Z. Cao, R. Liu, B. P. L. Lau, C. Yuen, and U. -X. Tan, ”Dis-tributed Relative Localization Based on Ultra-Wideband and LiDAR for Multirobot With Limited Communication,” in IEEE Transactions on Instrumentation and Measurement , vol. 74, pp. 1-12, 2025. [25] Z. Cao, R. Liu, C. Yuen, A. Athukorala, B. K. Kiat Ng, M. Mathanraj, and U.-X. Tan ”Relative Localization of Mobile Robots with Multiple Ultra-WideBand Ranging Measurements,” 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , Prague, Czech Republic, 2021, pp. 5857-5863. [26] A. Fishberg and J. P. How, ”Multi-Agent Relative Pose Estimation with UWB and Constrained Communications,” 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , Kyoto, Japan, 2022, pp. 778-785. [27] R. Liu, Z. Deng, Z. Cao, M. Shalihan, B. P. L. Lau, K. Chen, K. Bhowmik, C. Yuen, and U.-X. Tan, ”Distributed Ranging SLAM for Multiple Robots with Ultra-WideBand and Odometry Measurements,” 
+
+2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , Kyoto, Japan, 2022, pp. 13684-13691. [28] J. Redmon and A. Farhadi, ”Yolov3: An incremental improvement,” arXiv, 2018. [29] A. V. Oppenheim and R. W. Schafer, ”Discrete-Time Signal Processing,” 3rd ed. Upper Saddle River, NJ, USA: Pearson, 2010. [30] R. Subramanian, S. Sarkar, M. Labrador, K. Contino, C. Eggert, O. Javed, J. Zhu, and H. Cheng, ”Orientation invariant gait matching algo-rithm based on the Kabsch alignment,” IEEE International Conference on Identity, Security and Behavior Analysis (ISBA 2015) , Hong Kong, China, 2015, pp. 1-8. [31] D. J. Berndt and J. Clifford, ”Using dynamic time warping to find patterns in time series,” Proceedings of the 3rd international conference on knowledge discovery and data mining , Seattle, WA, USA, 1994, pp. 359-370. [32] R. K¨ ummerle, G. Grisetti, H. Strasdat, K. Konolige, and W. Burgard, ”G2o: A general framework for graph optimization,” 2011 IEEE In-ternational Conference on Robotics and Automation , Shanghai, China, 2011, pp. 3607-3613. [33] S. Macenski and I. Jambrecic, ”SLAM Toolbox: SLAM for the dynamic world,” in Journal of Open Source Software , vol. 6, no. 61, pp. 2783, May 2021. 
+
+Zhiqiang Cao received the B.S. and M.A.Sc. de-grees from the Southwest University of Science and Technology, Mianyang, China, in 2019 and 2022, re-spectively. He is currently pursuing his Ph.D. degree at the Singapore University of Technology and De-sign, Singapore, under the supervision of Prof. Chau Yuen. His current research interests include multi-robot systems, collaborative localization, distributed systems, and data fusion. 
+
+Ran Liu (Senior Member, IEEE) received the B.S. degree from the Southwest University of Science and Technology, China, in 2007, and the Ph.D. degree from the University of T¨ uebingen, Germany, in 2014. From 2015 to 2024, he was a research fel-low at the Singapore University of Technology and Design. He is currently a senior research fellow at the Nanyang Technological University. His research interests include robotics and SLAM. 
+
+Billy Pik Lik Lau (Senior Member, IEEE) received Ph.D. at the Singapore University of Technology and Design (SUTD) in 2021 as well as a degree in computer science and M. Phil degree in computer science from Curtin University in 2010 and 2014, respectively. His Ph.D. research work includes data fusion and big data analysis in field such as urban science and Internet of Things. Currently, he is a research fellow at Nanyang Technological Univer-sity doing data fusion with robotic application. His research interests are the integration of data fusion and data analysis with multi-agent system for real-world applications. 
+
+Chau Yuen (Fellow, IEEE) received the B.Eng. and Ph.D. degrees from Nanyang Technological Univer-sity, Singapore, in 2000 and 2004, respectively. He was a Post-Doctoral Fellow with Lucent Technolo-gies Bell Labs, Murray Hill, in 2005. From 2006 to 2010, he was with the Institute for Infocomm Research, Singapore. From 2010 to 2023, he was with the Engineering Product Development Pillar, Singapore University of Technology and Design. Since 2023, he has been with the School of Electrical and Electronic Engineering, Nanyang Technological University, currently he is Provost’s Chair in Wireless Communications and Assistant Dean in Graduate College. He is listed as Top 2% Scientists by Stanford University, and also a Highly Cited Researcher by Clarivate Web of Science from 2022. Dr. Yuen received IEEE Communications Society Leonard G. Abraham Prize (2024), IEEE Communications Society Best Tutorial Paper Award (2024). Dr. Yuen currently serves as an Editor-in-Chief for Springer Nature Computer Science, Editor for IEEE Transactions on Vehicular Technology, IEEE Transactions on Neural Networks and Learning Systems, and IEEE Transactions on Network Science and Engineering. IEEE PREPRINT, 2025 12 
+
+U-Xuan Tan (Senior Member, IEEE) received the B.Eng. degree in mechanical and aerospace engi-neering and the Ph.D. degree in mechatronics from Nanyang Technological University, Singapore, in 2005 and 2010, respectively. From 2009 to 2011, he was Post-Doctoral Researcher at the University of Maryland, College Park, MD, USA. From 2012 to 2014, he was a Lecturer with Singapore Univer-sity of Technology and Design (SUTD), Singapore, where he took up a research intensive role as an Assistant Professor in 2014, and has been promoted to an Associate Professor since 2021. He is currently the Chair of the SUTD Institutional Review Board and is also a Senior Visiting Academician with the Changi General Hospital. His research interests include Robotics & Automation, onsite sensing and control, SLAM in adverse conditions, sensing algorithms for human–robot interaction, and interdisciplinary teaching.

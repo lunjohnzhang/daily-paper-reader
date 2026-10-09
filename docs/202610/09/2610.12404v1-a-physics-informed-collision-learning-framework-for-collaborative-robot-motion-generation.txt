@@ -1,0 +1,507 @@
+Title: A Physics-Informed Collision Learning Framework for Collaborative Robot Motion Generation
+
+URL Source: https://arxiv.org/pdf/2610.12404v1
+
+Published Time: Fri, 09 Oct 2026 02:08:20 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+> 1
+
+# A Physics-Informed Collision Learning Framework for Collaborative Robot Motion Generation 
+
+Chen Cai and Steven Liu 
+
+Abstract —Close-proximity multi-arm manipulation requires collision models that are both geometrically accurate and differ-entiable enough for real-time optimization. Classical geometry checkers provide reliable distances but are difficult to use inside gradient-based model predictive control, while conservative proxy models can restrict tightly coupled motion. We present PI-UDF, a physics-informed unified differentiable framework for body-to-body collision distance prediction between articulated robots. PI-UDF combines analytical forward kinematics with learnable link-geometry embeddings and a shared residual network to predict pairwise inter-arm distances directly from robot configurations. To improve safety-critical fidelity, we combine quota-driven boundary mining with an asymmetric boundary-crossing penalty that emphasizes false-safe sign errors near the collision boundary. The learned distance field is integrated into nonlinear MPC as a differentiable inter-arm clearance term. We validate the framework on a real dual-Franka platform through high-speed close-proximity 14-DoF dual-arm swapping, sustained single-arm dynamic evasion, and dynamic-evasion planning configurations with frozen, predicted, and target-switching treatments of the moving arm. Hardware experiments and offline Drake/FCL replay show that PI-UDF provides a differentiable inter-arm clearance estimate suitable for closed-loop collision-aware col-laborative robot motion generation. 
+
+Index Terms —Collaborative robots, collision avoidance, dif-ferentiable collision detection, model predictive control, motion planning, robot learning. 
+
+I. INTRODUCTION Close-proximity multi-arm manipulation requires multiple robots to move through tight shared workspaces while main-taining continuous inter-arm clearance. Classical mesh-based checkers such as FCL [1] provide reliable geometry queries for offline validation, but their discrete and non-smooth computa-tions are difficult to embed in gradient-based model predictive control. Real-time controllers often replace full geometry with simplified convex proxies; for example, distributed MPC can approximate robot links by line segments and ellipsoids [2]. These proxies reduce computation, but their inflated clearances can restrict tightly coupled motion and cause deadlock-like behavior in dense workspaces [3]. Signed distance fields provide a continuous clearance signal and gradients that are useful for optimization-based collision avoidance. Neural SDF variants extend this idea to robot configuration spaces; for example, Neural-JSDF uses MLPs for joint-space distance fields [4], while Bernstein-polynomial representations improve storage efficiency [5]. However, most 
+
+Chen Cai and Steven Liu are with the Department of Electrical and Computer Engineering, University of Kaiserslautern Landau, Kaiserslautern, 67663, Germany (e-mail: {chen.cai, steven.liu }@rptu.de). This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible. 
+
+such formulations remain centered on point-to-robot queries rather than direct body-to-body clearance between two moving articulated arms. For multi-arm planning, treating one moving arm as a set of query points for the other arm requires dense online point sampling or proxy-shape approximations. Both choices scale poorly with link complexity and weaken the geometry signal available to a closed-loop optimizer. What is needed is a compact, differentiable body-to-body distance model that reasons directly over robot configurations. PairwiseNet [6] is an important step toward direct link-pair distance learning. It decomposes the global collision problem into pairwise subproblems and conditions a shared regressor on pairwise relative transforms and point-cloud-derived shape descriptors, thereby avoiding dense online point sampling during planning. Our framework builds on this established pairwise relative-pose factorization and focuses its contribution on the co-design of geometry representation, boundary-focused supervision, and differentiable integration into downstream motion generation. Boundary-focused data acquisition has also been studied for high-DoF collision-distance learning. Kim and Park [7] itera-tively update a fixed-size configuration dataset with samples near the current model’s global collision boundary and use a redundant link- SE (3) n representation to improve distance learning. Their approach is model-in-the-loop: the learned collision boundary guides subsequent data generation. In con-trast, our retained-set construction is driven by ground-truth coverage deficits over link-pair classes and distance zones, rather than by the boundary of an intermediate model. Against this background, we propose the Physics-Informed Unified Differentiable Framework (PI-UDF), a compact frame-work for body-to-body collision distance learning between articulated robots. PI-UDF provides a differentiable collision-distance representation that can be queried by downstream motion-generation modules; in this work, we instantiate this interface within nonlinear MPC. The model conditions ashared residual regressor on FK-derived relative poses and task-optimized link embeddings learned end-to-end from signed-distance supervision. PI-UDF further combines pair-level boundary mining with an asymmetric Boundary-Crossing Penalty that emphasizes false-safe prediction errors. The contributions of this work are threefold:  
+
+> •
+
+Task-optimized geometry representation with analyti-cal kinematics. We condition a shared residual regressor on FK-derived relative poses and task-optimized link em-beddings learned end-to-end from signed-distance super-vision. This replaces a separately pretrained point-cloud representation with lightweight embedding lookups, arXiv:2610.12404v1 [cs.RO] 8 Oct 2026 2
+
+(a) Body-to-Body SDF −0.1 0.0 0.1             
+
+> GT distance d⋆[m]
+> −0.1 0.0 0.1
+> Predicted distance ̂  d [m]  (b1) Sign semantics
+> False-safe hazard Correct safe
+> Correct collision
+> Conservative false-collide
+> −0.10 −0.05 0.00 0.05 0.10
+> Predicted distance ̂ d[m]
+> 0.0 0.3 0.6
+> Loss magnitude
+> (b2) BCP slice
+> loss slice at d⋆= 0
+> false-safe region
+> steeper penalty MAE MSE BCP boundary
+
+(b) Asymmetric BCP Loss (c) Closed-loop motion generation 
+
+Fig. 1: Overview of the PI-UDF framework. (a) Physics-informed Body-to-Body SDF provides differentiable inter-arm clearance and usable gradients for optimization. (b) The Boundary-Crossing Penalty (BCP) emphasizes false-safe boundary violations while keeping conservative safe-state errors less costly. (c) The learned distance field is used as an inter-arm clearance term in NMPC for close-proximity motion generation. Representative frames during close-proximity dual-arm crossing and subsequent separation are shown. yielding a compact 0.11 M -parameter model and an ap-proximately 5× wall-clock training speedup over Pair-wiseNet at the same 50-epoch budget.  
+
+> •
+
+Pair-level boundary supervision with asymmetric safety-aware learning. We introduce ground-truth class-zone quota mining at the link-pair level together with an asymmetric Boundary-Crossing Penalty that empha-sizes false-safe sign errors. This improves coverage of penetration and near-contact interactions while reducing hazardous boundary-crossing errors.  
+
+> •
+
+Differentiable motion-generation integration and hardware validation. We integrate PI-UDF into a JIT-compiled nonlinear MPC stack as a differentiable inter-arm clearance model and validate the complete learning– control pipeline on real dual-Franka hardware through close-proximity swapping, dynamic evasion, and reac-tive/predictive operating modes, with offline Drake/FCL replay for geometry-level validation. II. P HYSICS INFORMED UNIFIED COLLISION LEARNING 
+
+FRAMEWORK 
+
+A. Problem Formulation: Pairwise Decomposition with Ana-lytical Kinematics 
+
+Consider a collaborative system comprising two manipula-tors with joint configurations q1 ∈ Rn1 and q2 ∈ Rn2 . We denote the full dual-arm configuration by q = [ q⊤ 
+
+> 1
+
+, q ⊤ 
+
+> 2
+
+]⊤ ∈
+
+Rn1+n2 . Let Vr (qr ) ⊂ R3 be the workspace volume occupied by robot r ∈ { 1, 2} at configuration qr . The inter-arm signed clearance is defined as 
+
+D⋆(q) = sdist  V1(q1), V2(q2). (1) where sdist( ·, ·) denotes the signed set-to-set clearance: posi-tive for separated bodies, zero at contact, and negative under penetration. Directly learning D⋆(q) as a monolithic map from the full joint space is data inefficient: the network would have to infer both the rigid-body kinematic transformations and the local geometry-dependent distance field from sparse high-dimensional samples. PI-UDF avoids this entanglement by using the known kinematic chain as an analytical prior. Let Gr,i denote the fixed local geometry of link i on robot r, and let 0Tr,i (qr ) = FK r,i (qr ) ∈ SE (3) be the world-frame pose of that link computed by forward kinematics. For an inter-arm link pair 
+
+(i, j ), we define the relative pose 
+
+Tij (q) =  0T1,i (q1)−1 0T2,j (q2) ∈ SE (3) . (2) The global body-to-body clearance can then be written as the minimum over pairwise signed distances: 
+
+D⋆(q) = min  
+
+> (i,j )∈P
+
+d⋆ij 
+
+ Tij (q), G 1,i , G 2,j 
+
+. (3) where P is the set of inter-arm link pairs considered for collision reasoning, and d⋆ij is the ground-truth signed distance between the two link geometries. Equation (3) decomposes the global inter-arm clearance into link-pair subproblems. Within each subproblem, analytical forward kinematics computes the configuration-dependent relative pose Tij (q), while the learned regressor models its interaction with the fixed link ge-ometries. This separates the computational roles of kinematics and geometry without treating them as independent. The learning problem is therefore reduced from fitting a global joint-space distance field to approximating a family 3
+
+of shape-conditioned pairwise distance functions. PI-UDF represents the fixed link geometries by learnable descriptors 
+
+e1,i and e2,j , obtained from robot-specific embedding tables, and uses a single shared regressor to predict 
+
+ˆdij (q) = fθ (Tij (q), e1,i , e2,j ) ≈ d⋆ij (q). (4) Analytical kinematics provides the relative transform, leav-ing the neural network to learn the remaining geometry-conditioned distance mapping. For evaluation and reporting, the raw predicted inter-arm clearance is 
+
+ˆD(q) = min 
+
+> (i,j )∈P
+
+ˆdij (q). (5) Because the exact minimum is non-smooth when the active link pair changes, NMPC instead uses the smooth surrogate 
+
+eDα(q) defined in Sec. IV. 
+
+B. Unified Dual-Stream Architecture 
+
+To instantiate the pairwise regressor in Eq. (4), PI-UDF uses a unified dual-stream architecture, as shown in Fig. 2. The network input is composed of an explicit pose descriptor derived from the analytical relative transform Tij (q), and an implicit geometry descriptor obtained from learnable link-embedding tables. The two descriptors are fused by a shared residual regressor to predict the pairwise signed distance ˆdij .
+
+Explicit pose stream. For each inter-arm link pair (i, j ), the relative pose Tij (q) ∈ SE (3) is already provided by Eq. (2). We convert it into a vector representation 
+
+vpose = ϕ(Tij ) ∈ R12 ,
+
+where ϕ(·) flattens the rotation matrix and translation vector of 
+
+Tij . This descriptor exposes the relative spatial configuration of the two links directly to the network, instead of requiring the network to infer forward kinematics from joint angles. Because the predictor uses only Tij , it is invariant to a common rigid transformation applied to both links. 
+
+Implicit geometry stream. The link geometries G1,i and 
+
+G2,j are fixed for a given robot model and therefore need not be encoded from point clouds during inference. We represent them using robot-specific learnable embedding tables 
+
+E(r) ∈ RLr ×m, r ∈ { 1, 2},
+
+where Lr is the number of modeled links of robot r, and 
+
+m = 32 in our implementation. For a query pair (i, j ), the geometry descriptors are obtained by table lookup: 
+
+e1,i = E(1) [i], e2,j = E(2) [j],
+
+and concatenated as 
+
+vgeo = [ e1,i ; e2,j ] ∈ R2m.
+
+These embedding rows are initialized randomly and optimized jointly with the distance regressor using the collision-distance supervision. Thus, the learned descriptors are not intended to reconstruct visual shape, but to encode geometry features that are useful for signed distance prediction. During inference, this geometry stream reduces to constant-time indexing. Identical robots may share the same embedding table, while heteroge-neous robot pairs can be represented by robot-specific tables without changing the shared regressor architecture. The fused feature vector 
+
+zij = [ v⊤
+
+> pose
+
+, v⊤
+
+> geo
+
+]⊤
+
+is passed to a shared residual backbone. We interpret the residual predictor as 
+
+ˆdij = fθ (zij ) ≈ F base (vpose )
+
+| {z }
+
+> pose-dominant trend
+
++ Fcorr (vpose , vgeo )
+
+| {z }
+
+> geometry-conditioned correction
+
+.
+
+(6) Equation (6) provides a conceptual additive interpretation of the learned mapping rather than an explicitly implemented two-branch architecture, reflecting the structure of the distance query: the relative translation and orientation already provide a strong low-order cue for inter-link clearance, while the remain-ing correction depends on the detailed link shapes. The shared backbone therefore does not relearn rigid-body kinematics, but concentrates its capacity on geometry-conditioned deviations from the pose-dominant distance trend. Since the same fθ
+
+is reused for all link pairs, the model avoids both a heavy pretrained point-cloud encoding and a separate expert network for each pair. Moreover, when the experimental platform uses two identical Franka robots, the implementation shares a single embedding table between the two arms. 
+
+C. Safety-Aware Training Pipeline 
+
+Representative neural collision-learning methods rely on broad configuration-space sampling [3], [6], while PairwiseNet additionally adopts a standard symmetric regression objective [6]. In a 14-DoF dual-arm system, however, contact and near-contact configurations occupy only a small, structured subset of the joint space. Uniform q-sampling therefore produces predominantly far-field data and severely underrepresents the boundary interactions most relevant to closed-loop safety. We refer to this imbalance as the Sparsity Trap .Model-in-the-loop active learning has previously addressed this sparsity by iteratively updating a fixed-size dataset with configurations sampled near the learned global collision boundary [7]. Our objective differs in two respects. First, PI-UDF is supervised on pairwise distances rather than a single global configuration-level label. Second, our mining rule is based on ground-truth coverage deficits over link-pair classes and distance zones, without repeatedly estimating and resampling around an intermediate model boundary. The imbalance is amplified at the link-pair level be-cause each configuration induces many d⋆ij labels: a globally safe configuration may contain informative near-field pairs, whereas a boundary configuration may contain only one or two critical pairs. PI-UDF therefore retains physically valid whole configurations while performing mining and supervision at the link-pair level. Its Safety-Aware Training Pipeline combines class-zone quota-driven active mining with an asymmetric boundary-crossing loss, reflecting that neither all samples nor all errors are equally important. 4
+
+Fig. 2: Overview of the PI-UDF architecture. Given an inter-arm link pair (i, j ), analytical forward kinematics computes the world-frame link poses 0T1,i (q1) and 0T2,j (q2), from which the relative transform Tij (q) is constructed and vectorized as vpose . The fixed link geometries are represented by robot-specific learnable embedding-table lookups e1,i = E(1) [i] and 
+
+e2,j = E(2) [j], forming the implicit geometry descriptor vgeo . A shared residual regressor fuses both streams to predict the pairwise signed distance ˆdij .
+
+1) Quota-Driven Link-Pair Active Mining: We distinguish the configuration-level clearance D⋆(q) from the pairwise signed distance d⋆ij (q). The global collision state of a dual-arm configuration is determined by 
+
+D⋆(q) = min  
+
+> (i,j )∈P
+
+d⋆ij (q).
+
+whereas PI-UDF is supervised on individual inter-arm link-pair queries. Each retained configuration can be expanded into samples of the form 
+
+s =  q, i, j, T ij (q), d ⋆ij (q),
+
+where Tij (q) is the analytical relative pose defined in Eq. (2). The distance zone used for mining and batch construction is assigned by the pairwise label d⋆ij (q), not by the configuration-level ground-truth clearance D⋆(q).For fair comparison with joint-space baselines, we use the same budget of 100k retained dual-arm configurations. The difference is how these configurations are selected. Uni-form sampling passively accepts most far-field configurations, whereas our active generator retains a candidate configuration only when its induced link-pair distances improve the coverage of underrepresented boundary regions. Specifically, candidate configurations are proposed in joint space and evaluated over the canonical inter-arm link-pair set P. Each pairwise query is assigned to one of four distance zones: 
+
+W1 : d⋆ij ≤ 0 (penetration) ,W2 : 0 < d ⋆ij ≤ 5 cm (near-field) ,W3 : 5 cm < d ⋆ij ≤ 20 cm (mid-field) ,W4 : d⋆ij > 20 cm (far-field) .
+
+For each link-pair class and each zone, we maintain a prescribed coverage quota. A candidate configuration is re-tained if at least one of its link-pair queries contributes to an underrepresented class-zone bucket; otherwise it is rejected. This converts the fixed configuration budget into a boundary-enriched set of pairwise supervision signals. In practice, higher priority is assigned to kinematically relevant and historically under-covered pairs, such as distal forearm, wrist, and end-effector interactions, because these pairs dominate close-proximity collaborative manipulation. Retaining a configuration preserves labels for all canonical inter-arm link pairs. Thus, a configuration accepted because one pair lies near contact also supplies mid- and far-field labels for the remaining pairs, preserving global calibration. Mini-batches are sampled from the resulting class-zone buckets, while Fig. 3 summarizes the retained set at the configuration level through D⋆(q).
+
+2) Asymmetric Boundary-Crossing Penalty: Active mining determines which regions of the distance field are sampled 5
+
+frequently; the loss determines which errors are treated as safety-critical. Standard MSE penalizes far-field and boundary errors symmetrically. For MPC, however, the critical failure mode is a false-safe prediction, where the model predicts positive clearance although the ground-truth pair is in contact or penetration. To suppress this failure mode, we use an asymmetric Boundary-Crossing Penalty (BCP). Let d⋆s and ˆds denote the ground-truth and predicted signed distances of a pairwise training sample s, and let z(s) ∈ { W1, W 2, W 3, W 4} be its distance-zone label. We define Is = I[ ˆds > 0 ∧ d⋆s ≤ 0] as the false-safe boundary-crossing indicator. The loss is 
+
+LBCP = 1
+
+N
+
+> N
+
+X
+
+> s=1
+
+λz(s) d⋆s − ˆds (1 + ηI s) . (7) Here, η controls the strength of the asymmetric safety wall: only false-safe boundary crossings are amplified, while conservative safe-state errors remain penalized by the base weighted L1 term. The zone weight λz(s) further prioritizes boundary regions, with larger weights for penetration and near-field samples, e.g., λW1 , λ W2 > λW3 > λW4 . Thus, PI-UDF concentrates supervision and loss pressure on safety-critical link-pair interactions while retaining mid- and far-field coverage for global calibration. III. N ETWORK EVALUATION AND ABLATION STUDIES 
+
+A. Experimental Setup and Training Settings 
+
+To rigorously evaluate the proposed framework, we structure our experiments to assess both system-level safety and the underlying architectural choices. 
+
+1) Target System: As illustrated in Fig. 1(a), we evalu-ate PI-UDF on a fixed-cell dual-arm system consisting of two 7-DoF Franka Emika Panda arms with a fixed relative base placement (inter-base offset 1.16 m , opposing orienta-tions [0 , π ] rad). This setup matches the intended deployment scenario of many industrial collaborative workcells, where the robot bases are calibrated once and remain fixed during operation. This choice should be distinguished from the original goal of PairwiseNet [6], which targets generalized collision detec-tion across varying multi-arm layouts. Although the analytical relative transform already includes the robot-base placement, training across multiple layouts would be required to cover the resulting relative-pose distribution. Here we focus on the calibrated fixed-cell deployment. This fixed-cell setting allows us to evaluate whether a compact pairwise differentiable distance model can provide accurate near-boundary distances and gradients for downstream motion planning. 
+
+2) Training Datasets: We compare uniform and active datasets under the same budget of 100 k retained dual-arm configurations. The uniform set follows the joint-space sam-pling used in our PairwiseNet reproduction, whereas the active set is constructed using the class-zone quota rule in Sec. II-C. Figure 3 summarizes the induced configuration-level coverage using 
+
+D⋆(q) = min  
+
+> (i,j )∈P
+
+d⋆ij (q).
+
+Fig. 3: Configuration-level distance-zone distribution. 
+
+Each retained dual-arm configuration is assigned to a zone by its minimum inter-arm signed clearance D⋆(q) =min (i,j )∈P d⋆ij (q). Under the same 100k retained-configuration budget, uniform q-sampling is dominated by far-field config-urations, whereas our quota-driven active mining shifts the retained set toward penetration and near-field configurations. The link-pair-level quota mechanism used to construct this retained set is described in Sec. II-C. Only 0.64% of uniformly sampled configurations fall in the penetration or near-field zones, compared with over 98% in the actively retained set. Both retained sets are then expanded into canonical link-pair queries for training; thus, the active-data PairwiseNet variants isolate the effect of boundary coverage from the effects of the PI-UDF representation and BCP loss. Although the active set is boundary-focused at the configura-tion level, each retained configuration still provides mid- and far-field labels for non-critical link pairs. 
+
+B. Implementation and Baselines 1) Experimental Infrastructure: All data generation, train-ing, and evaluation procedures were executed on a stan-dard workstation equipped with an Intel Core i7-12700 CPU (2.10 GHz, 12 cores), 64 GB DDR4 RAM, and an NVIDIA GeForce RTX 5080 GPU. The proposed PI-UDF and all baseline models were implemented in PyTorch. For training, we generally utilize the Adam optimizer with a learning rate of 1 × 10 −4 and a batch size of 512 . Unless stated otherwise, BCP-trained variants use η = 5 .0, (λW1 , λ W2 , λ W3 , λ W4 ) = (1 .5, 1.0, 0.5, 0.1) , and balanced 4:4:4:4 zone sampling. 
+
+2) Baseline Variants: We use PairwiseNet [6] as the primary pairwise-learning baseline. Because pretrained geometry-encoder weights were unavailable, we trained the point-cloud encoders for the same Franka link geometries using the authors’ public pipeline and froze them during subsequent distance-regressor training. All PairwiseNet results below therefore denote a budget-matched fixed-cell reproduction on the same fixed-base dual-Franka setup. We evaluate the following variants:  
+
+> •
+
+PairwiseNet (Uniform, 100 ep): The PairwiseNet re-gressor is trained on the uniformly sampled joint-space 6
+
+dataset, following the original sampling paradigm, for 
+
+100 epochs.  
+
+> •
+
+PairwiseNet (Active, 50/75 ep): The same Pair-wiseNet encoder–regressor architecture is trained on our boundary-enriched active dataset for 50 and 75 epochs. These variants isolate the effect of data coverage while preserving the PairwiseNet representation and symmetric regression objective.  
+
+> •
+
+PI-UDF (Active+BCP, 50 ep): The complete PI-UDF model, comprising FK-derived relative-pose inputs, jointly learned link embeddings, the SiLU ResNet back-bone, and BCP training, is optimized on the active dataset for 50 epochs. Beyond these system-level benchmarks, a rigorous dissec-tion of PI-UDF’s internal architectural choices – specifically the impact of the ResNet backbone and continuous activation functions – is detailed in the subsequent ablation studies (Sec. III-D). 
+
+3) Held-Out Static and Dynamic Test Sets: To rigorously evaluate the models’ worst-case safety performance and prac-tical reliability, we construct two distinct test domains. First, we generate a Static Safety-Critical Test Set via rejection sampling from an independently sampled dual-arm configurations not used during training. We filter randomly drawn dual-arm configurations to enforce a strict quota: 30% true collisions ( d ≤ 0), 50% near-collisions ( 0 < d ≤ 5 cm), and 20% safe states in terms of minimum inter-arm collision distance. The final static set comprises 2,000 accepted con-figurations (yielding 110,000 valid inter-arm link-pair evalua-tions), with ground-truth signed distances computed via Drake (FCL/GJK) [8]. Second, to assess temporal consistency, we define a Dy-namic Trajectory Test Set using a high-speed dual-arm ”swap-ping” motion. By continuously evaluating the raw predicted clearance ˆD(qt) against the Drake/FCL reference D⋆(qt), we rigorously benchmark their point-wise accuracy and robustness against prediction chattering. 
+
+C. Comparative Evaluation on Held-Out Test Sets 
+
+Building upon the held-out test sets defined previously, we benchmark the model performance across several metrics:  
+
+> •
+
+RMSE (cm): The root mean-squared error (RMSE) between the estimated and actual collision distances.  
+
+> •
+
+SC-MAE (cm): Safety-Critical Mean Absolute Error targets precision exclusively within the narrow near-field and collision zones ( d < 5 cm).  
+
+> •
+
+FNR (%): The False Negative Rate represents the fre-quency of predicting a physically colliding state ( d∗ ≤ 0)as safe ( d > 0).  
+
+> •
+
+AUC: Area Under the ROC Curve. Evaluates the over-all classification capability of distinguishing safe versus colliding states across all continuous thresholds. 
+
+Evaluation on the Static Safety-Critical Test Set: Table I and Fig. 4 detail the models’ performance on the static test set, offering insights into the efficacy of our specific methodological contributions: 
+
+Dataset Quality and Sparsity Trap: Under the reproduced uniform-data setting, PairwiseNet yields an FNR of 100% ,with its predicted density mass shifted erroneously into the false-safe positive region (Fig. 4). Retraining the same regres-sor on the active dataset reduces the FNR to 16 .47% , isolating the effect of boundary-oriented data coverage. 
+
+Loss Formulation and Safety: When comparing models at an equal training budget of 50 epochs, PairwiseNet (Re-trained) and PI-UDF achieve highly comparable SC-MAE ( 2.38 cm vs. 
+
+2.33 cm). This suggests that our enriched dataset levels the playing field for near-field precision. Yet, PI-UDF achieves a substantially lower FNR ( 6.83% vs. 16 .47% ). This safety advantage is consistent with the proposed Boundary-Crossing Penalty (BCP), which amplifies false-safe boundary errors, i.e., predicting positive clearance when the ground-truth pair is in contact or penetration. Compared with the symmetric loss used by the re-trained PairwiseNet regressor, BCP therefore reduces hazardous sign errors while preserving comparable near-field accuracy. 
+
+Global Regression vs. Training Efficiency: Because BCP and the zone weights place less emphasis on far-field errors than on boundary errors, one might expect PI-UDF’s global RMSE to degrade. PI-UDF (50 ep) maintains a RMSE of 
+
+3.32 cm, closely trailing the larger PairwiseNet trained for 
+
+1.5× longer (75 ep, RMSE 3.08 cm). As observed in the far right of Fig. 4, PI-UDF still closely approximates the ground-truth density in the safe zone( d > 20 cm). This confirms that our framework attains competitive global regression and lowest FNR among the compared models, without requiring a massive pre-trained geometric encoder or exhaustive training cycles. 
+
+Continuous Dynamic Trajectory Tracking: Static metrics alone cannot guarantee the temporal consistency required for closed-loop control. We evaluate continuous predictions during a high-speed swapping maneuver in Fig. 5. PI-UDF maintains a smooth, continuous prediction profile that tightly overlaps with the ground-truth collision trend across all spatial zones, exhibiting minimal error in near field. The PairwiseNet (Re-trained, 75 ep) baseline also demonstrates similar trend tracking. In contrast, while the modestly trained PairwiseNet (Re-trained, 50 ep) manages to capture the general motion trend, it exhibits noticeably larger predictive errors. 
+
+End-to-End Architectural Efficiency: Table I further high-lights the computational benefit of the unified PI-UDF de-sign. PairwiseNet relies on a frozen point-cloud encoder with 0.81 M parameters in addition to its trainable regressor, whereas PI-UDF trains a compact 0.11 M parameter model end-to-end. Because the geometry representation is learned jointly with the distance regression objective and reused across all link pairs, PI-UDF avoids both online geometric encoding and link-specific expert networks. At the same 50-epoch train-ing budget, this compact model achieves a lower FNR than the re-trained PairwiseNet baseline while reducing training time from 138 min to 27.8 min. 
+
+D. Ablation Study 
+
+We ablate activation (ReLU/SiLU), backbone and capac-ity (MLP/ResNet), and training strategy (MSE/BCP and 7
+
+TABLE I: System-Level Performance and Computational Efficiency. Evaluated on the Static Safety-Critical Test Set (N =110 ,000 ). Best results are bold ; second-best are underlined. PI-UDF time includes end-to-end training of its embeddings and regressor. PairwiseNet times report distance-regressor training with a frozen geometry encoder and exclude the one-time encoder-pretraining cost. All reported times are measured on the same workstation.                                               
+
+> Model Params (M) ↓Train Time ↓RMSE ↓SC-MAE ↓FNR ↓AUC ↑
+> (Trainable / Frozen) (min) (cm) (cm) (%)
+> PairwiseNet (Uniform, 100 ep) 0.04 / 0.81 ≈270 .08.70 18.33 100.00 0.9221 PairwiseNet (Active, 50 ep) 0.04 / 0.81 138 4.80 2.38 16.47 0.9888 PairwiseNet (Active, 75 ep) 0.04 / 0.81 202.5 3.08 2.27 7.48 0.9950 PI-UDF (Ours; Active+BCP, 50 ep) 0.11 / 0.00 27.8 3.32 2.33 6.83 0.9948 025 50 75 100 125 150
+
+Distance (cm)        
+
+> 0.000 0.005 0.010 0.015 0.020 0.025
+> Density
+> −5 0510 15 0.0000 0.0025 0.0050 0.0075 0.0100 0.0125 0.0150
+> Density
+> Zoom: d∈[−5, 15] cm
+> Ground Truth (Drake/FCL) PI-UDF (Ours, 50 ep) PairwiseNet (Original) PW (Re-trained, 50 ep) PW (Re-trained, 75 ep) Boundary ( d= 0 )
+
+Fig. 4: Static Prediction Density. Probability density (KDE) of distance predictions on the static safety-critical set. PI-UDF captures the ground-truth penetration boundary ( d ≤ 0), whereas PairwiseNet (Original) shifts toward false-safe values, reflecting poor near-field/penetration field pre-training. Base/FT/HNM) on the static safety-critical test set. All com-parisons follow the evaluation protocol in Sec. III-B3, and the late-stage variants use the same total epoch budget. Because PI-UDF is differentiated inside NMPC, we additionally report a trajectory-level joint-gradient variation diagnostic. Along the fixed L4–L5 collision-crossing trajectory 
+
+{q(t)}Tt=1 , let 
+
+gt = ∇q ˆd(t).
+
+We define the gradient roughness as 
+
+Rg = 1
+
+T − 1 
+
+> T−1
+
+X
+
+> t=1
+
+∥gt+1 − gt∥2 . (8) A lower Rg indicates smaller adjacent-step input-gradient variation under the same trajectory and discretization. The complete comparison is reported in Table II. 
+
+1) Impact of Activation Function (SiLU vs. ReLU): For fixed link embeddings, a ReLU regressor is piecewise affine in its network input. After composition with the analytical FK map, activation-boundary crossings can still induce abrupt changes in the joint-space gradient ∇q ˆd. SiLU replaces this hard gating with a smooth transition. Such derivative regularity is relevant to methods based on repeated local linearization, including SLSQP [9] and iSAM2 [10], since abrupt gradient changes can reduce the fidelity of local models and quasi-Newton updates [11]. A smooth activation alone, however, does not guarantee solver convergence. We quantify this behavior using the model-level gradient roughness Rg in Eq. 8 along the fixed L4–L5 collision-crossing trajectory. Comparing the matched PI-UDF (ReLU) 
+
+and PI-UDF (Base) variants, ReLU worsens RMSE from 
+
+3.316 to 3.635 cm and FNR from 6.83% to 7.52% , while SC-MAE remains comparable. It also increases Rg from 
+
+2.14 × 10 −3 to 9.83 × 10 −3 (4.6×). Fig. 6 shows the cor-responding staircase-like directional derivative and localized input-gradient spikes. We therefore use SiLU in the deployed model. ReLU’s zero derivative for negative pre-activations may also leave units persistently inactive [12]. SiLU avoids an identi-cally zero negative branch, providing a secondary motivation for signed-distance regression; our activation choice is based primarily on the matched empirical comparison above. 
+
+2) Backbone and Model Capacity: The FK-derived relative-pose descriptor and learned link embeddings remain informative even with the shallow PI-UDF (MLP) baseline, which attains an RMSE of 4.027 cm and an FNR of 7.89% 
+
+(Table II). This result shows that useful pairwise distance prediction can be obtained without a separately pretrained point-cloud geometry representation. A matched capacity comparison is provided by PI-UDF (Small) and PI-UDF (Base) , which use the same SiLU activation and BCP loss. Increasing the residual backbone from 21 ,921 to 109 ,345 parameters reduces RMSE from 4.220 
+
+to 3.316 cm , SC-MAE from 2.588 to 2.328 cm , and FNR from 
+
+7.71% to 6.83% . We therefore use the Base backbone for deployment. It remains compact at 0.11 M parameters and evaluates a batch of 64 single-pair queries in 0.177 ms on an Intel i7-12700 CPU. Controller-level masking and smooth-min 8
+
+Fig. 5: Continuous Dynamic Trajectory Tracking. Raw predicted minimum clearances ˆD(qt) are compared with the Drake/FCL reference D⋆(qt) during the high-speed swapping trajectory. aggregation are described in Sec. IV. 
+
+3) Training Strategy: Boundary Fine-Tuning and HNM: 
+
+While PI-UDF (Base) establishes good accuracy-safety bal-ance, its collision-awareness can be further customized via targeted late-stage training interventions. Rather than changing the architecture or increasing the computational budget, these stage-wise strategies modify the data distribution or loss objective after the initial epochs. Crucially, the total training epochs remains strictly constant across all variants, ensuring that performance gains stem entirely from the intervention mechanisms rather than extended training time. As shown in Table II and Fig. 7, standard boundary fine-tuning (PI-UDF (FT) ) – achieved by shifting the batch sampling distribution heavily toward contact boundaries ( |d| <
+
+5 cm) – improves both primary metrics, reducing RMSE to 
+
+3.148 cm and FNR to 6.69% . Alternatively, Hard Negative Mining ( PI-UDF (HNM) ) alters the loss landscape by explic-itly up-weighting missed deep-collision configurations, i.e., false-safe predictions in penetration states. This heightened penalty further drives the FNR down to 6.37% , albeit intro-ducing a slight conservative bias that marginally increases the global RMSE to 3.298 cm. In summary, we present PI-UDF not merely as a static architecture, but as an adaptable framework. While the Base configuration serves as a strong default, the FT and HNM strategies demonstrate that practitioners can seamlessly steer the network in later epochs to satisfy specific deployment criteria. For instance, tasks demanding high spatial precision in tight clearances can leverage FT to maximize global accuracy, whereas highly safety-critical applications can employ HNM to enforce stronger collision conservatism and suppress false-safe predictions. IV. OPTIMIZATION-BASED M OTION PLANNING INTEGRATION 
+
+A. PI-UDF-NMPC Formulation 
+
+PI-UDF is actually agnostic to the downstream motion generator. In this work, we instantiate it as a differentiable inter-arm clearance term inside nonlinear model predictive control (NMPC). Compared with reactive velocity-level colli-sion avoidance based on simplified geometric proxies [13], the predictive formulation optimizes tracking, regularization, hard-ware limits, and inter-arm clearance jointly over a finite hori-zon. With the design in Section II, PI-UDF provides gradient-accessible body-to-body distance feedback along this horizon, 9
+
+TABLE II: Ablation study of architectural and training-loss choices. Regression metrics (RMSE, SC-MAE, FNR) are evaluated on the Static Safety-Critical Test Set ( N =110 ,000 ), while gradient roughness Rg is a model-level gradient diagnostic along a standardized trajectory. ↓: lower is better. The best result in each column is boldfaced . †BCP = Boundary-Crossing Penalty; 
+
+> ‡
+
+FT = Fine-tuned on boundary-region samples; HNM = Hard Negative Mining. Note: Latency is measured on the Intel i7-12700 CPU (Sec. III-B1) using a batch size of B=64 single-pair queries. Reported values are wall-clock averages over 200 runs after 20 warmup iterations. 
+
+Variant Backbone Act. Loss Params RMSE SC-MAE FNR Rg Lat. (cm) ↓ (cm) ↓ (%) ↓ (×10 −3) ↓ (ms) 
+
+PI-UDF (MLP) MLP (128 →64 →1) ReLU MSE 18,465 4.027 2.354 7.89 12.74 0.048 PI-UDF (MSE) ResNet ( w=128 , b =3 ) SiLU MSE 109,345 3.442 2.283 7.29 2.31 0.209 PI-UDF (Small) ResNet ( w=64 , b =2 ) SiLU BCP † 21,921 4.220 2.588 7.71 2.85 0.108 PI-UDF (ReLU) ResNet ( w=128 , b =3 ) ReLU BCP † 109,345 3.635 2.278 7.52 9.83 0.196 
+
+PI-UDF (Base) ⋆ ResNet ( w=128 , b =3 ) SiLU BCP † 109,345 3.316 2.328 6.83 2.14 0.177 PI-UDF (FT) ‡ ResNet ( w=128 , b =3 ) SiLU BCP † 109,345 3.148 2.275 6.69 1.98 0.189 PI-UDF (HNM) ‡ ResNet ( w=128 , b =3 ) SiLU BCP † 109,345 3.298 2.365 6.37 1.89 ∗ 0.194 
+
+> ∗
+
+The PI-UDF (HNM) Rg value is lower than PI-UDF (Base) due to the concentrated boundary-region training during Hard Negative Mining, which further smooths the constraint landscape near d=0 .
+
+Fig. 6: Gradient smoothness along an SE(3) collision trajectory (link pair L4–L5). Top: Predicted distance ˆd. Middle: Direc-tional derivative. ReLU exhibits piecewise-constant staircase artifacts, whereas SiLU remains C∞-smooth. Bottom: Gra-dient roughness |∆( ∇ ˆd)|. While ReLU’s mean roughness is 
+
+1.95 × higher, its peak spikes are 4.28 × more severe ( 0.075 
+
+vs. 0.017 ) and occur deep within the collision region ( t=0 .72 ). These severe discontinuities can degrade local linearizations and quasi-Newton curvature estimates. 0.0275 0.0300 0.0325 0.0350 0.0375 0.0400 0.0425 
+
+> RMSE (m)
+> 0.060 0.065 0.070 0.075 0.080
+> FNR
+> PI-UDF (MLP) PI-UDF (MSE) PI-UDF (Small) PI-UDF (ReLU)
+> PI-UDF (Base) PI-UDF (FT) PI-UDF (HNM)
+
+Fig. 7: RMSE–FNR trade-off across ablation variants (bottom-left is preferred); bubble area scales with parameter count. FT improves both metrics over Base, whereas HNM further lowers FNR with a small RMSE increase. allowing the optimizer to reason about close-proximity inter-actions without relying on inflated proxy geometries. 
+
+1) NMPC with Differentiable Soft Barriers: To integrate PI-UDF into a centralized motion planning framework, we define the generic state as xk = [ q⊤ 
+
+> k
+
+, ˙q⊤ 
+
+> k
+
+]⊤ ∈ R2n and the control input as uk = ¨ qk ∈ Rn, where n = 14 for centralized dual-arm swapping and n = 7 for the single-arm evasion controller. Evaluating all link pair permutations per integration step is computationally redundant, as many pairs are structurally incapable of colliding. To streamline collision queries, a hier-archical masking strategy can be employed: kinematically im-possible pairs are statically pruned, followed by a lightweight broad-phase filter (e.g., bounding capsules) to mask remaining pairs exceeding a safe distance threshold. However, instantiating a variable number of pairwise con-straints would change the NLP structure across solves. A constant-dimension soft-penalty approach is thus preferable. The filtered pairwise distances are aggregated by a smooth LogSumExp approximation of the minimum clearance ˆdmin 10 
+
+over the active pair set P:
+
+eDα(qk) = − 1
+
+α log X
+
+> (i,j )∈P act
+
+exp 
+
+
+
+−α ˆdij (qk)
+
+
+
+, (9) where α > 0 controls the approximation sharpness and Pact 
+
+denotes the active inter-arm pair set retained by the broad-phase mask. Using this smooth minimum, we define an exponential soft-barrier and solve the following NMPC problem over a prediction horizon N :
+
+min  
+
+> X,U
+> N−1
+
+X
+
+> k=0
+
+eγk 
+
+ℓtrack (xk) + ℓreg (uk)
+
+
+
++ ℓcoll (xk) (10a) s.t. xk+1 = fdyn (xk, uk) ∀k ∈ [0 , N − 1] (10b) 
+
+xmin ≤ xk ≤ xmax (10c) 
+
+umin ≤ uk ≤ umax (10d) where 
+
+ℓcoll (xk) = wcoll exp 
+
+h
+
+−β
+
+ eDα(qk) − dsafe 
+
+i 
+
+.
+
+is a smooth collision penalty around the safety margin dsafe .The exponential form remains small in well-separated states and increases rapidly near the boundary, providing contin-uous repulsive gradients without the numerical singularities of logarithmic or inverse barriers. The factor eγk emphasizes later-stage tracking and regularization terms, and the state and control bounds enforce hardware limits. 
+
+2) Real-Time-Oriented JIT-Compiled NMPC Implementa-tion: Solving the NMPC problem requires repeated evaluation of PI-UDF and its derivatives along the prediction horizon. Directly coupling deep-learning models with external nonlin-ear programming solvers can introduce callback latency, host-device transfer overhead, and Python Global Interpreter Lock (GIL) bottlenecks, which may limit the achievable planning frequency in closed-loop control [14]. To reduce these overheads, we port the trained PI-UDF model to a functional JAX implementation and express the for-ward kinematics, PI-UDF inference, soft-min collision aggre-gation, and L-BFGS-B optimization loop in a single JAX/XLA pipeline. The resulting end-to-end JIT-compiled computation graph enables automatic differentiation through the full NMPC objective and amortizes runtime overhead across repeated closed-loop solves [15], [16]. In hardware, the compiled planner is paired with a command interpolation layer that converts each optimized joint trajectory into high-rate references for the low-level robot controllers. The task-specific planning periods, workstation specifications, and controller rates are reported in Sec. V-A. V. R EAL -R OBOT EXPERIMENTS 
+
+A. Hardware Setup and Evaluation Protocol 
+
+Building on the model evaluation and NMPC formulation of Secs. III–IV, we evaluate PI-UDF as a differentiable safety primitive for closed-loop dual-arm hardware control. All ex-periments are conducted on a dual Franka Emika Panda system with a fixed relative base placement; the two arms share a common workspace and therefore require continuous inter-arm collision reasoning during execution. We instantiate the controller in two forms: a centralized 14-DoF dual-arm NMPC for tightly coupled swapping, where both robots are optimized jointly, and a single-arm evasion NMPC, where R1 tracks a task target while avoiding R2. In the evasion tasks, R2 is treated as an externally generated moving body rather than a jointly optimized agent. Depending on the operating mode, future R2 samples are either supplied to the prediction horizon or R2 is frozen at its current pose. All hardware controllers run on a centralized workstation running Ubuntu 22.04 with PREEMPT-RT, equipped with an AMD Threadripper 3960X CPU and an NVIDIA RTX A5000 GPU. The high-speed dual-arm swapping controller uses a 200 ms planning period and passes the optimized joint trajectory through a 100 Hz command-interpolation interface, while the low-level Franka controllers run at 1 kHz . The dynamic-evasion controllers use a 100 ms planning period with the same 100 Hz interpolation interface. Solve-time variability is treated as an implementation diagnostic rather than a hard real-time guarantee. In all hardware experiments, PI-UDF is queried online to provide pairwise inter-arm distances and gradients. The NMPC objective uses the smooth aggregate eDα(q) from Eq. (9), whereas the plots and tables report the raw predicted minimum 
+
+ˆD(q) defined in Eq. (5). The nominal operating threshold is set according to the con-trol architecture. Centralized dual-arm swapping uses dsafe =5 cm , since both arms are jointly optimized over a self-consistent 14-DoF horizon. Single-arm dynamic evasion uses the more conservative value dsafe = 10 cm , since only R1
+
+is optimized while R2 is externally generated. In both cases, 
+
+dsafe defines the operating clearance of the differentiable soft cost rather than a hard collision constraint. For post-hoc geometry validation, Drake/FCL [8] is eval-uated offline on the logged current configurations of both arms to obtain the reference D⋆(q); it is never queried by the online controller. In the dynamic-evasion mode study, future 
+
+R2 samples affect only the NMPC prediction horizon and are not used in the reported per-time-step PI-UDF–Drake/FCL clearance comparisons. The following subsections progress from close-proximity centralized swapping to sustained dynamic evasion and repre-sentative reactive, predictive, and waypoint-shaped operating modes. 
+
+B. Close-Proximity 14-DoF Dual-Arm Swapping 
+
+We next stress-test PI-UDF in a high-speed close-proximity swapping task. Both Franka arms are controlled by the cen-tralized 14-DoF NMPC and exchange sides through the same interaction region under the tight threshold dsafe = 5 cm ,without relying on Drake/FCL online. Fig. 8 summarizes the executed run. Fig. 8(a) shows four representative frames t1–t4 from the active swapping motion, illustrating the two arms entering, crossing, and leaving the shared interaction region. Fig. 8(b) reports the active 0–4 s 
+
+clearance window. The raw PI-UDF clearance ˆD(qreal ) and 11 
+
+Fig. 8: High-speed close-proximity dual-arm swapping. (a) Representative frames from the executed sequence showing the system configurations. (b) Raw PI-UDF minimum ˆD(qreal )
+
+and offline Drake/FCL clearance D⋆(qreal ) evaluated on the executed two-arm trajectory. (c) TCP speeds and per-arm max joint-speed ratios. the Drake/FCL reference D⋆(qreal ) are evaluated on the same executed two-arm trajectory. This executed-state replay pro-vides an apples-to-apples geometry comparison. The minimum logged PI-UDF clearance is 6.04 cm , while offline Drake/FCL replay gives 7.24 cm ; neither trace falls below the 5 cm 
+
+threshold. The active motion settles after approximately 3.0 s ,while the closest interaction occurs during the first second of the run. Fig. 8(c) provides the related motion-speed context. The TCP-speed traces show a rapid transient during the crossing phase. The upper plot reports, for each arm, the maximum normalized joint speed over its seven joints, 
+
+rmax (t) = max 
+
+> j
+
+| ˙qj (t)|
+
+˙qj, max 
+
+,
+
+which peaks at approximately 50% and 60% for the two arms. Thus, the swapping motion is not a quasi-static avoidance maneuver, while still remaining below joint-speed saturation. These speed traces contextualize the difficulty of the executed motion. 
+
+C. Sustained Single-Arm Dynamic Evasion 
+
+We next move from centralized dual-arm NMPC to asingle-arm dynamic-evasion setting, where R1 is optimized by NMPC while R2 is treated as an external moving robot body. In this baseline run, R2 follows a scripted trajectory composed of multiple motion segments, and R1 replans to track a task target while maintaining inter-arm clearance. This setting introduces the dynamic-evasion architecture used in the following operating-mode study. Fig. 9 shows a 126.6 s run under a 10 cm nominal clearance threshold. The raw predicted clearance ˆD remains above the threshold throughout the run, with a minimum clearance of 16.56 cm. Offline Drake/FCL replay gives min t D⋆(qt) =16 .33 cm , also with zero samples below 10 cm. This run serves as a sustained-operation check for the single-arm dynamic-evasion architecture; the next subsection studies representative 
+
+Fig. 9: Raw logged PI-UDF clearance ˆD(qt) and offline Drake/FCL replay D⋆(qt) along the logged sustained dynamic-evasion trajectory. TABLE III: Dynamic-evasion planning configurations and clearance outcomes.               
+
+> Mode Planning configuration Min. clr. [cm] Below dsafe
+> ˆD/D⋆ˆD/D⋆
+> React.-F frozen R2 + fixed target 9.16 / 9.68 3 / 1 Pred.-F future R2 + fixed target 12.22 / 13.93 0 / 0 Pred.-TS future R2 + target switching 14.09 / 15.91 0 / 0
+
+operating modes that vary how R2 motion is incorporated into the MPC horizon. 
+
+D. Dynamic-Evasion Operating Modes 
+
+We finally evaluate the PI-UDF-NMPC framework under several real-time motion-planning configurations for dynamic evasion. The goal is not to isolate a single MPC design choice, but to test whether the learned differentiable distance field remains reliable when integrated with different horizon and task-target formulations. In particular, the moving R2 arm can be treated as a frozen obstacle in the horizon, predicted over the horizon using its scripted future trajectory, or combined with online target switching for R1 as the interaction region changes. These differences affect how the NMPC predicts and optimizes future motion; the clearance values reported in Table III and Fig. 10 are evaluated at the current logged system configurations. Table III summarizes these configurations and their current-state clearance outcomes. React.-F freezes the current R2 configuration across the MPC horizon while R1 tracks a fixed target. Pred.-F supplies the scripted future R2 trajectory to the horizon, also with a fixed R1 target. Pred.-TS uses the same predictive R2 horizon together with task-level target switching for R1 as the interaction region changes. Since these planning configurations differ not only in horizon information but also in task-target policy and execution details, they should be interpreted as representative PI-UDF-NMPC integration tests rather than as a controlled ablation of prediction alone. Fig. 10 compares the logged PI-UDF clearance with offline Drake/FCL replay evaluated on the same current logged two-arm configurations. This same-q comparison checks whether the learned distance field remains geometrically consistent across the three planning configurations. Although Pred.-F and Pred.-TS use future R2 samples inside the NMPC horizon, 12 
+
+Fig. 10: Raw logged PI-UDF clearance ˆD(qt) is compared with offline Drake/FCL clearance D⋆(qt) evaluated at the same current logged configurations. those future samples are not used to compute the per-time-step clearance traces shown here. The React.-F run provides the closest interaction in this set of tests. It falls below the 10 cm nominal threshold for only a few MPC-rate samples: three samples according to the logged PI-UDF clearance and one sample according to recorded-state FCL replay. Its minimum FCL clearance is 9.68 cm, indicating a short violation of the nominal soft margin rather than a physical collision. Both predictive configurations remain above the threshold in the recorded-state replay. Across the tested operating modes, PI-UDF provides consistent current-state clearance estimates while supporting frozen-R2, predictive-R2, and target-switching NMPC formulations. VI. C ONCLUSION 
+
+This work presented PI-UDF, a compact differentiable body-to-body clearance model that combines FK-derived rela-tive poses, task-optimized link embeddings, and safety-aware boundary learning. Model-level experiments showed compet-itive global accuracy, the lowest FNR among the compared models, and substantially lower training cost than the re-trained PairwiseNet baseline. Integrated into NMPC, PI-UDF supported high-speed close-proximity 14-DoF swapping and sustained dynamic evasion on real dual-Franka hardware. Offline Drake/FCL replay con-firmed the reported current-state clearance behavior. Future work will address uncertainty-aware motion prediction, solver robustness, and generalization across robot layouts and mor-phologies. The use of PI-UDF as a geometry prior or safety critic for learning-based policy and trajectory generators can be interesting as well. REFERENCES [1] J. Pan, S. Chitta, and D. Manocha, “Fcl: A general purpose library for collision and proximity queries,” in 2012 IEEE international conference on robotics and automation , pp. 3859–3866, IEEE, 2012. [2] N. Gafur, G. Kanagalingam, A. Wagner, and M. Ruskowski, “Dynamic collision and deadlock avoidance for multiple robotic manipulators,” 
+
+IEEE Access , vol. 10, pp. 55766–55781, 2022. [3] X. Zhu, Y. Xin, S. Li, H. Liu, C. Xia, and B. Liang, “Efficient collision detection framework for enhancing collision-free robot motion,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) ,pp. 16162–16168, IEEE, 2025. [4] M. Koptev, N. Figueroa, and A. Billard, “Neural joint space implicit signed distance functions for reactive robot manipulator control,” IEEE Robotics and Automation Letters , vol. 8, no. 2, pp. 480–487, 2022. [5] B. Liu, G. Jiang, F. Zhao, and X. Mei, “Collision-free motion generation based on stochastic optimization and composite signed distance field networks of articulated robot,” IEEE Robotics and Automation Letters ,vol. 8, no. 11, pp. 7082–7089, 2023. [6] J. Kim and F. C. Park, “Pairwisenet: Pairwise collision distance learn-ing for high-dof robot systems,” in Conference on Robot Learning ,pp. 2863–2877, PMLR, 2023. [7] J. Kim and F. C. Park, “Active learning of the collision distance function for high-dof multi-arm robot systems,” Robotica , vol. 42, no. 12, pp. 4055–4069, 2024. [8] R. Tedrake and the Drake Development Team, “Drake: Model-based design and verification for robotics,” 2019. [9] D. Kraft, “A software package for sequential optimization,” tech. rep., Forschungsbericht-Deutsche Forschungs-und Versuchsanstalt fur Luft-und Raumfahrt, 1988. [10] M. Kaess, H. Johannsson, R. Roberts, V. Ila, J. J. Leonard, and F. Dellaert, “isam2: Incremental smoothing and mapping using the bayes tree,” The International Journal of Robotics Research , vol. 31, no. 2, pp. 216–235, 2012. [11] J. Nocedal and S. J. Wright, Numerical optimization . Springer, 2006. [12] A. L. Maas, A. Y. Hannun, A. Y. Ng, et al. , “Rectifier nonlinearities improve neural network acoustic models,” in Proc. icml , vol. 30, p. 3, Atlanta, GA, 2013. [13] J. Haviland and P. Corke, “Neo: A novel expeditious optimisation algorithm for reactive motion control of manipulators,” IEEE Robotics and Automation Letters , vol. 6, no. 2, pp. 1043–1050, 2021. [14] T. Salzmann, E. Kaufmann, J. Arrizabalaga, M. Pavone, D. Scaramuzza, and M. Ryll, “Real-time neural-mpc: Deep learning model predictive control for quadrotors and agile robotic platforms,” IEEE Robotics and Automation Letters , 2023. [15] J. Bradbury, R. Frostig, P. Hawkins, M. J. Johnson, Y. Katariya, C. Leary, D. Maclaurin, G. Necula, A. Paszke, J. VanderPlas, S. Wanderman-Milne, and Q. Zhang, “JAX: composable transformations of Python+NumPy programs,” 2018. [16] R. Frostig, M. J. Johnson, and C. Leary, “Compiling machine learning programs via high-level tracing,” in SysML conference 2018 , 2019.

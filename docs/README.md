@@ -44,14 +44,14 @@
       <span class="dpr-home-dashboard-kicker">2026-10-09</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 7 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 12 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-09 00:18:42 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-09 23:27:55 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,10 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共生成 7 篇推荐（精读 2 篇，速读 5 篇）</p>
-<p>精读：《Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network》（9.0/10）, 《Distributed Motion Planning for Multi-Robot Systems under Topological Constraints》（9.0/10）</p>
-<p>速读：《Embedded Evaluation of Task Admission Coalescing in Decentralized Multi-Robot Systems》（7.0/10）, 《World Motion Models: Flexible Sequence Modeling of SE(3) Trajectories》（6.0/10）, 《Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming》（6.0/10）</p>
-<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
+<p>2026-10-09 日报：完成 12 篇多智能体/多机器人规划论文筛选，精读 4 篇、速读 8 篇。</p>
+<p>最值得看的是两篇 9.0 分精读：异构图神经网络生成共享路线图与评估器的多智能体路径规划，以及拓扑约束下多机器人分布式运动规划。</p>
+<p>普通读者可优先读这两篇精读，若关注持续学习，再补速读中的《Continual Graph Multi-Agent Reinforcement Learning》。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -74,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network">Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed Motion Planning for Multi-Robot Systems under Topological Constraints">Distributed Motion Planning for Multi-Robot Systems under Topological Constraints</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network">Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed Motion Planning for Multi-Robot Systems under Topological Constraints">Distributed Motion Planning for Multi-Robot Systems under Topological Constraints</span></li><li><span class="dpr-home-dashboard-paper-title" title="Entropy-Gated Belief Coordination for Decentralized Multi-Agent Search Under Intermittent Communication">Entropy-Gated Belief Coordination for Decentralized Multi-Agent Search Under Intermittent Communication</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -87,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">5 篇</strong>
+    <strong class="dpr-home-dashboard-count">8 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Embedded Evaluation of Task Admission Coalescing in Decentralized Multi-Robot Systems">Embedded Evaluation of Task Admission Coalescing in Decentralized Multi-Robot Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="World Motion Models: Flexible Sequence Modeling of SE(3) Trajectories">World Motion Models: Flexible Sequence Modeling of SE(3) Trajectories</span></li><li><span class="dpr-home-dashboard-paper-title" title="Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming">Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Continual Graph Multi-Agent Reinforcement Learning">Continual Graph Multi-Agent Reinforcement Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming">Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming</span></li><li><span class="dpr-home-dashboard-paper-title" title="Fast Planning for Multi-object Multi-target Throwing">Fast Planning for Multi-object Multi-target Throwing</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>8</strong></span></div>
 </section>
 </div>
 
