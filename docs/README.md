@@ -41,7 +41,7 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-07</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-09</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 7 篇</strong>
@@ -51,7 +51,7 @@
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-07 23:55:25 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-09 00:18:42 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,10 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今天扫读 7 篇多机器人协作论文，精读 2 篇、速读 5 篇，聚焦运动规划、协同搬运与容错通信。</p>
-<p>最值得看的是《Multi-Robot Multi-Goal Motion Planning with Stochastic Skills》（9.0）和《Safe Multi-Robot Collaborative Transport Using Density Functions》（8.0），前者解决技能不确定下的多目标规划，后者用密度函数保障协同搬运安全。</p>
-<p>普通读者可先读这两篇精读了解&quot;不确定性+安全&quot;这一主线，再按兴趣挑速读里的去中心化协作或通信受限定位方向延伸。</p>
+<p>今日共生成 7 篇推荐（精读 2 篇，速读 5 篇）</p>
+<p>精读：《Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network》（9.0/10）, 《Distributed Motion Planning for Multi-Robot Systems under Topological Constraints》（9.0/10）</p>
+<p>速读：《Embedded Evaluation of Task Admission Coalescing in Decentralized Multi-Robot Systems》（7.0/10）, 《World Motion Models: Flexible Sequence Modeling of SE(3) Trajectories》（6.0/10）, 《Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming》（6.0/10）</p>
+<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -76,7 +77,7 @@
     <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Multi-Robot Multi-Goal Motion Planning with Stochastic Skills">Multi-Robot Multi-Goal Motion Planning with Stochastic Skills</span></li><li><span class="dpr-home-dashboard-paper-title" title="Safe Multi-Robot Collaborative Transport Using Density Functions">Safe Multi-Robot Collaborative Transport Using Density Functions</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network">Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed Motion Planning for Multi-Robot Systems under Topological Constraints">Distributed Motion Planning for Multi-Robot Systems under Topological Constraints</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
@@ -89,7 +90,7 @@
     <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CoRE: Learning Collaboration-Role Experts for Decentralized Collaborative Manipulation with One Policy">CoRE: Learning Collaboration-Role Experts for Decentralized Collaborative Manipulation with One Policy</span></li><li><span class="dpr-home-dashboard-paper-title" title="Communication-Free Obstacle Localization from Aggregate Wrench Measurements in Leader--Follower Cooperative Transport">Communication-Free Obstacle Localization from Aggregate Wrench Measurements in Leader--Follower Cooperative Transport</span></li><li><span class="dpr-home-dashboard-paper-title" title="Budget-Constrained Fault-Tolerant Mutual Visibility for Autonomous Robots under the Mobility Fault Model">Budget-Constrained Fault-Tolerant Mutual Visibility for Autonomous Robots under the Mobility Fault Model</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Embedded Evaluation of Task Admission Coalescing in Decentralized Multi-Robot Systems">Embedded Evaluation of Task Admission Coalescing in Decentralized Multi-Robot Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="World Motion Models: Flexible Sequence Modeling of SE(3) Trajectories">World Motion Models: Flexible Sequence Modeling of SE(3) Trajectories</span></li><li><span class="dpr-home-dashboard-paper-title" title="Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming">Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>

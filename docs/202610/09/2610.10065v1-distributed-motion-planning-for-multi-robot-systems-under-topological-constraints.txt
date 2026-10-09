@@ -1,0 +1,1271 @@
+Title: Distributed Motion Planning for Multi-Robot Systems under Topological Constraints
+
+URL Source: https://arxiv.org/pdf/2610.10065v1
+
+Published Time: Thu, 08 Oct 2026 01:50:42 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+# Distributed Motion Planning for Multi-Robot Systems under Topological Constraints 
+
+## Gianpietro Battocletti 1, Dimitris Boskos 1, Dimos V. Dimarogonas 2, and Bart De Schutter 1
+
+Abstract 
+
+Efficient and distributed coordination of mobile robots is one of the main challenges in multi-robot systems. Topological constraints, often expressed as topological braids, are a popular tool to encode complex coordination patterns between multiple mobile robots, as they offer a compact and abstract representation of the desired qualitative relation between the space-time trajectories of the robots. However, execution of joint motion plans encoded as braid-based topological constraints via distributed controllers is challenging, with existing approaches, generally based on the execution of one braid generator at a time, producing slow and suboptimal trajectories. We propose a distributed controller based on Model Predictive Control (MPC) to efficiently execute braid-based topological specifications. Rather than directly tracking the braid specification, we propose to use winding numbers, which are topological invariants for braids, as a proxy. This has the twofold benefit of converting braids into a continuous function, which can be easily tracked by an MPC controller through an appropriate term in the cost function, and of decoupling the global braid specification into a set of pairwise specifications, which can be tracked distributedly through the solution of only local MPC problems. To maintain global coordination, we propose a consensus-based progress estimation approach, which allows the robots to synchronize their motion toward the desired specification. We validate the proposed approach in simulation and in real-world experiments, where we demonstrate the effectiveness of the proposed approach and the improvement over existing approaches in terms of execution speed and control effort. 
+
+Keywords 
+
+Topological motion planning, topological braids, path and motion planning, multi-robot systems 
+
+## 1 Introduction 
+
+Autonomous multi-robot systems are becoming increasingly widespread, with applications ranging through many different domains. Modern hardware allows for a high degree of autonomy of mobile robots, enabling them to perform on board all the necessary tasks required for autonomous operation, such as mapping, localization, planning, and control. This also allows for multi-robot systems to operate with distributed or decentralized control architectures, increasing their scalability and removing the need for a central coordinator. Under those control architectures, robots sharing the same environment must coordinate with each other in order to avoid collisions, to optimize their motion trajectories, and to perform shared tasks. To this end, topological constraints represent an increasingly popular coordination tool (Bhattacharya et al. 2021), thanks to their ability to compactly represent the qualitative relation between the trajectories of different robots. In the last decade, the success of topology-based motion planning approaches for single-robot systems has lead to a growing interest in the development of novel methods to extend their use to multi-robot systems. However, while several algorithms have been proposed to solve multi-robot coordination tasks by computing some type of topological specification, the same does not hold for methods designed for the execution of such specifications. In fact, only a limited number of algorithms exist to execute multi-robot motion plans encoded as topological constraints, and they present several limitations. The most widely used approach to execute joint motion plans encoded as braid-based specifications and grid-based specifications is that of discretizing the set of positions the robots can take in the environment, and sequentially swapping the relative positions of pairs of robots, which results in practice in the execution of one element of the specification at a time (Diaz-Mercado et al. 2015; Diaz-Mercado and Egerstedt 2017; Cao et al. 2023, 2025). While this approach is effective, it is slow and scales poorly with the number of robots, as robots only move one pair at a time, and need to wait for others to complete their swap before being able to move. Another popular approach is that of selecting a set of trajectories compatible with the desired specification and tracking them (Imran et al. 2026; Mavrogiannis et al. 2023; Mavrogiannis and Knepper 2020). However, this method is sensitive to the sampling strategy, and usually produces suboptimal motion trajectories. A third possible approach is that of using winding numbers to encode         
+
+> 1Delft Center for Systems and Control, Delft University of Technology, Delft, The Netherlands.
+> 2Division of Decision And Control Systems, KTH Royal Institute of Technology, Stockholm, Sweden.
+> Corresponding author:
+> Gianpietro Battocletti, Delft Center for Systems and Control, Delft University of Technology, Mekelweg 2, 2628 CD Delft, The Netherlands. Email: g.battocletti@tudelft.nl
+
+1arXiv:2610.10065v1 [cs.RO] 7 Oct 2026 2 Journal Title XX(X) 
+
+pairwise swaps between agents. The sign of winding numbers indicates if the swap must happen in clockwise or counterclockwise fashion; the robots are then tasked with computing trajectories that maximize the increase of the winding numbers corresponding to the traveled paths, while matching the desired sign (Mavrogiannis et al. 2022; Nakao et al. 2025; Mavrogiannis and Knepper 2018, 2021). However, algorithms based on this approach are only suitable for the execution of a limited class of topological specifications, composed by those with at most one swap for each pair of robots. Moreover, those approaches provide no guarantees that the desired specification will be executed due to the absence of a temporal ordering of the swaps being encoded in the pairwise winding numbers. In this work, we aim at bridging this gap by proposing a distributed motion planning algorithm for a multi-robot system capable of executing general topological specifications, i.e., of making so that the trajectories traveled by the robots lie in the topological equivalence class encoded by the specification. Without loss of generality, we focus on a specific type of topological constraint, namely, topological braids, as it is the most widely used one in works on multi-robot systems (Cao et al. 2023; Diaz-Mercado and Egerstedt 2017; Mavrogiannis and Knepper 2020). Moreover, other types of constraints, such as sequences of permutation grids and winding numbers, can be translated into topological braids (Cao et al. 2025; Berger 2001), allowing to apply the proposed algorithm with little modifications. To achieve our goal, we propose the use of winding numbers as a way to translate the braid specification, which is a discrete object by nature, into a continuous one. This conversion retains the topological properties of the braid, since winding numbers are topological invariants for braids (Berger 2001). We then attain the execution of the specification via a distributed MPC-based braid controller that takes as input the winding numbers obtained from the braids, and computes feasible collision-free trajectories to track them thanks to the inclusion of a winding tracking term in the MPC cost function. Through this approach, we are able to track general braids, differently from existing works considering a winding tracking controller, which are limited to braids that include at most one swap for each pair robots such as in (Mavrogiannis et al. 2022; Mavrogiannis and Knepper 2021), and where winding numbers are often used solely as a mean to expedite the swap of position between pairs of robots. One challenge in this approach arises from the fact that braids do not provide a timing specification for the execution of the specification, which can make it challenging to synchronize the robots during their execution, in particular when considering a distributed control architecture. For this purpose, we propose to estimate the progress along the specification through the comparison of the winding numbers associated to the trajectories of the robots with those computed from the braid specification. This progress estimate can be computed locally and agreed upon through distributed consensus, and avoids the need for a pre-specified timing law for the tracking of the braid, which in general will be suboptimal if it requires executing the specification too slowly, or unattainable if it requires the execution to be too fast. The contributions of this work with respect to the state of the art are summarized as follows: • We introduce a novel approach to translate discrete braid-based topological specifications into continuous functions by means of winding numbers, which yield invariants for topological braids. The use of winding numbers results in splitting the global interaction pattern encoded by the braid in pairwise interaction patterns, which can be tracked distributedly. • We propose a distributed MPC-based control approach to execute braid-based multi-robot topological speci-fications, based on the tracking of winding numbers. Winding numbers can be directly computed from the trajectories of the robots, allowing to search for motion trajectories that minimize the mismatch of the trajectories’ winding numbers from the target winding numbers (i.e., those computed from the braid specifi-cation). This approach is scalable and efficient, since it requires the solution of only local MPC problems. We prove that the distributed MPC controller is recur-sively feasible, ensuring the existence of collision-free trajectories that satisfy state and input constraints. • We introduce a consensus-based progress variable to track the progress of the robots along the topological specification, that also serves as a coordination tool to synchronize the robots toward the desired interaction pattern. • The contributions are validated by means of numerical simulations, in which we show the benefits of the proposed controller with respect to existing approaches, and via real-world experiments, where we assess the robustness and effectiveness of the proposed approach in the presence of disturbances. The remainder of this article is organized as follows. In Section 2 we review existing work about the application of topological specifications to motion planning for mobile robots, and in Section 3 we introduce the background material and the problem setting. The proposed approach is composed by a preprocessing phase, presented in Section 4, and by an online control phase, presented in Section 5. We demonstrate the controller capabilities through numerical simulations in Section 6, and in real-world experiments in Section 7. Section 8 concludes the paper. 
+
+## 2 Related work 
+
+In this section, we expand on the overview we have provided in Section 1 of approaches that compute motion plans for mobile robots and encode them as topological constraints. In single-robot systems, topological tools allow to qualitatively categorize the possible trajectories of a robot depending on the homotopy class to which they belong. This corresponds to grouping together trajectories that can be continuously deformed into one another, establishing a qualitative equivalence between them (Lee 2010). In practice, the most common approach to determine the homotopy class where a trajectory lies in, is that of computing a topological invariant of the trajectory, with the most widely used being the so-called homotopy signature (Bhattacharya and Ghrist 2018). Homotopy signatures can be 2Battocletti et al. 3
+
+used to identify the homotopy class where a trajectory lies, and can also be used as a topological specification to impose a homotopy class constraint in the motion planning problem for mobile robots (Grigoriev and Slissenko 1998; Kim et al. 2014; Yang et al. 2022; Pokorny et al. 2016). Topological invariants other than signatures have also been considered for this purpose, such as the number of times a trajectory loops around each obstacle in the environment (Yershov et al. 2013; Narayanan et al. 2013), and the integral of the trajectory of a robot in the complex plane (He et al. 2022; Bhattacharya et al. 2012; Bhattacharya 2010). Alternatively, homotopy-class constraints can be cast as mixed-integer constraints (Park et al. 2015), which can be more easily included in optimization-based planners. In the context of optimization-based motion planning approaches, homotopy-based methods can be used to generate topologically-distinct initial solutions for the trajectory optimization problem. The parallelized optimization of trajectories in different homotopy classes has been shown to lead to motion plans closer to the global optimum (De Groot et al. 2024; Wong et al. 2025; Sahin and Bhattacharya 2024). Another notable application case of homotopy-based topological specifications is that of tethered robots, where the presence of a tethered connection between the robot and a fixed anchor point introduces topological constraints in the motion planning problem. Several approaches have been proposed to tackle this problem, with the majority of them leveraging topological invariants such as homotopy signatures to search feasible paths in distinct homotopy classes, and to find one where the trajectory of the robot is compatible with the maximum tether length (Kim et al. 2014; Tanner et al. 2013; Teshnizi and Shell 2021). Topological constraints in multi-robot systems require more complex topological tools. In fact, topological constraints in multi-robot systems must capture, in addition to the relations between the trajectories of the robots and the obstacles present in the environment, also the relations between the trajectories themselves. For this reason, the main challenge these tools need to address is that the classification of multi-robot trajectories in topological equivalence classes jointly depends on the topological relations between the trajectories. Several types of topological tools have been considered to represent the topological equivalence classes of the trajectories of multiple robots, such as topological braids (Mavrogiannis et al. 2017; Diaz-Mercado and Egerstedt 2017; Liu et al. 2024), sequences of permutation grids (Cao et al. 2025), winding numbers (Mavrogiannis et al. 2022; Nakao et al. 2025; Ma et al. 2025), and representative sets of topologically distinct paths (Wu et al. 2020; Wang et al. 2023; McBeth et al. 2023). Topological specifications based on these topological objects have been shown to be a powerful tool for the coordination of multiple robots, both in centralized (Imran et al. 2026), distributed (Mavrogiannis and Knepper 2019; Dong et al. 2025) and decentralized settings (Mavrogiannis et al. 2023, 2024). Those topology-based methods have been successfully employed in several applications for the coordination of multi-robot systems (Mavrogiannis et al. 2023), including crowd navigation (Mavrogiannis and Knepper 2019; Martinez-Baselga et al. 2026) and traffic control (Mavrogiannis et al. 2024; Liu et al. 2024; Wang et al. 2023). Similarly to the single-robot case, also multi-robot systems composed of multiple tethered robots represent a prime application case for topological specifications, since the tethers of the robots naturally give raise to multiple topological equivalence classes where each tether can lie with respect to the others. In this context, braid-based planning approaches have been proposed for the entanglement-free navigation of tethered mobile robots (Cao et al. 2025; Zhang and Pham 2019). Moreover, in (D’Antonio et al. 2026) topological specifications have been used to compute trajectories leading to the formation of knots between the tethers of multiple drones, which can be used to grab and lift a payload for transportation purposes. Multiple methods have been proposed in the literature for the execution of motion plans encoded through topological constraints, but with several limitations. The most popular approaches have been reviewed in Section 1, where their limitation have also been highlighted, such as their suboptimality and slow speed in executing the topological specification. In this work, we propose a distributed control method to overcome the limitations of existing approaches, producing efficient trajectories that satisfy the target topological specification. 
+
+## 3 Background and problem setting 
+
+In this section we introduce the relevant background on the topological objects considered in this work, namely, braids and winding numbers, and the problem setting. We conclude the section with an overview of the proposed approach. 
+
+## 3.1 Topological braids 
+
+Topological braids are topological objects with algebraic and geometric presentations (Artin 1947; Kassel and Turaev 2008). Geometrically, braids are defined as a tuple f =(f1, f 2, ..., f n) of n strands fi : [0 , 1] → R2 × [0 , 1] , i ∈{1, ..., n }, with fi : τ 7 → (x(τ ), y (τ ), α (τ )) , where α :[0 , 1] → [0 , 1] is a parameterization. 
+
+Assumption 1. For simplicity, but without loss of generality, in the following we assume α(τ ) = τ .Strands monotonically increase along τ , do not intersect with each other, i.e., fi(τ )̸ = fj (τ ), ∀i, j ∈ { 1, ..., n }, i ̸ =
+
+j, ∀τ ∈ [0 , 1] , and are defined so that fi(0) = ( i, 0, 0) ,
+
+fi(1) = ( p(i), 0, 1) , where p : {1, ..., n } → { 1, ..., n } is a permutation of n elements, with p(i) representing the image of i through p. An example of a geometric braid represented via a so-called braid diagram is shown in Figure 1a. Geometric braids can be viewed as an ordered sequence of pairwise swaps between adjacent strands. Under this point of view, they can be represented as the concatenation of the elements of a set of n − 1 elementary braids {σi}n−1 
+
+> i=1
+
+,called generators, along with their inverses and the identity braid e (Artin 1947). Each generator σi is a braid of n
+
+strands whose diagram swaps the i-th and (i + 1) -th strands. An example of generators is shown in Figure 1b, while an example of their concatenation is depicted in Figure 1c. As a result, a geometric braid β can be equivalently represented as an algebraic braid through a word ω, corresponding to the product of B elements from the generator set {σq }m−1
+
+> q=1
+
+34 Journal Title XX(X)           
+
+> Figure 1. (a) Example of a geometric braid composed of 3 strands. A corresponding braid word is ω=σ1σ−11σ2σ−11.(b) Two braid generators σ1,σ−11, and the identity braid e.(c) Example of product operation between two braid generators, corresponding to their concatenation.
+
+(Artin 1947): 
+
+ω =
+
+> B
+
+Y
+
+> b=1
+
+σsb 
+
+> gb
+
+(1) with gb ∈ { 1, . . . , m − 1}, s b ∈ {− 1, +1 }. The index gb of a generator indicates which strands are being swapped (namely, strands gb and gb + 1 ), and the exponent sb
+
+indicates the rotation direction of the swap. The rotation convention is arbitrary; in the following we use +1 to indicate a counterclockwise rotation, and −1 to indicate a clockwise one. It is important to note, however, that while β corresponds to an equivalence class of geometric braids equivalent up to homeomorphism, ω encodes only a strict subset of them, since it fixates the order in which the generators must appear. In order to obtain a one-to-one correspondence between algebraic and geometric braids, the following equivalence relations between braid words are defined (Artin 1947) 
+
+σg1 σg2 = σg2 σg1 , |g1 − g2| > 1, (2a) 
+
+σg1 σg2 σg1 = σg2 σg1 σg2 , |g1 − g2| = 1 , (2b) with the first stating that generators can commute if they do not share a strand, and the second corresponding to a continuous deformation of a triplet of strands (Thiffeault 2022). The generator set {σi}n−1 
+
+> i=1
+
+, together with the product operation corresponding to the concatenation of generators, and with the relations (2), gives raise to the braid group of 
+
+n strands Bn. The relations (2) also provide a convenient tool for comparing different braids words; in fact, two braids 
+
+β1, β2 are equivalent if the corresponding braid words are the same up to the relations (2). Given the correspondence between geometric and algebraic braids, braid words can be used to efficiently and compactly represent braids thanks to their discrete nature. A word ω is sufficient to identify a topological equivalence class of geometric braids β. The selection of the representative word ω can be arbitrary, as all words corresponding to β are equivalent under (2). However, while deciding equivalence of two braid words is polynomial (Epstein 1992), deciding whether a word has minimal length is co-NP-complete, so finding a shortest representative is NP-hard (Paterson and Razborov 1991). To further strengthen the connection between the two presentations of braids described above, under Assumption 1                    
+
+> Figure 2. (a) a set of three space-time curves λ1,λ2,λ3
+> generated by the motion of 3 points x1, x 2, x 3in Xover time. The curves are projected on the plane Πto generate the braid diagram shown in (b). The braid diagram corresponds to the braid word ω=σ−11σ−12σ−12σ−11σ−11σ−11.
+
+we can assume a uniform spacing of braid generators along geometric braids. 
+
+Assumption 2. In the geometric representation of a braid β
+
+composed by B ∈ N>0 generators, each generator σsb 
+
+> gb
+
+, b ∈{0, ..., B } spans an interval [τb, τ b+1 ] of length 1/B , with 
+
+τb = b/B , i.e., generators are uniformly spaced along τ .Moreover, in all the B + 1 points τb, we have xi(τb) ∈{1, ..., n } and yi(τb) = 0 , i ∈ { 1, ..., n }.
+
+## 3.2 Topological braids from trajectories 
+
+We now introduce an additional interpretation of braids, which connects them to the trajectories of a multi-robot system. In fact, braids can be extracted from the set of trajectories Λ = {λi}mi=1 , λ i : [0 , T ] → X × [0 , 1] : t 7 →
+
+(xi(t), y i(t), t ), generated by a set of robots moving in a 2D workspace X ⊆ R2 over a time interval [0 , T ]. This is achieved by projecting the set of curves traced by the trajectories λi ∈ Λ in the space X × [0 , T ] by the robots as they move, onto a plane Π defined by an axis z lying in the x-y plane and by the time axis t (Mavrogiannis et al. 2023; Thiffeault 2010). An example is shown in Figure 2a. We highlight that the projection plane Π can be selected arbitrarily, as braids obtained from different projection planes are related by conjugation (Thiffeault 2010). 1 The result of this operation is a braid diagram, which can be equivalently expressed as a braid word by concatenating the braid generators corresponding to the swaps between trajectories, following the temporal ordering in which they appear along the time axis t (see Figure 2b). 
+
+## 3.3 Winding numbers 
+
+Given a braid diagram such as the one represented in Figure 1, for each τ ∈ [0 , 1] , the winding number (Berger 2001) of a pair of strands i, j ∈ { 1, ..., m } is defined as: 
+
+wi,j (τ ) = 12π
+
+Z τ
+
+> 0
+
+˙θi,j (τ ′)dτ ′, (3) with θi,j (τ ′) representing the relative angle between the strands i and j at τ ′ ∈ [0 , τ ], as shown in the example of Figure 3a. Winding numbers can be used to encode the ‘mixing’ between two strands of a braid (Mavrogiannis et al. 2022), with a braid diagram yielding  m
+
+> 2
+
+ pairwise winding 4Battocletti et al. 5   
+
+> Figure 3. On the left-hand side, an example of the relative angle θi,j for a pair of strands. On the right-hand side, the winding number corresponding to a pairwise swap between two strands, the sign of which depends on the rotation direction.
+
+numbers. For all pairs of strands i, j ∈ { 1, ...m } it holds that 
+
+wi,j (τ ) = wj,i (τ ), ∀i, j ∈ { 1, ...m }, ∀τ ∈ [0 , 1] . (4) Each generator in a braid represents a swap between two strands, which corresponds to a rotation of ±π. This is independent of the actual path traced by the strands, and leads to a net variation of the winding number value between the beginning and the end of the braid generator equal to 
+
+±1/2 (see Figure 3b). Owing to the independence of the winding number value from the strands, winding numbers at 
+
+τ = 1 are topological invariants for braid generators (Berger 2001). We highlight that winding numbers defined as in (3) are not invariants for any value of τ , but only at the points where two generators are connected together (Berger 2001; Mavrogiannis et al. 2022), i.e., at a discrete set of points. Under Assumptions 1 and 2, for a braid β composed by 
+
+B generators, the B + 1 points where this is true are the points {b/B }Bb=0 . For each b ∈ { 1, ..., B }, winding numbers at τ = b/B are topological invariants for the sub-braid 
+
+βb = ( f1([0 , b/B ]) , f 2([0 , b/B ]) , ..., f n([0 , b/B ])) . Finally, it is worth noting that winding numbers are not complete topological invariants. In fact, while all braids in the same equivalence class give raise to the same set of winding numbers at τ = 1 , this mapping is not injective, as multiple equivalence classes of braids can correspond to the same set of winding numbers. 
+
+## 3.4 Problem setting 
+
+Let M = {1, . . . , m } be a set of m mobile robots moving inside a 2D obstacle-free environment X ⊂ R2. Static obstacles can be included in the proposed approach with little modification (Cao et al. 2025). Each robot i ∈ M is initially located at a point xi ∈ X , and is tasked to reach a goal point 
+
+xgoal ,i ∈ X . We assume the presence of a global high-level planner (e.g., one of those introduced in (Diaz-Mercado and Egerstedt 2017; Diaz-Mercado et al. 2015; Mavrogiannis et al. 2023; Cao et al. 2025)) that provides a topological specification, expressed either as a geometric braid β, or as a braid word ω representing a topological braid β, together with a projection plane Π. The plane Π is defined by a vector 
+
+z lying in the x − y plane, and by the t axis, as shown in the example of Figure 2. The task of the planner is to compute a set of robot trajectories {λi}mi=1 , λi : [0 , T ] → X for some common T ∈
+
+R>0 such that at the end of the motion, (i) each robot reaches its desired goal, and (ii) the projection of the trajectories traversed by the robots on Π yields a braid equivalent to the target topological braid β.
+
+Assumption 3. Without loss of generality 2 we assume that the projections of the initial locations of the robots and of their goal locations on the plane Π are distinct, i.e., that 
+
+xΠ
+
+> i
+
+̸ = xΠ
+
+> j
+
+xΠgoal ,i ̸ = xΠgoal ,j 
+
+, ∀i, j ∈ M , i ̸ = j, (5) where xΠ 
+
+> i
+
+indicates the projection of the initial location of robot i on Π, and xΠgoal ,i that of its goal. 
+
+Assumption 4. We assume the possibility for the robots to exchange information with each other in an all-to-all fashion. 
+
+## 3.5 Overview of the proposed approach 
+
+The proposed approach is designed to tackle the challenges posed by the problem of executing multi-robot motion plans encoded as braid-based topological constraints, which we now recall. • First, in order to execute the input braid specification, the braid word corresponding to the braid diagram generated by the projection of the robots’ trajectories on a plane Π (see Figure 2), must match the target one, i.e., the two braid words must coincide up to the equivalence relations (2). However, the discrete nature of braids makes it challenging to directly compute trajectories that match the desired sequence of generators of the braid, as naively projecting the trajectories on Π and evaluating the resulting generators is not suitable for online optimization. • Second, topological braids do not specify a timing law, so the robots must determine autonomously their current state along the specification, as well as decide how to continue to progress along the braid. In this sense, we highlight that using a pre-specified timing law, e.g., one that specifies a fixed progress along the specification for each discrete time step, is in general either suboptimal or unattainable, depending on the initial locations of the robots. For instance, if the robots are widely spaced, their will only be able to progress slowly along the specification, as looping around each other takes more time; however, this cannot easily be encoded in a pre-specified timing law. • Third, we want the control approach to be distributed, which requires (i) decoupling the tracking of the global braid specification in locally-trackable specifications, as well as (ii) the presence of some coordination tool to synchronize the robots toward the execution of the desired global interaction pattern. The proposed control scheme is composed of two parts. The first is a preprocessing phase, during which the topological braid specification is translated into a set of continuous functions encoding the winding numbers between all pairs of robots over time, which is described in Section 4. This is followed by an online control phase, where each robot solves a local MPC problem and executes the first action of the optimal control sequence to track the specification, which is described in Section 5. 56 Journal Title XX(X) 
+
+## 4 Preprocessing of the topological constraint 
+
+In this section we present the preprocessing phase of the proposed algorithm. As mentioned in the problem setting of Section 3.4, the input topological specification is provided either as a geometric braid β or as a braid word ω (expressed as in (1)), together with a projection plane Π. In both cases, in order to distributedly execute the motion plan encoded by the braid, we propose to translate it into a set of continuous functions 
+
+W = {wi,j : [0 , 1] → R, i, j ∈ M , i ̸ = j} (6) corresponding to the winding number between pairs of braid strands expressed as a function of the progress variable τ
+
+(vertical axis in Figure 1a), computed using (3). The values of the winding numbers are initially set to 0 for all the robots pairs, i.e., 
+
+wi,j (0) = 0 , ∀i, j ∈ M , i ̸ = j. (7) In order to obtain the set W, the topological constraint is run through a preprocessing phase. We consider here two cases, namely, the preprocessing of a braid word ω, and that of a geometric braid β (encoded as a collection of paths representative of a given topological equivalence class). The first case is illustrated in Section 4.1, and the second one in Section 4.2. The output of the preprocessing phase, and the initialization of the robots’ winding numbers used in the online control phase, is discussed in Section 4.3. 
+
+## 4.1 Preprocessing of braid words 
+
+As discussed in Section 3.1, topological braids can be conveniently expressed as a braid word ω. In such case, the winding number set W can be computed by using the following procedure. 
+
+4.1.1 Winding numbers from braid words Given a braid word (1) composed by B generators, the winding numbers at 
+
+τb = b/B, b ∈ { 1, . . . , B }, are found as 
+
+wi,j (τb) = wi,j (τb−1)+
+
+
+
+sb
+
+12 if |pb(i) − pb(j)| = 1 ∧ pb (min {i, j }) = gb
+
+0 otherwise 
+
+,
+
+(8) where pb : M → M indicates the permutation of the points 
+
+i ∈ M after b braid generators, and is recursively defined as 
+
+pb(i) = 
+
+
+
+pb−1(i + 1) if i = gb,pb−1(i − 1) if i = gb + 1 ,pb−1(i) otherwise ,
+
+(9) with p0(i) = i, ∀i ∈ M . Under Assumptions 1, 2, and 3, we can assume without loss of generality that winding numbers grow linearly. 
+
+Assumption 5. The value of a winding number at ageneric point τ ∈ [b/B, (b + 1) /B ] is defined as the linear combination 
+
+wi,j (τ ) = (1 − τ ′)wi,j 
+
+ bB
+
+
+
++ τ ′wi,j 
+
+ b + 1 
+
+B
+
+
+
+, (10) with τ ′ = τ B − b, as shown in the example of Figure 4b.           
+
+> Figure 4. (a) Example of a geometric braid composed by 4 strands. A corresponding braid word is ω=σ3σ−11σ2σ1σ1σ−13.(b) Winding numbers between each pair of strands in the given braid computed using the preprocessing strategy from Section 4.1.1. (c) Winding numbers computed from Algorithm 1. In (b) we have B= 6 , in (c) B′= 4 .
+
+This assumption does not restrict the applicability of the proposed approach, is coherent with the monotonic growth of braids along τ , and gives rise to the convenient relation 
+
+wi,j (τ2) − wi,j (τ1) ≤ B
+
+2 τ2 − τ1 , (11) which holds for any τ1, τ 2 ∈ [0 , 1] . This bound follows from the linear interpolation of the winding numbers and from the fact that by (3), a braid generator gives raise to a change in the corresponding winding number having magnitude equal to 1/2. A proof of (11) is given in Appendix A. We note that, by translating the braid word ω into a function encoding the winding numbers along τ , the invariance property of winding numbers is lost, as the set 
+
+W has a one-to-one correspondence with the specific braid word ω. This is due to the fact that the winding numbers in W enforce a specific ordering of the braid generators, not allowing for commutations that lead to equivalent braid words, i.e., those of (2). As a result, a set of winding numbers encoding a braid word ω is not representative of a geometric braid β, but only of some of its realizations. While, in principle, this is sufficient for the achievement of the objective stated in Section 3.4 (and is, in fact, the approach followed by all existing approaches, such as those proposed in (Cao et al. 2025; Diaz-Mercado and Egerstedt 2017)), it is also, in general, unnecessarily restrictive, as according to the problem statement of Section 3.4, any braid equivalent to β is suitable for the solution of the problem. For this reason, in the next section we propose a refined preprocessing routine that provides more flexibility for the specification tracking, but that still results in a braid equivalent to β. If, on the contrary, a given task requires the execution of a specific braid word 
+
+ω, and not of one equivalent to it, the preprocessing routine proposed in this section is sufficient. 
+
+4.1.2 Compacting of the winding numbers sequences 
+
+The braid relation (2a) allows the commutation of generators that do not share a strand, meaning that the two generators are independent of each other, as they regard distinct pairs 6Battocletti et al. 7
+
+of strands. We can leverage this property of the braid group to further ‘compact’ the winding numbers sequence, so that more generators can be executed in parallel, thus increasing the speed at which the braid can be tracked. Moreover, this has the advantage of allowing the execution of braids that are equivalent to β, but not identical to it, making the execution phase more flexible, and potentially resulting in more efficient trajectories being computed. We propose to shift parts of the winding numbers functions wi,j (τ ) so that changes in the winding numbers between distinct pairs of robots, which correspond to adjacent pairs of generators between which (2a) holds, happen at the same point τ ∈ [0 , 1] , and not sequentially as one would have from (8). We achieve this through the preprocessing procedure described in Algorithm 1. We note that, conceptually, this compacting routine is similar to that used in (Cao et al. 2025), with the main difference lying in the nature of the topological object being considered. 
+
+Algorithm 1 Preprocessing routine to compute W
+
+Inputs : A braid word ω = QBb=1 σsb 
+
+> gb
+
+, the robots set M 
+
+> 1:
+
+Define W′ = {w′ 
+
+> i,j
+
+: N≥0 → R, i ∈ M , j ∈ M , i ̸ = j} 
+
+> 2:
+
+Set w′ 
+
+> i,j
+
+(n) = 0 , ∀n ∈ N≥0, ∀i, j ∈ M , i ̸ = j 
+
+> 3:
+
+Initialize B′ ← 0, b ← 1, b ′ ← 1, Ω ← Ø 
+
+> 4:
+
+Initialize permutation p0 : M → M , p 0 : i 7 → i 
+
+> 5:
+
+while b ≤ B do  
+
+> 6:
+
+Ω ← Ω ∪ { b} 
+
+> 7:
+
+b′ ← b + 1  
+
+> 8:
+
+while b′ ≤ B do  
+
+> 9:
+
+for b′′ ∈ Ω do  
+
+> 10:
+
+if |gb′ − gb′′ | = 1 then  
+
+> 11:
+
+Go to line 15  
+
+> 12:
+
+Ω ← Ω ∪ { b′} 
+
+> 13:
+
+b′ ← b′ + 1  
+
+> 14:
+
+B′ ← B′ + 1  
+
+> 15:
+
+for b′′ ∈ Ω do  
+
+> 16:
+
+Update the permutation pB′ with (9)  
+
+> 17:
+
+Update the winding numbers as: 
+
+w′ 
+
+> i,j
+
+(B′) ← w′ 
+
+> i,j
+
+(B′ − 1) +
+
+
+
+sb′′ 12 if |pB′ (i) − pB′ (j)| = 1 
+
+and pB′ (min {i, j }) ∈ Ω,
+
+0 otherwise  
+
+> 18:
+
+Ω ← Ø 
+
+> 19:
+
+b ← b′ ▷ Move to new generator and continue  
+
+> 20:
+
+for b′ ∈ { 0, ..., B ′ − 1} do  
+
+> 21:
+
+Compute final winding numbers as: 
+
+wi,j (τ ) ← (1 − τ ′)w′ 
+
+> i,j
+
+(b′) + τ ′w′ 
+
+> i,j
+
+(b′ + 1) ,
+
+∀τ ∈ [b′/B ′, (b′ + 1) /B ′], with τ ′ = τ B ′ − b′ 
+
+> 22:
+
+return W = {wi,j , i, j ∈ M , i ̸ = j}
+
+In Algorithm 1, a temporary set of winding numbers W′ is used to store the compacted winding numbers. The algorithm iterates through the braid generators (lines 5 – 19), keeping track of the sequence of adjacent generators that do not share a strand (lines 8–13), and collecting them in the set Ω (line 12). The changes in winding numbers corresponding to the generators in Ω are then added at the same point in W′ (lines 15–19), before resetting Ω and moving forward along the braid word (lines 18, 19). In this sense, the key difference of Algorithm 1 with respect to the procedure described in Section 4.1.1, lies in the condition pB′ (min {i, j }) ∈ Ω in the equation 
+
+w′ 
+
+> i,j
+
+(B′) ← w′ 
+
+> i,j
+
+(B′ − 1) +
+
+
+
+sb′′ 12 if |pB′ (i) − pB′ (j)| = 1 
+
+and pB′ (min {i, j }) ∈ Ω,
+
+0 otherwise (12) at line 17, which, differently from the corresponding condition in (8), enables multiple winding numbers to change in the same interval of τ . Once the end of the braid word is reached, the temporary winding numbers W′ are remapped to the continuous interval [0 , 1] by rescaling them and linearly interpolating their value in between the points where they are defined (lines 20–22) An example of the winding numbers resulted from Algorithm 1 is shown in Figure 4c. The winding numbers W computed from Algorithm 1 divide the [0 , 1] interval into B′ ≤ B intervals. By assuming that each interval of τ takes the same amount of time to be executed, the winding numbers computed from Algorithm 1 can be tracked quicker than those returned from Section 4.1.1, thanks to the parallelization of the execution of multiple braid generators obtained through the inclusion of the equivalence relation (2a) in Algorithm 1. Moreover, differently from the preprocessing routine of Section 4.1.1, multiple (equivalent) braid words map to the same set of winding numbers through Algorithm 1; for example, the words ω1 = σ1σ3 and ω2 = σ3σ1 yield the same set of winding numbers W1, W2 through Algorithm 1. This has the advantage of reducing the influence on the algorithm of the representative word ω provided as input to represent the equivalence class of the geometric braid β.
+
+Remark 1. We highlight that the winding number set W
+
+obtained from Algorithm 1 are computed by taking into account the equivalence relation (2a), but not (2b). Therefore, in principle W could be further refined to make the execution of the specification even more parallelized and efficient. However, the inclusion of (2b) in Algorithm 1 is not trivial, and is left for future work. Nonetheless, we remark that (i) the proposed approach still improves upon the existing literature, where only the input braid word ω can be realized, and (ii) the set of braid words corresponding to W depends on the representation of β provided as input (i.e., on the input braid word ω), which is determined by the external high-level planner computing it. As already mentioned, searching for a shorter braid word is in general NP-hard, and is therefore not considered in the proposed preprocessing phase. Lastly, (iii) for the objective defined in the problem setting in Section 3.4, i.e., the execution of a braid equivalent to β, the use of the winding numbers returned by Algorithm 1 is sufficient, as they correctly encode β.
+
+## 4.2 Preprocessing of geometric braids 
+
+A topological constraint encoded as a geometric braid β is generally provided as a set of paths 
+
+Λ = {λi : [0 , 1] → X × [0 , 1] } (13) 78 Journal Title XX(X)    
+
+> Figure 5. (a) Example of a sequence of four permutation grids, describing three swaps in the relative positions for a set of
+> m= 3 robots. (b) Example of a set of representative paths describing the same topological equivalence class as the sequence of permutation grids on the left.
+
+that yields the geometric braid β through their projection on the plane Π. Namely, these paths represent a possible realization of the strands of the geometric braid β. Two options are available to compute the set of winding numbers 
+
+W of (6) from the set of paths Λ. The first option is to compute W by using (3) for each pair of paths from Λ,which result in a direct computation of the pairwise winding numbers wi,j . The second option is to compute a braid word 
+
+ω associated to the braid diagram obtained by projecting the paths in Λ onto the plane Π. Then, W can be computed by following the preprocessing procedure from Section 4.1. There are several ways to describe a set of representative paths Λ. One popular way to do so is to encode them as a sequence of permutation grids (Cao et al. 2023, 2025; D’Antonio et al. 2026), compactly describing the paths by keeping track of the relative position of the robots over time. A permutation grid is defined as a matrix G ∈ M m×m with all entries equal to zero, except for m entries that have values corresponding to the elements of M. Each row and each column only contains exactly one nonzero element, and each index i ∈ M appears exactly once. Under this definition, a permutation grid G can be used to represent the relative position that each robot occupies relative to the others (Cao et al. 2025). In particular, if a robot i ∈ M has a lower row index in G with respect to another one, it is closer to the origin along the x axis; analogously, column indexes indicate the relative position of the robots along the y axis, as depicted in the top-left corner of Figure 5a. Then, a set of qualitative interactions between the trajectories of the robots can be described as a sequence of grids 
+
+G = ( G1, . . . , GG), (14) with G ∈ N>0. Each pair of grids Gg , Gg+1 , g ∈ { 1, ..., G −
+
+1}, is characterized by the swap of two adjacent rows or of two adjacent columns, corresponding to a swap in the relative position of the two robots occupying those rows/columns. An example of a sequence of permutation grids is shown in Figure 5a. The sequence of relative positions of the robots over G indicates a temporal ordering (but not a timed one) in which the robots must occupy that given set of relative positions; this encodes a topological interaction pattern akin to that of a topological braid. To construct a set of representative paths Λ corresponding to the topological equivalence class described by the sequence G, one possible approach is to interpolate the positions that the robots occupy over time, as in the example of Figure 5b. 
+
+## 4.3 Initialization of the robots’ winding numbers 
+
+In the preprocessing phase, the topological constraint, expressed either as a braid word ω or as a geometric braid 
+
+β, is converted in a set of winding numbers W, by using the preprocessing routine described in Section 4.1 or the one described in Section 4.2, respectively. At the end of the preprocessing phase, each robot i ∈ M stores in its memory the set of winding number functions 
+
+Wi = {wi,j ∈ W , j ∈ M \ { i}} ⊂ W (15) composed by all the winding numbers in which it is involved. In the online phase of the proposed control approach, the sets of target winding numbers W are compared with those computed from the trajectories of the robots. In this work we consider discrete-time trajectories in which we use the variable k ∈ N≥0 to index discrete time steps of ∆t time units. The winding numbers corresponding to the trajectories traveled by the robots up to time step k are denoted as 
+
+W(k) = {wi,j (k), i, j ∈ M , i ̸ = j}, (16) with each element corresponding to a different pair of robots, and the relation (4) holding for each pair wi,j , wj,i . The values of the elements of W depend on the trajectories traveled by the robots, and therefore are time-varying. In this section we focus on computation of the initial value of W;a detailed explanation of the online update of W during the motion of the robots is provided in Section 5. In principle, the winding numbers set W could be initialized with a value equal to 0. However, when the target winding numbers are computed from a braid word ω, it is implicitly assumed that the robots are initially located at points lying along the z axis, i.e., on the plane Π. Since the initial locations of the robots can be general points in 
+
+X , this creates an offset between the target winding numbers and those computed from the robots’ trajectories. Therefore, when the input to the algorithm is a braid word ω we initialize the set W as 
+
+wi,j (0) = 12π
+
+
+
+θi,j (0) − θΠ 
+
+> i,j
+
+(0) 
+
+
+
+, ∀i, j ∈ M , i ̸ = j, (17) where θi,j (0) indicates the relative angle between the initial positions xi(0) , x j (0) of the robots i and j, while θΠ 
+
+> i,j
+
+(0) 
+
+is the relative angle between the projections of the points 
+
+xi(0) , x j (0) on the plane Π. An example of the projection is shown in Figure 6a, with the relevant variables from (17) depicted in Figure 6b. 
+
+## 5 Distributed winding-based MPC controller 
+
+The preprocessing step introduced in Section 4 results in the braid specification being decoupled in a set of winding numbers W describing pairwise interactions between the robots. This enables the possibility of tracking winding numbers locally, as each robot is tasked with tracking only the winding numbers in which it is involved. In our approach, this is achieved through a distributed MPC-based controller. 8Battocletti et al. 9        
+
+> Figure 6. (a) Projection of the initial positions of the robots on the projection plane Π. (b) Computation of the relative angles
+> θi,j (0) and θΠ
+> i,j (0) used to initialize the winding numbers set ¯W.
+
+## 5.1 Online control loop 
+
+At each discrete time step, each robot sequentially performs the following tasks: 1. Update of the realized winding numbers according to the change in the relative positions between the robots. 2. Estimation of the current progress state along the topological specification from the winding number values corresponding to the trajectories executed by the robots; 3. Broadcast to other robots of the local progress variable and of the predicted state sequence computed at the previous time step; 4. Computation of the global progress variable from the local ones via distributed consensus; 5. Solution of the local MPC problem; 6. Execution of the first element of the optimal control sequence computed from the MPC problem. Next, we illustrate in detail each of these steps to provide a complete description of the proposed approach. A summary of the resulting control loop is provided in Section 5.3. 
+
+5.1.1 Computation of winding numbers from the observed trajectories At every time step, each robot measures the state xi of itself and the state {xj }j∈M\{ i}
+
+of every other robot (or receives it during the broadcasting step), and stores it in a trajectory vector γl. The trajectory traveled by robot l ∈ M up to time step k is defined as 
+
+γl(k) = [ x⊤ 
+
+> l
+
+(0) , x ⊤ 
+
+> l
+
+(1) , . . . , x ⊤ 
+
+> l
+
+(k)] ⊤. (18) Two trajectories γi(k), γj (k) yield a sequence of relative headings θi,j (h), h ∈ { 0, ..., k } between the robots i and 
+
+j. Without loss of generality, in the following we assume all angles θi,j (h) to be wrapped to the interval (−π, π ].Moreover, we assume a minimum distance dmin > 0
+
+between any two robots i, j over each discrete time step 
+
+k ∈ N, and that the robots move in a straight line over a single discrete time step. Therefore, we get the following rate constraint on the variation of the relative heading: 
+
+|θi,j (h) − θi,j (h − 1) | < π. (19) Given a sequence of relative angles {θi,j (h)}kh=0 , we define a discrete-time version of winding numbers (Mavrogiannis et al. 2022) as 
+
+wi,j (k) = 12π
+
+> k
+
+X
+
+> h=1
+
+δ
+
+
+
+θi,j (h), θ i,j (( h − 1)) 
+
+
+
+, (20) where δ : ( −π, π ]2 → (−π, π ] is an angle wrapping function that, given two input angles, returns the signed angle difference between them. The function δ is defined 3 as 
+
+δ(θ1, θ 2) = arctan2 
+
+
+
+sin( θ1 − θ2), cos( θ1 − θ2)
+
+
+
+. (21) We note that (20) can be conveniently rewritten as an update equation, i.e., at time step k the winding number corresponding to the trajectories γi(k), γ j (k) can be computed as 
+
+wi,j (k) = wi,j (k − 1) + 12π δ
+
+
+
+θi,j (k), θ i,j (k − 1) 
+
+
+
+. (22) We collect the current winding numbers wi,j in which robot 
+
+i is involved in the set 
+
+Wi(k) = {wi,j (k), j ∈ M \ { i}} ⊂ W (k). (23) 
+
+5.1.2 Local estimation of the progress variable The robots keep track of the progress along the topological specification through a progress variable τ . A copy τi of the progress variable is computed locally by each robot i ∈ M 
+
+at the beginning of each time step. Each robot i keeps track of the set of winding numbers {wi,j (k)}j∈M\{ i} and uses them to estimate the progress along the braid β by solving the minimization problem 
+
+τi(k) ∈ arg min  
+
+> τ′∈T
+
+X
+
+> j∈M\{ i}
+
+
+
+wi,j (τ ′) − wi,j (k)
+
+2
+
+. (24) Equation (24) allows achieving the crucial task of linking the progress variable τ with the time index k, thus addressing the absence of an intrinsic timing law associated to the braid specification β.Given the fact that wi,j is not monotonic, and the same value wi,j (τ ) can be achieved for multiple values of τ ∈
+
+[0 , 1] , the optimization interval 
+
+T = [ τ (k − 1) , min {τ (k − 1) + ∆ τmax , 1}]
+
+ensures that the estimate of τi(k) increases monotonically with k or stays constant, while the upper bound ∆τmax on the variation of τi limits the number of local minima in (24). The value of ∆τmax depends on the dynamics of the robots, on the length of the time step ∆t, and on the number of generators in the braid specification, and can be expressed as 
+
+∆τmax = 2
+
+πB arcsin 
+
+ vmax ∆td′
+
+> min
+
+
+
+, (25) where d′ 
+
+> min
+
+is an inflated safety distance designed to prevent collisions when two robots move in a straight line over a discrete time step. The derivation of (25) and of d′ 
+
+> min
+
+are discussed in Appendix B. 
+
+5.1.3 Broadcasting of local information At every time step k, each robot i ∈ M shares its predicted future trajectory 
+
+bxi(k) = [ x⊤ 
+
+> i
+
+(k),x ⋆, ⊤ 
+
+> i
+
+(2 |k − 1) , . . . , x⋆, ⊤ 
+
+> i
+
+(K|k − 1) , x ⋆, ⊤ 
+
+> i
+
+(K|k − 1)] ⊤ (26) with all the other robots, corresponding to a shifted version of the solution computed by solving the MPC optimization 910 Journal Title XX(X) 
+
+problem at time step k. The variable K > 1 represents the control horizon of the MPC controller, and x⋆i (k − 1) 
+
+represents the solution of the MPC problem for robot i at the previous time step. Moreover, we use the notation □(h|k)
+
+to indicate a variable □, h steps into the prediction window period of the MPC controller at time step k. We note that the first element of the vector bxi(k) coincides with the current state xi(k), while the last one is repeated twice to obtain a vector with K + 1 elements, consistent with the length of the MPC prediction window. We collect the predicted trajectories received by robot i in the set 
+
+bXi(k) = {bxj (k)}j∈M\{ i}. (27) Additionally, each robot shares their local copy of the progress variable τi with the other robots. 
+
+5.1.4 Global progress variable via distributed consensus 
+
+In order to coordinate with each other, the robots must agree on the current progress along the topological specification. To this end, from the local copies of τi(k) they compute the global estimate τ (k) of the progress variable. Two options are considered here to do so, namely, min-consensus, where the global τ (k) is found as 
+
+τ (k) = min  
+
+> i∈M
+
+τi(k), (28) and average-consensus, where τ (k) is found as 
+
+τ (k) = 1
+
+m
+
+X
+
+> i∈M
+
+τi(k). (29) In the first case, the robots wait for the ‘slowest’ progressing robots before moving further, while in the second they average their estimated progress, thus maintaining a higher overall progress speed. The use of (28) versus (29) is decided a priori by the robots, and all the robots use the same strategy to compute the global progress variable τ (k).
+
+5.1.5 Local MPC controller Equipped with the informa-tion computed at the steps described above, each robot computes a trajectory that, paired with those communicated by the other robots, results in a variation of the winding number as close as possible to the desired one. This is achieved by solving a local MPC control problem formulated as follows: 
+
+J
+
+
+
+xi(k), x goal ,i , bXi(k), Wi, Wi(k), τ (k)
+
+
+
+=min 
+
+> xi(k),ui(k)
+
+"
+
+ξuJu,i (k) + ξg(τ (k)) Jg,i (k) + ξwJw,i (k)
+
+#
+
+(30a) s.t. xi(0 |k) = xi(k) (30b) 
+
+τi(0 |k) = τ (k) (30c) 
+
+bwi,j (0 |k) = wi,j (k) (30d) for h = 0 , . . . , K − 1
+
+xi(h + 1 |k) = fi(xi(h|k), u i(h|k)) (30e) 
+
+ui(h|k) ∈ U i (30f) 
+
+xi(h|k) ∈ X i (30g) 
+
+xi(K|k) ∈ X term ,i (30h) for h = 0 , . . . , K 
+
+for j ∈ M \ { i}
+
+g
+
+
+
+xi(h|k), bxj (h|k)
+
+
+
+≥ 0 (30i) for h = 1 , . . . , K 
+
+bwi,j (h|k) = bwi,j (h − 1|k)+ 12π δ
+
+bθi,j (h|k), bθi,j (h − 1|k)
+
+
+
+, (30j) 
+
+τi(h|k) = min {τi(h − 1|k) + ∆ τmax , 1}
+
+(30k) where Ui corresponds to an input constraint, Xi to a state constraint, and Xterm ,i to a terminal state constraint. The function g in (30i) is used to define a collision avoidance constraint between the trajectory of robot i and the one predicted by robot j at the previous time step. Since in general the actual trajectory of robot j is different from that broadcasted in bxj (k), some additional steps are required to guarantee the recursive feasibility of (30), such as the tightening of the collision avoidance constraint (Brito et al. 2019; Chen et al. 2020), the introduction of consistency constraints to bound the maximum change in the trajectory 
+
+xi(k) from xi(k − 1) (Wiltz et al. 2025; Lyu et al. 2019), or the use of slack variable to render the constraint a softened one. Two of these options are considered and discussed in Sections 5.2 and 7. The cost function (30a) is composed by three terms, namely, the control cost 
+
+Ju,i (k) = 
+
+> K−1
+
+X
+
+> h=0
+
+u⊤ 
+
+> i
+
+(h|k)Qu i(h|k), (31) with Q ≻ 0 a weight matrix, the goal tracking cost 
+
+Jg,i (k) = 
+
+> K
+
+X
+
+> h=1
+
+xi(h|k) − xgoal ,i 
+
+> 22
+
+, (32) and the winding tracking cost 
+
+Jw,i (k) = X
+
+> j∈M\{ i}
+
+ξw,i,j (k)
+
+> K
+
+X
+
+> h=1
+
+h
+
+wi,j (τi(h|k)) − bwi,j (h|k)
+
+i2
+
+.
+
+(33) 10 Battocletti et al. 11 
+
+The predicted winding number bwi,j that appears in the winding tracking cost (33) is computed through (30j), with the initial value being set to the current winding number through (30d). In (30j), bθi,j (h|k) is the predicted relative heading between robots i and j, h time steps into the MPC prediction window, which depends on the predicted state sequence bxj (k) and the optimization variable xi(k). We remark that, from the point of view of robot i, the trajectory 
+
+bxj is fixed (corresponding to solution computed by robot j at the previous time step), while the trajectory bxi is optimized locally through the decision variable xi(k).A weight is associated to each term composing the cost function (30a). The weight of the control cost term ξu and that of the winding tracking term ξw are constant. The weight of the goal tracking cost depends on τ (k) and is given by the sigmoid function 
+
+ξg(τ ) = 11 + e−s(τ −c) , (34) with s, c ∈ R>0 two tuning parameters. A larger s
+
+corresponds to a steeper increase of ξg as τ grows, while c
+
+determines the value of τ at which the function grows from 0 to 1. The weight of the goal tracking cost is defined in this way to ease the tracking of the topological specification. In fact, the tracking of the winding numbers and the tracking of the goal represent conflicting objectives, since, if the robot goes directly to the goal, it is neglecting the tracking of the topological specification, and vice versa. To overcome this issue, (34) effectively disables the goal tracking cost from (30a) until a given value of τ , which depends on the value of c, has been reached, corresponding to some portion of the specification having been executed. Lastly, for each of the components of the winding tracking cost in (33), i.e., for each robot in the set M \ { i}, we introduce a time-varying weight defined as 
+
+ξw,i,j (k) = 1
+
+|| xi(k) − xj (k)|| 22
+
+. (35) The weight inversely depends on the relative distance between robots i and j at time step k. This increases the relative importance of the winding cost for robots that are closer together, since their relative motion has a higher impact on the change in their winding number.   
+
+> 5.1.6 Execution of control actions
+
+After the solution to (30) is computed, each robot applies the first element of its optimal control sequence u⋆i . The robots take the corresponding actions in the environment, and the control loop starts over again. 
+
+## 5.2 Recursive feasibility of the MPC controller 
+
+Under a suitable definition of the collision avoidance constraint (30i), it is possible to show that the problem (30) is recursively feasible, i.e., if the problem has a feasible solution at time step k, then it also has a feasible solution that satisfies all the constraints at time step k + 1 . To this end, we propose to use a buffered Voronoi partitioning of the environment to generate a set of convex constraints that guarantees the recursive feasibility of the local MPC control problems (Park et al. 2022; Zhou et al. 2017). In particular, we adapt the results from (Chen et al. 2024) to define a set of separating hyperplanes which, paired with an appropriate terminal constraint, guarantees the recursive feasibility of the distributed MPC controller. 
+
+Proposition 1. Let the collision avoidance constraint (30i) be defined as 
+
+a⊤ 
+
+> i,j
+
+(h|k)xi(h|k) ≥ bi,j (h|k) (36) with ai,j (h|k) and bi,j (h|k) defined as 
+
+ai,j (h|k) = bxi(h|k) − bxj (h|k)
+
+|| bxi(h|k) − bxj (h|k)|| , (37a) 
+
+bi,j (h|k) = a⊤
+
+> i,j
+
+bxi(j|k) + bxj (h|k)2 + d′
+
+> min
+
+2 , (37b) and let the terminal constraint Xterm ,i in (30h) be defined as a set of fixed points, i.e., 
+
+Xterm ,i = {x|∃ u ∈ U i : x = fi(x, u )}. (38) Then, (30) is recursively feasible at time step k by using the shifted solution from the previous time step k − 1, with the last element of x⋆i and u⋆i repeated to match the length of the MPC horizon. 
+
+Proof. The proof follows from that of (Chen et al. 2024, Theorem 3) since by using (38) in place of (30b), and (36), (37) in place of (30i), then the constraint (30e), (30f), (30g), (30h), and (30i) are equivalent to those of the MPC problem considered in (Chen et al. 2024). Moreover, the constraints (30c), (30d), (30j), and (30k) are always feasible, and the variables whose values they constrain only appear in the cost function of the MPC problem, therefore not hindering the feasibility of (30). We note that, unlike recursive feasibility, stability and convergence of the proposed control scheme are more difficult to prove, and require further analysis. As such, the investigation of these properties is left for future work. 
+
+## 5.3 Summary of the proposed approach 
+
+The approach introduced above is suitable for the distributed execution of multi-robot motion plans encoded as braid-based topological specifications. This is achieved by addressing the three main challenges posed by topological braids, namely (i) their discrete nature, (ii) the fact that braids encode a global specification that considers all the robots simultaneously, (iii) the fact that braids encode a temporal ordering of the generators, i.e., of the interactions between the robots, but do not specify a timing law to be followed, with the addition of (iv) the use of a distributed control architecture. The first two challenges are tackled through the use of winding numbers as a proxy to track the specification. Winding numbers result in a set of continuous objects that can be integrated in the cost function of the local MPC problem, and they encode pairwise interactions, which can be tracked distributedly. The third challenge is addressed through the consensus-based estimation of the progress variable τ , which allows the robots to compute their progress along the braid over time. The consensus-based computation of τ also serves as a coordination tool to synchronize the robots, so that no robot can progress too far 11 12 Journal Title XX(X) 
+
+with respect to the others along its local winding numbers, rendering it possible to use a distributed control architecture. The resulting control algorithm is summarized in Algorithm 2, where we report the key actions taken by each robot during each online control loop. 
+
+Algorithm 2 Control loop for robot i.
+
+Inputs : Set of target winding numbers functions Wi,goal location xgoal ,i . 
+
+> 1:
+
+Measure xi(k) and {xj (k)}j∈M\ i 
+
+> 2:
+
+For all robots l ∈ M (including i), update the traveled trajectories with γl(k) ← [γ⊤ 
+
+> l
+
+(k − 1) , x ⊤ 
+
+> l
+
+(k)] ⊤ 
+
+> 3:
+
+Update wi,j (k), ∀j ∈ M \ { i} with (22)  
+
+> 4:
+
+Compute τi(k) with (24)  
+
+> 5:
+
+Broadcast bxi(k) and τi(k), receive bXi and {τj }j∈M\{ i} 
+
+> 6:
+
+Compute τ (k) via (28) or (29)  
+
+> 7:
+
+Solve (30)  
+
+> 8:
+
+Apply u∗(0 |k)
+
+## 6 Simulations 
+
+The proposed controller is evaluated in simulations, and compared with existing controllers to evaluate the benefits of the proposed approach. The simulations have been implemented in Python 3.10.12 and run on a laptop with an 11th Gen Intel processor with four i7 cores (3.00 GHz) and 16 GB of RAM. In the code, we leverage the braidlab MATLAB package (Thiffeault and Budiˇ si´ c 2013–2026) to compute braids from trajectories, and to compare braids. The source code is available at https://github.com/gbattocletti/braid-controller. 
+
+## 6.1 Evaluated controllers 
+
+In the simulations, the following controllers are evaluated and compared: 
+
+Grid-based Braid Controller (GBC) : This controller is adapted from those proposed in (Diaz-Mercado and Egerstedt 2017; Cao et al. 2025) to track topological specifications, and is based on a grid-based discretization of the environment. First, the workspace X is discretized as a grid Φ of m × m uniformly-spaced points with a minimum distance between each pair of points of at least 
+
+d′
+
+> min
+
+. Then, the braid word ω is translated in a sequence of 2D permutation grids G = ( G1, . . . , GG) with G ∈ N>0,
+
+G ≥ B (see (Cao et al. 2025) for more details). As described in Section 4.2, each pair of grids Gg , Gg+1 is characterized by the swap of two adjacent rows or of two adjacent columns, indicating a swap in the relative position of the robots occupying those rows/columns. Following the algorithm from (Cao et al. 2025), these swaps are executed sequentially, following their order in G, by a setpoint-tracking MPC controller defined as 
+
+J
+
+
+
+xi(k), exi(k)
+
+
+
+=min 
+
+> xi(k)
+> ui(k)
+
+"
+
+ξuJu,i (k) + ξg
+
+> K
+
+X
+
+> h=1
+
+xi(h|k) − exi(k) 22
+
+#
+
+(39a) s.t. (30b) , (30h) (39b) for h = 0 , . . . , K − 1
+
+(30e) , (30f) , (30g) , (39c) where exi(k) represent the target location of robot i on Φ,corresponding to the point in Φ associated to the entry i in the grid Gg+1 . This controller is sufficient for this task since each swap entails the motion of only two robots moving along parallel straight lines (from a pair of nodes of the grid to an adjacent pair). Since points are spaced more than d′
+
+> min
+
+,the presence of collision-avoidance constraints in (39) is not required. 
+
+Distributed Winding MPC (D-WMPC) : This controller implements our proposed approach. First, the topological constraint is broadcasted to all the robots, which locally execute the preprocessing routine described in Section 4 to compute the set of target winding numbers W. Second, the online control phase is executed. Each robot runs the control loop of Algorithm 2, and communicates the necessary information with the others to maintain global coordination and collision avoidance, as described in Section 5. We highlight that we do not compare the proposed approach with the controllers introduced in (Mavrogiannis et al. 2022; Nakao et al. 2025), since they are able to track only a limited set of braid-based specifications, and not general ones. In this sense, we remark that our approach generalizes the controllers proposed there as it is applicable to any braid specification. 
+
+## 6.2 Simulation results 
+
+The approaches are compared for the execution of different topological specifications, with a varying number of robots 
+
+m ∈ { 3, 5, 10 }. Each approach is simulated with the same initial conditions, with the controller parameters set to the values listed in Table 1. An example of a simulation of the D-WMPC for a set of m = 10 robots is shown in Figure 7.                        
+
+> Table 1. Values of the parameters of the D-WMPC and GBC approaches used in the simulations.
+> Parameter Value
+> ∆t0.25 s
+> K21
+> ξu0.05
+> ξg1
+> ξw20
+> s20
+> c0.95
+> Qdiag(1 ,1)
+> dmin 0.7
+> Ui[−0.5,0.5] ×[−0.5,0.5]
+> Xi[0 ,20] ×[0 ,20]
+> Xterm (38)
+
+12 Battocletti et al. 13            
+
+> Figure 7. Simulation of the D-WMPC controller for a set of m= 10 robots. (a) The braid diagram corresponding to the input specification ω. (b) The target winding numbers wij(top plot) and the realized winding numbers ¯wijcorresponding to the trajectories of the robots (bottom plot). (c) The local (colored lines) and global (black dashed line) estimation of the progress variable τover time. (d) The trajectories of the 10 robots over time.
+
+For each of the simulated approaches we measure the following evaluation metrics: • The execution time T after which the specification has been fully executed, and the robots have reached their goal locations; • The computation time required to solve (30) (for the D-WMPC approach) and (39) (for the GBC approach), averaged over the m robots and over the T / ∆t
+
+simulation time steps. Additionally, the maximum computation time required to solve the MPC problem in a single time step is reported; • The length l of the trajectories traveled by the robots. We report the trajectories length averaged over the m
+
+robots, as well as the length of the shortest trajectory and that of the longest trajectory; • The mean control input u, averaged over the m robots and over the T / ∆t simulation time steps. We also report the cumulative sum of the absolute value of u
+
+over the T / ∆t time steps, which we denote by Σu.The results of the simulations are collected in Table 2. The table shows how the proposed D-WMPC approach outperforms the GBC baseline under most of the evaluation metrics, and achieves a comparable performance for the others. In particular, the D-WMPC achieves the execution of all the specifications significantly faster than the GBC baseline, requiring less than 1/3 of the time necessary for the GBC approach to lead the robots to their goals after executing the specification. The computation time of the two approaches is comparable, and both are able to consistently compute a solution to the MPC problem in less than 0.1s, which is generally suitable for real-time control. The length of the trajectories traveled by the robots under the D-WMPC approach are also significantly shorter than that of those generated by the GBC baseline, and require a lower control effort, both in terms of average and of total control effort over the simulation time T .Overall, this comparison shows the benefits of the proposed approach over existing ones, and the effectiveness of the D-WMPC approach in coordinating a synchronizing the robots toward the common goal of executing the target braid-based topological specification. 
+
+## 7 Real-world experiments 
+
+A set of real-world experiments has been performed on the DISCOWER ATMOS platform (Roque et al. 2026), which is a free-flyer platform developed at the KTH Space Robotics Laboratory simulating frictionless flight conditions, such as those encountered in space (see https://atmos.discower.io/). The experimental setup is shown in Figure 11. A video of the experiments is available at https://youtu.be/ 97aHa2v qw. 
+
+## 7.1 Experimental setup 
+
+The proposed approach has been tested on a set of 3 ATMOS robots. The robots operate in a 2D workspace having an approximate dimension of 4.1 × 3.0 m (Roque et al. 2026). For the real-world experiments, our controller is used as a high-level controller, which computes a set of trajectories corresponding to the optimizers x⋆i of (30) for all i ∈ M , which are then tracked by lower-level controllers. To this end, the controller is deployed as a node in ROS 2 Humble (Macenski et al. 2022). The main repository with the implementation of the controller can be found at https://github.com/gbattocletti/px4-braid-mpc. Due to practical constraints, all the local MPC controller are solved inside the same ROS 2 node, which runs on an offboard computer connected to the ATMOS robots via a wireless connection. The proposed distributed control architecture is retained by only using information local to each robot, or that communicated by the other robots, when solving (30). For feasibility, the collision avoidance constraints in (30) are softened by means of slack variables, as described in Appendix C. The reference trajectories computed by the proposed approach are tracked by a lower-level MPC controller based on the px4-mpc (https://github.com/DISCOWER/px4-mpc), which returns a control input vector that represents the desired force and torque to be applied to the center of mass of each robot (see (Roque et al. 2026) for more details). The px4-mpc controllers also run on the offboard computer. 13 14 Journal Title XX(X)  
+
+> Table 2. Comparison of the GBC and D-WMPC approaches in simulation.
+
+# m T [s] tsol ,avg [s] tsol ,max [s] lavg lmin lmax uavg Σu
+
+1 3 D-WMPC 32.50 0.0348 ±0.0060 0.0539 11.33 ±1.22 9.77 12.75 0.0007 ±0.0044 8.52 3 GBC 115.50 0.0268 ±0.0141 0.0785 32.18 ±6.99 23.10 40.13 0.0020 ±0.0071 24.18 
+
+2 5 D-WMPC 29.50 0.0354 ±0.0083 0.0583 7.94 ±2.71 4.40 12.69 0.0005 ±0.0035 9.96 5 GBC 94.75 0.0278 ±0.0152 0.0980 26.71 ±3.78 22.66 33.26 0.0017 ±0.0064 33.43 
+
+3 5 D-WMPC 44.75 0.0352 ±0.0089 0.0584 9.47 ±2.84 5.04 13.61 0.0006 ±0.0035 11.89 5 GBC 145.25 0.0223 ±0.0146 0.0983 27.64 ±3.87 23.10 34.21 0.0017 ±0.0064 34.59 
+
+4 10 D-WMPC 108.50 0.0341 ±0.0099 0.1007 15.36 ±4.65 7.87 22.14 0.0010 ±0.0042 38.47 10 GBC 314.00 0.0162 ±0.0108 0.0787 37.65 ±8.67 23.22 54.79 0.0024 ±0.0076 94.18 
+
+5 10 D-WMPC 84.25 0.0394 ±0.0115 0.0855 14.68 ±7.26 6.49 29.17 0.0009 ±0.0046 36.75 10 GBC 310.75 0.0158 ±0.0100 0.0670 37.84 ±11.88 15.75 58.96 0.0024 ±0.0079 94.64 
+
+6 10 D-WMPC 96.50 0.0353 ±0.0104 0.0863 12.40 ±6.27 2.09 25.84 0.0008 ±0.0041 31.04 10 GBC 313.25 0.0164 ±0.0109 0.0820 40.09 ±7.76 22.45 50.33 0.0025 ±0.0080 100.27  
+
+> Figure 8. Control architecture for the real-world experiments in the ATMOS platform. The red box represents the ROS 2 node with the proposed controller, the orange ones the ROS 2 nodes running the px4-mpc controllers, and the yellow ones the PX4 flight controllers running on board of the robots.
+
+Finally, the desired control inputs are received and executed by the PX4 flight controllers (Meier et al. 2015) running on board of the robots. The PX4 flight controllers, together with a motion-capture system, are also tasked with the estimation of the pose and velocities of the robots, which are then read by the ROS 2 nodes and provided as inputs to the MPC controllers, closing the control loop. The resulting control architecture is summarized in Figure 8. 
+
+## 7.2 Experiments with ATMOS free-flyer robots 
+
+We experimentally evaluate the proposed approach in an untethered scenario and in a tethered one, where each robot is connected by a tether to a fixed anchor point. 
+
+7.2.1 Experiment with untethered robots The first exper-iment is performed to compare the proposed approach with the GBC baseline controller. To this end, we task the robots with following the specification encoded by the braid 
+
+ω =  σ2σ−11
+
+4 σ−12 σ−11 , (40) which corresponds to the robots looping around each other in an ‘8’-shaped pattern. The robots start from initial positions x1 = [1 .0, 0.0] , x2 = [2 .0, 1.0] , x3 = [3 .0, −1.0] ,and must reach the locations xgoal ,1 = [2 .0, 0.0] , xgoal ,2 =[1 .0, −1.0] , xgoal ,3 = [3 .0, 1.0] . The resulting trajectories achieved by the D-WMPC and GBC controllers are shown in Figure 9. The length of the trajectories traversed by the robots are reported in Table 3, while the input force used to execute them are depicted in Figure 10. The figure highlights the generally lower control effort required by the D-WMPC approach, which reaches the saturation point the actuators,   
+
+> Figure 9. Experiment with the ATMOS robots. The robots are tasked with tracking the specification
+
+(40) . Both the sets of trajectories yield a topological braid corresponding to the specification.   
+
+> Figure 10. Input forces
+
+Fx and Fy , expressed in N, generated by the D-WMPC (left) and GBC (right) approaches to execute the trajectories of the experiment depicted in Figure 9. 
+
+which limits the control force to stay in the interval [−3, 3] N, much less often than the GBC controller.  
+
+> Table 3. Length of the trajectories of the ATMOS robots in the experiment depicted in Figure 9, expressed in meters.
+
+Robot 1 Robot 2 Robot 3 D-WMPC 10.59 9.44 9.66 
+
+GBC 13.24 13.48 15.01 
+
+14 Battocletti et al. 15        
+
+> (a)
+> (b)
+> (c) (d)
+> Figure 11. Experiment with tethered ATMOS robots. (a) A close-up of the initial knot between the tethers. (b) The robots in the initial configuration, with the tethers entangled by the knot. (c) The robots in their final configuration with the tethers free from entanglement. (d) The paths followed by the robots to disentangle the tethers, corresponding to the specification ω=σ2σ−11σ2σ−11.The top plot shows the trajectories under the D-WMPC controller, the bottom one those generated by the GBC controller.
+
+As can be seen from the figure and from the table, the proposed approach is able to execute the specification in only 55% of the time required by the GBC controller (85s for D-WMPC against the 140 s required by GBC). This is achieved thanks to the computation of more efficient trajectories, on average 40% shorter than the ones computed by the GBC approach, and thanks to the fact that the robots are not constrained to wait for others to finish executing a swap before being able to move. 
+
+7.2.2 Experiment with tethered robots The second experiment presented here considers a set of tethered mobile robots. Multi-robot tethered systems represent a prime application case where topological specifications can be used for coordination purposes, usually with the objective or reaching a set of goal locations while avoiding entanglement between the tethers (Cao et al. 2023, 2025). We demonstrate the capabilities of the proposed approach through a disentanglement experiment, where the robots must execute a specification designed to free a set of entangled tethers. For this purpose, we modify our problem setting to include the presence of the tethers. In particular, we take inspiration from the problem setting considered in (Cao et al. 2025), and we connect each robot to a tether, anchored in a fixed point lying on a plane at a different height with respect to that where the robot moves. We then entangle the tethers, achieving the knot shown in Figure 11a. The initial configuration of the robots with the entangled tethers is shown in Figure 11b, where the robots are located at x1 = [1 .0, 1.0] , x2 = [2 .0, 0.0] , x3 = [3 .0, −1.0] . We then use an adapted version of the algorithm of (Cao et al. 2025) to compute a disentanglement specification, i.e., one that leads the robots to an entanglement-free tethered configuration. The resulting braid specification is 
+
+ω = σ2σ−11 σ2σ−11 . (41) The robots track this specification through the D-WMPC controller, tracing the trajectories depicted in Figure 11d, and finally reaching the entanglement-free configuration shown in Figure 11c and their goal locations xgoal ,1 =[3 .0, −1.0] , xgoal ,2 = [1 .0, 1.0] , xgoal ,3 = [2 .0, 0.0] . Figure 11d also shows the trajectories generated by the GBC controller to follow the specification (41). The comparison of the trajectories in Figure 11d shows how the proposed approach computes more efficient trajectories, as confirmed by the shorter length of the trajectories computed by the D-WMPC approach (see Table 4) and by the lower control effort required for the execution of the trajectories (see Figure 12). Also in this case, the actuators require a generally lower control effort, never reaching the saturation point of the actuator, differently from the GBC controller, which often does so. Additionally, the trajectories computed by the D-WMPC approach generally keep the robots closer together; this is often desirable in tethered robot systems, as wider movements are more likely to result in the robots pulling each other’s tethers.          
+
+> Table 4. Length of the trajectories of the ATMOS robots in the experiment depicted in Figure 11, expressed in meters.
+> Robot 1 Robot 2 Robot 3 D-WMPC 3.46 4.80 4.51
+> GBC 4.51 6.30 6.49
+
+## 8 Conclusions 
+
+We have proposed a novel distributed MPC-based control approach for the distributed execution of multi-robot motion plans encoded as braid-based topological constraints. The controller is based on the computation of trajectories to track a set of pairwise winding numbers obtained from the given 15 16 Journal Title XX(X)   
+
+> Figure 12. Input forces
+
+Fx and Fy , expressed in N, generated by the D-WMPC (left) and GBC (right) approaches to execute the trajectories of the experiment depicted in Figure 11. 
+
+topological specification, and encoding the same interaction pattern thanks to their invariance for topological braids. As a coordination tool to maintain the synchronization of the robots toward the specification, the robots use a progress variable computed locally and agreed upon through distributed consensus. We have demonstrated the effectiveness of the proposed approach against existing methods in simulations and in real-world experiments. Future work will look at providing formal guarantees about the specification tracking, and at further improving the preprocessing routine to compute the target winding numbers, allowing the MPC planner expedite the execution of the specification. Furthermore, the scalability of the algorithm will be improved by removing the requirement for all-to-all communication, and using only information about neighboring robots during the online control phase. Additionally, the proposed approach will be extended to the 3D case, where the main challenge lies in the fact that a single topological braid is not able to fully describe the qualitative relation between the space-time trajectories of the robots, and additional topological tools are required. 
+
+Notes 
+
+1. Two braids β1, β2 are said to be conjugate if there exists a braid 
+
+ζ ∈ Bn such that β1 = ζβ 2ζ−1 (Thiffeault 2010, 2022). For more details on existing methods to evaluate if two braids are conjugate, and to compute a conjugacy braid ζ, see (Garside 1969; Thiffeault and Budiˇ si´ c 2013–2026). 2. Since the number of robots is finite, if Assumption 3 is not satisfied for a given plane Π, it is sufficient to perturb the orientation the plane to obtain a new one for which the assumption holds. 3. The 2-argument arctangent arctan 2( y, x ) is a function that, given two arguments x, y ∈ R, returns an angle θ in (−π, π ]
+
+such that x = r cos θ and y = r sin θ, with r = px2 + y2.Unlike the standard arctangent, it correctly determines the quadrant of the angle using the signs of both arguments. The 2-argument arctangent can be used to wrap an angle θ in the interval (−π, π ] via arctan2(sin θ, cosθ ), and to compute the smallest signed difference between two angles θ1, θ2 via 
+
+arctan2(sin( θ1 − θ2), cos( θ1 − θ2)) ∈ (−π, π ].
+
+Supplemental material 
+
+Supplemental material for this article is available online at https: //youtu.be/ 97aHa2v qw. 
+
+Acknowledgements 
+
+The authors wish to thank Prasetyo Sanjaya and Elias Krantz, from the Royal Institute of Technology, Stockholm, Sweden, for their support during the implementation of the real-world experiments in the ATMOS setup. 
+
+Funding 
+
+This publication has been supported by funding from the European Union’s Horizon Europe Programme under grant agreement No 101093822 (SeaClear 2.0). 
+
+Declaration of conflicting interests 
+
+The author(s) declared no potential conflicts of interest with respect to the research, authorship, and/or publication of this article. 
+
+References 
+
+Artin E (1947) Theory of braids. Annals of Mathematics 48(1): 101–126. Berger MA (2001) Topological invariants in braid theory. Letters in Mathematical Physics 55(3): 181–192. Bhattacharya S (2010) Search-based path planning with homotopy class constraints. Proceedings of the AAAI Conference on Artificial Intelligence 24(1): 1230–1237. Bhattacharya S and Ghrist R (2018) Path homotopy invariants and their application to optimal trajectory planning. Annals of Mathematics and Artificial Intelligence 84: 139–160. Bhattacharya S, Likhachev M and Kumar V (2012) Topological constraints in search-based robot path planning. Autonomous Robots 33(3): 273–290. Bhattacharya S, Pokorny FT and Choset H (2021) Guest editorial: Special issue on “Topological methods in robotics”. 
+
+Autonomous Robots 45(5): 611–612. Brito B, Floor B, Ferranti L and Alonso-Mora J (2019) Model predictive contouring control for collision avoidance in unstructured dynamic environments. IEEE Robotics and Automation Letters 4(4): 4459–4466. Cao M, Cao K, Xu X, Yuan S, Wong YL and Xie L (2025) Braid-based entanglement-free trajectory planning for multiple tethered robots. The International Journal of Robotics Research 0(0). Cao M, Cao K, Yuan S, Liu K, Wong YL and Xie L (2023) Path planning for multiple tethered robots using topological braids. In: Robotics: Science and Systems XIX , volume 19. pp. 1–10. Chen Y, Guo M and Li Z (2024) Deadlock resolution and recursive feasibility in MPC-based multirobot trajectory generation. 
+
+IEEE Transactions on Automatic Control 69(9): 6058–6073. Chen Y, Singletary A and Ames AD (2020) Guaranteed obstacle avoidance for multi-robot operations with limited actuation: A control barrier function approach. IEEE Control Systems Letters 5(1): 127–132. D’Antonio DS, Wu T, Bhattacharya S and Salda˜ na D (2026) From hitch to lift: Autonomous cable interlacing by multi-UAV teams for aerial grasping and transportation. IEEE Transactions on Robotics 42: 1769–1783. 
+
+16 Battocletti et al. 17 
+
+De Groot O, Ferranti L, Gavrila DM and Alonso-Mora J (2024) Topology-driven parallel trajectory optimization in dynamic environments. IEEE Transactions on Robotics 41: 110–126. Diaz-Mercado Y and Egerstedt M (2017) Multirobot mixing via braid groups. IEEE Transactions on Robotics 33(6): 1375– 1385. Diaz-Mercado Y, Jones A, Belta C and Egerstedt M (2015) Correct-by-construction control synthesis for multi-robot mixing. In: 
+
+2015 54th IEEE Conference on Decision and Control (CDC) .pp. 221–226. Dong H, Guo M, He C and Li Z (2025) Homotopy-aware multi-agent navigation via distributed model predictive control. In: 
+
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . pp. 6448–6455. Epstein DB (1992) Word processing in groups . AK Peters/CRC Press. Garside FA (1969) The braid group and other groups. The Quarterly Journal of Mathematics 20(1): 235–254. Grigoriev D and Slissenko A (1998) Polytime algorithm for the shortest path in a homotopy class amidst semi-algebraic obstacles in the plane. In: Proceedings of the 1998 International Symposium on Symbolic and Algebraic Computation . pp. 17–24. He W, Huang Y, Wang J and Zeng S (2022) Homotopy method for optimal motion planning with homotopy class constraints. 
+
+IEEE Control Systems Letters 7: 1045–1050. Imran MIIS, Peters L, Khayyat M, Arrigoni S, Braghin F and Ferranti L (2026) Homotopy-guided potential games for congestion-aware navigation. IEEE Robotics and Automation Letters 11(5): 5962–5969. Kassel C and Turaev V (2008) Braid groups . Springer Science & Business Media. Kim S, Bhattacharya S and Kumar V (2014) Path planning for a tethered mobile robot. In: 2014 IEEE International Conference on Robotics and Automation (ICRA) . pp. 1132–1139. Lee J (2010) Introduction to Topological Manifolds . Springer. Liu H, Chen L, Qiao Y, Lv C and Li H (2024) Reasoning multi-agent behavioral topology for interactive autonomous driving. Advances in Neural Information Processing Systems 
+
+37: 92605–92637. Lyu Y, Hu J, Chen BM, Zhao C and Pan Q (2019) Multivehicle flocking with collision avoidance via distributed model predictive control. IEEE Transactions on Cybernetics 51(5): 2651–2662. Ma C, Zhao Y, Gan Z, Gao B and Ding W (2025) Topology-driven trajectory optimization for modelling controllable interactions within multi-vehicle scenario. In: 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . pp. 10220–10227. Macenski S, Foote T, Gerkey B, Lalancette C and Woodall W (2022) Robot Operating System 2: Design, architecture, and uses in the wild. Science Robotics 7(66): eabm6074. Martinez-Baselga D, de Groot O, Knoedler L, Riazuelo L, Alonso-Mora J and Montano L (2026) SHINE: Social homology identification for navigation in crowded environments. The International Journal of Robotics Research 45(1): 60–79. Mavrogiannis C, Balasubramanian K, Poddar S, Gandra A and Srinivasa SS (2022) Winding through: Crowd navigation via topological invariance. IEEE Robotics and Automation Letters 
+
+8(1): 121–128. Mavrogiannis C, Blukis V and Knepper RA (2017) Socially competent navigation planning by deep learning of multi-agent path topologies. In: 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . pp. 6817–6824. Mavrogiannis C, DeCastro JA and Srinivasa S (2023) Implicit multiagent coordination at uncontrolled intersections via topological braids. In: Algorithmic Foundations of Robotics XV . pp. 368–384. Mavrogiannis C, DeCastro JA and Srinivasa SS (2024) Abstracting road traffic via topological braids: Applications to traffic flow analysis and distributed control. The International Journal of Robotics Research 43(9): 1299–1321. Mavrogiannis C and Knepper RA (2019) Multi-agent path topology in support of socially competent navigation planning. The International Journal of Robotics Research 38(2-3): 338–356. Mavrogiannis C and Knepper RA (2020) Decentralized multi-agent navigation planning with braids. In: Algorithmic Foundations of Robotics XII: Proceedings of the Twelfth Workshop on the Algorithmic Foundations of Robotics . pp. 880–895. Mavrogiannis C and Knepper RA (2021) Hamiltonian coordination primitives for decentralized multiagent navigation. The International Journal of Robotics Research 40(10-11): 1234– 1254. Mavrogiannis CI and Knepper RA (2018) Multi-agent trajectory prediction and generation with topological invariants enforced by hamiltonian dynamics. In: International Workshop on the Algorithmic Foundations of Robotics . pp. 744–761. McBeth C, Motes J, Uwacu D, Morales M and Amato NM (2023) Scalable multi-robot motion planning for congested environments with topological guidance. IEEE Robotics and Automation Letters 8(11): 6867–6874. Meier L, Honegger D and Pollefeys M (2015) PX4: a node-based multithreaded open source robotics framework for deeply embedded platforms. In: 2015 IEEE International Conference on Robotics and Automation (ICRA) . pp. 6235–6240. Nakao T, Kasaura K and Kozuno T (2025) Symmetry-breaking in multi-agent navigation: Winding number-aware MPC with a learned topological strategy. arXiv preprint arXiv:2511.15239 .Narayanan V, Vernaza P, Likhachev M and LaValle SM (2013) Planning under topological constraints using beam-graphs. In: 2013 IEEE International Conference on Robotics and Automation . pp. 431–437. Park J, Karumanchi S and Iagnemma K (2015) Homotopy-based divide-and-conquer strategy for optimal trajectory planning via mixed-integer programming. IEEE Transactions on Robotics 
+
+31(5): 1101–1115. Park J, Kim D, Kim GC, Oh D and Kim HJ (2022) Online distributed trajectory planning for quadrotor swarm with feasibility guarantee using linear safe corridor. IEEE Robotics and Automation Letters 7(2): 4869–4876. Paterson M and Razborov AA (1991) The set of minimal braids is co-NP-complete. Journal of Algorithms 12(3): 393–408. Pokorny FT, Hawasly M and Ramamoorthy S (2016) Topological trajectory classification with filtrations of simplicial complexes and persistent homology. The International Journal of Robotics Research 35(1-3): 204–223. Roque P, Phodapol S, Krantz E, Lim J, Verhagen J, Jiang FJ, D¨ orner D, Mao H, Tibert G, Siegwart R, Stenius I, Tumova J, Fuglesang C and Dimarogonas DV (2026) Toward open-source 
+
+17 18 Journal Title XX(X) 
+
+and modular space systems with ATMOS. IEEE Transactions on Field Robotics 3: 141–161. Sahin A and Bhattacharya S (2024) Topo-geometrically distinct path computation using neighborhood-augmented graph, and its application to path planning for a tethered robot in 3D. IEEE Transactions on Robotics 41: 20–41. Tanner MM, Burdick JW and Nesnas IAD (2013) Online motion planning for tethered robots in extreme terrain. In: 2013 IEEE International Conference on Robotics and Automation .pp. 5557–5564. Teshnizi RH and Shell DA (2021) Motion planning for a pair of tethered robots. Autonomous Robots 45(5): 693–707. Thiffeault JL (2010) Braids of entangled particle trajectories. 
+
+Chaos: An Interdisciplinary Journal of Nonlinear Science 
+
+20(1). Thiffeault JL (2022) Braids and Dynamics . Springer. Thiffeault JL and Budiˇ si´ c M (2013–2026) Braidlab: A soft-ware package for braids and loops. arXiv preprint arXiv:2511.15239 . Version 3.2.6. Wang X, Sahin A and Bhattacharya S (2023) Coordination-free multi-robot path planning for congestion reduction using topological reasoning. Journal of Intelligent & Robotic Systems 
+
+108(3): 50. Wiltz A, Chen F and Dimarogonas DV (2025) Parallelized robust distributed model predictive control in the presence of coupled state constraints. Automatica 171: 111952. Wong RCY, Sewlia M, Wiltz A and Dimarogonas DV (2025) Generating and optimizing topologically distinct guesses for mobile manipulator path planning with path constraints. IEEE Robotics and Automation Letters 10(12): 12453–12460. Wu W, Bhattacharya S and Prorok A (2020) Multi-robot path deconfliction through prioritization by path prospects. In: 2020 IEEE International Conference on Robotics and Automation (ICRA) . pp. 9809–9815. Yang T, Huang L, Wang Y and Xiong R (2022) Efficient search of the k shortest non-homotopic paths by eliminating non-k-optimal topologies. arXiv preprint arXiv:2207.13604 .Yershov DS, Vernaza P and LaValle SM (2013) Continuous planning with winding constraints using optimal heuristic-driven front propagation. In: 2013 IEEE International Conference on Robotics and Automation . pp. 5551–5556. Zhang X and Pham QC (2019) Planning coordinated motions for tethered planar mobile robots. Robotics and Autonomous Systems 118: 189–203. Zhou D, Wang Z, Bandyopadhyay S and Schwager M (2017) Fast, on-line collision avoidance for dynamic vehicles using buffered Voronoi cells. IEEE Robotics and Automation Letters 2(2): 1047–1054. 
+
+## A Bound on winding numbers 
+
+We prove here the linear bound (11) between the change in wi,j and the change in τ . Given τ1, τ 2 ∈ [0 , 1] , τ 1 < τ 2,we aim to find a bound on |wi,j (τ2) − wi,j (τ1)|. Let b1 =
+
+⌈Bτ 1⌉ and b2 = ⌊Bτ 2⌋, so that b1/B, (b1 + 1) /B, . . . , b 2/B 
+
+are the breakpoints in [τ1, τ 2], with τ1 ≤ b1/B < (b1 +1) /B < · · · < (b2 − 1) /B < b 2/B ≤ τ2. Splitting the inter-val [τ1, τ 2] at these breakpoints and applying the triangle   
+
+> Figure 13. Maximum change in the relative heading between two robots over a time step. Two robots
+
+i, j are displayed, each moving of the maximum distance they can cover in one time step, i.e., vmax ∆t.
+
+inequality, we have 
+
+wi,j (τ2) − wi,j (τ1)
+
+≤ wi,j (τ2) − wi,j 
+
+ b2
+
+B
+
+
+
++
+
+> b2−1
+
+X
+
+> b=b1
+
+wi,j 
+
+ b + 1 
+
+B
+
+
+
+− wi,j 
+
+ bB
+
+
+
++ wi,j 
+
+ b1
+
+B
+
+
+
+− wi,j (τ1)
+
+≤ B
+
+2
+
+
+
+τ2 − b2
+
+B
+
+
+
++ b2 − b1
+
+2 + B
+
+2
+
+ b1
+
+B − τ1
+
+
+
+≤ B
+
+2 (τ2 − τ1).
+
+(42) In the second inequality, each term of the sum is at most 
+
+1/2, since by (10) the winding numbers change by at most 
+
+1/2 between consecutive breakpoints. The first term and the last term involve partial segments, on which wi,j is linear by (10). The change over a partial segment is the maximum change over the full segment (i.e., 1/2) scaled by the fraction of the segment covered, i.e., B(τ2 − b2/B )
+
+and B(b1/B − τ1), respectively. The final equality follows since (b2 − b1)/2 = B/ 2 · (b2 − b1)/B and the lengths of the pieces add up to τ2 − τ1. If no breakpoint lies in [τ1, τ 2],the same scaling argument of the partial segments gives 
+
+|wi,j (τ2) − wi,j (τ1)| ≤ B 
+
+> 2
+
+(τ2 − τ1) directly. 
+
+## B Maximum angle change over a time step 
+
+The value of ∆τmax can be derived considering the maximum change in the relative angle between two robots over one time step. An example is shown in Figure 13. As shown in the image, each robot i, j can travel, in a single time step, a maximum distance equal to vmax ∆t. Since we consider discrete time steps, during which the robots move in a straight line, and we require the robots to always be at a distance larger than or equal to dmin , the initial and final positions of the robots must be at a distance of at least d′
+
+> min
+
+,which is found as (Chen et al. 2024) 
+
+d′ 
+
+> min
+
+=
+
+q
+
+d2min + ( vmax ∆t)2. (43) Then, the relative motion of the robots gives raise to a change in the relative heading between them corresponding to the 18 Battocletti et al. 19 
+
+geometric relation 
+
+d′
+
+> min
+
+2 sin 
+
+ δ(θi,j (k + 1) , θ i,j (k)) 2
+
+
+
+= vmax ∆t
+
+2 , (44) shown in the example of Figure 13. Equation (44) can be rearranged to obtain 
+
+δ(θi,j (k + 1) , θ i,j (k)) = 2 arcsin 
+
+ vmax ∆td′
+
+> min
+
+
+
+(45) We know from (20) that δ(θi,j (k + 1) , θ i,j (k)) corresponds to the maximum change of wi,j in a single time step: 
+
+∆wi,j = 12π δ θi,j (k + 1) , θ i,j (k)
+
+= 1
+
+π arcsin 
+
+ vmax ∆td′
+
+> min
+
+ (46) Under the assumption of linear interpolation of the winding numbers introduced in Section 3, the change in wi,j 
+
+is related to the change in τ through (11). By combining (11) with (46), the relation (25) follows. 
+
+## C Updates to the MPC controllers in real-world experiments 
+
+Given the multiple sources of uncertainty intrinsic in real-world experiments, such as mismatch between the real dynamic of the robot and the prediction model of the MPC controller, actuation noise, and measurement noise, feasibility of the local MPC problem is not guaranteed due to the presence of hard constraints in (30). For this reason, in our experiments, we soften the collision avoidance constraints via slack variables. The constraint (30i) is then replaced with 
+
+a⊤ 
+
+> i,j
+
+(h|k)xi(h|k) + si,j (h|k) ≥ bi,j (h|k) (47) where ai,j (h|k) and bi,j (h|k) are defined as in (37), while 
+
+si,j is a slack variable local to robot i. In order to ensure slack variables are non-negative, the constraint 
+
+si,j (h|k) ≥ 0, ∀h ∈ { 0, . . . , K } (48) is added to (30). Additionally, slack variables are penalized in the cost function through the term 
+
+Js,i (k) = ξs
+
+X
+
+> j∈M\{ i}
+> K
+
+X
+
+> h=0
+
+s2 
+
+> i,j
+
+(h|k) (49) which is added to (30a), with ξs > 0 a large weight. Since, in general, the use of softened constraint could lead to collisions between robots, during the experiments the safety distance 
+
+dmin in (37b) is slightly inflated with respect to the one in the nominal case. In the experiments, this approach results in the computation of collision-free trajectories by the MPC controller. 19
