@@ -1,0 +1,1087 @@
+2DGS-Planner: Rasterization-based Path Planning
+in 2D Gaussian Splatting Map
+Jiwon Park1, Dong-Uk Seo2 and Hyun Myung2∗
+Abstract— Gaussian splatting provides an explicit and effi-
+ciently rasterizable scene representation for robot navigation.
+However, individual Gaussian primitives may not reliably
+represent obstacles as they are jointly optimized through alpha-
+composited rendering from a finite set of reconstruction views.
+We propose 2DGS-Planner, a path planner for ground robots
+that reads planning-relevant geometry from a 2D Gaussian
+splatting (2DGS) map through rasterization, rather than treat-
+ing individual Gaussian primitives as obstacles. During offline
+roadmap construction, multi-view attribution converts rendered
+normal dispersion into structural scores for non-ground disks
+supported by the reconstruction views. These scores guide
+adaptive node sampling on the ground. Path-aligned ortho-
+graphic queries validate candidate edges, while cylindrical
+queries estimate local clearance fields that are cached on the
+edges. During online planning, graph search initializes a route,
+and path refinement reuses the cached fields while accounting
+for the robot’s dimensions and ground constraints. Experiments
+demonstrate improved roadmap connectivity, more accurate
+clearance estimation, and higher planning success compared
+with the tested baselines. These results support rasterization as
+an effective geometric query interface for planning directly on
+Gaussian maps. Code and data are available at https://2dgs-
+planner.github.io/.
+I. INTRODUCTION
+Autonomous navigation requires spatial reasoning about
+the environment to find safe and efficient paths. This rea-
+soning is closely tied to how the environment is represented,
+since planners interact with a map through the spatial queries
+it can support efficiently. Occupancy grids enable graph-
+based search through discrete occupancy lookups [1], while
+signed distance fields provide differentiable distance queries
+for gradient-based trajectory optimization [2], [3]. Point-
+based geometric maps can be queried directly for collision
+checking in sampling-based planning [4].
+Recently, learned scene representations have been ex-
+plored as environment maps for navigation [5]–[10]. Neural
+Radiance Field (NeRF)-based approaches obtain collision
+evidence directly from the learned density [5]. Other meth-
+ods rely on rendered outputs for localization, image-goal
+navigation, and traversability-aware planning [6], [7]. Both
+approaches rely on evaluating an implicit field, which can be
+computationally expensive for real-time planning.
+Gaussian splatting (GS) [11] provides an explicit alterna-
+tive, encoding scenes with Gaussian primitives and render-
+ing images from arbitrary viewpoints through differentiable
+rasterization. Existing GS-based planners generally treat the
+primitives directly as obstacles or convert the map into
+an intermediate geometric representation [8]–[10]. However,
+∗Corresponding author: Hyun Myung.
+Adaptive roadmap
+local clearance
+Rendered depth
+Rendered normal
+2DGS map
+From Rasterization to Path Planning
+Fig. 1. 2DGS-Planner uses rasterization to read surface structure and local
+clearance directly from a 2D Gaussian splatting (2DGS) map. Multi-view
+normal dispersion guides structure-aware roadmap construction, while path-
+aligned rasterization queries validate candidate motions and provide local
+clearance for path refinement. The resulting roadmap and refined path are
+shown in the reconstructed scene.
+visually plausible renderings do not guarantee that the under-
+lying primitives align with the composited surface (Fig. 2).
+Individual primitives may therefore fail to reliably represent
+scene geometry.
+Two properties of GS training motivate rasterization-based
+geometric queries. First, the primitives are jointly optimized
+through their contributions to alpha-composited renderings,
+so the training objective constrains the composited geometry
+rather than any individual primitive. This motivates querying
+the composited geometry instead of treating primitives as
+independent obstacles. Second, this supervision comes from
+only a finite set of posed training views. Geometry outside
+their observation support is therefore less constrained by
+the training data. A planner should consider not only the
+rendered surface geometry but also how well that surface
+was observed during training.
+We therefore propose 2DGS-Planner (Fig. 1), a ground-
+robot path planner that treats rasterization as the geometric
+query interface to a GS map. We build on 2D Gaussian
+splatting (2DGS) [12], whose training aligns each disk with
+the local surface through a normal consistency term, so that
+surface normals become a rendered channel alongside depth
+and alpha. The framework constructs a roadmap directly
+from rasterized geometric queries without converting the
+scene into an intermediate geometric representation. During
+offline roadmap construction, multi-view attribution derives
+arXiv:2610.11752v1  [cs.RO]  8 Oct 2026
+
+
+structural scores from rendered normal dispersion. Scores
+from non-ground disks supported by the reconstruction views
+guide adaptive node sampling on the ground, placing more
+nodes near corners and cluttered areas and fewer in open
+regions. Path-aligned orthographic queries validate candi-
+date connections, while cylindrical queries estimate local
+clearance fields that are cached on retained edges. During
+online planning, graph search finds an initial path, which is
+then refined using the cached fields while accounting for the
+robot’s dimensions and ground constraints.
+The main contributions are as follows:
+• We propose 2DGS-Planner, a ground-robot path planner
+that queries 2DGS maps through rasterization without
+an intermediate geometric representation.
+• We introduce multi-view attribution that converts ren-
+dered normal dispersion into structural scores for adap-
+tive roadmap sampling.
+• We formulate path-aligned orthographic and cylindri-
+cal queries for edge validation and local clearance
+estimation, with the clearance fields cached for path
+refinement.
+• We evaluate the proposed framework from geometric
+reasoning to complete planning, including structural
+attribution, clearance estimation, end-to-end path plan-
+ning, and real-world robot experiments.
+II. RELATED WORK
+A. Rasterization-based Geometry in Gaussian Splatting
+3D Gaussian splatting (3DGS) [11] represents a scene
+with volumetric Gaussian primitives, while 2DGS [12] re-
+places them with planar Gaussian disks to impose a surface-
+oriented geometric representation. During rasterization, the
+2DGS renderer computes ray–disk intersections and alpha-
+composites the intersected disks along each ray, yielding
+geometric quantities such as depth and surface normals
+in 3D. Recent methods have increasingly exploited such
+rasterized quantities as geometric signals. PGSR [13] renders
+plane distances and normals for surface reconstruction, while
+RaDe-GS [14] derives depth and surface normals directly
+from rasterized 3D Gaussians. 3DGUT [15] further extends
+Gaussian rasterization beyond standard pinhole projection
+to support secondary rays. These methods use rasterization
+primarily for rendering or reconstruction, while we use it
+as a geometric query interface for path planning on a fixed
+2DGS map.
+B. Planning on Gaussian Splatting
+GS-based motion planning and control differ in how they
+obtain collision information. Splat-Nav [8] constructs safe
+corridors from Gaussian ellipsoids, while SAFER-Splat [16]
+formulates control barrier functions over the primitives.
+SPLANNING [17] derives collision-probability bounds from
+a normalized Gaussian field, and FOCI [18] optimizes tra-
+jectories using overlap between Gaussian representations of
+the robot and the scene, including trajectories for a legged
+ground robot.
+(a)
+(b)
+(c)
+Fig. 2. Geometric discrepancy between individual 2DGS primitives and
+the alpha-composited surface. (a) RGB rendering. (b) Underlying Gaussian
+disks visualized at their 1σ extent. (c) Disks with large depth discrepancies
+from the rendered surface, highlighted in red. Visually consistent rendering
+can therefore coexist with inaccurate primitive-level geometry.
+Other approaches use auxiliary geometric representations.
+Splatblox [9] supports wheeled and legged outdoor naviga-
+tion through a traversability-aware Euclidean signed distance
+field (ESDF), while LiftNav [19] uses a joint TSDF–GS map
+for semantic navigation and trajectory optimization. Splat-
+lessDF [20] couples 2DGS with a separately parameterized
+continuous distance field that supplies distance and gradient
+queries for planning.
+Rendering has also been used directly for collision avoid-
+ance. ReMoSPLAT [21] renders depth from virtual cameras
+attached to a mobile manipulator and uses the resulting
+distances for reactive control. Whereas ReMoSPLAT targets
+reactive collision avoidance, we use rasterization for ground-
+robot path planning on a fixed 2DGS map, with queries
+organized around candidate ground motions to evaluate and
+retain clearance for subsequent refinement.
+III. PRELIMINARIES
+A 2DGS map consists of N oriented planar Gaussian disks
+G = {Gi}N
+i=1 reconstructed from K posed images. Their
+camera poses form the reconstruction views V = {Tk}K
+k=1.
+Each disk Gi has a center µi ∈R3, orthonormal tangent
+axes tu
+i , tv
+i , positive scales su
+i , sv
+i , and opacity αi ∈[0, 1].
+Its unit normal is ni = tu
+i × tv
+i .
+A rasterization query consists of rays indexed by a query
+sample p, with origin o(p) ∈R3 and unit direction r(p) ∈
+S2. Closed-form ray–disk intersections [12] are evaluated in
+world space to obtain the Gaussian response Gi(p) ∈[0, 1]
+and the hit distance di(p) from the ray origin to the plane
+of each intersected disk.
+Front-to-back alpha composition determines the contribu-
+tion wi(p) of disk Gi to sample p and the accumulated
+opacity A(p):
+wi(p) = αiGi(p)
+Y
+j≺pi
+(1 −αjGj(p)) ,
+A(p) =
+X
+i
+wi(p) ∈[0, 1],
+(1)
+where j ≺p i indicates that the ray intersects disk Gj
+before disk Gi. For A(p) > 0, the normalized contribution
+is ˆwi(p) = wi(p)/A(p).
+For a reconstruction view Tk, superscript k denotes view-
+specific rendered quantities, such as wk
+i (p) and Ak(p);
+quantities without the superscript refer to the current query.
+A ray is considered observed when A(p) ≥τA, with τA =
+0.5. For observed rays, the rendered median depth dmed(p)
+is defined as the first hit distance at which the accumulated
+
+
+: start
+: goal
+Pass
+ground
+building
+vegetation
+grav.
+Disk normal
+Rendered normal
+2DGS map 
+Reconstruction views
+Roadmap construction
+Online planning
+(a) Preprocessing
+(b) Multi-view attribution
+Semantic segmentation
+Adaptive sampling
+Cylindrical query
+Orthographic query
+Gravity alignment
+Cross-view aggregation
+(c) Structural score
+(d) Node placement
+(f) Edge caching
+(e) Edge screening 
+low
+high
+Reject
+Roadmap + cached LCC fields
+viewpoint
+grav.
+Roadmap search
+Path and body poses
+initial route
+refined B-spline
+obstacle
+cached LCC field
+Clearance-aware refinement
+ni −¯n k(p)
+2
+¯n k(p)
+ni
+Σi
+: node
+: edge
+2DGS rendering ray
+Fig. 3. Overview of 2DGS-Planner. Roadmap construction (top): Given a 2DGS map and its reconstruction views, (a) semantic preprocessing identifies
+supporting ground and aligns the map with gravity. (b)–(c) Multi-view attribution aggregates contribution-weighted per-pixel normal dispersion across
+reconstruction views to obtain structural scores Σi for observation-supported non-ground disks. (d) The scores guide adaptive node placement. (e)
+Orthographic queries screen candidate edges, and (f) cylindrical queries estimate surrounding clearance and cache the resulting fields on retained edges.
+Online planning (bottom): Roadmap search using A∗initializes a route, which is refined as a B-spline using surface samples back-projected from
+the cached clearance fields while accounting for robot dimensions and ground constraints. The final panel shows the refined path and its corresponding
+gravity-aligned body poses, with headings following the path tangents.
+opacity reaches 0.5. Because low accumulated opacity may
+result from either empty space or insufficient observation,
+unobserved rays are treated as lacking geometric evidence
+rather than as free space.
+IV. 2DGS-PLANNER
+A. Problem Formulation and Overview
+We plan for a ground robot on a static 2DGS map G
+with reconstruction views V. The robot body is modeled as
+a gravity-aligned ellipsoid with semi-axes (a, b, c), whose
+center is maintained at a prescribed height h above the
+supporting ground. Given start and goal locations on the
+observed ground, we seek a connecting path that maintains
+body clearance and ground support.
+Fig. 3 summarizes the overall pipeline. The offline stage
+constructs a roadmap H = (N, E) over candidate robot
+positions. Multi-view attribution determines the sampling
+density from rendered structural cues, while path-aligned
+queries validate candidate edges and cache local clearance
+on retained edges. During online planning, A∗initializes a
+graph route, which is subsequently refined using the cached
+clearance under body-clearance and ground constraints.
+B. Map Preprocessing
+Map preprocessing assigns semantic labels to the Gaussian
+disks and aligns the reconstruction with gravity. Semantic
+predictions from the reconstruction views are transferred to
+the disks to identify ground regions. Ground-labeled disks
+satisfying the orientation and height criteria form Ggrd ⊂G,
+which defines the support surface for roadmap sampling and
+path refinement. All subsequent planning is performed in the
+gravity-aligned frame.
+C. Multi-View Attribution
+Multi-view attribution estimates local structural complex-
+ity from the variation of rendered normals and uses it to
+guide roadmap sampling.
+a) Per-pixel normal dispersion: For a pixel p in re-
+construction view Tk with Ak(p) > 0, we compute the
+contribution-weighted mean normal as follows:
+¯n k(p) =
+X
+i
+ˆwk
+i (p)ni.
+(2)
+Because ∥ni∥= 1, the corresponding dispersion is
+V k(p) =
+X
+i
+ˆwk
+i (p)
+ni −¯n k(p)
+2
+= 1 −
+¯n k(p)
+2 .
+(3)
+The mean normal is not renormalized, so its magnitude re-
+flects agreement among the contributing normals. Dispersion
+therefore rises where multiple surface orientations contribute
+to a single pixel, as occurs near corners, thin structures, and
+cluttered regions.
+b) Per-disk attribution: We aggregate the rendered dis-
+persion across reconstruction views using each disk’s alpha-
+compositing contribution as follows [22]:
+νi =
+P
+k,p wk
+i (p)V k(p)
+P
+k,p wk
+i (p)
+.
+(4)
+Observations in which a disk contributes more strongly
+therefore have greater influence on its attributed dispersion.
+
+
+c) Structural score: We convert νi into a normalized
+structural score Σi ∈[0, 1] using its empirical percentile
+among eligible non-ground disks. Eligibility requires suffi-
+cient total rendering contribution and support from a mini-
+mum number of reconstruction views, with thresholds given
+in Sec. V.C. For each eligible disk, Σi is the fraction of
+eligible disks with attributed dispersion no greater than νi,
+and ineligible disks are assigned Σi = 0. Ground disks are
+excluded from the ranking to prevent their numerous low-
+dispersion values from biasing non-ground scores upward.
+The resulting scores guide the sampling density of nearby
+ground candidates.
+D. Roadmap Construction
+We construct a roadmap by sampling robot positions
+on the supporting ground and connecting them through
+collision-free edges.
+a) Nodes:
+Candidate
+positions
+are
+sampled
+from
+ground-disk centers and lifted to the prescribed ride height.
+Each candidate q is assigned a local complexity score
+u(q) =
+1
+Knb
+X
+j∈I(q)
+
+1 −∥q −µj∥
+R
+
++
+Σj,
+(5)
+where I(q) contains the Knb nearest non-ground disks, R
+is the neighborhood radius, and [x]+ = max(x, 0). The
+fixed denominator Knb keeps the score low for candidates
+with few contributing neighbors. The percentile rank of u(q)
+determines the target node spacing between ℓmax and ℓmin,
+assigning denser sampling to structurally complex regions,
+while candidates with no non-ground disk within R use ℓmax.
+Adaptive Poisson-disk thinning then produces the final node
+set (Fig. 4).
+b) Edges: A Gabriel graph [23] proposes candidate
+connections between sampled nodes. Each candidate edge
+is first screened by an orthographic query, after which a
+cylindrical query estimates local clearance for the remaining
+edges. Only edges satisfying both criteria are retained in E
+together with their cached clearance fields for online path
+refinement.
+E. Path-Aligned Motion Queries
+Both queries use a frame aligned with the candidate edge,
+with the orthographic query screening motion along the edge
+and the cylindrical query recording surrounding clearance for
+path refinement.
+a) Edge-aligned frame: An edge e connects nodes at
+x1, x2 ∈R3, with length L = ∥x2 −x1∥and unit direction
+te = (x2 −x1)/L. With ˆz denoting the world up axis, the
+transverse axes are
+b1 =
+ˆz × te
+∥ˆz × te∥,
+b2 = te × b1,
+which span the cross-sectional plane shared by both queries.
+(b)
+(d)
+(c)
+(a)
+Fig. 4. Structure-aware roadmap sampling. (a) RGB rendering. (b) Structural
+score produced by multi-view attribution. (c) Uniform sampling with its
+resulting roadmap. (d) Adaptive sampling using the structural scores, which
+concentrates nodes near locally complex structures while reducing sampling
+in open regions under the same node budget.
+b) Orthographic footprint validation: We sample (u, v)
+on a regular grid in the b1–b2 plane and retain samples
+satisfying (u/(b + δ))2 + (v/(c + δ))2 ≤1, where δ is
+the safety margin. Each sample casts a parallel ray from
+o(u, v) = x1 + ub1 + vb2 along te. The edge is rejected
+if any sampled ray observes a surface before reaching the
+endpoint, that is, A(u, v) ≥τA and dmed(u, v) < L. This
+test screens translation between the two nodes but covers
+neither the longitudinal overhang a beyond either endpoint
+nor in-place rotations at a node.
+c) Local cylindrical clearance: For edges passing the
+orthographic screen, the cylindrical query records surround-
+ing geometry in a local cylindrical coordinate (LCC) system
+(Fig. 5), parameterized by axial position s ∈[0, L] and
+azimuth θ ∈(−π, π] measured from b1 toward b2. At
+regularly sampled pairs (s, θ), the radial rays are
+o(s, θ) = x1 + ste,
+r(s, θ) = cos θ b1 + sin θ b2.
+(6)
+The clearance field ρe(s, θ) = dmed(s, θ) is defined only
+for observed rays with A(s, θ) ≥τA. A slice at fixed s is
+rejected if none of its rays is observed or if its minimum
+observed clearance falls below the lateral half-width b, and
+the candidate edge is rejected if any sampled slice fails.
+Each retained edge stores ρe for clearance queries during
+path refinement.
+F. Path Optimization
+a) Initial path: The start and goal are connected to
+nearby roadmap nodes using the same path-aligned queries,
+and A∗provides a graph route for B-spline initialization. The
+endpoints remain fixed during refinement.
+b) Corridor-constrained refinement: Each cached local
+cylindrical coordinate (LCC) field is back-projected into
+local surface samples and reused throughout refinement
+without additional rendering. For each spline sample qn,
+clearance c(qn) is evaluated as the distance to the nearest
+surface sample associated with the corresponding route edge.
+Unlike ρe(s, θ), which is measured radially from the original
+edge axis, c(qn) is evaluated at the current refined path
+
+
+(a)
+(b)
+unroll into 
+LCC fields
+= radial distance to surface
+x1
+x2
+te
+b1
+b2
+ρe(s, θ)
+ρe(s, θ)
+s ∈[0, L]
+sampled clearance
+Fig. 5. Local cylindrical clearance (LCC) representation. (a) For an edge
+e = (x1, x2), radial rasterization queries are cast from axial position s
+in the edge-aligned frame {te, b1, b2}. The resulting distance ρe(s, θ)
+measures radial clearance to the observed surface at azimuth θ. (b) Unrolling
+the measurements over (s, θ) forms the LCC field, which is cached on the
+edge and reused during path refinement. Colors encode radial clearance.
+position. To account for the additional space required by
+an elongated body during turning, the required clearance
+increases with the local path curvature κn as
+rn = min
+
+b + 1
+2a2κn, max(a, b)
+
+.
+(7)
+The spline control points are then updated iteratively by
+minimizing
+E = wlen
+X
+n
+∥qn+1 −qn∥2
++ wclr
+X
+n
+[rn + δ −c(qn)]2
++ ,
+(8)
+where wlen and wclr weight path regularization against the
+clearance penalty, with control-point heights constrained to
+the prescribed ride height above the estimated local ground.
+The robot heading follows the path tangent. The refined
+path is finally revalidated using the orthographic query, and
+failed spans fall back to the corresponding validated graph
+segments.
+V. EXPERIMENTS
+The experiments evaluate 2DGS-Planner at three levels:
+roadmap construction, geometric query fidelity, and end-
+to-end planning. Sec. V.D evaluates whether multi-view at-
+tribution captures local structural complexity and improves
+adaptive roadmap sampling. Sec. V.E evaluates the fidelity of
+cached LCC clearance fields against a voxelized representa-
+tion of the same rendered surfaces. Sec. V.F evaluates the re-
+sulting end-to-end planning performance, including ablations
+of adaptive sampling and LCC-based refinement. Sec. V.G
+further illustrates how robot dimensions affect roadmap
+connectivity and the resulting path through robot-specific or-
+thographic footprint queries. Finally, Sec. V.H demonstrates
+the planner on a physical humanoid robot.
+A. Evaluation Environments
+Quantitative evaluation is performed on two 2DGS scenes
+reconstructed from posed RGB images. Stonehenge
+provides
+an
+exact
+synthetic
+reference
+mesh,
+whereas
+Tokyo [24] provides an aligned proxy mesh for a partially
+observed real-world reconstruction. Together, they enable
+evaluation under both exact and imperfect reference geome-
+try and are used for the experiments in Secs. V.D–V.F.
+All
+r
+2r
+3r
+5r
+0.4
+0.6
+0.8
+1
+ROC-AUC
+disks sampler input u(q)
+0
+0.25
+0.5
+0.75
+Spearman ρs
+Stonehenge
+All Bldg. r
+2r
+3r
+5r
+0.6
+0.65
+0.7
+0.75
+disks
+sampler input u(q)
+0.1
+0.2
+0.3
+0.4
+0.5
+Tokyo
+Rendered
+16 nearest
+Voxel v=r/5
+Voxel v=r/2
+Voxel v=r
+Fig. 6. Correlation and discrimination performance of structural scores
+with respect to reference-mesh normal dispersion on Stonehenge (exact
+mesh, left) and Tokyo (proxy mesh, right). The top and bottom rows
+report Spearman correlation ρs and ROC-AUC, respectively. Disk-level
+results compare rendered attribution with geometric neighborhood scores,
+while sampler-input results evaluate the aggregated node score u(q) over
+reference radii r–5r. For Tokyo, “Bldg.” denotes the building subset.
+Dotted horizontal lines indicate chance-level ROC-AUC.
+B. Baselines
+We compare against sampling-based planners and an
+ESDF-based planner, all operating on the same 2DGS recon-
+struction. Disk probabilistic roadmap (PRM) [25], RRT∗[4],
+and Informed RRT∗[26] treat each Gaussian disk as an
+obstacle truncated at its 1σ elliptical extent and evaluate
+collisions using exact point-to-ellipse distances [27]. For
+Disk PRM, we evaluate uniformly sampled roadmaps with
+node budgets of 1k, 10k, and 60k to examine how increased
+sampling affects roadmap construction cost and planning
+performance. The ground-constrained ESDF baseline fuses
+depth panoramas rendered from the reconstruction views
+into an occupancy grid, performs A∗search on the resulting
+distance field, and applies B-spline refinement. This base-
+line evaluates planning through an intermediate volumetric
+representation.
+We evaluate uniform and adaptive roadmap sampling, each
+with and without LCC-based refinement.
+C. Implementation Details
+The robot is modeled as a sphere throughout the exper-
+iments, with radius r = 0.05 in scene units for the non-
+metric Stonehenge map and r = 0.50m for the metric
+Tokyo map. The anisotropic robot-body model of Sec. IV.A
+is used only in the robot-size-aware planning experiment.
+The roadmap uses node spacing ℓ∈[0.10, 0.25] in the
+corresponding map units and a 64×128 cylindrical clearance
+field per edge. For structural attribution, disks are retained
+with support τS = 10−3 from at least Kmin = 3 views. Path
+refinement uses a B-spline with 12 control points, maintains
+the prescribed ride height, and revalidates the resulting
+path using the orthographic query of Sec. IV.E. Semantic
+labels are obtained with SegFormer-B5 [28] pretrained on
+ADE20K [29] and grouped into task-relevant categories. All
+
+
+experiments are conducted on an NVIDIA RTX 4090, an
+Intel Core i9-10900K, and 94GB of RAM.
+D. Structure-Aware Roadmap Construction
+We evaluate whether rendered attribution captures local
+scene structure well enough to serve as a sampling prior.
+Fig. 6 compares rendered attribution (Sec. IV.C) with disk-
+neighborhood scores on Stonehenge and Tokyo, taking
+normal dispersion on the reference mesh as the measure of
+local structural complexity. Spearman correlation ρs mea-
+sures whether more complex regions receive higher scores,
+and ROC-AUC measures how well the scores separate the
+top 25% from the bottom 50% of reference dispersion.
+At the disk level, the two scenes rank differently.
+On Stonehenge, the finest voxel score correlates most
+strongly with the exact mesh, indicating that individual disk
+geometry represents local surface structure well in a synthetic
+scene. On Tokyo, rendered attribution instead achieves the
+highest ρs and ROC-AUC for both the full obstacle set and
+the building subset, since deriving structure from surfaces
+supported by visible disk contributions across views depends
+less on noisy local geometry. The geometric scores also lose
+consistency with the reference as the neighborhood scale
+grows, revealing their sensitivity to the chosen spatial scale.
+For node placement, the relevant quantity is the aggre-
+gated score u(q) rather than individual disk accuracy. With
+R = 3r, rendered attribution achieves the highest ρs and
+ROC-AUC at Rref = r and 2r on both scenes, despite
+its lower disk-level ranking on Stonehenge, so stronger
+primitive-level agreement does not necessarily yield a better
+sampling prior. The ranking again becomes less consistent
+at larger scales, supporting rendered attribution as a local,
+robot-scale structural signal. Whether this signal improves
+planning is evaluated directly in Sec. V.F, where uniform and
+attribution-guided sampling are compared under a matched
+node budget.
+E. Clearance Query Fidelity
+We compare cached LCC fields with ESDFs constructed
+from identical rendered 2DGS surface samples to iso-
+late the effect of the clearance representation. The ex-
+act Stonehenge mesh provides reference clearance, and
+the evaluation focuses on configurations near the collision
+boundary, where clearance estimation errors are most rele-
+vant to planning decisions.
+Fig. 7 shows that LCC yields lower clearance error and
+fewer false-blocked configurations than the tested ESDFs,
+better preserving free space supported by the reference
+geometry. The higher false-blocked rates of the ESDFs are
+consistent with volumetric occupancy fusion reducing the
+represented free space, whereas LCC retains clearance in
+path-aligned fields without additional volumetric discretiza-
+tion.
+These results indicate that LCC more faithfully preserves
+the rendered surface information relevant to local feasibility
+decisions. False-safe cases remain, however, so the estimated
+clearance does not provide a collision-free guarantee. LCC
+0.2
+2
+20
+Error
+(cm)
+LCC
+ESDF 1 cm
+ESDF 2 cm
+ESDF 5 cm
+ESDF 10 cm
+0
+100
+Rate
+(%)
+1
+1000
+Memory
+(MiB)
+0.01
+1
+Build
+(s)
+Median–P95
+Mean
+Voxel
+FS
+FB
+Fig. 7. Clearance fidelity and representation cost on Stonehenge. LCC
+fields and ESDFs are constructed from the same rendered 2DGS surface
+samples and evaluated on 5,716 near-boundary queries satisfying |cGT −
+r| < 5 cm along 30 paths. Clearance error is summarized by the mean
+(diamond) and median–95th percentile interval (bar); the remaining panels
+report false-safe (FS) and false-blocked (FB) rates, memory usage, and
+construction time. Error, memory, and time are shown on logarithmic scales.
+TABLE I. Reference-geometry evaluation on 50 start–goal pairs per
+scene. Collision pass reports paths satisfying the reference check
+at tolerance ε, while SPL evaluates successes at ε = εref using
+min(1, Lref/L), where Lref and L are the reference and returned
+path lengths. We use εref = 0.005 for Stonehenge and 0.10 m
+for Tokyo.
+Stonehenge
+Tokyo
+Method
+ε=εref ↑
+ε=0 ↑
+SPL↑
+ε=εref ↑
+ε=0 ↑
+SPL↑
+Disk PRM (1k)
+21/50
+15/50
+0.335
+6/50
+6/50
+0.091
+Disk PRM (10k)
+43/50
+29/50
+0.746
+10/50
+10/50
+0.176
+Disk PRM (60k)
+45/50
+27/50
+0.810
+10/50
+9/50
+0.168
+RRT∗
+35/50
+24/50
+0.663
+10/50
+8/50
+0.180
+Informed RRT∗
+33/50
+24/50
+0.650
+13/50
+10/50
+0.248
+ESDF (ground-constr.)
+38/50
+26/50
+0.751
+12/50
+8/50
+0.218
+Ours (uniform)
+38/50
+26/50
+0.752
+38/50
+30/50
+0.694
++ refinement
+40/50
+31/50
+0.781
+39/50
+33/50
+0.717
+Ours (adaptive)
+46/50
+31/50
+0.917
+40/50
+32/50
+0.765
++ refinement
+48/50
+34/50
+0.956
+40/50
+34/50
+0.782
+Best
+Second best
+construction is also faster than that of the finer ESDF grids.
+F. End-to-End Planning
+We evaluate end-to-end planning on 50 start–goal pairs per
+scene in Stonehenge and Tokyo. For each start–goal pair,
+we construct an evaluation-only reference path using scene-
+specific reference geometry independently of the planner.
+The reference paths are used only for evaluation. Table I
+reports reference collision-pass counts and success weighted
+by path length (SPL) [30], while Fig. 8 shows representative
+paths.
+a) Planning performance: 2DGS-Planner achieves the
+highest SPL on both scenes. On Stonehenge, its collision-
+pass counts are comparable to those of the largest Disk PRM
+roadmap, while SPL is higher. On Tokyo, it improves both
+collision-pass counts and SPL over the primitive-based and
+ground-constrained ESDF baselines.
+b) Node budget and construction cost: Fig. 9 compares
+uniform Disk PRM across different node budgets. Larger
+roadmaps consistently increase construction cost, while the
+gains in SPL diminish on Stonehenge and saturate on
+Tokyo. The strict collision-pass rate likewise does not
+improve consistently with additional nodes. The full planner
+achieves higher SPL with lower construction time than the
+
+
+Stonehenge
+Tokyo
+start point
+end point
+3D viewpoint
+GT
+Ours
+Disk PRM
+RRT*
+Informed-RRT*
+ESDF
+Seq.04
+Seq.03
+Seq.01
+Seq.02
+Seq.04
+Seq.03
+Seq.02
+Seq.01
+Fig. 8. Qualitative planning results on Stonehenge (top) and Tokyo (bottom) for four representative start–goal pairs from Table I. Each panel overlays
+the evaluation reference path in yellow with the paths returned by the compared planners; missing trajectories indicate planning failures. Circles and stars
+denote the start and goal, respectively. For both scenes, the camera symbol indicates the secondary viewpoint shown in the inset. Across these examples,
+2DGS-Planner more consistently returns feasible paths, and its trajectories tend to follow the reference path more closely than those of the compared
+methods.
+Ours
+1k
+10k
+60k
+100
+101
+102
+103
+Build [s] (log)
+Stonehenge
+Tokyo
+Ours
+1k
+10k
+60k
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+SPL
+Fig. 9. Effect of roadmap node budget on construction cost and planning
+performance. Roadmap build time (left) and SPL (right) are shown for
+uniform Disk PRM with 1k, 10k, and 60k nodes and for 2DGS-Planner.
+Stonehenge and Tokyo are indicated by solid and hatched bars, re-
+spectively. Increasing the uniform sampling budget substantially increases
+construction time while providing diminishing or saturated SPL gains.
+largest Disk PRM roadmap on both scenes, showing that
+simply increasing the uniform sampling budget does not
+close the performance gap within the tested range.
+c) Effect of LCC-based refinement: Ours (no refine-
+ment) uses the same roadmap and edge validation as the
+full method but omits path refinement. Refinement improves
+SPL on both scenes, while increasing collision-pass counts
+on Stonehenge and maintaining comparable counts on
+Tokyo. This indicates that the cached LCC fields can im-
+prove the graph route through refinement without modifying
+the underlying roadmap.
+d) Online planning latency: Fig. 10 reports the mean
+per-request latency, including failed queries, separately from
+offline construction. Path refinement increases online com-
+putation, but the full planner remains faster than RRT∗on
+both scenes. On Tokyo, its latency is higher than Disk PRM
+and ESDF, reflecting the additional computation required
+for refinement alongside the improved SPL and reference
+collision-pass performance.
+G. Robot-Size-Aware Planning
+Fig. 11 shows the effect of robot size on planning. A
+robot with a lateral half-width of 0.3 is routed through the
+wider passage, while reducing the half-width to 0.1 allows
+the planner to use the narrower passage and obtain a shorter
+path. In both cases, the refined path is revalidated with the
+corresponding robot-specific orthographic footprint query.
+10−2
+10−1
+100
+101
+102
+Online [s/req.] (log)
+Ours
+Ours (w/o LCC)
+ESDF
+Disk PRM
+RRT*
+0.357
+0.052
+0.265
+0.445
+8.45
+Stonehenge
+10−2
+10−1
+100
+101
+102
+Online [s/req.] (log)
+1.11
+0.31
+0.077
+0.476
+2.4
+Tokyo
+Fig. 10. Per-request online planning latency for Stonehenge and Tokyo,
+averaged over 50 requests including failures and reported separately from
+offline roadmap construction. LCC-based path refinement increases online
+computation, while the full 2DGS-Planner remains faster than RRT∗on
+both scenes. Colors follow the method palette.
+(b)
+(a)
+0.1
+0.6
+0.6
+0.3
+Fig. 11. Robot-size-aware planning through footprint-specific edge valida-
+tion. (a) Initial graph route (red), refined path (green), and robot body with
+lateral half-width b = 0.3 m; the narrower passage is infeasible, leading to
+the wider route. (b) With b = 0.1 m, the narrower passage becomes feasible
+and yields a shorter path. Candidate edges and the refined path are validated
+using the corresponding orthographic robot footprint.
+H. Real-World Humanoid Deployment
+We demonstrate 2DGS-Planner on a humanoid robot
+in a real-world environment (Fig. 12). The reconstructed
+2DGS map is registered with the LiDAR map from FAST-
+LIO2 [31], allowing the planned path to be transferred to
+the robot. The robot tracks the path using a pure-pursuit
+controller, demonstrating successful physical execution.
+VI. CONCLUSION
+We proposed 2DGS-Planner, a path planning framework
+that directly queries planning-relevant geometry from 2DGS
+
+
+(a)
+(b)
+Fig. 12. Real-world deployment of 2DGS-Planner on a humanoid robot.
+(a) Initial graph route (red), refined path (green), and corresponding robot
+body poses in the reconstructed 2DGS map. (b) Autonomous execution of
+the refined path in the corresponding real-world environment.
+maps through rasterization. Experiments on public and self-
+collected scenes demonstrated the effectiveness of the pro-
+posed approach for clearance estimation and end-to-end path
+planning, with improved performance over the evaluated
+baselines. These results suggest that rasterization provides a
+practical interface for planning directly on Gaussian scene
+representations. The current formulation approximates the
+robot body with an ellipsoid, which limits the representation
+of detailed and articulated robot geometry, and does not
+explicitly account for robot dynamics. Future work will
+consider more detailed robot-body models and incorporate
+kinematic and dynamic feasibility into the planning process.
+REFERENCES
+[1] A. Elfes, “Using occupancy grids for mobile robot perception and
+navigation,” Computer, vol. 22, no. 6, pp. 46–57, 1989.
+[2] N. Ratliff, M. Zucker, J. A. Bagnell, and S. Srinivasa, “CHOMP:
+Gradient optimization techniques for efficient motion planning,” in
+Proc. IEEE Int. Conf. Robot. Autom., 2009, pp. 489–494.
+[3] H. Oleynikova, Z. Taylor, M. Fehr, R. Siegwart, and J. Nieto,
+“Voxblox: Incremental 3D Euclidean signed distance fields for on-
+board MAV planning,” in Proc. IEEE/RSJ Int. Conf. Intell. Robot.
+Syst., 2017, pp. 1366–1373.
+[4] S. Karaman and E. Frazzoli, “Sampling-based algorithms for optimal
+motion planning,” Int. J. Robot. Res., vol. 30, no. 7, pp. 846–894,
+2011.
+[5] M. Adamkiewicz, T. Chen, A. Caccavale, R. Gardner, P. Culbertson,
+J. Bohg, and M. Schwager, “Vision-only robot navigation in a neural
+radiance world,” IEEE Robot. Automat. Lett., vol. 7, no. 2, pp. 4606–
+4613, 2022.
+[6] O. Kwon, J. Park, and S. Oh, “Renderable neural radiance map for
+visual navigation,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Recognit., 2023, pp. 9099–9108.
+[7] A. Dai, S. Gupta, and G. Gao, “Neural radiance maps for extraterres-
+trial navigation and path planning,” arXiv preprint arXiv:2603.17236,
+2026.
+[8] T. Chen, O. Shorinwa, J. Bruno, A. Swann, J. Yu, W. Zeng, K. Nagami,
+P. Dames, and M. Schwager, “Splat-Nav: Safe real-time robot navi-
+gation in Gaussian splatting maps,” IEEE Trans. Robot., vol. 41, pp.
+2765–2784, 2025.
+[9] S. Chopra, J. Liang, G. Seneviratne, Y. Lee, J. Choi, J. An, S. Cheng,
+and D. Manocha, “Splatblox: Traversability-aware Gaussian splatting
+for outdoor robot navigation,” arXiv preprint arXiv:2511.18525, 2025.
+[10] R. Jin, Y. Gao, Y. Wang, Y. Wu, H. Lu, C. Xu, and F. Gao, “GS-
+Planner: A Gaussian-splatting-based planning framework for active
+high-fidelity reconstruction,” in Proc. IEEE/RSJ Int. Conf. Intell.
+Robot. Syst., 2024, pp. 11 202–11 209.
+[11] B. Kerbl, G. Kopanas, T. Leimkühler, and G. Drettakis, “3D Gaussian
+splatting for real-time radiance field rendering,” ACM Trans. Graph.,
+vol. 42, no. 4, pp. 1–14, 2023.
+[12] B. Huang, Z. Yu, A. Chen, A. Geiger, and S. Gao, “2D Gaussian
+splatting for geometrically accurate radiance fields,” in Proc. ACM
+SIGGRAPH, 2024, pp. 1–11.
+[13] D. Chen, H. Li, W. Ye, Y. Wang, W. Xie, S. Zhai, N. Wang, H. Liu,
+H. Bao, and G. Zhang, “PGSR: Planar-based Gaussian splatting for
+efficient and high-fidelity surface reconstruction,” IEEE Trans. Vis.
+Comput. Graph., vol. 31, no. 9, pp. 6100–6111, 2025.
+[14] B. Zhang, C. Fang, R. Shrestha, Y. Liang, X. Long, and P. Tan, “RaDe-
+GS: Rasterizing depth in Gaussian splatting,” ACM Trans. Graph.,
+vol. 45, no. 2, pp. 1–14, 2026.
+[15] Q. Wu, J. Martinez Esturo, A. Mirzaei, N. Moenne-Loccoz, and
+Z. Gojcic, “3DGUT: Enabling distorted cameras and secondary rays
+in Gaussian splatting,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Recognit., 2025, pp. 26 036–26 046.
+[16] T. Chen, A. Swann, J. Yu, O. Shorinwa, R. Murai, M. Kennedy III,
+and M. Schwager, “SAFER-Splat: A control barrier function for
+safe navigation with online Gaussian splatting maps,” arXiv preprint
+arXiv:2409.09868, 2024.
+[17] J. Michaux, S. Isaacson, C. E. Adu, A. Li, R. K. Swayampakula,
+P. Ewen, S. Rice, K. A. Skinner, and R. Vasudevan, “Let’s make a
+Splan: Risk-aware trajectory optimization in a normalized Gaussian
+splat,” IEEE Trans. Robot., vol. 41, pp. 4380–4397, 2025.
+[18] M. Gomez Andreu, M. Wilder-Smith, V. Klemm, V. Patil, J. Torde-
+sillas, and M. Hutter, “FOCI: Trajectory optimization on Gaussian
+splats,” in Proc. IEEE/RSJ Int. Conf. Intell. Robot. Syst., 2025, pp.
+1884–1891.
+[19] H. Schieber, D. Frischmann, V. Schaack, A. P. Schoellig, and D. Roth,
+“LiftNav: Path planning via semantic lifting in TSDF-guided Gaussian
+splatting,” arXiv preprint arXiv:2605.31376, 2026.
+[20] M. M. Uttsha, L. Wu, and T. Vidal-Calleja, “SplatlessDF: Continuous
+distance field mapping with non-splatting Gaussians,” arXiv preprint
+arXiv:2606.13990, 2026.
+[21] N. Marticorena, T. Fischer, and N. Suenderhauf, “ReMoSPLAT: Reac-
+tive mobile manipulation control on a Gaussian splat,” arXiv preprint
+arXiv:2512.09656, 2025.
+[22] S. Rota Bulò, L. Porzi, and P. Kontschieder, “Revising densification
+in Gaussian splatting,” in Proc. Eur. Conf. Comput. Vis., 2024.
+[23] K. R. Gabriel and R. R. Sokal, “A new statistical approach to
+geographic variation analysis,” Systematic Zoology, vol. 18, no. 3, pp.
+259–278, 1969.
+[24] Niantic
+Spatial,
+Inc.,
+“Niantic
+spatial
+real2sim
+sample
+usdz
+scenes,”
+https://huggingface.co/datasets/NianticSpatial/
+real2sim-sample-usdz-scenes, 2026, hugging Face dataset, accessed
+September 2, 2026.
+[25] L. E. Kavraki, P. Švestka, J.-C. Latombe, and M. H. Overmars, “Prob-
+abilistic roadmaps for path planning in high-dimensional configuration
+spaces,” IEEE Trans. Robot. Autom., vol. 12, no. 4, pp. 566–580, 1996.
+[26] J. D. Gammell, S. S. Srinivasa, and T. D. Barfoot, “Informed RRT*:
+Optimal sampling-based path planning focused via direct sampling
+of an admissible ellipsoidal heuristic,” in Proc. IEEE/RSJ Int. Conf.
+Intell. Robot. Syst., 2014, pp. 2997–3004.
+[27] D. Eberly, “Distance from a point to an ellipse, an ellipsoid, or
+a hyperellipsoid,” Geometric Tools, Tech. Rep., 2020. [Online].
+Available: https://hal.science/hal-04946422
+[28] E. Xie, W. Wang, Z. Yu, A. Anandkumar, J. M. Alvarez, and P. Luo,
+“SegFormer: Simple and efficient design for semantic segmentation
+with transformers,” in Adv. Neural Inf. Process. Syst., vol. 34, 2021.
+[29] B. Zhou, H. Zhao, X. Puig, S. Fidler, A. Barriuso, and A. Torralba,
+“Scene parsing through ADE20K dataset,” in Proc. IEEE/CVF Conf.
+Comput. Vis. Pattern Recognit., 2017, pp. 633–641.
+[30] P. Anderson, A. Chang, D. S. Chaplot, A. Dosovitskiy, S. Gupta,
+V. Koltun, J. Kosecka, J. Malik, R. Mottaghi, M. Savva, et al.,
+“On evaluation of embodied navigation agents,” arXiv preprint
+arXiv:1807.06757, 2018.
+[31] W. Xu, Y. Cai, D. He, J. Lin, and F. Zhang, “FAST-LIO2: Fast direct
+LiDAR-inertial odometry,” IEEE Trans. Robot., vol. 38, no. 4, pp.
+2053–2073, 2022.

@@ -1,0 +1,2314 @@
+LACE–CRAFT: Robot Co-Design with Actor Inheritance and
+Blackboard Collaboration
+Yuhan Wen1,2
+Jiawei Wang1,3
+Qixuan Zhang1,2
+Yusen Qin4
+Lan Xu1,2,∗
+1Deemos Corporation
+2ShanghaiTech University
+3University of Cambridge
+4D-Robotics
+Fig. 1. LACE–CRAFT combines policy reuse with body–reward co-design. CRAFT reviews and pairs body and reward proposals using shared
+experiment records. Both LACE branches independently start from the same round-start state. Continuation restores the full training state, while
+adaptation inherits policy weights and input normalization and initializes other states anew. With equal additional environment-step budgets, both
+branches produce candidates scored by a fixed task metric and compared against the retained incumbent’s stored score. The winner initializes the
+next round, and recorded results update the blackboard. Solid arrows carry states and candidates. Dashed arrows carry proposals, reviews and
+evidence. The bridge indicates no connection. Outside the iterative loop, the final design is fabricated as a real robot.
+Abstract— Robot co-design couples morphology search with
+policy learning, yet training every new design from scratch dis-
+cards acquired control experience. We present LACE–CRAFT,
+which compares continued learning on the current robot with
+policy adaptation to new morphology–reward pairs. LACE
+resumes the incumbent’s full learning state and initializes com-
+patible challengers with its actor parameters and observation
+statistics. A fixed task metric selects among both branches
+and the frozen incumbent. CRAFT coordinates Feedback,
+Morphology, Reward, and Integration roles through shared
+experimental records and behavioral replays to generate and
+cross-review paired proposals. A generative extension converts
+generated meshes into editable articulated models with con-
+figured joints, actuator interfaces, and consistently updated
+simulation assets. Across five locomotion benchmarks, mean
+scores over three evaluation seeds are 6.4–91.9% higher than
+D2C. Both methods train 30 new morphology–reward pairs over
+five rounds; LACE additionally uses four continuation training
+units. Five-task ablations examine policy inheritance and replay-
+derived feedback. A fabricated prototype demonstrates indoor
+walking and illustrates the geometry-to-hardware workflow.
+I. Introduction
+Robot morphology determines the dynamics a controller
+must exploit, while the training reward shapes the behavior
+it learns. Co-design therefore couples body design, reward
+*Corresponding author: Lan Xu
+(xulan1@shanghaitech.edu.cn).
+design, and policy optimization [1], [2]. Large language
+models (LLMs) provide flexible operators for this search:
+Eureka generates executable rewards from training feed-
+back [3], and Debate2Create (D2C) uses multi-agent debate
+to refine morphology–reward pairs before simulation-based
+evaluation [4].
+The search must also decide how to use the control
+experience acquired during candidate evaluation. In our D2C
+reproduction, design records guide subsequent proposals,
+while each new policy is trained from scratch. Prior co-
+design methods already reuse experience or transfer con-
+troller parameters across morphologies [1], [5]. We focus
+on how to select between further training the current design
+and adapting its policy to a new body and reward. A
+learned policy can provide a useful initialization after a
+design change, whereas value estimates and stored transitions
+depend on the dynamics and reward under which they were
+obtained.
+LACE–CRAFT addresses this decision through two com-
+peting training branches (Fig. 1). LACE initializes new
+designs with the incumbent’s actor parameters and obser-
+vation statistics, while resetting other learner components.
+A continuation branch resumes the incumbent’s complete
+learning state on its unchanged morphology and reward. A
+fixed external task metric compares both branches with the
+arXiv:2610.09283v1  [cs.RO]  7 Oct 2026
+
+
+frozen incumbent, allowing search to select either further
+learning on the current design or adaptation to a new design.
+CRAFT uses the resulting experimental evidence to guide
+subsequent proposals. Its shared blackboard links tested
+morphology–reward pairs to checkpoints, scores, and be-
+havioral replays. Feedback proposes diagnoses and improve-
+ments; Morphology and Reward independently draft and then
+cross-review changes; Integration constructs complete paired
+candidates. New evaluations update the blackboard for the
+next round, preserving the association between each result
+and the robot that produced it.
+We further extend the morphology representation from pa-
+rameterized benchmark bodies to generated meshes. Follow-
+ing the geometry-to-hardware approach of Text2Robot [6],
+we process generated shapes into editable links, configured
+joints, and actuator interfaces. Geometry edits update the
+articulated model and its simulation assets while preserving
+LACE’s policy interface. Alongside the five-task benchmark
+study, we document this processing workflow and a fabri-
+cated walking prototype. Our contributions are:
+• Continuation-aware co-design. LACE compares full-
+state continuation of the incumbent with actor-initialized
+morphology–reward challengers under a fixed task metric,
+while retaining the incumbent as a selection option.
+• Evidence-informed proposal generation. CRAFT coor-
+dinates four specialist roles through shared experiment
+records, diagnostic feedback, reciprocal morphology–
+reward review, and integration.
+• A generative morphology extension. Editable links,
+configured joints, and actuator interfaces connect gener-
+ated geometry to the co-design representation; processing
+records and a walking prototype illustrate its use.
+II. Related Work
+a) Morphology–control co-design:
+Evolutionary co-
+design
+spans
+simulated
+creatures
+[7]
+and
+fabricated
+robots [8]. Later approaches optimize body parameters or
+design distributions alongside controllers [1], [9], [10]. Robo-
+Grammar constrains structural search [11], while Trans-
+form2Act combines design and control [12]. DERL couples
+evolution with lifetime learning [13]. Morphological innova-
+tion protection allows controllers to adapt before new bodies
+face selection [14], highlighting the interaction between
+design changes and learning progress.
+b) Controller transfer:
+Hardware conditioning [15],
+graph policies [16], and shared actuator modules [17] support
+cross-morphology control. Amorpheus examines morpholog-
+ical graph biases [18], whereas MetaMorph and ModuMorph
+use Transformer-based conditioning [19], [20]. N-LIMB
+jointly learns designs and a universal controller [21]. Neural
+Graph Evolution inherits parental policies [5], and controller
+archives retrieve policies for related body plans [22]. LACE
+compares compatible actor transfer with continued learning
+of the retained robot.
+c) Language-guided design: Language models provide
+proxy reward signals [23], synthesize dense reward pro-
+grams [24], and translate instructions into control objec-
+tives [25]. Code as Policies instead generates executable pol-
+icy programs [26]. Eureka iteratively refines rewards using
+training feedback [3]. RoboMorph explores morphology [27],
+while RoboMoRe and D2C jointly propose morphology–
+reward changes [2], [4].
+d) Agent collaboration: ReAct interleaves reasoning
+and actions [28]. Reflexion retains verbal feedback [29],
+and Self-Refine revises outputs through self-critique [30].
+AutoGen supports configurable conversations [31], MetaGPT
+structures role-specific artifacts [32], and CAMEL organizes
+role-conditioned cooperation [33]. Multiagent debate enables
+reciprocal critique [34]. CRAFT combines role specialization
+with a blackboard-style shared record [35], grounding pro-
+posals in experimental evidence.
+e) Generated geometry and deployment: CLAY gener-
+ates static 3D assets [36], BANG decomposes parts [37],
+and Text2Robot connects generated geometry to fabrica-
+tion [6]. RoboGen generates simulation tasks and training
+supervision [38]. Our extension exposes generated bodies as
+editable articulated morphologies. GPU simulation [39] and
+parallel locomotion training [40] accelerate policy optimiza-
+tion. Actuator modeling and robust training support physical
+quadruped deployment [41], [42], while DrEureka automates
+reward and domain-randomization proposals [43].
+III. LACE–CRAFT Method
+A. Problem Formulation
+Let M, Z, and R denote the morphology, training-state,
+and training-reward spaces. The training state z contains the
+policy and the learner variables needed to resume PPO [44]
+or SAC [45], as listed in Table I. We distinguish the robot-
+and-learning state x from the search state y, which also
+retains its training reward:
+x = (m, z),
+y = (x, r),
+(m, z, r) ∈M × Z × R.
+(1)
+A reward r and transition budget B ∈N+ specify the
+learning update Ur
+B. On morphology m, it performs rein-
+forcement learning for B environment transitions, summed
+across parallel environments:
+z+ = Ur
+B(m; z).
+(2)
+The updated state is x+ = (m, z+). The projection Π ex-
+tracts the executable observation-to-action policy, including
+its input normalization. Deployment uses (m, Π(z)); auxil-
+iary training variables remain in z for subsequent learning.
+For task τ, let gτ(st+1) be the fixed evaluation signal after
+action at and Tτ the evaluation horizon. Following external
+task-fitness evaluation in reward design and co-design [3],
+[4], we define
+Sτ(m, π) = Eρ∼p(·|m,π)
+"Tτ −1
+X
+t=0
+gτ(st+1)
+#
+.
+(3)
+Here ρ is a rollout drawn from the trajectory distribution
+p(· | m, π) under morphology m and policy π; st and at
+are its state and action at timestep t. Contributions after
+
+
+termination are zero. The signal gτ and horizon Tτ are fixed
+across candidates, independently of their training rewards.
+Following the D2C benchmark, we accumulate distance
+from the origin over each episode using the root-position
+coordinates exposed by each task environment. This metric
+differs from path length and training return. Selection uses
+the finite-evaluation estimate
+bSτ(m, π) =
+1
+Neval
+Neval
+X
+ℓ=1
+Tτ −1
+X
+t=0
+gτ(s(ℓ)
+t+1),
+(4)
+where Neval is the number of evaluation episodes and ℓ
+indexes an episode.
+Let Xτ ⊆M × Z contain the admissible morphology–
+state pairs with a compatible policy interface. The co-design
+objective is
+max
+(m,z)∈Xτ Sτ
+ m, Π(z)
+
+.
+(5)
+The reward r guides the finite-budget learning update,
+while Sτ
+evaluates the resulting robot. LACE–CRAFT
+searches through agent-proposed morphology–reward pairs
+and RL updates, retaining the complete state needed to
+continue the selected candidate.
+B. LACE: Learning-State-Aware Continuation Evolution
+After initialization of y0, LACE runs for at most K
+iterations, indexed by k = 0, . . . , K −1. Each iteration
+trains one continuation candidate and Nch design challengers.
+Subscripts identify the current state’s components in (1);
+superscripts cont and ch identify the two branches. Thus
+K counts post-initialization iterations, not the initialization
+round.
+a) Transfer boundary: Within each task, morphology
+edits preserve kinematic connectivity, actuated-joint order-
+ing, and the dimensions and meanings of observations and
+actions. Direct actor inheritance also requires the same
+policy-network architecture; matching vector dimensions
+alone does not establish compatibility. Geometry and training
+rewards may change within this interface. Topology changes
+and changes to observation or action semantics require a
+different transfer mechanism. Full-state continuation retains
+the morphology, reward, and learner configuration.
+TABLE I
+Training-state handling before each branch learns. Copied Actor
+parameters and observation statistics continue to update.
+Component
+Continuation
+Challenger
+Morphology and reward
+Unchanged
+New proposal
+Actor parameters
+Restore
+Copy
+Observation statistics
+Restore
+Copy
+Value / critic networks
+Restore
+Initialize anew
+Optimizer states
+Restore
+Initialize anew
+SAC targets and temperature
+Restore
+Initialize anew
+SAC replay buffer
+Restore
+Empty
+Environment / random generators
+Restore
+Initialize anew
+Training counters
+Continue
+Reset
+b) Continuation Candidate: The continuation candidate
+resumes zk on the current morphology mk and reward rk for
+another B environment transitions:
+zcont
+k
+= Urk
+B (mk; zk),
+(6)
+ycont
+k
+= ((mk, zcont
+k
+), rk).
+(7)
+c) Design Challengers: CRAFT generates the ordered
+sequence of morphology–reward pairs
+Qk =
+ (mk,j, rk,j)
+Nch
+j=1,
+(8)
+Here mk,j and rk,j specify challenger j, and Qk is indexed
+in candidate order. Each challenger inherits the incumbent’s
+actor and observation statistics within the transfer boundary
+above.
+Let θ(z) denote the actor parameters. The operator
+Init(zk) creates a template ezk with θ(ezk) = θ(zk) and copied
+observation statistics. Both branches start from the incumbent
+state at the beginning of the iteration; challenger initialization
+does not use the continuation result. The copied normalizer
+preserves the input scaling expected by the inherited policy.
+Other learner components are initialized anew (Table I), so
+value estimation and data collection adapt to the proposed
+dynamics and reward. Each challenger receives an indepen-
+dent copy of the template, and both its actor and normalizer
+continue to learn.
+Starting from ezk, the j-th design challenger performs
+reinforcement learning for B environment transitions under
+morphology mk,j and reward rk,j, yielding
+zch
+k,j = Urk,j
+B
+(mk,j; ezk) ,
+(9)
+ych
+k,j = ((mk,j, zch
+k,j), rk,j).
+(10)
+d) Unified Evaluation and State Update: Let Ck denote
+the comparison set of search states at iteration k:
+Ck =
+
+yk, ycont
+k
+, ych
+k,1, . . . , ych
+k,Nch
+	
+.
+(11)
+New candidates are evaluated using (m, Π(z)); the frozen
+incumbent keeps its recorded score. The next search state is
+Tk =
+arg max
+y=((m,z),r)∈Ck
+bSτ
+ m, Π(z)
+
+,
+yk+1 = first≺k(Tk).
+(12)
+Here Tk is the set of highest-scoring candidates, and
+first≺k selects its first member under the fixed order yk ≺k
+ycont
+k
+≺k ych
+k,1 ≺k · · · ≺k ych
+k,Nch. Thus a tied incumbent is
+retained; otherwise, the earliest highest-scoring new candi-
+date is selected. Ties do not terminate the search. Incumbent
+retention makes the cached best score nondecreasing; it does
+not guarantee monotonic improvement in expected perfor-
+mance under fresh rollouts.
+C. CRAFT: Blackboard-Based Collaboration
+CRAFT coordinates four specialist LLM roles through a
+shared blackboard [35]. Given task τ, the roles use prior
+evaluations and replayed behavior to propose morphology–
+reward pairs. The blackboard contains:
+• Experiment records Ak. Each record ai = (yi, si, bi)
+identifies an evaluated state, its recorded score si =
+bSτ(mi, Π(zi)), and its selection indicator bi. Candidate
+and checkpoint identifiers link the result to the morphol-
+ogy, reward, and training files.
+
+
+• Diagnostic evidence Ek: the selected robot’s replayed
+behavior and associated task measurements, used to di-
+agnose motion and guide design revisions.
+The shared input at iteration k is
+Bk = (Ak, Ek).
+(13)
+TABLE II
+Shared CRAFT evidence and role-specific outputs.
+Record
+Shared contents
+Experiment history
+Candidate identifier, selected score, and linked
+morphology, reward, and checkpoint files.
+Current evidence
+Saved replay video, trajectory and task
+measurements, and the selected-checkpoint
+reference.
+Role
+Output
+Feedback
+Failure hypotheses.
+Morphology
+Body edits and reward cross-review.
+Reward
+Reward code and body cross-review.
+Integration
+Paired morphology–reward candidates.
+Example history entry: Ant, round 3; mainline continuation; selected score
+60,870.41.
+Each role receives the same bounded view of Ak, by de-
+fault the latest five selection records, together with the current
+replay evidence and task measurements (Table II). Within-
+round feedback and proposals pass directly between roles. A
+separate round-indexed archive Hk stores complete requests
+and responses; subsequent role inputs do not automatically
+include this archive. Diagnostic replay is distinct from the
+SAC replay buffer used for training.
+For an initially trained robot y0 = ((m0, z0), r0), its score
+and diagnostic rollout E0 establish
+B0 =
+
+{(y0, bSτ(m0, Π(z0)), 1)}, E0
+
+.
+(14)
+The indicator 1 marks the selected initial robot. When no
+trained robot is available, an initialization round trains Nch
+designs from scratch; their records and winner establish
+(y0, B0). Our benchmarks use six initial designs followed by
+four continuation–challenger rounds. The shared history re-
+mains fixed during each round and is updated after candidate
+evaluation.
+a) Feedback and cross-review: Feedback uses behav-
+ioral replays and task measurements to identify potential
+failure modes and propose coordinated morphology–reward
+changes. Available evidence comprises replay video frames
+and programmatically computed task measurements; Feed-
+back produces the textual diagnoses passed to the design
+roles. The measurements include rollout length, cumulative
+reward, recorded root positions, and displacement. Morphol-
+ogy and Reward then draft independently:
+fk = F(τ, Bk),
+(15)
+Mk = GM(τ, Bk, fk, ∅),
+(16)
+Rk = GR(τ, Bk, fk, ∅).
+(17)
+Here F, GM, GR are the Feedback, Morphology, and Reward
+calls; fk contains observed limitations and improvement
+hypotheses, while Mk and Rk are the initial design drafts.
+The final argument is review context; ∅means no draft has
+Algorithm 1
+LACE–CRAFT after initialization
+Input: task τ; initialized y0, B0, s(y0);
+budget B; iterations K; challengers Nch.
+1: y∗←y0; H0 ←∅
+2: for k = 0, . . . , K −1 do
+3:
+((mk, zk), rk) ←yk
+4:
+ezk ←Init(zk) {Iteration-start Actor + normalizer}
+5:
+zcont
+k
+←U rk
+B (mk; zk)
+6:
+ycont
+k
+←((mk, zcont
+k
+), rk)
+7:
+fk ←F(τ, Bk)
+8:
+Mk ←GM(τ, Bk, fk, ∅)
+9:
+Rk ←GR(τ, Bk, fk, ∅)
+10:
+c
+Mk ←GM(τ, Bk, fk, (Mk, Rk))
+11:
+b
+Rk ←GR(τ, Bk, fk, (Rk, Mk))
+12:
+(Qk, hk) ←I(τ, Bk, fk, c
+Mk, b
+Rk)
+13:
+for j = 1, . . . , Nch do
+14:
+(mk,j, rk,j) ←Qk[j]
+15:
+zch
+k,j ←U
+rk,j
+B
+(mk,j; ezk)
+16:
+ych
+k,j ←((mk,j, zch
+k,j), rk,j)
+17:
+end for
+18:
+Ck ←{yk, ycont
+k
+} ∪{ych
+k,j}Nch
+j=1
+19:
+for all y = ((m, z), r) ∈Ck \ {yk} do
+20:
+s(y) ←bSτ(m, Π(z))
+21:
+end for
+22:
+Tk ←arg maxy∈Ck s(y)
+23:
+yk+1 ←first≺k(Tk); y∗←yk+1
+24:
+∆Ak ←{(y, s(y), 1[y = yk+1]) : y ∈Ck}
+25:
+Ek+1 ←Replay(xk+1, τ)
+26:
+Bk+1 ←(Ak ∪∆Ak, Ek+1)
+27:
+Hk+1 ←Hk ∪RecordH(k)
+28: end for
+29: Return (m∗, Π(z∗)), where y∗= ((m∗, z∗), r∗)
+yet been supplied. Both designers next receive both complete
+drafts, with their own first:
+c
+Mk = GM(τ, Bk, fk, (Mk, Rk)),
+(18)
+bRk = GR(τ, Bk, fk, (Rk, Mk)).
+(19)
+For the five-task benchmark, each reward proposal is
+complete Python/JAX source defining compute_reward,
+following D2C [4]. The callback maps observations, actions,
+and task metrics to a per-step training reward and named
+diagnostic terms; proposals may change both algebra and
+coefficients.
+The hatted outputs are
+complete revised proposals.
+Through reciprocal critique [4], [34], each designer assesses
+how the peer’s changes affect its own proposal. These ex-
+changes guide candidate generation; simulation supplies the
+evidence for selection.
+b) Integration and records: Integration combines the
+revisions into paired body–reward candidates:
+(Qk, hk) = I(τ, Bk, fk, c
+Mk, bRk).
+(20)
+Here I is the Integration call, Qk contains the Nch pairs
+in (8), and hk records their joint rationales. Integration can
+combine proposals with different source indices and revise
+either component. In the six-challenger configuration, two
+candidates receive each assessed design-risk label: Conser-
+vative, Medium, and Aggressive. All six follow the same
+inheritance rule and learning configuration.
+
+
+Initial geometry
+Shape reference
+Rodin mesh
+Editable morphology m
+User requirement: add an arm to the referenced body
+Body + limbs
+Edit link
+geometry
+Joint layout
+Topology +
+joint limits
+Motor interfaces
+Refit cavities +
+mating surfaces
+SO-101 mount
+Mount on base link
+Reuse SO-101 arm
+CRAFT
+Propose body + reward changes
+Shared blackboard + four agents
+LACE: train and select
+Train walking
+Arm held in
+fixed postures
+reward
+replay + score
+Fig. 2.
+An input image and user requirement define editable morphology m through Rodin reconstruction and BANG decomposition. The four views show
+complementary components, not sequential steps. The base link incorporates an SO-101 mount, while other arm components reuse the SO-101 design.
+CRAFT supplies morphology edits and training rewards. LACE receives the compiled model and selects trained candidates using a task metric distinct
+from training reward. Replays and scores return to CRAFT. Simulation evaluates walking with fixed arm postures, not manipulation. Physical walking
+excludes the arm. The mounted-arm photograph documents assembly only.
+c) Memory update: After selection, ∆Ak records the
+comparison states, scores, and selection flags. Deterministic
+policy inference on the selected robot produces the next
+diagnostic replay and task measurements:
+Ek+1 = Replay(xk+1, τ),
+Bk+1 = (Ak ∪∆Ak, Ek+1).
+(21)
+The round’s role requests and outputs are appended to
+Hk by RecordH(k), including feedback, drafts, revisions,
+and integration rationales. Candidate and round identifiers
+link records to the corresponding morphology, reward, and
+checkpoint. The next round uses the bounded experiment
+history and selected robot’s replay evidence; the complete
+discussion archive is not automatically added to role inputs.
+Algorithm 1 summarizes the procedure. Its score map s(y)
+stores bSτ(m, Π(z)) for y = ((m, z), r); the incumbent’s
+entry is reused. The indicator 1[y = yk+1] is one for
+the selected state and zero otherwise. The returned y∗=
+((m∗, z∗), r∗) is the last retained state, or y0 if no update
+occurs. Drafting and cross-review each use parallel role calls.
+D. Extension to Generative Robots
+The generative extension constructs an articulated mor-
+phology from a shape reference c and user-specified hardware
+requirements, following the geometry-to-hardware approach
+of Text2Robot [6]. For an arm-equipped quadruped, the
+reference image guides body shape and the arm requirement
+specifies a torso mounting interface. Scale, orientation, and
+joint topology are configured alongside hardware η, which
+specifies motor dimensions, torque and speed limits, joint
+limits, control frequency, and payload. Hyper3D Rodin [46]
+generates a static mesh from c; the model components in
+Fig. 2 provide articulation and hardware interfaces. Task τ
+defines the evaluation objective.
+a) Part decomposition and articulation: BANG [37]
+decomposes the Rodin mesh into components. Scripts repair,
+merge, and scale them into body and limb meshes {gi}n
+i=1,
+preserving part identifiers. Alignment scripts place the links
+in a common body frame, and an assembly template assigns
+them to a configured kinematic tree Gm = (V, E) [11]. Each
+link stores its mesh, mass, center of mass, and inertia; each
+joint stores its type, parent-relative pose, axis, and limits
+under URDF conventions [47]. The illustrated geometry
+model has two actuated joints per leg. R17 denotes the
+hardware-adapted quadruped version used in the walking
+demonstration, with three actuated joints per leg.
+b) Actuator interfaces and export: Scripts cut hip and knee
+motor cavities into aligned meshes using mesh Boolean
+operations and configured motor dimensions. Clearances
+separate mating surfaces; paired slot faces determine joint
+origins. The interface record Σ stores motor poses, cavities,
+and mating surfaces for actuated joints. Screw holes and
+fastening details are designed manually. The torso (base link)
+incorporates an SO-101 mounting interface [48]; the arm
+links, motors, and gripper follow the existing SO-101 design.
+Export scripts construct the morphology package
+mgen = (Gm, Σ, Φ),
+Φ = (URDF, Ccoll, Pinert, L, Γ).
+(22)
+Here Ccoll and Pinert contain collision and inertial assets
+computed from the processed geometry and configured ma-
+terial and motor masses. The fields L and Γ specify joint
+and actuator limits, ordered action-to-joint mapping, action
+scaling, and control frequency. The training adapter loads
+this package into Isaac Gym for locomotion learning. In this
+backend, reward revisions update the task configuration’s re-
+ward terms and parameters, which the PyTorch environment
+evaluates during training. For the arm-equipped robot, Γ
+maps policy actions to the leg joints, while prescribed arm
+postures define the configurations under which walking is
+trained. Arm joints remain fixed during locomotion training.
+c) Consistent morphology updates: Morphology pro-
+posals can modify link dimensions and associated joint
+and mounting fields. Geometry scripts apply these edits,
+refit affected joint origins and motor slots, and regenerate
+collision and inertial assets, keeping the assembled robot
+model consistent with its simulation assets. Hardware η,
+kinematic connectivity, and the policy interface remain fixed,
+preserving compatibility with LACE’s transfer rule. Fasten-
+ing details require renewed manual checking after geometry
+changes.
+IV. Experiments
+A. Experimental Setup
+We evaluate on Ant, HalfCheetah, Hopper, Swimmer,
+and Walker2D using the D2C benchmark settings [4], [49].
+Methods share each task’s morphology and policy interfaces,
+learner, per-design training budget, horizon, and evaluation
+
+
+metric. Morphology search changes link geometry within a
+fixed kinematic tree. D2C is the primary co-design baseline;
+Default trains the original morphology and hand-designed
+reward from scratch.
+D2C, LACE–CRAFT, and the ablation variants use GPT–
+5.6-sol and propose six morphology–reward pairs per round
+for five rounds, including initialization. Each search therefore
+generates 30 new designs. LACE additionally trains one
+continuation candidate in each of the four later rounds, giving
+34 training units compared with D2C’s 30.
+Final performance is evaluated with seeds 0, 1, 2, each
+using 128 parallel episodes, the task horizon, and the
+metric in (4). We report the mean and sample standard
+deviation of the three seed-level mean scores. Morphol-
+ogy, policy parameters, and observation statistics remain
+frozen; actions are sampled from the learned policy. D2C
+returns a morphology–reward pair, from which a policy is
+trained with the task-specific budget; LACE–CRAFT returns
+a morphology–policy pair. These tests measure fixed-policy
+evaluation variability, not variation across training seeds or
+independent searches.
+B. Overall Performance against D2C
+Figure 3 normalizes the three-seed means by each task’s
+D2C mean; Table III reports raw means and standard devia-
+tions. LACE–CRAFT has higher mean scores on all five tasks
+under the protocol above. Gains are 91.9% on Ant, 36.8%
+on HalfCheetah, 15.0% on Hopper, 46.7% on Swimmer, and
+6.4% on Walker2D.
+0
+0.5
+1
+1.5
+2
+Default
+D2C
+LACE-CRAFT
+Ant
+Half-
+Cheetah
+Hopper
+Swimmer
+Walker2D
+Mean score / D2C mean
+Fig. 3.
+Three-seed evaluation means with ±1 sample-standard-deviation
+error bars. Means and deviations are divided by the task’s fixed D2C mean;
+denominator uncertainty is not propagated.
+TABLE III
+Final-policy evaluation scores: mean with ± sample standard
+deviation below, over three evaluation seeds (128 episodes each).
+Task
+Default
+D2C
+LACE–CRAFT
+Ant
+27,362.80
+±621.94
+33,044.51
+±477.05
+63,396.82
+±656.01
+HalfCheetah
+18,343.94
+±201.20
+20,072.15
+±18.82
+27,455.51
+±22.39
+Hopper
+4,377.53
+±9.80
+6,195.22
+±2.29
+7,125.95
+±11.94
+Swimmer
+897.83
+±8.19
+6,637.06
+±10.67
+9,733.43
+±68.55
+Walker2D
+10,114.19
+±10.37
+17,362.33
+±221.69
+18,466.68
+±29.89
+a) A recorded search trajectory: In the reported Ant
+search, round 2 selects a challenger scoring 54,646.39 over
+continuation at 40,341.80. Continuation then wins rounds 3
+and 4 with 60,870.41 and 64,252.91, respectively. Round 5
+retains the incumbent ahead of continuation at 63,058.92.
+These are historical selection scores, not the post-selection
+three-seed means. The trace illustrates how design adapta-
+tion, continued learning, and retention contribute within one
+search.
+C. Ablation Study
+We examine policy reuse in LACE and behavioral feed-
+back in CRAFT using two variants on all five tasks. No
+Actor inheritance initializes challengers with fresh actor
+parameters and observation statistics. No replay evidence
+excludes replay frames, trajectory-level evidence, and their
+derived behavioral diagnoses from all role inputs, while
+retaining scalar evaluation scores and design history. Both
+retain the four agents, shared blackboard, cross-review, and
+score history. Both ablations retain the full method’s four
+continuation updates and per-branch training budget. The
+replay variant examines behavioral context within CRAFT.
+0
+0.25
+0.5
+0.75
+1
+Full
+No Actor
+No replay
+Ant
+Half-
+Cheetah
+Hopper
+Swimmer
+Walker2D
+Mean score / Full mean
+Fig. 4.
+Three-seed evaluation means with ±1 sample-standard-deviation
+error bars, divided by the task’s fixed full-method mean. Denominator
+uncertainty is not propagated.
+TABLE IV
+Final-policy ablations: mean with ± sample standard deviation
+below, over three evaluation seeds (128 episodes each).
+Task
+Full
+No Actor
+No replay
+Ant
+63,396.82
+±656.01
+54,806.01
+±432.08
+50,609.18
+±838.12
+HalfCheetah
+27,455.51
+±22.39
+25,147.09
+±116.61
+25,272.34
+±25.86
+Hopper
+7,125.95
+±11.94
+6,600.18
+±9.61
+6,693.74
+±2.87
+Swimmer
+9,733.43
+±68.55
+4,278.96
+±23.92
+4,832.12
+±2.60
+Walker2D
+18,466.68
+±29.89
+10,919.33
+±133.34
+13,171.87
+±232.93
+a) Policy reuse in LACE: The full method has a higher
+three-seed mean than No Actor on all five tasks (Fig. 4).
+The largest gaps occur on Swimmer and Walker2D, where
+No Actor reaches 44.0% and 59.1% of the full-method
+mean, respectively. The full method’s advantage is smaller
+on Ant, HalfCheetah, and Hopper, at 8.0–15.7%. These
+comparisons concern the transferred actor and observation
+statistics together.
+
+
+b) Behavioral feedback in CRAFT: The full method
+also has a higher three-seed mean than No replay on all five
+tasks. The relative gap is largest on Swimmer, where No
+replay reaches 49.6% of the full-method mean, and smallest
+on Hopper, at 93.9%. The no-replay condition remains closer
+to the full method on Hopper than on Swimmer, indicating
+a task-dependent difference for these selected policies.
+D. Generative Robot Demonstration
+Hardware-adapted parts
+Base link
+Motor case
+Knee connector
+Upper legs
+Lower legs
+Assembly
+SO-101 arm fitted
+Torso simplified for printing. Leg and arm mounts retained.
+Manual fastening design. STL parts are not shown to scale.
+Fig. 5.
+Hardware-adapted printable parts and assembly with the SO-101
+arm.
+The fabricated quadruped demonstrates the conversion of
+generated geometry into printable parts and a robot assem-
+bled with physical actuators (Fig. 5). Its base link retains the
+leg attachments and an SO-101 arm mount, while the head
+and tail are omitted to simplify printing and reduce cost. The
+printed torso therefore differs from the simulated geometry.
+The mounted-arm photograph documents the hardware
+interface; the walking trial uses the arm-free configuration.
+An onboard Raspberry Pi runs the R17 PPO controller at 20
+Hz. The controller was trained in the Isaac Gym hardware-
+adaptation task and maps 12 policy outputs to the leg-
+joint position commands. Figure 6 shows consecutive stages
+of indoor walking. This provides qualitative evidence of
+fabrication and locomotion, while quantitative transfer from
+the co-design search and walking with the arm remain to be
+evaluated.
+24 s
+28 s
+32 s
+36 s
+Fig. 6.
+Indoor walking with the arm removed. Frames are from one video;
+timestamps are in seconds.
+V. Limitations and Future Work
+a) Interpreting replay evidence: Behavioral replays can
+support multiple explanations, so task measurements should
+corroborate proposed diagnoses. The three evaluation seeds
+quantify rollout variability of fixed policies; they do not
+quantify variation across complete searches or training runs,
+or disentangle errors in evidence interpretation from variation
+in proposal generation.
+b) Fabrication and hardware integration: Fabricating
+the platform requires manual screw-hole and fastening design
+(Fig. 5). The printed parts underwent no structural simula-
+tion, and thin connections were prone to fracture. Structural
+analysis under expected loads and durability testing are
+needed to improve mechanical reliability.
+c) Closing the sim-to-real loop: Differences between
+the simulated model and fabricated robot remain a challenge
+for policy transfer. Incorporating hardware video and mea-
+sured joint motions into CRAFT’s shared blackboard would
+allow subsequent design revisions to draw on both simulation
+and physical execution.
+VI. Conclusion
+LACE–CRAFT combines policy reuse with morphology–
+reward search guided by behavioral evidence. LACE com-
+pares adapted challengers, full-state continuation, and incum-
+bent retention under a fixed task metric. CRAFT coordinates
+proposals and cross-review through shared experimental
+records and replays. The selected LACE–CRAFT policies
+achieve higher three-seed evaluation means than D2C on all
+five tasks under the stated protocol. The generative extension
+connects editable geometry to articulated models and simu-
+lation assets; the fabricated prototype demonstrates indoor
+walking with the arm removed. Future work will address
+diagnostic reliability, mechanical validation, and quantitative
+sim-to-real evaluation.
+Acknowledgments
+This work was supported in part by the National
+Natural
+Science
+Foundation
+of
+China
+under
+Grant
+W2431046, the National Key R&D Program of China
+under Grant 2025YFA1309603, the Central Guided Local
+Science
+and
+Technology
+Foundation
+of
+China
+under
+Grant
+YDZX20253100001001,
+the
+MoE
+Key
+Lab
+of
+Intelligent Perception and Human-Machine Collaboration
+(ShanghaiTech University), and the Shanghai Frontiers
+Science Center of Human-centered Artificial Intelligence.
+References
+[1] K. S. Luck, H. B. Amor, and R. Calandra, “Data-efficient co-adaptation
+of morphology and behaviour with deep reinforcement learning,” in
+Conference on Robot Learning.
+PMLR, 2020, pp. 854–869.
+[2] J. Fang, Y. Sun, C. Ma, Q. Lu, and L. Yao, “Robomore: Llm-based
+robot co-design via joint optimization of morphology and reward,”
+arXiv preprint arXiv:2506.00276, 2025.
+[3] Y. J. Ma et al., “Eureka: Human-level reward design via coding large
+language models,” in International conference on learning Represen-
+tations, vol. 2024, 2024, pp. 26 516–26 560.
+[4] K. Qiu and M. Cygan, “Debate2create: Robot co-design via multi-
+agent LLM debate,” in Forty-third International Conference on Ma-
+chine Learning, 2026.
+[5] T. Wang, Y. Zhou, S. Fidler, and J. Ba, “Neural graph evolution:
+Automatic robot design,” in International Conference on Learning
+Representations, 2019.
+
+
+[6] R. P. Ringel, Z. S. Charlick, J. Liu, B. Xia, and B. Chen, “Text2robot:
+Evolutionary robot design from text descriptions,” in 2025 IEEE
+International Conference on Robotics and Automation (ICRA). IEEE,
+2025, pp. 5789–5797.
+[7] K. Sims, “Evolving virtual creatures,” in Seminal Graphics Papers:
+Pushing the Boundaries, Volume 2, 2023, pp. 699–706.
+[8] H. Lipson and J. B. Pollack, “Automatic design and manufacture of
+robotic lifeforms,” Nature, vol. 406, no. 6799, pp. 974–978, 2000.
+[9] D. Ha, “Reinforcement learning for improving agent design,” Artificial
+life, vol. 25, no. 4, pp. 352–365, 2019.
+[10] C. Schaff, D. Yunis, A. Chakrabarti, and M. R. Walter, “Jointly
+learning to construct and control agents using deep reinforcement
+learning,” in 2019 international conference on robotics and automation
+(ICRA).
+IEEE, 2019, pp. 9798–9805.
+[11] A. Zhao et al., “Robogrammar: graph grammar for terrain-optimized
+robot design,” ACM Transactions on Graphics (TOG), vol. 39, no. 6,
+pp. 1–16, 2020.
+[12] Y. Yuan, Y. Song, Z. Luo, W. Sun, and K. M. Kitani, “Transform2act:
+Learning a transform-and-control policy for efficient agent design,” in
+International Conference on Learning Representations, 2022.
+[13] A. Gupta, S. Savarese, S. Ganguli, and L. Fei-Fei, “Embodied intel-
+ligence via learning and evolution,” Nature communications, vol. 12,
+no. 1, p. 5721, 2021.
+[14] N. Cheney, J. Bongard, V. SunSpiral, and H. Lipson, “Scalable co-
+optimization of morphology and control in embodied machines,”
+Journal of The Royal Society Interface, vol. 15, no. 143, p. 20170937,
+2018.
+[15] T. Chen, A. Murali, and A. Gupta, “Hardware conditioned policies
+for multi-robot transfer learning,” Advances in Neural Information
+Processing Systems, vol. 31, 2018.
+[16] T. Wang, R. Liao, J. Ba, and S. Fidler, “Nervenet: Learning structured
+policy with graph neural networks.” in ICLR (Poster), 2018.
+[17] W. Huang, I. Mordatch, and D. Pathak, “One policy to control them all:
+Shared modular policies for agent-agnostic control,” in International
+Conference on Machine Learning.
+PMLR, 2020, pp. 4455–4464.
+[18] V. Kurin, M. Igl, T. Rocktäschel, W. Boehmer, and S. Whiteson, “My
+body is a cage: the role of morphology in graph-based incompatible
+control,” in International Conference on Learning Representations,
+2021.
+[19] A. Gupta, L. Fan, S. Ganguli, and L. Fei-Fei, “Metamorph: Learning
+universal controllers with transformers,” in International Conference
+on Learning Representations, 2022.
+[20] Z. Xiong, J. Beck, and S. Whiteson, “Universal morphology control
+via contextual modulation,” in International Conference on Machine
+Learning.
+PMLR, 2023, pp. 38 286–38 300.
+[21] C. Schaff and M. R. Walter, “N-limb: Neural limb optimization
+for efficient morphological design,” arXiv preprint arXiv:2207.11773,
+2022.
+[22] L. K. Le Goff et al., “Morpho evolution with learning using a
+controller archive as an inheritance mechanism,” IEEE Transactions
+on Cognitive and Developmental Systems, vol. 15, no. 2, pp. 507–517,
+2022.
+[23] M. Kwon, S. M. Xie, K. Bullard, and D. Sadigh, “Reward design
+with language models,” in The Eleventh International Conference on
+Learning Representations, 2023.
+[24] T. Xie et al., “Text2reward: Reward shaping with language models
+for reinforcement learning,” in International Conference on Learning
+Representations, vol. 2024, 2024, pp. 35 663–35 699.
+[25] W. Yu et al., “Language to rewards for robotic skill synthesis,” in Pro-
+ceedings of The 7th Conference on Robot Learning, ser. Proceedings
+of Machine Learning Research, J. Tan, M. Toussaint, and K. Darvish,
+Eds., vol. 229.
+PMLR, 06–09 Nov 2023, pp. 374–404.
+[26] J. Liang et al., “Code as policies: Language model programs for
+embodied control,” in 2023 IEEE International conference on robotics
+and automation (ICRA).
+IEEE, 2023, pp. 9493–9500.
+[27] K. Qiu, W. Pałucki, K. Ciebiera, P. Fijałkowski, M. Cygan, and
+Ł. Kuciński, “Robomorph: Evolving robot morphology using large
+language models,” in IEEE International Conference on Robotics and
+Automation (ICRA), 2026.
+[28] S. Yao et al., “React: Synergizing reasoning and acting in language
+models,” in The Eleventh International Conference on Learning Rep-
+resentations, 2023.
+[29] N. Shinn, F. Cassano, A. Gopinath, K. Narasimhan, and S. Yao,
+“Reflexion: Language agents with verbal reinforcement learning,”
+Advances in neural information processing systems, vol. 36, pp. 8634–
+8652, 2023.
+[30] A. Madaan et al., “Self-refine: Iterative refinement with self-feedback,”
+Advances in neural information processing systems, vol. 36, pp.
+46 534–46 594, 2023.
+[31] Q. Wu et al., “Autogen: Enabling next-gen LLM applications via multi-
+agent conversations,” in First Conference on Language Modeling,
+2024.
+[32] S. Hong et al., “Metagpt: Meta programming for a multi-agent
+collaborative framework,” in International Conference on Learning
+Representations, vol. 2024, 2024, pp. 23 247–23 275.
+[33] G. Li, H. Hammoud, H. Itani, D. Khizbullin, and B. Ghanem, “Camel:
+Communicative agents for" mind" exploration of large language model
+society,” Advances in neural information processing systems, vol. 36,
+pp. 51 991–52 008, 2023.
+[34] Y. Du, S. Li, A. Torralba, J. B. Tenenbaum, and I. Mordatch, “Improv-
+ing factuality and reasoning in language models through multiagent
+debate,” in Proceedings of the 41st International Conference on
+Machine Learning, ser. Proceedings of Machine Learning Research,
+R. Salakhutdinov et al., Eds., vol. 235.
+PMLR, 21–27 Jul 2024, pp.
+11 733–11 763.
+[35] B. Hayes-Roth, “A blackboard architecture for control,” Artificial
+intelligence, vol. 26, no. 3, pp. 251–321, 1985.
+[36] L. Zhang et al., “Clay: A controllable large-scale generative model
+for creating high-quality 3d assets,” ACM Transactions On Graphics
+(TOG), vol. 43, no. 4, pp. 1–20, 2024.
+[37] L. Zhang et al., “Bang: Dividing 3d assets via generative exploded
+dynamics,” ACM Transactions on Graphics (TOG), vol. 44, no. 4, pp.
+1–21, 2025.
+[38] Y. Wang et al., “RoboGen: Towards unleashing infinite data for auto-
+mated robot learning via generative simulation,” in Proceedings of the
+41st International Conference on Machine Learning, ser. Proceedings
+of Machine Learning Research, R. Salakhutdinov et al., Eds., vol. 235.
+PMLR, 21–27 Jul 2024, pp. 51 936–51 983.
+[39] V. Makoviychuk et al., “Isaac gym: High performance GPU based
+physics simulation for robot learning,” in Thirty-fifth Conference on
+Neural Information Processing Systems Datasets and Benchmarks
+Track (Round 2), 2021.
+[40] N. Rudin, D. Hoeller, P. Reist, and M. Hutter, “Learning to walk
+in minutes using massively parallel deep reinforcement learning,” in
+Conference on robot learning.
+PMLR, 2022, pp. 91–100.
+[41] J. Tan et al., “Sim-to-real: Learning agile locomotion for quadruped
+robots,” in Proceedings of Robotics: Science and Systems, Pittsburgh,
+Pennsylvania, June 2018.
+[42] J. Hwangbo et al., “Learning agile and dynamic motor skills for legged
+robots,” Science robotics, vol. 4, no. 26, p. eaau5872, 2019.
+[43] Y. J. Ma et al., “DrEureka: Language Model Guided Sim-To-Real
+Transfer,” in Proceedings of Robotics: Science and Systems, Delft,
+Netherlands, July 2024.
+[44] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov,
+“Proximal
+policy
+optimization
+algorithms,”
+arXiv
+preprint
+arXiv:1707.06347, 2017.
+[45] T. Haarnoja, A. Zhou, P. Abbeel, and S. Levine, “Soft actor-critic: Off-
+policy maximum entropy deep reinforcement learning with a stochastic
+actor,” in International conference on machine learning.
+Pmlr, 2018,
+pp. 1861–1870.
+[46] Hyper3D, “Hyper3D Docs: Introduction,” accessed: Sep. 15, 2026.
+[Online]. Available: https://docs.hyper3d.ai/
+[47] I. Sucan and J. Kay, “urdf documentation,” ROS Kinetic API
+documentation,
+accessed:
+Sep.
+15,
+2026.
+[Online].
+Available:
+https://docs.ros.org/kinetic/api/urdf/html/
+[48] R. Knight et al., “Standard Open SO-100 & SO-101 Arms.” [Online].
+Available: https://github.com/TheRobotStudio/SO-ARM100
+[49] C. D. Freeman, E. Frey, A. Raichuk, S. Girgin, I. Mordatch, and
+O. Bachem, “Brax - a differentiable physics engine for large scale rigid
+body simulation,” in Thirty-fifth Conference on Neural Information
+Processing Systems Datasets and Benchmarks Track (Round 1), 2021.
+
+
+Appendix A
+Training-State Transfer
+A. Continuation, inheritance, and incumbent retention
+LACE carries three distinct states into candidate com-
+parison. The incumbent retains its morphology, reward,
+checkpoint, and recorded evaluation score without further
+training. Continuation restores the complete learner on that
+morphology and reward. A design challenger initializes a
+new learner from the incumbent’s Actor and observation
+statistics, then trains on the proposed morphology–reward
+pair. Table S1 lists the component-level operations.
+TABLE S1
+Checkpoint handling for the current LACE protocol.
+Component
+Continuation
+Challenger
+Morphology and reward
+Unchanged
+Proposed pair
+Actor parameters
+Restore
+Copy
+Observation statistics
+Restore
+Copy
+Value / critic parameters
+Restore
+Initialize anew
+Optimizer states
+Restore
+Initialize anew
+SAC targets and entropy state
+Restore
+Initialize anew
+SAC replay buffer
+Restore
+Empty buffer
+Environment and random gener-
+ators
+Restore
+Initialize anew
+Training counters
+Continue
+New training unit
+Copied Actor parameters and observation statistics con-
+tinue to update during challenger training. Each challenger
+receives its own learner state, so training one candidate
+does not modify the initialization used by another. A copied
+normalizer preserves the observation scaling expected by the
+inherited policy at the start of the new training unit.
+The frozen incumbent remains in the comparison set with
+its cached score. Ties are resolved in the fixed order of
+incumbent, continuation, and ordered challengers; a tied
+incumbent is retained, and ties do not terminate the search.
+This rule makes retained evaluation scores nondecreasing
+along the search, while fresh evaluations of a retained policy
+can still vary.
+B. PPO continuation state
+The serialized PPO state is represented by
+zPPO = (θπ, θV , ν, o, ce, ξ).
+(A.1)
+Here θπ and θV
+are Actor and value-network parame-
+ters, ν contains optimizer variables, o contains observation-
+normalization statistics, and ce counts environment tran-
+sitions. The collection state ξ contains the wrapped en-
+vironment state and the random-generator states used by
+learning, rollout collection, and evaluation. The continuation
+implementation serializes these variables around the Brax
+PPO learner [44], [49].
+Continuation restores all components of (A.1). Challenger
+initialization copies θπ and o, creates a new value func-
+tion and optimizer, resets collection state and counters,
+and collects trajectories on the new body. Value estimates
+are therefore learned under the challenger’s dynamics and
+training reward.
+C. SAC continuation state
+For SAC [45], the serialized state is
+zSAC = (θπ, θQ, ¯θQ, α, νπ, νQ, να,
+o, ce, cg, D, ξ).
+(A.2)
+The critics and target critics have parameters θQ and ¯θQ; α
+is the entropy-temperature state. The variables νπ, νQ, and
+να are the corresponding optimizer states. The counter cg
+records gradient updates, and D is the replay-buffer state.
+The remaining variables have the meanings given for PPO.
+SAC continuation restores the critics, targets, entropy
+state, and collected replay data together with the Actor. A
+challenger initializes these components anew and starts with
+an empty replay buffer. Thus its critic updates use transitions
+collected under its own morphology and reward.
+D. Policy-interface compatibility
+The benchmark morphology adapters preserve observation
+dimensions, action dimensions, and actuated-joint ordering
+within each task. Inheritance uses a direct parameter copy
+between compatible policy networks. All six challengers in
+the current protocol receive the same Actor and normal-
+izer transfer; Conservative, Medium, and Aggressive denote
+design-risk groups, not transfer coefficients.
+When initialization starts from six untrained designs, all
+six use fresh learners. Actor inheritance begins after selection
+of the first trained robot. Task-specific initialization settings
+are detailed in Appendix C.
+Appendix B
+CRAFT Requests, Responses, and Persistent Records
+A. Role requests and execution order
+Every role receives the task description, editable mor-
+phology interface, training configuration, and a bounded
+blackboard view. The standard view contains the latest five
+selection records and the selected robot’s current numerical
+behavior summary and artifact references. This shared input
+remains fixed during the round.
+Feedback executes first. Morphology and Reward then
+draft in parallel, each receiving the Feedback response. Once
+both drafts are available, the two designers cross-review in
+parallel. Each review receives both complete drafts, with the
+receiving role’s draft first. Integration executes after both
+revisions are available.
+Let pa
+k be the input packet for role a in round k, and let ιa
+contain its role-specific instructions. With superscripts 0 and
+rev identifying initial drafting and cross-review, the packets
+are
+pF
+k = (τ, Bk, ιF ),
+(B.1)
+pM,0
+k
+= (τ, Bk, fk, ιM),
+(B.2)
+pR,0
+k
+= (τ, Bk, fk, ιR),
+(B.3)
+pM,rev
+k
+= (τ, Bk, fk, (Mk, Rk), ιrev
+M ),
+(B.4)
+pR,rev
+k
+= (τ, Bk, fk, (Rk, Mk), ιrev
+R ),
+(B.5)
+pI
+k = (τ, Bk, fk, c
+Mk, bRk, ιI).
+(B.6)
+
+
+The quantities fk, Mk, Rk, and their hatted revisions are the
+outputs defined in the method. A round without retries uses
+six role calls: one Feedback call, two drafts, two reviews,
+and one Integration call.
+B. Output contracts
+a) Feedback: The response identifies limitations in the
+recorded behavior and proposes testable design changes. Its
+evidence combines replay video frames with programmati-
+cally computed task measurements, including rollout length,
+cumulative reward, root-position summaries, displacement,
+and numerical-finiteness checks. Explanations involving bal-
+ance, contact, or failure mechanisms remain hypotheses when
+those quantities are not directly measured.
+b) Morphology: The draft contains at least six complete
+morphology vectors within the task’s editable interface. Each
+vector is paired with a rationale connecting its geometric
+changes to the task and Feedback response. The revised
+output contains complete proposals after considering the
+Reward draft.
+c) Reward:
+The draft contains at least six com-
+plete Python/JAX programs. Each JSON proposal supplies
+proposal_id, reward_program, mechanism, and
+scale_audit. The code defines the D2C reward call-
+back [4]:
+compute_reward(obs, action, prev_action,
+dt, metrics) -> (reward, extras)
+Here obs is the environment observation supplied at that
+transition, action and prev_action are the current
+and previous controls, dt is the control-step duration, and
+metrics contains the task-specific quantities exposed by
+the environment. The output reward is the per-step scalar
+optimized by RL; extras maps component names to diag-
+nostic values. Available metric keys are task-dependent. For
+Ant they include forward_reward, healthy_reward,
+ctrl_cost, contact_cost, and is_healthy.
+The
+proposal
+specifies
+the
+full
+expression,
+includ-
+ing coefficients, nonlinearities, and couplings. For in-
+stance,
+one
+recorded
+HalfCheetah
+candidate
+computes
+metrics[’x_velocity’]
+minus
+0.014
+times
+the
+squared action norm, returning the velocity and negative
+effort term separately for logging. This is a candidate-specific
+expression, not a reward template imposed on all tasks.
+Cross-review revises the complete programs in response to
+morphology drafts; Integration emits the final program paired
+with each geometry vector.
+The
+runtime
+parses
+the
+source
+and
+checks
+task-
+specific metric access before saving reward.py alongside
+morphology.xml. Their hashes are stored together in the
+candidate binding. The D2C compiler loads the callable into
+the environment. Its compatibility adapter accepts scalar-
+only returns or reduced signatures and normalizes them to a
+reward–diagnostics pair; this does not change the full-source
+proposal format. The external selection metric is computed
+separately from the generated reward.
+d) Integration: Integration returns exactly six complete
+morphology–reward pairs, with two assigned to each design-
+risk group. It can combine proposals with different source
+indices and revise either component. Each result contains a
+unique candidate identifier, source proposal identifiers, the
+complete morphology and reward, a joint rationale, and a
+risk assessment.
+The structured output is checked for candidate count,
+unique identifiers, required risk groups, renderable geometry,
+and the reward-program interface. A rejected response is
+stored with its validation error, and the next request asks for a
+complete corrected response. The role pipeline permits up to
+three stage-level attempts. Accepted candidates subsequently
+undergo training and external evaluation.
+C. Blackboard and archive contents
+The blackboard Bk = (Ak, Ek) combines stored experi-
+ment records with the selected checkpoint’s diagnostic evi-
+dence. Candidate and checkpoint identifiers connect scores
+to morphology files, reward source, and training state. Large
+replay artifacts remain in files; role requests contain their
+references and the numerical summary.
+TABLE S2
+Persistent records and their use in CRAFT.
+Record
+Stored content and use
+Selected robot
+Candidate and checkpoint identifiers, morphology
+and reward bindings, score, and full-state check-
+point.
+Selection
+history
+Ak
+Compared candidates, scores, and round-specific
+selection flags; the bounded view enters the next
+discussion.
+Evidence Ek
+Selected-checkpoint rollout summary and refer-
+ences to replay and visual manifests.
+Role archive Hk
+Requests, responses, drafts, revisions, integration
+rationales, validation errors, and API records; re-
+tained separately from future role inputs.
+New Feedback and proposal text is passed directly between
+roles within a round. After training and selection, the com-
+parison results are appended to Ak, and a diagnostic rollout
+produces Ek+1 for the selected robot. The separate archive
+Hk preserves the complete discussion without automatically
+expanding the next round’s language-model context.
+D. Linking results, proposals, and replay
+Each selection record associates a round and candidate
+identifier with an evaluation score, a selection flag, and
+a checkpoint. The candidate’s asset record identifies its
+morphology XML and reward program. This association dis-
+tinguishes a new body–reward proposal from further training
+of an existing design.
+Replay evidence is indexed by the selected checkpoint. Its
+manifest links the numerical rollout summary, saved HTML
+replay, and morphology assets; a file hash identifies the
+corresponding replay. Drafts, cross-reviews, and integration
+responses are indexed by round and role in Hk. These links
+connect the measured behavior to the robot that produced it
+and the proposals generated in that discussion.
+
+
+Appendix C
+Evaluation and Training Budgets
+A. Selection metric and diagnostic measurements
+Candidate
+selection
+uses
+eval/episode_distance_from_origin:
+the
+root-position norm in the task coordinates listed in Table S7.
+Values are summed over the episode and averaged across
+evaluation episodes. This metric measures accumulated
+distance from the origin, rather than path length, signed
+forward displacement, or training return.
+The diagnostic replay is generated separately. It loads the
+selected morphology, reward, and policy parameters and runs
+deterministic inference with a reset seed derived from the
+checkpoint identifier. The rollout ends at termination or the
+task horizon. Pipeline-state frames, including the initial state,
+are saved for the HTML replay.
+The numerical replay summary records executed steps,
+cumulative reward, the first and last recorded root x co-
+ordinates, their absolute difference, and a finiteness flag.
+These positions are sampled after environment steps; the
+initial rendered frame is stored separately. The coordinate
+difference is a displacement diagnostic. Numerical finiteness
+checks valid numerical values and does not establish balance
+or task success. Replay video frames and these numerical
+measurements are available as behavioral evidence; Feedback
+produces the textual diagnoses passed to the design roles.
+B. Learner settings
+Tables S3 and S4 give algorithm-specific settings. Obser-
+vation normalization is enabled, action repeat is one, and
+each task uses 128 parallel evaluation environments. The
+seeds are RL seeds for the individual searches.
+TABLE S3
+PPO configuration. HC denotes HalfCheetah.
+Setting
+Ant
+HC
+Swimmer
+Learning rate
+3 × 10−4
+3 × 10−4
+3 × 10−4
+Discount
+0.97
+0.95
+0.97
+Entropy cost
+0.01
+0.001
+0.001
+Reward scaling
+25
+3
+5
+Training environments
+256
+128
+128
+Batch size
+512
+512
+128
+Unroll length
+5
+15
+6
+Minibatches
+8
+16
+8
+Updates per batch
+4
+8
+4
+Episode horizon
+450
+400
+600
+RL seed
+0
+0
+0
+TABLE S4
+SAC configuration.
+Setting
+Hopper
+Walker2D
+Learning rate
+6 × 10−4
+6 × 10−4
+Discount
+0.997
+0.997
+Reward scaling
+30
+5
+Training environments
+12
+12
+Batch size
+48
+48
+Gradient updates per step
+3
+3
+Minimum replay size
+2,048
+4,096
+Maximum replay size
+50,000
+65,536
+Episode horizon
+800
+1,000
+RL seed
+1
+1
+Requested transition budgets are aligned to complete
+learner batches (Table S5). Training units use these endpoints
+rather than truncating the last learner batch.
+TABLE S5
+Task-specific learning configurations. Actual transition counts
+include batch alignment.
+Task
+RL
+Requested
+Actual Horizon
+Ant
+PPO 8,000,000 8,007,680
+450
+HalfCheetah PPO 5,000,000 5,038,080
+400
+Hopper
+SAC
+400,000
+400,008
+800
+Swimmer
+PPO
+350,000
+350,208
+600
+Walker2D
+SAC
+500,000
+500,004
+1,000
+C. Networks and software
+PPO uses an actor with four 32-unit hidden layers and
+a value network with five 256-unit layers, both with Swish
+activation. SAC uses two 256-unit ReLU layers for the actor
+and each of two critics. Actors parameterize a tanh-squashed
+Gaussian. The five-task benchmark uses Python 3.10.20,
+Brax 0.12.4, JAX/JAXlib 0.6.2, Flax 0.10.6, MuJoCo/MJX
+3.3.3, and Optax 0.2.8. This software configuration applies
+to the five-task benchmark; generated robots use the Isaac
+Gym adapter described in Sec. III-D.
+D. Default baseline and reported checkpoint scores
+Default uses the task’s original morphology and built-in
+hand-designed reward, with morphology and reward gener-
+ation disabled and no LLM calls. Each policy is initialized
+from scratch and receives one task-specific training budget:
+8 million transitions for Ant, 5 million for HalfCheetah,
+400,000 for Hopper, 350,000 for Swimmer, and 500,000 for
+Walker2D. The PPO/SAC hyperparameters and task horizons
+follow the D2C-aligned settings above; Default is not a 30-
+candidate search.
+The reported Default checkpoints use seeds 0, 0, 1, 0, and
+2 for Ant, HalfCheetah, Hopper, Swimmer, and Walker2D,
+respectively. The historical Walker2D value 10,125.74 is the
+stored seed-2 checkpoint score, not the three-seed evaluation
+mean reported in the main text. Its implementation uses
+NaN-safe masks for inactive evaluation episodes and rejected
+MJX line-search updates. Morphology, reward, and transition
+budget remain unchanged; these numerical repairs are part
+of the implementation configuration.
+Training and evaluation use separate simulator rollouts. At
+the training endpoint, the evaluator holds the policy fixed and
+runs 128 parallel episodes with independently reset environ-
+ments, the configured task horizon, and the task termination
+rule. Policy sampling follows the learner’s evaluation set-
+ting; the PPO implementation uses stochastic evaluation by
+default. The evaluator logs the episode mean of the fixed task
+metric as eval/episode_distance_from_origin.
+This value is stored in the candidate result and used for
+selection. A retained incumbent keeps its recorded score.
+The historical search traces in this appendix report these
+stored selection scores. The main comparison and ablation
+tables instead report post-selection evaluation: the mean and
+sample standard deviation across evaluation seeds 0, 1, 2,
+
+
+each with 128 parallel episodes and frozen policy parameters,
+morphology, and observation statistics. These evaluations do
+not retrain the selected LACE–CRAFT policies.
+These evaluation episodes estimate the performance of one
+trained policy. Repeating the complete proposal–training–
+selection search measures a different source of variation.
+D2C reports multiple search seeds and separate retraining
+studies [4]; adopting its per-candidate learner settings does
+not imply those repetitions in the present main tables. The
+Ant search-level analysis below reports the complete searches
+available for that comparison.
+E. Morphology parameter bounds
+Morphology vectors contain 10, 24, 10, 6, and 10 scalars
+for Ant, HalfCheetah, Hopper, Swimmer, and Walker2D, re-
+spectively. All coordinates and radii below are in meters. The
+indexed scalars pi are the entries of the task’s morphology
+vector, not policy parameters. Bounds are applied before ren-
+dering; additional geometric constraints reject combinations
+that are individually in range but do not form valid bodies.
+a) Ant: The torso radius is p1 ∈[.05, .50]. Proximal
+planar offsets p2:5 each lie in [.05, .80], distal offsets p6:7
+in [.05, 1.50], and capsule radii p8:10 in [.01, .30]. Mirroring
+these offsets constructs the four limbs. Each link radius is at
+most half its segment length, with nominal ground clearance
+checked at the configured reset pose.
+b) HalfCheetah: Coordinates p1:4 describe the torso
+endpoints and head endpoint. Rear-leg endpoint offsets are
+p5:10, and front-leg offsets are p11:16, ordered as thigh,
+shin, and foot (x, z) pairs. Radii p17:24 correspond to torso,
+head, rear thigh/shin/foot, and front thigh/shin/foot. Table S6
+gives every interval. Joint ranges and actuator gears remain
+fixed, and initialization height is derived to preserve ground
+clearance.
+TABLE S6
+HalfCheetah morphology-vector intervals.
+Index
+Interval
+Index
+Interval
+1
+[−.90, −.20]
+13
+[−.35, .50]
+2
+[.20, .90]
+14
+[−.45, −.04]
+3
+[.55, 1.35]
+15
+[−.50, .35]
+4
+[.04, .45]
+16
+[−.35, −.02]
+5
+[−.50, .30]
+17
+[.015, .100]
+6
+[−.45, −.04]
+18
+[.010, .090]
+7
+[−.50, .35]
+19
+[.010, .090]
+8
+[−.45, −.04]
+20
+[.010, .090]
+9
+[−.35, .50]
+21
+[.008, .080]
+10
+[−.35, −.02]
+22
+[.010, .090]
+11
+[−.30, .50]
+23
+[.010, .090]
+12
+[−.45, −.04]
+24
+[.008, .080]
+c) Hopper: Vertical anchors p1:4 have intervals [.3, 3],
+[.2, 2.5], [.1, 2], and [.01, 1.5], with p1 > p2 > p3 > p4 > 0.
+Foot endpoints satisfy p5 ∈[.01, .5] and p6 ∈[−.8, −.01].
+The four radii p7:10 lie in [.01, .2]. Each segment length must
+exceed its diameter, and the canonical pose must clear the
+floor.
+d) Swimmer: The three segment lengths p1:3 each lie in
+[.1, 3], and their radii p4:6 in [.01, .5]. The generator retains
+the ordered three-link chain and two actuated joints.
+e) Walker2D:
+Vertical anchors p1:4 have intervals
+[.3, 3], [.2, 2.5], [.1, 2], and [.01, 1.5], with p1 > p2 >
+p3 > p4 > 0. Here p1 is the torso center. Foot endpoints
+satisfy p5 ∈[.01, .5] and p6 ∈[−.8, 0]; radii p7:10 lie in
+[.01, .2]. Additional checks impose 0.8 < p1 < 2, segment
+lengths of at least 0.1, radii no greater than 0.45 times
+the corresponding segment length, and nonnegative foot
+clearance.
+F. Model calls and failed candidates
+The recorded model identifier is GPT-5.6-sol with temper-
+ature 1.0, low reasoning effort, and low verbosity. The client
+requests a JSON object through a streaming Responses-
+compatible interface, with a Chat-Completions-compatible
+fallback. No explicit maximum output-token count is set.
+The CRAFT role pipeline allows three attempts per role; the
+transport client also has retry handling. A six-role-call round
+is therefore a logical call count, not a limit on metered API
+requests.
+Validation checks the morphology vector, generated XML,
+reward syntax and interface, candidate identifiers, and six-
+candidate portfolio. Invalid outputs retain their error records
+for correction; exhaustion halts the round. A training excep-
+tion or non-finite evaluation score leaves the round unse-
+lected. The pipeline does not assign a synthetic zero score to
+a failed candidate. Resumption preserves already completed,
+checkpoint-bound results. Training budgets count completed
+units in the reported search.
+G. Design counts and total training
+D2C and LACE–CRAFT generate six new designs per
+round for five rounds, giving 30 designs per search. LACE
+trains six initial designs, then six challengers and one con-
+tinuation in each of four later rounds:
+Ntrain = 6 + 4(6 + 1) = 34.
+(C.1)
+Here Ntrain counts completed training units. Incumbent
+retention uses a cached score and adds no training unit.
+The D2C comparison matches new-design counts and per-
+unit settings, with LACE using four additional continuation
+units. The original D2C study used an 80-policy, multi-
+seed protocol [4]; the results here use the stated 30-design
+reproduction.
+H. Five-task initialization configurations
+Table S7 records the initialization protocol for all five
+tasks. Each search begins with six fresh designs; subsequent
+rounds copy the incumbent Actor parameters and observa-
+tion statistics into compatible challengers and restore the
+complete saved learner state for continuation. Conservative,
+Medium, and Aggressive labels describe proposal risk, not
+different transfer coefficients.
+
+
+TABLE S7
+Initialization of the reported five-task searches.
+Task
+Coordinates Challenger
+Continuation
+Ant
+(x, y, z)
+Copy
+Full state
+HalfCheetah
+(x, y, z)
+Copy
+Full state
+Hopper
+(x, y, z)
+Copy
+Full state
+Swimmer
+(x, y)
+Copy
+Full state
+Walker2D
+(x, y, z)
+Copy
+Full state
+I. Search-level variability and normalized visualization
+The main five-task table reports three-seed evaluation
+means and sample standard deviations for the final policies.
+Its normalized plot divides means and deviations by the fixed
+D2C mean within each task; the ablation plot uses the fixed
+full-method mean. Denominator uncertainty is not propa-
+gated. Neither normalization pools episodes or tasks into
+statistical replicates. The historical search-selection scores
+below are a separate record.
+The Ant variability analysis uses three complete searches
+with the same task configuration, role-input specifica-
+tion, PPO settings, and inheritance rules. Each inde-
+pendently
+generates
+six
+initial
+designs
+and
+completes
+four continuation–challenger rounds. Their final scores are
+57,560.79, 55,259.83, and 64,252.91; the latest search sup-
+plies the selected Full checkpoint subsequently evaluated for
+the main comparison tables. For n = 3 searches with round-
+end scores si,k, the plotted center and spread are ¯sk =
+n−1 P
+i si,k and
+pP
+i(si,k −¯sk)2/(n −1). The final mean
+and sample standard deviation are 59,024.51 ± 4,671.80,
+not confidence limits. The RL seed is fixed at zero, so this
+comparison measures variation between complete searches
+under that training seed.
+Each Ant training unit contains 8,007,680 actual tran-
+sitions. LACE’s plotted budgets are therefore 48,046,080;
+104,099,840; 160,153,600; 216,207,360; and 272,261,120
+transitions. D2C uses 48,046,080; 96,092,160; 144,138,240;
+192,184,320; and 240,230,400. Points mark completed
+rounds; connecting segments do not represent additional
+evaluations. Cached incumbent scores add no training bud-
+get. The figure does not count generation latency, inference
+costs, or incomplete training attempts as completed training
+units.
+TABLE S8
+Additional Full searches on Ant; 30 generation units per search.
+Scores are historical selection scores.
+Search
+RL seed
+Selected score
+1
+0
+57,560.79
+2
+0
+55,259.83
+3
+0
+64,252.91
+These three Full searches are not a matched repeated-
+search comparison with D2C. The 128 episode evaluations
+within each checkpoint score are rollouts of one policy, not
+independent proposal–training–selection searches. The main
+text separately evaluates the final selected policies with three
+evaluation seeds.
+Appendix D
+Cross-Iteration Evolution
+A. New-design performance across rounds
+Table S9 compares the highest-scoring newly generated
+design in each Walker2D round. Round 1 trains the ini-
+tial population; subsequent LACE rounds train design chal-
+lengers initialized from the selected Actor. The table excludes
+the retained incumbent and continuation candidate. Each
+entry is a within-round maximum, not a cumulative best.
+TABLE S9
+Walker2D: best new design in each round.
+Round
+D2C
+LACE–CRAFT
+Gain
+1
+11,023.11
+12,435.48
++12.8%
+2
+14,422.04
+16,488.11
++14.3%
+3
+14,902.87
+16,742.91
++12.3%
+4
+13,902.85
+15,088.00
++8.5%
+5
+13,186.34
+16,394.60
++24.3%
+LACE–CRAFT produces a higher-scoring new design in
+all five rounds. Its round-wise maximum decreases in round
+4 before recovering in round 5, whereas incumbent retention
+keeps the selected score from decreasing. The final selected
+Walker2D score is 18,483.50 because selection also admits
+continuation. These independently generated searches com-
+pare the complete methods; their differences do not isolate
+Actor inheritance.
+B. Continuation and challenger selection on Ant
+Figure S1 shows all eight comparison states in Ant rounds
+2–4: the retained incumbent, one continuation, and six
+challengers. The initial population selects a robot scoring
+40,420.20. In round 2, a design challenger reaches 54,646.39,
+while continuation scores 40,341.80. Continuation then wins
+rounds 3 and 4 with 60,870.41 and 64,252.91. Round 5 re-
+tains the incumbent at 64,252.91; its additional continuation
+scores 63,058.92.
+The round-2 challenger improves the incoming incumbent
+by 35.2%; continuation adds 11.4% in round 3 and 5.6% in
+round 4. Thus design changes and further training both con-
+tribute to this search. Across five rounds, LACE–CRAFT’s
+cumulative best increases from 40,420.20 to 64,252.91;
+D2C’s increases from 28,408.55 to 35,139.39. These are
+recorded outcomes of individual searches, rather than esti-
+mates of how often each branch wins across seeds.
+Appendix E
+Ablation Configurations and Results
+A. Variant definitions
+The ablation study compares the full method, No Actor
+inheritance, and No replay evidence on Ant, HalfCheetah,
+Hopper, Swimmer, and Walker2D. All retain Feedback, Mor-
+phology, Reward, Integration, and reciprocal cross-review.
+Full and both ablations share the same five-round schedule:
+30 new morphology–reward pairs and four full-state contin-
+uation updates, with the same per-branch training budget.
+Each search therefore uses 34 training units.
+
+
+Round 2
+0
+20
+40
+60
+Inc.
+Cont.
+C1
+C2
+C3
+C4
+C5
+C6
+Round 3
+Inc.
+Cont.
+C1
+C2
+C3
+C4
+C5
+C6
+Round 4
+Inc.
+Cont.
+C1
+C2
+C3
+C4
+C5
+C6
+Task score (thousands)
+Selected: initial 40.4  →  challenger 54.6  →  continuation 60.9  →  continuation 64.3  →  incumbent 64.3
+Fig. S1. Ant candidate scores in rounds 2–4 and the five-round selection path. Stars mark winners. Inc.: incumbent; Cont.: continuation; C1–C6: challengers
+ordered by identifier within each round.
+6
+12
+18
+24
+30
+Cumulative generation units
+30
+40
+50
+60
+Ant score (thousands)
+D2C (n=1)
+No Actor (n=1)
+No replay (n=1)
+Full: mean +/- SD (n=3)
+Fig. S2.
+Exploratory search-level variation on Ant versus cumulative
+generation units. Full shows the mean and sample standard deviation of
+three searches at RL seed 0; other methods have one search each.
+No Actor inheritance uses fresh challenger Actors and
+fresh observation-normalization statistics. Value or critic
+parameters, optimizers, collection state, and replay buffers
+are initialized as for a new learner. The variant changes both
+the learned action mapping and its observation scaling.
+No replay evidence excludes replay frames, trajectory-
+level evidence, and their derived behavioral diagnoses from
+all role inputs. It retains the current-robot binding, scalar
+evaluation scores, candidate rankings, and design history.
+Feedback remains active with these retained inputs.
+TABLE S10
+Historical search-selection scores and completed training budgets.
+These are not the post-selection three-seed means in the main text.
+Units include continuations.
+Task
+Variant
+Score Units Cont.
+Ant
+Full
+64,252.91
+34
+4
+No Actor
+56,901.25
+34
+4
+No replay 51,878.46
+34
+4
+HalfCheetah Full
+27,458.55
+34
+4
+No Actor
+25,263.65
+34
+4
+No replay 25,277.06
+34
+4
+Hopper
+Full
+7,124.44
+34
+4
+No Actor
+6,595.88
+34
+4
+No replay
+6,693.28
+34
+4
+Swimmer
+Full
+9,789.24
+34
+4
+No Actor
+4,254.11
+34
+4
+No replay
+4,835.91
+34
+4
+Walker2D
+Full
+18,483.50
+34
+4
+No Actor
+10,899.12
+34
+4
+No replay 13,342.64
+34
+4
+B. Ant round-wise outcomes
+The Ant No Actor variant reaches selected scores of
+34,631.61, 50,914.84, 50,914.84, 56,901.25, and 56,901.25
+across five rounds. No replay reaches 51,878.46 in round 4
+and retains this score in round 5. In the full Ant search, a
+design challenger wins round 2, continuation wins rounds 3
+and 4, and round 5 retains the incumbent.
+C. Scope of the comparisons
+Each variant generates its own initial candidates. Differ-
+ences can therefore arise before the first transfer step and
+propagate through later proposals, training, and selection.
+Because No Actor resets both the Actor and observation
+statistics, the contrast concerns their joint inheritance under
+the common continuation schedule. The full-search initial-
+ization settings are listed in Table S7. No replay uses
+the same unscaled Actor/normalizer copying and full-state
+continuation as Full; only the replay evidence is removed.
+The replay comparison yields higher full-method scores
+on all five tasks. This comparison assesses replay evidence
+within the retained four-role collaboration; it does not isolate
+
+
+TABLE S11
+Selected scores after each ablation round. Repeated values indicate retention of the best available robot.
+Task
+Variant
+Round 1
+Round 2
+Round 3
+Round 4
+Round 5
+Ant
+No Actor
+34,631.61
+50,914.84
+50,914.84
+56,901.25
+56,901.25
+No replay
+29,049.02
+42,973.31
+48,472.22
+51,878.46
+51,878.46
+HalfCheetah
+No Actor
+25,263.65
+25,263.65
+25,263.65
+25,263.65
+25,263.65
+No replay
+20,733.75
+23,762.41
+24,715.28
+25,277.06
+25,277.06
+Hopper
+No Actor
+5,212.28
+6,595.88
+6,595.88
+6,595.88
+6,595.88
+No replay
+6,573.45
+6,573.45
+6,573.45
+6,573.45
+6,693.28
+Swimmer
+No Actor
+2,876.15
+2,876.15
+2,876.15
+2,876.15
+4,254.11
+No replay
+2,466.44
+2,718.34
+2,718.34
+2,718.34
+4,835.91
+Walker2D
+No Actor
+9,239.89
+9,890.62
+9,890.62
+10,899.12
+10,899.12
+No replay
+13,342.64
+13,342.64
+13,342.64
+13,342.64
+13,342.64
+the contribution of the collaboration structure itself. The his-
+torical scores in this section are individual search outcomes,
+without an estimate of variability across independent search
+seeds. The main ablation table separately reports fixed-policy
+evaluation variability over three evaluation seeds.
+Appendix F
+Generative Geometry and Hardware Interfaces
+A. Artifacts at each processing stage
+The visual reference supplies a shape cue for Rodin mesh
+generation. BANG separates the generated surface into body
+and limb meshes; repair, scaling, and alignment establish the
+link geometry used for joint placement. Motor cavities and
+mating interfaces are then fitted before compilation of the
+articulated model.
+TABLE S12
+Artifacts produced by generative-morphology processing.
+Stage
+Output
+Shape generation
+Static mesh conditioned on the morphology ref-
+erence.
+Decomposition
+and
+alignment
+Separate link meshes gi with local frames and
+aligned connections.
+Joint allocation
+Parent–child graph, joint origins, types, axes, and
+position limits.
+Actuator fitting
+Motor positions and orientations, cavity geome-
+try, and mating surfaces in Σ.
+Compilation
+URDF, collision geometry, inertial properties,
+joint and actuator limits, and action mapping in
+Φ.
+B. Dependencies of a morphology edit
+A link edit changes geometry within Gm. Affected joint
+origins and motor placements must remain consistent with
+the revised shape and local coordinate frames. Cavity dimen-
+sions are constrained by the selected motors; mating surfaces
+must remain aligned between the connected links. Collision
+geometry, masses, centers of mass, and inertia tensors are
+updated with the compiled model.
+The action mapping Γ binds policy outputs to an ordered
+set of actuated joints and defines their scaling and control
+frequency. Fixed observation and action dimensions and con-
+sistent joint ordering are required for direct Actor inheritance.
+Changes in articulation that alter these interfaces require a
+compatible controller specification before training.
+Hardware attachment remains partly manual. Screw-hole
+placement and mating details are designed for the selected
+components. The printed parts were fabricated without prior
+structural simulation, and thin connections were prone to
+fracture. Structural analysis and load-aware redesign remain
+necessary for more reliable fabrication.
+C. Raspberry Pi controller and physical recording
+The indoor walking recording uses the R17 hardware-
+adapted PPO policy at training epoch 650. It was trained
+with the Isaac Gym robot task and exported from the PyTorch
+checkpoint to a NumPy parameter archive. This controller be-
+longs to the generative-robot hardware adaptation, separately
+from the five Brax benchmark policies. Its hardware-specific
+training uses three actuated joints per leg (12 actions),
+whereas the illustrated geometry-stage model uses two per
+leg. The exported actor has hidden widths 512, 256, and
+128 with ELU activations and a 12-dimensional output. The
+recorded export check reports a maximum absolute NumPy–
+PyTorch output difference of 4.17 × 10−7.
+Policy inference runs locally on the Raspberry Pi at 20
+Hz. The 58-dimensional observation contains 12 measured
+joint positions, 12 joint velocities estimated by one-step finite
+differences, 12 previous actions, eight sinusoidal gait-clock
+signals, three command entries, and 11 fixed placeholder
+entries. The placeholders comprise unavailable base linear
+and angular velocities, a fixed gravity direction, and un-
+available planar position-error signals. No IMU is required.
+Observation normalization statistics are exported with the
+actor; normalized inputs are clipped to [−5, 5]. The runtime
+reproduces the one-control-frame observation delay used in
+the adaptation.
+Actions are clipped to [−1, 1], low-pass filtered with co-
+efficient approximately 0.49646, and scaled by 0.63 radians
+about the reference pose. Joint-target changes are limited to
+0.145 radians per control step and clipped to joint limits.
+Calibrated zero offsets, signs, and radians-per-unit mappings
+convert targets into servo-bus commands. The policy joint
+ordering maps to servo IDs 1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12.
+The internal gait clock runs at 1.05 Hz. These settings
+describe the R17 deployment; the arm is absent during the
+recorded walking trial.
+The figure uses frames at 24, 28, 32, and 36 seconds from
+one continuous indoor recording. Equal-sized crops follow
+the robot to keep its body and feet visible. They docu-
+ment physical motion rather than calibrated displacement or
+
+
+benchmark task scores. Quantitative comparisons in the main
+tables concern the simulated benchmark tasks.
+D. Manipulation interface
+A mount is incorporated into the base link for an SO-101
+arm, while the arm’s existing links, motors, and gripper are
+reused. The assembled photograph shows the arm installed;
+the walking recording shows the platform without it. Simu-
+lation controls the leg joints while holding the arm at pre-
+scribed fixed postures. Initial manipulation trials performed
+poorly. Effective mobile manipulation requires additional
+control and mechanical validation. Measured joint motion
+and real-world video could subsequently supply blackboard
+feedback.
+Appendix G
+Single-search Generation Progress
+Figure S3 tracks the reported Ant search for each method
+after 6, 12, 18, 24, 30 cumulative generation units. Each point
+is the selected checkpoint score at the end of that round. The
+Full curve ends at the stored selection score 64,252.91; the
+main tables report a separate three-seed evaluation of the
+selected policy. Each curve represents one complete search.
+6
+12
+18
+24
+30
+Cumulative generation units
+30
+40
+50
+60
+Ant score (thousands)
+D2C
+No Actor
+No replay
+Full
+Fig. S3.
+Ant single-search progress versus cumulative generation units.
+Each curve shows stored selection scores from one search, not the post-
+selection evaluation means.

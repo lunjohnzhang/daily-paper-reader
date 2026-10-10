@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-09</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-10</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 12 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>4</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-09 23:27:55 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-10 22:57:35 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-10-09 日报：完成 12 篇多智能体/多机器人规划论文筛选，精读 4 篇、速读 8 篇。</p>
-<p>最值得看的是两篇 9.0 分精读：异构图神经网络生成共享路线图与评估器的多智能体路径规划，以及拓扑约束下多机器人分布式运动规划。</p>
-<p>普通读者可优先读这两篇精读，若关注持续学习，再补速读中的《Continual Graph Multi-Agent Reinforcement Learning》。</p>
+<p>今日共生成 5 篇推荐（精读 0 篇，速读 5 篇）</p>
+<p>速读：《When Robots Crash: Optimal Asynchronous Gathering at Weber Meeting Nodes》（6.0/10）, 《OpenWAM: An Open Framework for Composable World-Action Models》（6.0/10）, 《LACE-CRAFT: Robot Co-Design with Actor Inheritance and Blackboard Collaboration》（6.0/10）</p>
+<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network">Shared-Roadmap Generation and Evaluator for Multi-Agent Path Planning Using Heterogeneous Graph Neural Network</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed Motion Planning for Multi-Robot Systems under Topological Constraints">Distributed Motion Planning for Multi-Robot Systems under Topological Constraints</span></li><li><span class="dpr-home-dashboard-paper-title" title="Entropy-Gated Belief Coordination for Decentralized Multi-Agent Search Under Intermittent Communication">Entropy-Gated Belief Coordination for Decentralized Multi-Agent Search Under Intermittent Communication</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">8 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Continual Graph Multi-Agent Reinforcement Learning">Continual Graph Multi-Agent Reinforcement Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming">Nonlinear Density-Driven Optimal Control (D2OC) for Multi-Agent Spatial Coverage via Sequential Convex Programming</span></li><li><span class="dpr-home-dashboard-paper-title" title="Fast Planning for Multi-object Multi-target Throwing">Fast Planning for Multi-object Multi-target Throwing</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="When Robots Crash: Optimal Asynchronous Gathering at Weber Meeting Nodes">When Robots Crash: Optimal Asynchronous Gathering at Weber Meeting Nodes</span></li><li><span class="dpr-home-dashboard-paper-title" title="OpenWAM: An Open Framework for Composable World-Action Models">OpenWAM: An Open Framework for Composable World-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="LACE-CRAFT: Robot Co-Design with Actor Inheritance and Blackboard Collaboration">LACE-CRAFT: Robot Co-Design with Actor Inheritance and Blackboard Collaboration</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>8</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 </div>
 
