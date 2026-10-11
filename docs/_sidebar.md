@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-10-11 <!--dpr-date:20261011-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202610/11/2610.06598v1-simforcing-distilling-simulation-motion-priors-into-real-domain-robot-world-models" data-sidebar-item="{&quot;title&quot;: &quot;SimForcing: Distilling Simulation Motion Priors into Real-Domain Robot World Models&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2610.06598v1-simforcing-distilling-simulation-motion-priors-into-real-domain-robot-world-models&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;面向动态预测的机器人世界模型&quot;}">SimForcing: Distilling Simulation Motion Priors into Real-Domain Robot World Models</a>
   * 2026-10-10 <!--dpr-date:20261010-->
     * 速读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202610/10/2610.06939v1-when-robots-crash-optimal-asynchronous-gathering-at-weber-meeting-nodes" data-sidebar-item="{&quot;title&quot;: &quot;When Robots Crash: Optimal Asynchronous Gathering at Weber Meeting Nodes&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2610.06939v1-when-robots-crash-optimal-asynchronous-gathering-at-weber-meeting-nodes&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;崩溃故障下多机器人团队的异步最优聚集&quot;}">When Robots Crash: Optimal Asynchronous Gathering at Weber Meeting Nodes</a>
