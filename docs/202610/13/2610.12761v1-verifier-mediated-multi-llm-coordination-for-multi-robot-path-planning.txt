@@ -1,0 +1,144 @@
+Title: Verifier-Mediated Multi-LLM Coordination for Multi-Robot Path Planning
+
+URL Source: https://arxiv.org/pdf/2610.12761v1
+
+Published Time: Mon, 12 Oct 2026 00:18:55 GMT
+
+Number of Pages: 5
+
+Markdown Content:
+# Verifier-Mediated Multi-LLM Coordination for Multi-Robot Path Planning 
+
+Vivek Khatana †,‡, Zijian Song †, Naira Hovakimyan †, Petros Voulgaris ‡
+
+> †
+
+{vkhatana, zijians4, nhovakim }@illinois.edu 
+
+> ‡
+
+{vkhatana, pvoulgaris }@unr.edu 
+
+> †
+
+Department of Mechanical Science and Engineering, University of Illinois Urbana-Champaign, Urbana, IL, USA 
+
+> ‡
+
+Department of Mechanical Engineering, University of Nevada, Reno, NV, USA 
+
+Abstract — Foundation models are increasingly used for high-level multi-robot task planning, yet independently generated symbolic plans can become jointly infeasible after geometric grounding because of shared spatial and temporal constraints. We study execution-aware coordination of large-language-model (LLM) planners for multi-robot navigation. We compare a centralized architecture, in which one LLM jointly reasons over the robot team, with a decentralized multi-LLM architec-ture in which each robot independently proposes a task plan. A geometric verifier grounds the candidate plans into robot trajectories, detects predicted inter-robot conflicts, and converts conflict information into structured feedback for targeted re-planning. This verifier-mediated architecture separates seman-tic task reasoning from execution-level feasibility while enabling iterative coordination among LLM planners. Experiments in CARLA and on Crazyflie aerial robots evaluate coordination performance as task complexity increases and characterize the trade-offs between centralized reasoning, decentralized verifier-mediated coordination, and physical executability. 
+
+Index Terms— Large language models, multi-robot systems, multi-agent planning, decentralized coordination, foundation models, robot navigation, path planning 
+
+I. I NTRODUCTION 
+
+Foundation models provide a flexible interface for seman-tic reasoning, task decomposition, and high-level planning in robotic systems. In multi-robot settings, however, a plan that is individually meaningful for each robot may still be jointly infeasible after geometric grounding. Independently generated routes can intersect in space and time, violate shared workspace constraints, or create execution conflicts that are not apparent at the symbolic planning level. These failures motivate an execution-aware coordination mech-anism between foundation-model reasoning and physical robot motion. A key architectural question is whether multi-robot foundation-model planning should be centralized or decentralized. A centralized planner can reason over the com-plete team state and generate coordinated plans jointly, but its context and decision space grow with team and task complex-ity. In contrast, decentralized planners provide modularity and local reasoning, but they require an explicit coordination mechanism to resolve conflicts between independently gener-ated plans. Recent multi-robot LLM frameworks coordinate robot teams through centralized or decentralized symbolic reasoning and inter-agent communication [1], [2]. However, such symbolic coordination does not by itself ensure that the resulting plans remain physically feasible after geometric grounding. This work studies verifier-mediated multi-LLM coordi-nation . Each robot-level LLM proposes a symbolic task plan, which is grounded into an executable trajectory by a geometric planning layer. A shared execution-level verifier evaluates the grounded trajectories for obstacle and inter-robot conflicts. When a conflict is predicted, the verifier converts the failure into structured feedback —including the affected agents, conflict location, and conflict time—and returns this information to the appropriate LLM planner for targeted replanning. This creates a closed coordination loop between foundation-model reasoning and robot execution without requiring unrestricted natural-language negotiation. The framework is illustrated in Fig. 1. LLM Grounding +Local Planning LLM-1 LLM-M 
+
+CENTRALIZED DECENTRALIZED Joint multi-robot task 𝝉 𝟏 𝝉 𝑴 
+
+𝒑 𝟏 𝒑 𝑴 𝒑 𝟏 𝒑 𝑴 
+
+> Grounding +Local Planning
+
+𝝃 𝟏 𝝃 𝑴 𝝃 𝟏 𝝃 𝑴   
+
+> Execution-Level Geometric Verifier Obstacle + trajectory-level inter-agent collision check
+> || 𝝃 𝒊 (𝒕) − 𝝃 𝒋 (𝒕)|| ≥ 𝒅 𝐦𝐢𝐧 𝐟𝐨𝐫 𝐚𝐥𝐥 𝒊 ≠ 𝒋, ∀𝒕 ∈ [𝟎, 𝑻]
+> Feasible Execute Conflict
+> Structured feedback 𝚿( 𝒋, 𝒕 𝒄 , 𝒙 𝒄 , 𝒅 𝒊𝒋 𝐦𝐢𝐧 )
+> Affected LLM
+
+…
+
+… …
+
+… …
+
+Fig. 1: Verifier-mediated multi-robot planning architecture. In the centralized architecture, a single LLM jointly gener-ates symbolic plans for the robot team, whereas in the decen-tralized architecture each robot is assigned an independent LLM planner. The resulting symbolic plans are grounded into robot trajectories and evaluated by a shared execution-level verifier. Predicted obstacle or inter-agent conflicts are con-verted into structured feedback and returned to the affected LLM planner for targeted replanning. arXiv:2610.12761v1 [cs.RO] 8 Oct 2026 The main contributions of this work are: i) We formulate centralized and decentralized LLM-based architectures for multi-robot task planning under shared execution constraints. ii) We introduce a verifier-mediated coordination mecha-nism that converts predicted geometric conflicts into structured feedback for targeted multi-LLM replanning. iii) We empirically study coordination and task comple-tion performance across increasingly complex multi-robot tasks in CARLA [3] and demonstrate transfer of the planning–verification–execution framework to Crazyflie [4] aerial robots. 
+
+Relation to prior work. Recent work has explored cen-tralized and decentralized LLM-based multi-robot symbolic reasoning and coordination [1], [2], [5], as well as feedback and constraint-guided refinement of LLM-enabled robotic behavior [6]–[8]. Our focus is different: we use an exter-nal execution-level verifier to evaluate grounded multi-robot trajectories, detect physical conflicts, and return structured agent-specific geometric feedback for targeted multi-LLM replanning. II. V ERIFIER -M EDIATED MULTI -R OBOT PLANNING 
+
+A. Multi-Robot Task and Path Representation 
+
+We represent the robot environment by a graph G =(V, E), where nodes denote admissible symbolic states and edges denote valid transitions. Robot i ∈ { 1, . . . , M } is assigned a task τi := {si, g i, Wi, Fi, Ci} containing its start 
+
+si, goal gi, required targets Wi, and task-specific constraints 
+
+(Fi, Ci). The LLM generates a symbolic plan 
+
+pi = PLLM ,i (τi, G, I i), (1) where Ii denotes the planner context, including prior execution-level feedback when available. Each symbolic plan is grounded and passed to a local geometric planner, 
+
+ξi = Π loc (Γ( pi)) , (2) where Γ : V → X maps symbolic states to geometric anchors in the robot’s state space X and Πloc is a local geometric planner used to connect grounded waypoints, such as an A⋆-based planner [9]. The resulting route is subsequently associated with the robot execution trajectory ξi.
+
+B. Centralized and Decentralized LLM Architectures 
+
+In the centralized architecture, a single LLM receives the joint team task and generates all robot plans simultaneously, 
+
+{p1, . . . , p M } = Pc
+
+> LLM
+
+(τ1, . . . , τ M , G, I ). (3) This exposes the planner to the global coordination problem but increases the size of the joint planning context. In the 
+
+decentralized architecture, robot i has its own LLM planner as in (1). The planners need not directly negotiate in unre-stricted natural language. Instead, their candidate trajectories are coupled through a shared execution-level verifier. 
+
+Fig. 2: CARLA multi-agent, multi-target navigation environment. The two agents navigate the shared road-network graph while visiting target sets of increasing complexity, with |W| ∈ { 2, 5, 9}
+
+> corresponding to the green, red, and black task configurations, respectively.
+
+C. Execution-Level Conflict Verification and Feedback 
+
+For every robot pair (i, j ), the verifier evaluates the trajectories and requires 
+
+∥ξi(t) − ξj (t)∥ ≥ dmin , ∀i̸ = j, ∀t ∈ [0 , T ], (4) where dmin > 0 is a prescribed separation threshold. The verifier can additionally check robot-obstacle constraints using the same grounded trajectories. If condition (4) is violated, the verifier identifies a predicted and constructs a structured feedback object ψψ(r) 
+
+> i
+
+= Ψ  j, t c, x c, d min 
+
+> ij
+
+ ,p(r+1)  
+
+> i
+
+= PLLM ,i (τi, G, I i ∪ ψ(r) 
+
+> i
+
+), (5) where tc and xc denote the predicted conflict time and location, dmin  
+
+> ij
+
+is the minimum predicted separation between robots i and j, and the superscript r denotes the planning iteration r. Replanning is targeted to the affected agent while feasible plans from other agents may be retained. The process terminates when all candidate trajectories satisfy the execution-level constraints. III. M ULTI -R OBOT EVALUATION 
+
+A. CARLA Experiments 
+
+We first evaluate the proposed centralized and decen-tralized multi-LLM planning architectures in CARLA [3] using a structured road-network graph (shown in Fig. 2). We evaluate two environment representations: raw coordinate descriptions and a neighbor-list representation. In the raw-coordinate representation, the environment is provided to the LLM through the serialized geometric positions of the graph nodes. In the neighbor-list representation, each node vi ∈ V 
+
+is instead described by its adjacent nodes, N (vi) = {vj :(vi, v j ) ∈ E} , thereby explicitly encoding the admissible graph connectivity. We consider a two-agent multi-target navigation problem. Each agent begins at an assigned start node, visits all designated target points in any order, and returns to its start node. The agents share the road network and must avoid inter-agent conflicts during execution. To evaluate increasing task complexity, we consider target sets of size |W| ∈ { 2, 5, 9} nodes. A trial is declared successful only if both agents visit all assigned target points and remain (a) Mean Success Time (b) Mean Successful Path Length (c) Mean Planning Time Across All Trials 
+
+Fig. 3: Performance on two-agent multi-target navigation in CARLA as the number of target points increases from 2 to 5 to 9. Results compare centralized single-LLM planning with coordinate and neighbor-list representations against decentralized two-LLM planning with the neighbor-list representation. Metrics are (a) mean planning time of successful trials, (b) mean successful path length, and (c) mean planning time over all trials. 
+
+collision-free. Our experiments use an inter-agent separation threshold of 7 m; a trial is declared unsuccessful if the distance between the agents falls below this threshold at any time. We compare centralized and decentralized planning under the same task conditions. In the centralized architecture, a single LLM jointly generates plans for both agents. In the decentralized architecture, each robot is assigned an indepen-dent LLM planner that reasons over its own task and tentative trajectory. Coordination is achieved through iterative verifier-mediated replanning as described in Section II. At the end of each planning iteration, the agents exchange their tentative paths, which are evaluated by a prediction-based collision checker using a time-indexed distance criterion (cf. (4)). If an inter-agent conflict is detected, the predicted conflict location and time index are communicated to the corresponding LLM, which replans its trajectory while the other agent retains its current plan (cf. (5)). This process is repeated until no predicted inter-agent conflict is detected. Performance is evaluated using three primary metrics: (i) expected success time, defined as the average planning time over successful trials; (ii) expected successful path length, defined as the average path length over successful trials; and (iii) expected planning time, defined as the average planning time over all trials. For decentralized planning, the reported planning time is averaged across the two LLM planners. Fig. 3 highlights the trade-off between centralized and de-centralized LLM coordination as task complexity increases. For smaller target sets, centralized planning incurs lower planning overhead, whereas the performance gap narrows for larger target sets as decentralized planning benefits from its modular structure. The results also show that the environ-ment representation matters: neighbor-list inputs consistently produce graph-valid routes with path lengths comparable to centralized planning, while raw-coordinate inputs provide greater geometric flexibility but are more susceptible to invalid waypoint generation. 
+
+B. Insights from CARLA Experiments 
+
+The CARLA experiments reveal several system-level trade-offs in foundation-model-based multi-robot planning. First, centralized planning is computationally efficient for the two-agent tasks considered here because a single LLM reasons jointly over the complete multi-agent state and can account for inter-agent interactions during plan generation. In contrast, decentralized planning introduces additional communication and replanning overhead through verifier-mediated coordination. As task complexity increases, how-ever, the performance gap between the two architectures becomes smaller, suggesting that the additional coordination overhead of decentralized planning is partially offset by its modular planning structure. Second, the environment representation provided to the LLM has a significant effect on planning reliability. The neighbor-list representation consistently produces graph-valid feasible routes with similar path lengths across the two planning architectures, whereas coordinate-based de-scriptions occasionally produce shorter trajectories but are more susceptible to invalid or out-of-map waypoints. This illustrates a trade-off between geometric flexibility and sym-bolic validity. Finally, collision-free task completion became more dif-ficult as the number of target points increased, consistent with longer trajectories, larger waypoint-ordering spaces, and more frequent inter-agent conflicts. These factors also increase the difficulty of resolving conflicts through iterative replanning, highlighting the importance of explicit execution-level feasibility checking. 
+
+C. Crazyflie Cross-Platform Evaluation 
+
+We next evaluate whether the planning–verification– execution interface transfers from ground vehicles to aerial robots through both Crazyflie [4] simulation and physical hardware experiments. In simulation, two quadrotors are assigned distinct navigation tasks, and the same central-ized/decentralized planning architectures are used to gen-erate trajectories satisfying the verifier’s predicted inter-agent separation criterion. The geometric verifier evaluates synchronized inter-agent distances and triggers replanning when a predicted conflict is detected. On physical hardware, we deploy the same symbolic-to-geometric planning pipeline for obstacle-aware navigation of a single Crazyflie. The LLM generates sparse waypoint se-quences, which are grounded into executable trajectories and (a) Two-Crazyflie simulation (b) Physical Crazyflie execution. 
+
+Fig. 4: Cross-platform evaluation on Crazyflie aerial robots. (a) Two-Crazyflie coordinated navigation in simulation with obstacle and predicted inter-agent conflict checking (demo video: https://tinyurl.com/cn3anffv ). (b) Physical Crazyflie navigation demonstrating transfer of the symbolic-to-geometric planning and feasibility interface to hardware (demo videos: https://tinyurl. com/476s68br ). Multi-robot coordination is evaluated in simulation, while the hardware experiment evaluates the planning pipeline under tracking, localization, actuation, and physical execution effects. 
+
+evaluated for feasibility before being passed to the Crazyflie low-level controller. Unlike in simulation, the executed tra-jectory naturally deviates from the ideal waypoint connec-tions due to tracking errors, actuator dynamics, localization uncertainty, and external disturbances. The hardware experi-ments therefore evaluate the planning–grounding–feasibility interface under execution-level effects, while multi-robot co-ordination itself is evaluated in the two-Crazyflie simulation experiments. Fig. 4 shows some snapshots from the Crazyfile simulation and hardware experiments illustrating that the same planning–verification–execution interface supports both two-robot coordination in simulation and physically executed obstacle-aware navigation on Crazyflie hardware. 
+
+D. Insights from Crazyflie Experiments 
+
+The Crazyflie experiments provide complementary evi-dence of both multi-robot coordination and cross-platform transfer. In simulation, the verifier-mediated architecture enables two independently tasked quadrotors to coordinate through trajectory-level conflict checking and replanning, demonstrating that the proposed interface is not specific to the CARLA road-network setting. The physical experiments further show that the same symbolic-to-geometric planning and feasibility pipeline can be deployed on real aerial hard-ware despite tracking errors, actuator dynamics, localiza-tion uncertainty, and external disturbances. Together, these results highlight the modularity of separating foundation-model reasoning from execution-level feasibility evaluation: the high-level planning architecture can be retained across robot embodiments while the geometric grounding and exe-cution layers are adapted to the underlying platform. In the present implementation, the verifier operates as an execution-level feasibility checker for predicted trajectory conflicts; extending this interface with uncertainty-aware or formally certified safety mechanisms provides a natural direction for future work. IV. C ONCLUSION 
+
+We presented a verifier-mediated architecture for coordi-nating foundation-model planners in multi-robot navigation. The approach separates high-level semantic reasoning from execution-level feasibility: centralized or decentralized LLM planners propose robot-level task plans, while a geomet-ric verifier evaluates the grounded trajectories and returns structured conflict information for targeted replanning. This formulation provides a concrete interface between decentral-ized foundation-model reasoning and execution-aware multi-robot coordination. CARLA experiments study coordina-tion performance under increasing task complexity, while Crazyflie experiments demonstrate transfer of the planning– verification–execution interface to aerial robot navigation. Ongoing work includes extending the framework to larger robot teams, richer communication policies, uncertainty-aware verification, and multi-robot hardware deployment. ACKNOWLEDGMENT 
+
+The authors used ChatGPT (OpenAI) to edit the manuscript. The authors independently conceived all re-search questions, designed the architectures, experimental methods, and conducted all validations, interpretations, and scientific conclusions. REFERENCES [1] Y. Chen, J. Arkin, Y. Zhang, N. Roy, and C. Fan, “Scalable multi-robot collaboration with large language models: Centralized or decentralized systems?” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 4311–4317. [2] Z. Huang, G. Shi, Y. Wu, V. Kumar, and G. S. Sukhatme, “Composi-tional coordination for multi-robot teams with large language models,” in Proceedings of the IEEE International Symposium on Multi-Robot and Multi-Agent Systems (MRS) , 2025. [3] A. Dosovitskiy, G. Ros, F. Codevilla, A. Lopez, and V. Koltun, “CARLA: An open urban driving simulator,” in Proceedings of the 1st Annual Conference on Robot Learning , 2017, pp. 1–16. [4] W. Giernacki, M. Skwierczy´ nski, W. Witwicki, P. Wro´ nski, and P. Kozierski, “Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering,” in 2017 22nd International Conference on Methods and Models in Automation and Robotics (MMAR) , 2017, pp. 37–42. [5] P. Li, Z. An, S. Abrar, and L. Zhou, “Large language models for multi-robot systems: A survey,” Autonomous Robots , 2026. [6] A. Madaan, N. Tandon, P. Gupta, S. Hallinan, L. Gao, S. Wiegreffe, U. Alon, N. Dziri, S. Prabhumoye, Y. Yang et al. , “Self-refine: Iter-ative refinement with self-feedback,” Advances in Neural Information Processing Systems , vol. 36, 2023. [7] W. Huang, F. Xia, T. Xiao, H. Chan, J. Liang, P. Florence, A. Zeng, J. Tompson, I. Mordatch, Y. Chebotar et al. , “Inner monologue: Embodied reasoning through planning with language models,” vol. 205, pp. 1769–1782, 14–18 Dec 2023. [Online]. Available: https://proceedings.mlr.press/v205/huang23c.html [8] Z. Ravichandran, A. Robey, V. Kumar, G. J. Pappas, and H. Hassani, “Safety guardrails for llm-enabled robots,” IEEE Robotics and Automa-tion Letters , 2026. [9] P. E. Hart, N. J. Nilsson, and B. Raphael, “A formal basis for the heuristic determination of minimum cost paths,” IEEE Transactions on Systems Science and Cybernetics , vol. 4, no. 2, pp. 100–107, 1968.

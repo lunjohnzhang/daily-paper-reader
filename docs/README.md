@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-11</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-13</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 8 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-11 23:13:51 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-13 01:10:02 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,10 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读1篇，聚焦《SimForcing》如何将仿真运动先验蒸馏进真实域机器人世界模型（6.0/10）。最值得看的是“仿真先验+真实域适配”这一思路，或为降低机器人世界模型真机数据依赖提供参考。普通读者可先关注该方向后续是否有开源与真机验证，再判断实用价值。</p>
+<p>今日共生成 8 篇推荐（精读 3 篇，速读 5 篇）</p>
+<p>精读：《Verifier-Mediated Multi-LLM Coordination for Multi-Robot Path Planning》（9.0/10）, 《Failure-Resilient Multi-Robot Coordination with $k$-Connectivity Constrained Submodular Maximization》（9.0/10）</p>
+<p>速读：《Distributed Harmonic-Covariance Feedback for Hole Closure in Planar Robot Swarms》（7.0/10）, 《SafeDiSTL: Decomposing Joint Constraints for Safe Multi-Agent Reinforcement Learning》（7.0/10）, 《KineWorld: Action-Induced Transport Fields for Embodied World Modeling》（6.0/10）</p>
+<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +74,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Verifier-Mediated Multi-LLM Coordination for Multi-Robot Path Planning">Verifier-Mediated Multi-LLM Coordination for Multi-Robot Path Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Failure-Resilient Multi-Robot Coordination with $k$-Connectivity Constrained Submodular Maximization">Failure-Resilient Multi-Robot Coordination with $k$-Connectivity Constrained Submodular Maximization</span></li><li><span class="dpr-home-dashboard-paper-title" title="MAGMA-Bench: Evaluating Long-Horizon Embodied Agents under Dynamic Tasks and Execution Failures">MAGMA-Bench: Evaluating Long-Horizon Embodied Agents under Dynamic Tasks and Execution Failures</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +87,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SimForcing: Distilling Simulation Motion Priors into Real-Domain Robot World Models">SimForcing: Distilling Simulation Motion Priors into Real-Domain Robot World Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Distributed Harmonic-Covariance Feedback for Hole Closure in Planar Robot Swarms">Distributed Harmonic-Covariance Feedback for Hole Closure in Planar Robot Swarms</span></li><li><span class="dpr-home-dashboard-paper-title" title="SafeDiSTL: Decomposing Joint Constraints for Safe Multi-Agent Reinforcement Learning">SafeDiSTL: Decomposing Joint Constraints for Safe Multi-Agent Reinforcement Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="KineWorld: Action-Induced Transport Fields for Embodied World Modeling">KineWorld: Action-Induced Transport Fields for Embodied World Modeling</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 </div>
 

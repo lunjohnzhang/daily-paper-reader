@@ -1,0 +1,754 @@
+Title: Failure-Resilient Multi-Robot Coordination with k-Connectivity Constrained Submodular Maximization
+
+URL Source: https://arxiv.org/pdf/2610.13049v1
+
+Published Time: Mon, 12 Oct 2026 00:41:03 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Failure-Resilient Multi-Robot Coordination with k-Connectivity Constrained Submodular Maximization 
+
+Yoonjae Hwang 1, Hojune Kim 1, Ellen Novoseller 2, Guangyao Shi 1,and Gaurav S. Sukhatme 1
+
+Abstract — Multi-robot coordination is essential in applica-tions such as coverage, target tracking, and information gath-ering, where robots must jointly select actions to maximize team performance. Submodular maximization provides an effective framework for such coordination, and resilient variants further account for robot failures or adversarial removals. However, existing methods typically overlook the impact of robot loss on the communication network, which may disconnect the surviving team and prevent continued coordination. To address this issue, we introduce Resilient k-Connected Submodular Maximization, which jointly considers task performance, re-silience, and communication connectivity. The resulting feasible family is not a matroid, preventing a direct application of clas-sical curvature-greedy guarantees. We overcome this challenge through a Menger-based connectivity reduction, a connectivity-aware greedy algorithm with a feasibility-preserving fallback, and a new curvature-based analysis that captures the cost of enforcing connectivity through a single factor ρ. Our method achieves a worst-case post-failure objective within a factor [max(1 − νf (I), h (N, β ))] 2ρ 1 
+
+> κf
+
+(1 − e−κf ) of the optimal connectivity-respecting resilient assignment, while recovering the classical unconstrained guarantee in the appropriate lim-its. Experiments on multi-robot target tracking validate the proposed method and characterize the practical impact of connectivity constraints. 
+
+I. I NTRODUCTION 
+
+Multi-robot systems provide scalable solutions to appli-cations such as environmental monitoring, target tracking, search and rescue, and collaborative exploration [1]–[4]. In many of these settings, the robots must coordinate their sensing or motion decisions to maximize a common team objective [5]. Submodular set functions provide a natural mathematical framework for such coordination by capturing the principle of diminishing returns: the marginal benefit of adding an additional robot decreases as more robots are already selected. Many commonly used objectives, including mutual information [6], area coverage [7], number of ob-served targets [8], and sensor-measurement entropy [9] are monotone submodular [10]. This structure enables compu-tationally efficient greedy algorithms with well-established constant-factor performance guarantees, as reviewed in Sec-tion II. Classical submodular maximization, however, typically assumes that the selected robots remain available throughout execution. In practice, robots may be lost due to hardware  
+
+> 1Y. Hwang, G. Shi, H. Kim, and G. S. Sukhatme are with the School of Computer Science, University of Southern California, Los Angeles, CA, USA
+
+{yoonjae, shig, hojuneki, gaurav}@usc.edu  
+
+> 2E. Novoseller is with the U.S. Army DEVCOM Army Research Labo-ratory,
+
+ellen.r.novoseller.civ@army.mil 
+
+Fig. 1: The core structural conflict in multi-robot deployments. 
+
+(Left) Aerial teams face adversarial attacks or failures removing up to β nodes. (Middle) Existing frameworks treat requirements in isolation, in which standard resilient maximization risks post-attack fragmentation, while standard connectivity assumes a failure-free environment. (Right) Our framework resolves this by achieving simultaneous adversarial resilience and (β + 1) -vertex-connectivity, ensuring the surviving team remains structurally connected and performant. 
+
+failures, communication interference, denial-of-service at-tacks, or other adverse events. This has motivated resilient submodular maximization, where the team is selected so that the objective remains large even after a bounded number of robots are removed [8], [11], [12]. Existing resilient formu-lations primarily focus on preserving submodular objective performance after such removals. Yet, critically, robot loss can disrupt the communication network among surviving robots. A team might therefore retain high sensing or cover-age capacity after failures while becoming disconnected and rendered unable to continue coordinated operation. Communication connectivity and resilience have both been studied extensively, but largely as separate requirements. In this work, we consider them jointly and ask how to select robot actions so that the team achieves a high submodular objective while remaining connected even after adversar-ial robot removals. We refer to this problem as Resilient 
+
+k-Connected Submodular Maximization (see Fig. 1). The joint treatment is substantially more challenging than simply combining two existing constraints. Resilience requires ac-counting for the worst-case subset of removed robots, while connectivity is a global property whose feasibility depends on which robots survive. This interaction also breaks key structures used in existing approximation analysis. In the resilient maximization framework of Tzoumas et al. [11], robustness is achieved by constructing a sacrificial “bait” set of β high-value robots together with a greedily selected remainder. Under a connectivity requirement, however, the arXiv:2610.13049v1 [cs.RO] 9 Oct 2026 adversary determines which robots are removed, and the worst-case removal need not coincide with the bait set. Consequently, enforcing connectivity only on the non-bait robots does not guarantee that the surviving team remains connected. Moreover, the constraint of selecting one tra-jectory per robot together with a global vertex-connectivity requirement does not form a matroid. As a result, classical curvature-based greedy guarantees cannot be applied directly and must be re-established for the connectivity-constrained resilient setting. We make the following contributions:  
+
+> •
+
+We formulate resilient submodular maximization under a (β+1) -vertex-connectivity constraint and show that the family of partial, connectivity-feasible selections is not a matroid (Proposition 1), identifying precisely why the classical greedy analysis fails to transfer.  
+
+> •
+
+We introduce a connectivity filter with a rigid-shift fallback across both bait and greedy stages, show it guarantees a feasible, (β+1) -connected output that sur-vives any removal of size at most β regardless of com-position (Proposition 2), and re-derive the curvature-greedy bound against a connectivity-respecting bench-mark (Lemma 1), isolating the filter’s entire cost into a single interpretable constant ρ ∈ [0 , 1] . 
+
+> •
+
+We prove a resilient, connectivity-preserving approxi-mation guarantee (Theorem 1) and empirically corrobo-rate the algorithm’s feasibility, the price of connectivity, and the squared resilience factor (Section V). II. R ELATED WORK 
+
+Our problem sits at the intersection of three literatures, summarized in Table I. 
+
+Submodular maximization and curvature. The classical greedy (1 − 1/e ) guarantee [10] was sharpened via curva-ture [13], [14] and extended to matroid and knapsack con-straints [15], [16]. None impose a structural k-connectivity requirement on the selected elements. 
+
+Connected submodular maximization. Connected max-imum coverage was introduced by Vandin et al. [17] and improved by Hochbaum and Rao [18], with follow-up work giving a 1/2-approximation in the geometric setting [19], an O(p1/k ) bound [20], and a two-stage heuristic for 1-connectivity [7]. None provide a provable guarantee for 
+
+k ≥ 2, with or without an adversary. 
+
+Resilient submodular maximization. Maximizing f (A \
+
+B) against an adversary removing β elements was introduced and shown NP-hard by Orlin et al. [12] ( ≈ 29% guarantee, 
+
+β ≤ √2α). Tzoumas et al. [11] remove this restriction for any β ≤ α, and Zhou et al. [8] extend it to the matroid-constrained multi-robot setting [6]. None impose a structural requirement on the surviving graph. No prior work imposes k-connectivity as a constraint that holds simultaneously with adversarial resilience, and this is the gap we address. III. P ROBLEM FORMULATION 
+
+A. Trajectory Model and Submodular Objective 
+
+Let R = {r1, . . . , r N } be a team of N robots. Each robot 
+
+r has a finite set of candidate trajectories, which we tag with the robot’s identity, Tr = {(r, τ ) : τ ∈ T r }, with |T r | = D.Because the robot identity r is part of each element, the sets Tr are pairwise disjoint by construction, and we write 
+
+TR = S 
+
+> r∈R
+
+Tr for their (disjoint) union. A selection assigns each robot exactly one trajectory. We identify it with the set 
+
+S ⊆ T R of chosen (robot, trajectory) pairs. The team objective is a normalized, monotone nondecreas-ing, submodular set function f : 2 TR → R≥0, with f (∅) = 0 .Thus, adding a trajectory never decreases the objective, and its marginal benefit exhibits diminishing returns. We write 
+
+f (s | X) := f (X ∪ { s}) − f (X) for the marginal gain of trajectory s relative to X. One example of such an objective is the number of distinct targets covered by the selected trajectories, as discussed in Section V. 
+
+B. Communication and Failure Model 
+
+Let P (s) denote the endpoint of trajectory s, and for a selection S let P (S) = {P (s) : s ∈ S} be the joint config-uration. Two robots communicate when their endpoints lie within range rc. We define the proximity graph G(P (S)) = (R, E ), where (i, j ) ∈ E ⇐⇒ ∥P (si) − P (sj )∥ ≤ rc.Recall that the vertex connectivity κ(G) of a graph G is the size of the smallest set of vertices whose removal disconnects 
+
+G. By Menger’s theorem [22], κ(G) is the largest k such that every pair of vertices is joined by k internally vertex-disjoint paths. In our setting, each vertex is a robot, so κ(G) is exactly the minimum number of robot failures that can disconnect the network. We assume that in any deployment, at most β robots may fail or be attacked [8], [11]. As in prior work, the identities of the failed robots are unknown at the time of trajectory selection, and a failure removes the affected robot’s trajectory contribution. It also removes the corresponding vertex of our communication graph G. Because every robot acts, the number of selected trajectories α := |S| = N , and the number of greedily selected “resilient” robots is at least 
+
+α − β = N − β.
+
+C. Assumptions 
+
+Assumption 1 (Initial connectivity) . At the start of each planning cycle, the current configuration induces a (β+1) -vertex-connected graph representing a multi-robot team with a prescribed k-vertex-connected topology as in Shi et al. [21]. 
+
+Assumption 2 (Endpoint connectivity) . Connectivity is re-quired only of the committed endpoint configuration P (S).In other words, robots may temporarily disconnect mid-trajectory. 
+
+Assumption 3 (Non-degeneracy) . Every singleton trajectory satisfies f (s)̸ = 0 , so that νf (I) and κf are well defined and the resilient optimum is nonzero, i.e., f ⋆ 
+
+> I
+
+> 0. Section V shows the excluded degenerate instances (post-attack objec-tive collapsing to zero) are a negligible fraction of scenarios. TABLE I: Positioning relative to prior work. k: connectivity level, β: resilience budget, Matroid: whether the feasible family is a matroid Work k β Matroid Guarantee Nemhauser [10] – – yes 1 − 1/e                                                           
+
+> Conforti [13] ––yes 1
+> κf(1 −e−κf)
+> Hochbaum–Rao [18] 1–no radius-based Kuo [20] ≥1–no O(p1/k )
+> Shi [7] 1–no heuristic Orlin [12] –≤ √2αyes ≈0.29
+> Tzoumas [11] –≤αyes max(1 −κf,1
+> β+1 )1
+> κf(1 −e−κf)
+> Zhou [8] –≤αyes [·]2(matroid)
+> This work β+1 ≤αno [max {1−νf(I), h (N, β )}]2ρ1
+> κf
+>  1−e−κf(Thm. 1)
+
+D. Formal Problem Statement 
+
+We synthesize the individual components of robot assign-ment, communication connectivity, and adversarial resilience into a single robust optimization problem. 
+
+Problem 1 (Resilient Connectivity-Constrained Maximiza-tion) . Given a team of robots R, candidate trajectories Tr for each r ∈ R , communication radius rc, and an attack budget 
+
+β, find a joint trajectory selection S⋆ ⊆ T R that solves: 
+
+max 
+
+> S⊆T R
+
+min 
+
+> B⊆S
+> |B|≤ β
+
+f (S \ B) (1) s.t. |S ∩ T r | = 1 , ∀r ∈ R (2) 
+
+κ G(P (S))  ≥ β + 1 (3) We assign each robot one trajectory so that the pre-attack graph is (β+1) -vertex-connected, ensuring the sur-viving graph stays connected after at most β removals. The goals pull in opposite directions: coverage rewards spreading robots out to reduce overlap, while resilient connectivity re-wards keeping them close with redundant links. This tension, against a worst-case adversary, breaks the matroid structure the classical greedy analysis relies on, as we show next. 
+
+E. Resilient Objective and Theoretical Baseline 
+
+For a selection S, a worst-case removal is B⋆(S) ∈
+
+arg min B⊆S, |B|≤ β f (S \ B). We compare algorithm per-formance against the best connectivity-respecting resilient assignment, 
+
+f ⋆ 
+
+> I
+
+= max  
+
+> S∈I
+
+min  
+
+> B⊆S, |B|≤ β
+
+f (S \ B), (4) while the unconstrained optimum is f ⋆ =max |S∩T r |=1 min |B|≤ β f (S \ B). Since (4) ranges over a subset of the selections feasible for f ⋆, we have f ⋆ 
+
+> I
+
+≤ f ⋆.Comparing against the constrained optimal solution f ⋆ 
+
+> I
+
+is theoretically necessary, as standard greedy approximation proofs require the elements of the optimal set to be feasible additions to the algorithm’s intermediate solutions. 
+
+F. The Feasible Family and the Failure of Matroid Structure 
+
+The central object is the intersection of the partition matroid (one trajectory per robot) with the connectivity constraint: 
+
+I =
+
+n
+
+S ⊆ T R : |S ∩ T r | = 1 ∀r ∈ R ,
+
+and κ G(P (S))  ≥ β + 1 
+
+o
+
+.
+
+(5) The one-trajectory-per-robot condition is a partition matroid. Intersecting it with a k-connectivity requirement, however, destroys the matroid structure. To make this precise, extend 
+
+I to a family of independent sets Iind : S ∈ I ind iff S
+
+selects at most one trajectory per robot and the induced endpoint graph G(P (S)) is (β+1) -vertex-connected. This is the object relevant to Algorithm 1’s correctness, since the stages of the proposed algorithm (Algorithm 1, introduced in Sec. IV) build the final trajectory selection ARES one trajectory at a time, and it is exactly the family of partial 
+
+selections encountered along this process that the classical curvature-greedy guarantee requires to form a matroid. We show it does not. 
+
+Proposition 1 (Iind is not a matroid) . There exist a com-munication radius rc and a robot set such that Iind violates the hereditary property, and is therefore not the independent-set family of any matroid. Algorithm 1 constructs solutions through partial selections in Iind . Its failure to form a matroid is therefore what prevents direct use of the classical curvature-greedy analysis. Proof. Take β = 1 , so that feasibility requires 2-vertex con-nectivity, and set rc = 1 . Consider four robots {r1, r 2, r 3, r 4}
+
+and let X = {(r1, τ 1), (r2, τ 2), (r3, τ 3), (r4, τ 4)} be the selection whose endpoints P (ri, τ i) form a 2-connected unit square, so X ∈ Iind . Let Y = X \ { (r4, τ 4)} =
+
+{(r1, τ 1), (r2, τ 2), (r3, τ 3)}. Removing one vertex from a 4-cycle leaves a path on three vertices. Thus, Y /∈ Iind ,violating the axiom that every subset of an independent set must itself be independent, so Iind fails to be a matroid. IV. M ETHODOLOGY AND THEORETICAL ANALYSIS 
+
+Our algorithm mirrors the bait-plus-greedy structure of Tzoumas et al. [11] and Zhou et al. [8], augmented with a connectivity filter and a rigid-shift fallback in both stages. The analysis is in two parts. First, connectivity and surviv-ability (Section IV-B) follow essentially by construction and are dealt with in Proposition 2. Second, the substance of Algorithm 1 RES-CON 
+
+Require: Robots R, trajectory sets {Tr }r∈R , budget β, ini-tial (β+1) -connected configuration P0 (Assumption 1) 
+
+Ensure: Feasible, (β+1) -connected selection ARES ∈ I 
+
+Stage S1 — bait  
+
+> 1:
+
+A1 ← ∅ ; P ← P0 ▷ shadow configuration  
+
+> 2:
+
+Sort R by non-increasing single-trajectory coverage  
+
+> 3:
+
+while |A1| < β do  
+
+> 4:
+
+r ← next robot in sorted order  
+
+> 5:
+
+s ← highest-coverage trajectory of r
+
+s.t. G P [r: = P (s)]  is (β+1) -connected  
+
+> 6:
+
+if no such s exists then  
+
+> 7:
+
+s ← τ0(r) ▷ stay at P0(r); Prop. 2  
+
+> 8:
+
+end if  
+
+> 9:
+
+A1 ← A1 ∪ { s}; P [r] ← P (s) ▷ update shadow  
+
+> 10:
+
+end while 
+
+Stage S2 — resilient greedy  
+
+> 11:
+
+A2 ← ∅  
+
+> 12:
+
+for k = 1 to α − β do  
+
+> 13:
+
+s⋆ ← arg max  
+
+> s
+
+f (s | A1 ∪ A2)
+
+subject to G P [rs: = P (s)]  (β+1) -connected  
+
+> 14:
+
+if no feasible s⋆ exists then  
+
+> 15:
+
+s⋆ ← τ0(rs) ▷ stay at P0(rs) 
+
+> 16:
+
+end if  
+
+> 17:
+
+A2 ← A2 ∪ { s⋆}; P [rs⋆ ] ← P (s⋆) 
+
+> 18:
+
+end for  
+
+> 19:
+
+return ARES ← A1 ∪ A2
+
+the analysis is the performance bound (Sections IV-D–IV-E), which quantifies the effect of the connectivity constraint on the usual resilient greedy choices, and how this constraint impacts the approximation guarantee. 
+
+A. The Algorithm 
+
+Algorithm 1 (RES-CON) states the procedure precisely. 
+
+a) Stage S1 (bait A1): The robots are sorted in non-increasing order of their maximum single-trajectory cover-age. The top β robots are then processed, each assigned its highest-coverage trajectory subject to keeping the running shadow configuration (β+1) -connected (line 5), with the stay-in-place fallback (i.e., returning the robot to its As-sumption 1 initial endpoint P0(r)) invoked when no such trajectory exists (line 7; see Proposition 2). Ordering by standalone rather than marginal value may assign overlap-ping bait trajectories, but this affects neither feasibility nor Theorem 1 as the redundancy is priced into the guarantee through νf (I) → 1. Because the fallback leaves the shadow configuration unchanged at that robot’s coordinate, it trivially preserves whatever connectivity level the configuration held prior to the attempted commit. 
+
+b) Stage S2 (resilient set A2): Each of the remaining 
+
+α − β robots greedily selects the connectivity-feasible trajec-tory of maximal marginal gain (line 13), executing the rigid fallback when no feasible candidate exists (line 15). 
+
+c) Output: ARES = A1 ∪ A2 (line 19). 
+
+d) Complexity: Each commit evaluates at most D can-didate trajectories, and for each it tests whether κ(G) ≥ β+1 
+
+on an N -vertex graph. This test runs in O (β+1) |E| √N 
+
+time, with |E| = O(N 2) in the worst case. Over the N
+
+commits, RES-CON therefore runs in low-order polynomial time, O N D (β+1) |E| √N , matching the connectivity-blind resilient greedy up to the per-step connectivity factor. 
+
+B. Connectivity and Survivability 
+
+Every commitment in Algorithm 1 preserves (β+1) -connectivity (or falls back to a move that trivially does), so output connectivity and survivability under attack follow directly from the construction. 
+
+Proposition 2 (Connectivity and survivability) . Algorithm 1 always outputs some ARES ∈ I . Moreover, for every removal 
+
+B ⊆ R with |B| ≤ β (whether B consists of bait robots, greedy robots, or any mixture of the two), the induced subgraph G(P (ARES )) \ B is connected. Proof. Feasibility. Let P (0) = P0 denote the shadow config-uration prior to any commits, and let P (i) denote the shadow configuration after the i-th commit (previously committed robots at their chosen endpoints, not-yet-committed robots still at their P0 position). We show by induction on i that P (i)
+
+is (β+1) -connected for every i. The base case P (0) = P0
+
+holds by Assumption 1. For the inductive step, suppose 
+
+P (i−1) is (β+1) -connected and consider the i-th commit, for robot r. If a trajectory s exists such that G P (i−1) [r:= P (s)] 
+
+is (β+1) -connected, the algorithm selects it directly, and 
+
+P (i) = P (i−1) [r:= P (s)] is (β+1) -connected by construc-tion. Otherwise, the algorithm falls back to τ0(r), i.e., r
+
+remains at P0(r), so P (i) = P (i−1) is unchanged and remains (β+1) -connected by the inductive hypothesis. Every commit in both Stage S1 and Stage S2 falls into one of these two cases, so by induction over the full commit sequence the final shadow configuration P (N ) = P (ARES ) is (β+1) -connected, so ARES ∈ I .
+
+Survivability. A graph with κ(G) ≥ k remains connected after deleting any set of fewer than k vertices, equivalently (by Menger’s theorem) every pair of vertices is joined by k
+
+internally vertex-disjoint paths [22]. Taking k = β + 1 and 
+
+|B| ≤ β yields connectivity of G(P (ARES )) \ B for any B
+
+of size at most β, regardless of its composition. Proposition 2 collapses a requirement over all  Nβ
+
+ possible removals, ∀B with |B| ≤ β, G(P (ARES )) \ B connected, into a single scalar test, κ(G) ≥ β + 1 , checked by the connectivity filter once per commit rather than enumerated per attack. 
+
+C. Curvature 
+
+We use the constrained curvature of Zhou et al. [8] to quantify the worst-case informational overlap between selected trajectories. For a feasible family I and a monotone submodular f with f (s)̸ = 0 for every singleton trajectory, 
+
+νf (I) = 1 − min  
+
+> S∈I
+
+min 
+
+> s∈S
+
+f (S) − f (S \ { s})
+
+f (s) ∈ [0 , 1] . (6) Here νf = 0 means the trajectories provide independent information, while νf → 1 indicates severe diminishing returns. We also define the global curvature, κf = 1 −
+
+min v f (TR)−f (TR\{ v})  
+
+> f(v)
+
+[13], [14], which similarly bounds overlap across the entire ground set, for the greedy recursion. 
+
+D. A Greedy Bound under the Connectivity Constraint 
+
+Because I is not a matroid, the Conforti–Cornuéjols curvature-greedy guarantee does not immediately transfer. We re-derive it with respect to the constrained optimum, isolating the cost of the connectivity filter into a single interpretable constant. 
+
+Definition 1 (Price of connectivity per step) . At greedy step 
+
+k, let gunc  
+
+> k
+
+be the largest marginal gain over all remaining single-robot trajectories, and let gcon  
+
+> k
+
+be the largest marginal gain over those trajectories that keep the committed graph 
+
+(β+1) -connected. Define: 
+
+ρ = min   
+
+> k:gunc
+> k>0
+
+gcon 
+
+> k
+
+gunc 
+
+> k
+
+∈ [0 , 1] . (7) A feasible candidate always exists at every step (Proposi-tion 2), so gcon  
+
+> k
+
+is well defined; ρ is the worst-case fraction of greedy marginal value retained under the constraint, with 
+
+ρ = 1 when connectivity never throttles the greedy choice and ρ → 0 when it does so severely. Let A⋆ 
+
+> I,2
+
+∈ arg max A: A1∪A∈I ,|A|≤ α−β f (A) be the best feasible completion of the bait, where recall that A1 and A2
+
+denote the S1 and S2 outputs, respectively. 
+
+Lemma 1 (Constrained curvature-greedy bound) . Under Assumptions 1–3, 
+
+f (A2) ≥ ρ · 1
+
+κf
+
+ 1 − e−κf
+
+ f (A⋆
+
+> I,2
+
+). (8) 
+
+Proof. Index the greedy steps k = 1 , . . . , α − β, and write 
+
+A(k)2 for the partial greedy set after k commits. Let O := 
+
+A⋆
+
+> I,2
+
+, with |O| ≤ α − β.
+
+Step (i): submodular decomposition relative to the feasible optimum. By monotonicity and submodularity, at each step 
+
+k,
+
+f (O) − f (A(k)2 ) ≤ f (O ∪ A(k)2 ) − f (A(k)2 )
+
+≤ X
+
+> s∈O\A(k)2
+
+f (s | A(k)2 ).
+
+Every s ∈ O is, by definition of O as a feasible completion of the bait, a candidate the greedy step could have considered, so it lies in the feasible pool whose best element defines 
+
+gunc 
+
+> k+1
+
+. This decomposition is exactly why the bound is stated against the constrained optimum f ⋆ 
+
+> I
+
+: elements of an unconstrained optimum could be infeasible to add and would break it. 
+
+Step (ii): curvature relates the marginal sum to a sin-gle greedy step. Applying the curvature definition to the marginals bounded in Step (i) and telescoping via the stan-dard Conforti–Cornuéjols recursion [13] yields f (A′
+
+> 2
+
+) ≥ 
+
+> 1
+> κf
+
+(1 − e−κf )f (O) for the hypothetical greedy A′ 
+
+> 2
+
+that at each step takes the unconstrained best feasible marginal gunc  
+
+> k
+
+.Crucially, this recursion remains valid because submodularity and curvature are properties of f alone; they do not require the optimal set O to be drawn from a strict matroid structure. 
+
+Step (iii): discount by ρ. The actual algorithm commits the connectivity-feasible best, achieving marginal gcon  
+
+> k
+
+≥ ρg unc 
+
+> k
+
+at every step by (7). Replacing each step’s progress by its 
+
+ρ-fraction and re-telescoping yields f (A2) ≥ ρf (A′
+
+> 2
+
+). This scales the bound in (ii) uniformly by ρ, giving (8). 
+
+E. Main Theorem 
+
+To bound Algorithm 1’s performance, we first use Lemma 1 to bound f (A2) in terms of its constrained optimum 
+
+f (A⋆
+
+> I,2
+
+) and then apply Lemma 2 (proven below) to bound 
+
+f (A⋆
+
+> I,2
+
+) in terms of the true worst-case optimum f ⋆ 
+
+> I
+
+.
+
+Theorem 1 (Resilient, connectivity-preserving approxima-tion) . Under Assumptions 1–3, the output ARES of Algo-rithm 1 satisfies, 
+
+f  ARES \ B⋆(ARES ) ≥  max(1 − νf (I), h (N, β )) 2 · ρ
+
+· 1
+
+κf
+
+ 1 − e−κf
+
+ f ⋆ 
+
+> I
+
+, (9) 
+
+where h(N, β ) = max   11+ β , 1 
+
+> N−β
+
+.Proof. We follow the bait/greedy case split over I. Write 
+
+B⋆ = B⋆(ARES ), B⋆ 
+
+> 1
+
+= B⋆ ∩ A1, and B⋆ 
+
+> 2
+
+= B⋆ ∩ A2.
+
+Case A: B⋆ 
+
+> 2
+
+= ∅. Then ARES \ B⋆ = A2, so by Lemma 1 and Lemma 2, f (ARES \ B⋆) = f (A2) ≥
+
+ρ 1 
+
+> κf
+
+(1 − e−κf ) max(1 − νf (I), h (N, β )) f ⋆ 
+
+> I
+
+. Since max(1 −
+
+νf (I), h (N, β )) ≤ 1, the squared bound in (9) holds. 
+
+Case B: B⋆
+
+> 2
+
+̸ = ∅. Because |B⋆| = |A1| = β and at least one greedy element is removed, at least one bait element survives. The bait robots are those of largest single-trajectory coverage, each assigned its highest-coverage connectivity-feasible trajectory. Since the greedy elements are drawn from the same connectivity-feasible universe, each surviving bait element dominates each removed greedy element in abso-lute single-trajectory coverage. Applying the constrained-curvature counterpart of Tzoumas et al.’s Lemma 1 (using 
+
+νf (I) in place of the global curvature) and value-domination gives the modularity-side bound f (ARES \ B⋆) ≥ (1 −
+
+νf (I)) f (A2). Independently, the resilience accounting of Zhou et al. [8] yields the cardinality-side bound f (ARES \
+
+B⋆) ≥ h(N, β )f (A2). Taking the larger of the two gives 
+
+f (ARES \ B⋆) ≥ max(1 − νf (I), h (N, β )) f (A2). Substitut-ing f (A2) using Lemma 1, and then substituting f (A⋆
+
+> I,2
+
+)
+
+using Lemma 2, yields the desired squared bound in (9). Because the max factor is ≤ 1, this squared bound is the worst-case minimum, ensuring (9) holds in all cases. We now formally bound the constrained optimum f (A⋆
+
+> I,2
+
+)
+
+against the worst-case optimum f ⋆ 
+
+> I
+
+.
+
+Lemma 2 (Second resilience factor) . f (A⋆
+
+> I,2
+
+) ≥ max(1 −
+
+νf (I), h (N, β )) · f ⋆ 
+
+> I
+
+.
+
+Proof. Let S⋆ ∈ I attain f ⋆ 
+
+> I
+
+, with worst-case removal 
+
+B⋆(S⋆), and split it into the β highest-singleton-value ele-ments (the virtual bait ˜A1) and the remainder ˜A2 := S⋆ \ ˜A1.Since ˜A2 is a feasible completion of a size-β bait, it competes in the maximization defining A⋆
+
+> I,2
+
+, so f (A⋆
+
+> I,2
+
+) ≥ f ( ˜A2).Removing the β highest-value elements extracts the maxi-mum possible value under the curvature bound defined by Zhou et al. [8], guaranteeing that the remainder retains at least f ( ˜A2) ≥ (1 −νf (I)) f ⋆ 
+
+> I
+
+. The survivor-count accounting of Zhou et al. [8] gives the cardinality bound f ( ˜A2) ≥
+
+h(N, β )f ⋆ 
+
+> I
+
+. Taking the larger yields the claim. We formally justify multiplying the bounds from Lem-mas 1 and 2 by ensuring the connectivity penalty ρ is con-ditionally independent of the Stage S1 trajectory selections: 
+
+Proposition 3 (Stage independence under intra-stage filter-ing) . Suppose the connectivity filter is intra-stage : the feasi-ble S2 completions of the bait depend on S1 only through the fixed endpoint set P (A1), and the retention ratios gcon  
+
+> k
+
+/g unc 
+
+> k
+
+defining ρ are evaluated against that same configuration. Then the loss from the S1 bait commitment (Lemma 2) and the S2 loss (Lemma 1) compose multiplicatively, yielding the squared factor in (9) .Proof. The bounds from Lemma 1 and Lemma 2 chain through the common term f (A⋆
+
+> I,2
+
+). The intra-stage hypoth-esis confines the influence of the S1 choice to the endpoints 
+
+P (A1); freezing these renders ρ conditionally independent of the specific S1 trajectories, so the two worst-case fractions multiply. Combining with the Case B inequality f (ARES \
+
+B⋆) ≥ max(1 − νf (I), h (N, β )) f (A2) yields the squared bound in Theorem 1. 
+
+Remark 1 (Scope of the square) . The squared factor holds under Assumptions 1–3 and the intra-stage hypothesis of Proposition 3 on every non-degenerate instance. When f ⋆ 
+
+> I
+
+=0, (9) is vacuously true but the ratio is the indeterminate 
+
+0/0; Assumption 3 excludes exactly this floor-collapse set. Section V confirms that the ≈ 0.7% of swept instances violating the squared bound are precisely these degenerate cases, independent of the connectivity regime. 
+
+Corollary 1 (Bridge to the unconstrained optimum) . Sup-pose there is γ ∈ (0 , 1] with f ⋆ 
+
+> I
+
+≥ γf ⋆ (γ = 1
+
+whenever some unconstrained resilient optimum is already 
+
+(β+1) -connected). Then f (ARES \ B⋆(ARES )) ≥ [max(1 −
+
+νf (I), h (N, β ))] 2ρ 1 
+
+> κf
+
+(1 − e−κf )γf ⋆.
+
+V. E XPERIMENTS 
+
+Our experiment objectives are (i) to characterize the connectivity penalty ρ across communication densities and team sizes, establishing that it remains bounded away from zero in realistic instances, (ii) to validate the feasibility of Algorithm 1’s outputs (Proposition 2), (iii) to test the squared resilience factor derived in (9), and (iv) to evaluate the algo-rithm’s operational resilience and connectivity maintenance over multi-planning cycle deployments. 
+
+A. System Model 
+
+We instantiate a multi-robot active target tracking formu-lation, following Shi et al. [7]. A team of N aerial robots flies at fixed altitude in a bounded arena W = [0 , L ]2.Robot i occupies position xi ∈ W with a downward camera of sensing radius rs under a condition where two robots communicate if and only if ∥xi − xj ∥ ≤ rc. During each planning cycle, robot i may move within a disc of radius rmove , discretized into D candidate trajectories, while 
+
+M ground targets move by a single-integrator model with reflecting boundaries. The objective is the number of distinct targets observed by at least one robot, 
+
+f (A) = [
+
+> i∈A
+
+T (xi) , T (xi) = {j : ∥pj −xi∥ ≤ rs}, (10) a monotone submodular coverage function with total curva-ture κf = 1 − 1/M . This closed form gives direct control over curvature. After the team commits A, a rational β-adversary removes B⋆(A) = arg min |B|≤ β f (A \ B), which may be computed exactly for small teams. We compare against baselines spanning the connectiv-ity/resilience design space: Pure Greedy (no constraints), 
+
+Resilient-Only (Tzoumas et al. [11], no connectivity), 1-Connected-Only (Hochbaum–Rao [18], CSM from Shi et al. [7]), (β+1) -Connected-Only (connectivity, no adver-sary), and Fallback-ablated (ours without the rigid-shift fallback). We denote our method RES-CON . Figure 2 vi-sualizes a post-attack comparison between RES-CON and the Resilient-Only baseline. 
+
+B. Measuring the Price of Connectivity ρ
+
+At each greedy step, we record the marginal gains gunc  
+
+> k
+
+and 
+
+gcon  
+
+> k
+
+and the running minimum of their ratio, i.e., the realized 
+
+ρ (7). We sweep density rc/r move across sparse-to-dense regimes and use N ∈ { 6, 10 , 20 , 40 } and β ∈ { N/ 4, N/ 2},over 100 random initializations per parameter set. Above the connectivity percolation threshold, the realized 
+
+ρ is a flat median of 1.0 in every (N, β ) cell (Fig. 3), with fallback frequency collapsing to approximately zero. Meanwhile, below the threshold, it degrades sharply (median 
+
+→ 0, with the fallback invoked up to 44% of steps). This empirical result demonstrates that (9) is non-vacuous in the operating regime: when Assumption 1 is satisfied, the connectivity filter imposes no significant penalty to the objective score (i.e., ρ ≈ 1). To distinguish whether ρ = 1 reflects a filter that is inexpensive to satisfy or one that is invoked only rarely, we measure the per-step candidate-rejection rate. Above threshold, the filter rejects at least one candidate on only 
+
+1.67% of steps. Below threshold, by contrast, the filter rejects at least one selection on 32% of steps. Thus, we conclude that the connectivity constraint is essentially inactive above the percolation threshold and becomes binding precisely in the sparse regime where connectivity is genuinely at risk. 
+
+C. Feasibility Validation (Proposition 2) 
+
+Across 3,619 instances, the committed team is (β+1) -connected on 100% of outputs, confirming Proposition 2. For comparison, an ablation without the Stage S1 connectivity filter fails to maintain connectivity on ≈ 29% of instances below threshold. The S1 filter repairs this at negligible Fig. 2: Post-attack topology after removing 3 bait robots from an 8-robot team. (a) Resilient Only [8]: unconstrained S2 (resilient set) selection leaves survivors fragmented ( κ = 0 , 2 components); 36/56 possible 3-robot failures would disconnect them. (b) RES-CON :adding a k-connectivity constraint ( k = 4 ) keeps survivors fully connected ( κ = 7 ), with 0/56 possible failures.                   
+
+> Fig. 3: Realized price of connectivity ρ(solid: median; shaded band: interquartile range) and fallback-firing frequency (dashed) versus communication density, for β=N/ 4(left) and β=N/ 2(right). The dotted verticals mark the (β+1) -connectivity percolation threshold. Above the threshold ρis a flat 1.0and the fallback frequency collapses to zero. Below it, ρdegrades as the fallback activates.
+
+cost without measurably affecting the post-attack objective (93 .5% of instances identical to the unfiltered variant), con-firming that guaranteed connectivity does not trade away resilience. 
+
+D. Testing the Squared Resilience Factor 
+
+For small teams ( N ≤ 12 ) where f ⋆ 
+
+> I
+
+is computable by brute force, we measure the empirical ratio f (ARES \B⋆)/f ⋆
+
+> I
+
+and compare against the squared bound of (9). The squared bound is respected on ≈ 99 .3% of instances, with margin uniformly positive across the (κf , β ) plane, from +0 .18 to +0 .87 (Fig. 4). The ≈ 0.7% exceptions are exactly the degenerate f ⋆ 
+
+> I
+
+= 0 instances of Remark 1, independent of the connectivity regime. 
+
+E. The Connectivity-Resilience Trade-off 
+
+Our central claim is that RES-CON preserves connectivity under repeated adversarial attack where connectivity-blind methods fragment. We test this over a T -planning cycle horizon with moving targets, sweeping rc relative to the percolation threshold and measuring both the worst-case-survivor disconnection rate and cumulative target tracking. 
+
+Connectivity: Below the percolation threshold, RES-CON disconnects on 12 .5% of planning cycles at the sparsest      
+
+> Fig. 4: Margin (realized ratio −squared bound) over the (κf, β )
+> plane, where the non-negativity certifies the squared factor. Every cell is positive, indicating the squared bound holds across the entire swept plane on non-degenerate instances.
+
+density versus 24 .7% for Resilient-Only and 27% for Pure Greedy (Fig. 5). At and above threshold every method disconnects at near-zero rate. 
+
+Trade-off: Below threshold, Resilient-Only secures the highest cumulative tracking by disregarding the communi-cation graph, but since a fragmented team cannot coordinate Fig. 5: Worst-case-survivor disconnection rate versus communica-tion density (normalized to the percolation threshold). 
+
+Fig. 6: Cumulative worst-case tracking below threshold (rc/r move = 5.2). Resilient-Only accrues the most tracking value by ignoring connectivity, while RES-CON accepts a modest tracking reduction in exchange for roughly halved disconnection 
+
+under our assumptions, that advantage is misleading. RES-CON instead accepts a modest tracking reduction for the roughly halved disconnection rate as shown in Fig. 5 and in Fig. 6, delivering connectivity-guaranteed tracking at a small coverage cost. At and above threshold, the tracking curves of all methods coincide, consistent with the connectivity constraint being inactive there (Section V-B). VI. C ONCLUSION AND FUTURE WORK 
+
+We introduced resilient submodular maximization under a (β+1) -vertex-connectivity constraint, jointly capturing ad-versarial robustness and communication network integrity for multi-robot teams. Several directions remain open. First, the squared resilience factor is established under the intra-stage hypothesis of Proposition 3 and corroborated empirically. A proof that this hypothesis holds unconditionally for disk-graph geometries under bounded motion would bolster the idea. Second, deriving a geometric lower bound for ρ would convert the penalty into a computable quantity, making (9) a fully unconditional guarantee on non-degenerate instances. Finally, a hardware demonstration on an aerial or ground fleet would validate the connectivity guarantee under real communication models. ACKNOWLEDGMENTS 
+
+This work was sponsored in part by the U.S. Army DEVCOM Army Research Laboratory under Cooperative Agreement Number W911NF-17-2-0181. REFERENCES [1] M. Dunbabin and L. Marques, “Robots for environmental monitoring: Significant advancements and applications,” IEEE Robotics & Automa-tion Magazine , vol. 19, no. 1, pp. 24–39, 2015. [2] C. Robin and S. Lacroix, “Multi-robot target detection and tracking: Taxonomy and survey,” Autonomous Robots , vol. 40, no. 4, pp. 729– 760, 2016. [3] J. Peña Queralta, J. Taipalmaa, B. Can Pullinen, V. K. Sarker, T. Nguyen Gia, H. Tenhunen, M. Gabbouj, J. Raitoharju, and T. Westerlund, “Collaborative multi-robot search and rescue: Planning, coordination, perception, and active vision,” IEEE Access , vol. 8, pp. 191617–191643, 2020. [4] W. Burgard, M. Moors, C. Stachniss, and F. E. Schneider, “Co-ordinated multi-robot exploration,” IEEE Transactions on Robotics ,vol. 21, no. 3, pp. 376–386, 2005. [5] A. Krause and D. Golovin, “Submodular function maximization,” in Tractability: Practical Approaches to Hard Problems , Cambridge University Press, pp. 71–104, 2014. [6] A. Krause, H. B. McMahan, C. Guestrin, and A. Gupta, “Robust submodular observation selection,” Journal of Machine Learning Re-search , vol. 9, no. 12, 2008. [7] G. Shi, I. E. Rabban, L. Zhou, and P. Tokekar, “Communication-aware multi-robot coordination with submodular maximization,” in Proc. IEEE International Conference on Robotics and Automation (ICRA) ,pp. 8955–8961, 2021. [8] L. Zhou, V. Tzoumas, G. J. Pappas, and P. Tokekar, “Resilient active target tracking with multiple robots,” IEEE Robotics and Automation Letters , vol. 4, no. 1, pp. 129–136, 2019. [9] P. Dames, P. Tokekar, and V. Kumar, “Detecting, localizing, and tracking an unknown number of moving targets using a team of mobile robots,” The International Journal of Robotics Research , vol. 36, no. 13-14, pp. 1540–1553, 2017. [10] G. L. Nemhauser, L. A. Wolsey, and M. L. Fisher, “An analysis of approximations for maximizing submodular set functions—I,” Math-ematical Programming , vol. 14, no. 1, pp. 265–294, 1978. [11] V. Tzoumas, K. Gatsis, A. Jadbabaie, and G. J. Pappas, “Resilient monotone submodular function maximization,” in Proc. IEEE Confer-ence on Decision and Control (CDC) , pp. 1362–1367, 2017. [12] J. B. Orlin, A. S. Schulz, and R. Udwani, “Robust monotone submod-ular function maximization,” Mathematical Programming , vol. 172, no. 1, pp. 505–537, 2018. [13] M. Conforti and G. Cornuéjols, “Submodular set functions, matroids and the greedy algorithm,” Discrete Applied Mathematics , vol. 7, no. 3, pp. 251–274, 1984. [14] R. K. Iyer, S. Jegelka, and J. A. Bilmes, “Curvature and optimal algorithms for learning and minimizing submodular functions,” in 
+
+Advances in Neural Information Processing Systems , vol. 26, 2013. [15] G. Calinescu, C. Chekuri, M. Pál, and J. Vondrák, “Maximizing a monotone submodular function subject to a matroid constraint,” SIAM Journal on Computing , vol. 40, no. 6, pp. 1740–1766, 2011. [16] C. Chekuri, J. Vondrák, and R. Zenklusen, “Submodular function maximization via the multilinear relaxation and contention resolution schemes,” in Proc. 43rd ACM Symposium on Theory of Computing (STOC) , pp. 783–792, 2011. [17] F. Vandin, E. Upfal, and B. J. Raphael, “Algorithms for detecting significantly mutated pathways in cancer,” Journal of Computational Biology , vol. 18, no. 3, pp. 507–522, 2011. [18] D. S. Hochbaum and X. Rao, “Approximation algorithms for con-nected maximum coverage problem for the discovery of mutated driver pathways in cancer,” Information Processing Letters , vol. 158, art. 105940, 2020. [19] C.-C. Huang, M. Mari, C. Mathieu, J. S. B. Mitchell, and N. H. Mustafa, “Maximizing covered area in the Euclidean plane with connectivity constraint,” in APPROX/RANDOM , pp. 32:1–32:21, 2019. [20] T.-W. Kuo, K. C.-J. Lin, and M.-J. Tsai, “Maximizing submodular set function with connectivity constraint: Theory and application to networks,” IEEE/ACM Transactions on Networking , vol. 23, no. 2, pp. 533–546, 2014. [21] G. Shi, M. Ishat-E-Rabban, G. Bonner, and P. Tokekar, “Fast k-connectivity restoration in multi-robot systems for robust communi-cation maintenance: Algorithmic and learning-based solutions,” Au-tonomous Robots , vol. 49, Art. no. 34, 2025. [22] K. Menger, “Zur allgemeinen Kurventheorie,” Fundamenta Mathemat-icae , vol. 10, no. 1, pp. 96–115, 1927.

@@ -1,0 +1,600 @@
+Title: Non-Prehensile Multi-Object Placement with Mobile Robots via Diffusion-Based Trajectory Planning
+
+URL Source: https://arxiv.org/pdf/2610.12684v1
+
+Published Time: Mon, 12 Oct 2026 00:13:35 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Non-Prehensile Multi-Object Placement with Mobile Robots via Diffusion-Based Trajectory Planning 
+
+Lance Pharand 1, Megnath Ramesh, Mark Chiu, Yash Vardhan Pant, Stephen L. Smith 
+
+Abstract — Non-prehensile manipulation with mobile robots has primarily targeted placement in coarse goal regions. Precision placement has been studied with manipulators on benchmarks such as Push-T, where an omnidirectional end effector can readily re-approach an object from any side. For a mobile robot, correcting the same placement errors may require wide repositioning maneuvers around the object. We formalize multi-object pushing with a mobile robot as a multi-target assignment problem at tight tolerances. We propose a diffusion planner with a causal factorization: each robot denoising step is followed by an object step conditioned on the current clean robot estimate. This factorization allows us to sample multiple object outcomes for a single robot plan, capturing the multi-modality of pushing. We also design a set of pushing-specific costs for mobile robots, used for both guidance and best-of-
+
+N sampling at inference. On Push-T, our planner attains the highest success rate of the methods we compare, while having the lowest rate of implausible object motion. Across three multi-box pushing environments resembling warehouse scenarios, it raises the fraction of boxes placed by 21 .5 percentage points over an unguided baseline, and replans 1.8× faster than a planner that denoises the two trajectories together. Lastly, we deploy the guided planner on a TurtleBot 3 Burger with object shapes absent from the training data, where it places 85 .0% of objects within tolerance against Diffusion Policy’s 37 .5% .
+
+I. I NTRODUCTION 
+
+In this work, we focus on the problem of multi-object pushing with a mobile robot. Formally, this is a multi-target assignment problem, where each object must be placed inside a tight target configuration (Fig. 1). Successfully solving this problem would make mobile robots viable for warehouse tasks where they must push boxes or pallets to precise positions for downstream automation to take over. Precision pushing has been studied in the manipulator setting, where Push-T [1], [2] is a popular benchmark [3], [4]. Here, a robot with a circular end-effector must push a T-shaped block onto a goal pose, with success requiring near-complete overlap. In contrast, existing non-prehensile manipulation (NPM) work with mobile robots [5], [6], [7] only requires the object to land inside a target zone much larger than the object itself. Two properties of the mobile robot setting make pushing an object to within a small tolerance of a target harder than it is in the manipulator setting. First, mobile robots typically have non-holonomic dynamics and cannot move  
+
+> 1This research is supported in part by the Natural Sciences and Engineer-ing Research Council of Canada (NSERC) and the Canada Research Chairs Program. This research was enabled in part by support provided by the Vector Institute (https://vectorinstitute.ai) and the Digital Research Alliance of Canada (alliance.can.ca). Lance Pharand is also financially supported by the Vector Scholarship in Artificial Intelligence, provided through the Vector Institute. All authors are part of the Electrical and Computer Engineering Department at the University of Waterloo, ON, Canada
+
+Fig. 1: Robot completes a successful push during an Out-of-distribution (OOD) experiment with new shapes. Robot demo videos and code available on our project website 
+
+sideways. Second, the robot’s contact face is typically a non-prehensile bumper fixed to the front, so changing the side of the object being pushed requires a wide reposition. Both aspects make it difficult to perform the small corrections needed to bring an object within a tight tolerance of its target. In contrast, the end effector in Push-T can move sideways, is omnidirectional, and can re-approach the object from any side. Planners and policies for the studied setting must account for the difficulty of these corrections, but existing mobile robot NPM methods are evaluated in settings where this is not necessary. Diffusion-based planners have shown promise in solving difficult pushing problems [3], [4]. Diffusion planners that predict object motion typically denoise the robot and object trajectories simultaneously [8], which can yield object mo-tion that is implausible given the robot’s actions. We instead factorize the joint trajectory distribution into a robot trajec-tory prior and an object trajectory conditional. Each robot denoising step is followed by an object step conditioned on the current clean robot estimate (Fig. 2). As a result, guidance can be evaluated on a predicted object outcome that is a response to the current robot plan, and its gradient is backpropagated through that response to improve the robot plan. The Causal factorization also lets us sample several object outcomes for a single robot plan, which is beneficial as pushing is multimodal [9]. Our main contributions are: 1) We formulate and evaluate multi-object placement by a mobile robot under tight spatial tolerances, requiring each object’s footprint to lie within its target region and previously completed placements to remain undisturbed. We assess how placement tolerance affects execution success across multiple environments. 2) We propose a diffusion-based planner that uses a Causal arXiv:2610.12684v1 [cs.RO] 8 Oct 2026 factorization of trajectory denoising for non-prehensile pushing. With this, each robot denoising step is followed by an object step that is conditioned on the current clean robot estimate. We also propose a guidance formulation for this factorization, together with a set of differentiable cost terms tailored to mobile robot pushing. In this work, our evaluation spans the Push-T task, three unseen mobile robot pushing environments, and a hardware deployment on a TurtleBot 3 Burger, with analysis of the planner’s capabilities and limitations. 
+
+A. Related Works a) Diffusion models for planning: Diffusion-based tra-jectory planners have been applied to both short and long-horizon tasks, both of which arise in NPM. At short horizons, the planner samples a trajectory, executes a portion of it, and then replans [1], [3]. Long horizon settings instead tend to rely on trajectory stitching, where a full plan is com-posed from sub-trajectories already present in the training distribution [8], [10]. Closest to our proposed factorization is MBA [11], which also splits robot and object denoising into two phases. However, MBA fully denoises the object trajectory first and conditions the robot denoising on that finished prediction, whereas our phases alternate within each denoising step. Diffusion Forcing [12] also orders denoising, but through per-token noise levels rather than separate phases, resolving lower-noise tokens first. Unlike our method, most of these planners do not apply guidance at inference, which can limit their ability to adapt to task settings outside their training distribution at deployment. 
+
+b) Guidance in diffusion models: Guidance is applied to diffusion models across many domains such as image generation [13], [14], [15], autonomous driving, and robotics. Diffuser [16] steers plans by nudging the denoising process along the gradient of a learned return predictor. However, the performance of this learned model on novel scenes is dependent on its training distribution. Diffusion-ES [17] skips gradient-based guidance entirely. Instead, it samples trajectories from an unconditional diffusion model, scores them with a reward function, and projects elites back onto the data manifold. This keeps the trajectory distribution broader and improves robustness, but the search across iterations is expensive. Diffusion Planner [18] is a transformer-based driving planner that relies on hand-designed energy functions at inference, eliminating the need for an auxiliary model. Our work builds upon this concept in two ways. First, we extend these energy functions to have asymmetric penalties for precision pushing tasks. Second, we add a per-term gradient rescaling that lets each term’s contribution be tuned independent of its native scale and units. 
+
+c) Pushing tasks: Diffusion-based trajectory planners have been applied to pushing in non-precision settings, beyond just Push-T. CompDiffuser [8] reports encouraging results on AntSoccer, where a quadruped agent pushes a ball to a goal location, and HeRD [7] demonstrates similar gains in a multi-object box environment. Precision has instead been pursued through reinforcement learning by [19], who train a recurrent policy that pushes single objects to within 1 cm of the goal. To the best of our knowledge, no diffusion-based planner targets multi-object NPM with a mobile robot at tight tolerances. II. P RELIMINARIES 
+
+A. Diffusion models and DDIM sampling 
+
+A denoising diffusion probabilistic model (DDPM) [20] defines a forward Markov chain that corrupts a clean sample 
+
+x0 ∼ pdata with Gaussian noise according to a variance schedule {βt}Tt=1 . With ¯αt = Qts=1 (1 − βs), the noisy sample xt can be obtained directly from x0 in a single step as xt = √¯αt x0 + √1 − ¯αt ϵ, ϵ ∼ N (0, I). A neural network ϵθ (xt, t ) is trained to predict ϵ via the objective 
+
+Et, x0,ϵ∥ϵθ (xt, t ) − ϵ∥2 and the network recovers the score function directly as ∇xt log p(xt) = −ϵθ (xt, t )/√1 − ¯αt
+
+[21]. We sample with DDIM [22] at η = 0 , a determin-istic reverse process derived from a non-Markovian forward formulation that reuses the trained ϵθ . The update from xt
+
+to xt−1 depends on a clean estimate ˆx0(xt) of the sample: 
+
+xt−1 = √¯αt−1 ˆx0(xt) + √1 − ¯αt−1 ϵθ (xt, t ) where ˆx0(xt)
+
+is given by Tweedie’s formula [23], 
+
+ˆx0(xt) = E[x0 | xt] = xt − √1 − ¯αt ϵθ (xt, t )
+
+√¯αt
+
+(1) Under ϵ-prediction, this estimate divides by √¯αt and is ill-conditioned as ¯αt → 0 (Eq. 1). We therefore use v-prediction [24], where the network predicts vt = √¯αt ϵ −√1 − ¯αt x0 and the Tweedie estimate ˆx0(xt) = √¯αt xt −√1 − ¯αt vθ (xt, t ) involves no division. 
+
+B. Gradient-based guidance: DPS 
+
+Test time guidance steers a trained diffusion model toward samples consistent with an auxiliary signal y without retrain-ing. Following [16], [18], let y ∈ { 0, 1} be an indicator variable with likelihood p(y=1 | x0) ∝ e−C (x0), where 
+
+C(x0) is a cost associated with x0. The reverse process should then sample from the conditional p(xt | y) rather than the unconditional prior. The corresponding posterior score decomposes by Bayes’ rule as ∇xt log p(xt | y) = 
+
+∇xt log p(xt) + ∇xt log p(y | xt). The first term is the prior score, given by the trained ϵθ (Sec. II-A). The second is the guidance term, which is intractable because y depends on the clean x0 rather than the noised xt. We therefore require an approximation of the guidance term to estimate the posterior score. For this, we use diffusion posterior sampling (DPS) [25] which can directly estimate the guidance expectation 
+
+Ex0∼p(x0|xt)[p(y | x0)] . DPS replaces it with the point estimate p(y | ˆx0(xt)) by evaluating at the Tweedie posterior mean (Eq. (1)). As a result, the guidance term becomes 
+
+∇xt log p(y | ˆx0(xt)) , which is tractable. III. P ROBLEM FORMULATION 
+
+Our setup for the multi-object mobile robot pushing setting follows prior NPM work [7]. The robot is equipped with a non-prehensile bumper, so it can only push, and an object moves only while it is in contact with the bumper. Consider a closed planar workspace W ⊆ R2 containing M movable objects, N fixed obstacles O1, . . . , ON ⊆ W , and a mobile robot with pose r(t) ∈ SE(2) . Let bm(t) ⊆ W be the region occupied by object m ∈ {1, . . . , M } at time t,and let Tm ⊆ W be its target configuration. 1 Each target 
+
+Tm is a square with a margin δ ≥ 0 around the object’s footprint, where a smaller δ tightens the tolerance. Object 
+
+m is placed at time t′ when bm(t′) ⊆ T m and the robot is no longer in contact with object m. The task is to place every object within the time budget Tmax while avoiding all placed objects. The robot navigates the free space F(t) = 
+
+W \   S Ni=1 Oi ∪S 
+
+> m∈P (t)
+
+bm(t), where P(t) ⊆ { 1, . . . , M }
+
+indexes the placed objects at time t. We decompose the NPM problem into M subproblems by solving a traveling salesman problem (TSP) that assigns boxes to targets and orders them for execution. For t < T max , a trajectory planner predicts trajectories of length Tp. Some planners predict a robot trajectory τ R paired with an object trajectory τ O whereas others only predict τ R. At step k ∈ { 0, . . . , T p − 1}, the predicted robot pose is τ Rk ∈ SE(2) and the predicted object position is τ Ok ∈ R2. The robot executes τ R, after which the trajectory planner replans. IV. M ETHOD 
+
+In this section, we first describe the Causal factorization diffusion model and its main comparison, the Joint pre-diction model. Following this, we introduce the guidance formulation and the cost function that penalizes undesirable overshoots and safety infractions during pushing. 
+
+A. Diffusion model architectures 
+
+Causal factorization model. In pushing, the robot’s mo-tion determines the object’s. We encode this dependency through the factorization p(τ R, τ O | c) = p(τ R | c) p(τ O |
+
+τ R, c). We refer to the two factors as the Robot phase 
+
+and Object phase (Fig. 2), and both phases share a single transformer decoder. The Object phase conditions on the clean Tweedie estimate 
+
+ˆτ R 
+
+> 0
+
+produced by the Robot phase. This dependence drives two design choices, since ˆτ R 
+
+> 0
+
+is unreliable early in the reverse process. First, we train with the v-parameterization [24], which keeps the estimate bounded as ¯αt → 0. Second, ˆτ R 
+
+> 0
+
+is close to pure noise early in the reverse process, so we gate the robot conditioning tokens using the signal fraction of the diffusion schedule, hRt = ¯ αt ϕ( ˆ τ R 
+
+> 0
+
+) + (1 − ¯αt) h∅, where ϕ
+
+is an embedding space projection and h∅ is a learned null embedding. The intention is for the Object phase to fall back to a marginal prediction when the robot plan carries no usable signal, and recover the causal conditional p(τ O | τ R, c) as the robot trajectory denoises. 
+
+Joint prediction model. We also compare with a joint trajectory denoiser, which models p(τ R, τ O | c). This model is not considered causal under our definition since it does not condition the object denoising on a clean robot trajectory       
+
+> 1We use target configuration rather than goal because the latter typically denotes a single agent’s destination, whereas our task requires defining a target region for each of the Mobjects.
+
+ˆτ R 
+
+> 0
+
+. As a result, Eq. 2’s two rightmost factors fuse into one, 
+
+∂ ˆτ O 
+
+> 0
+
+/∂ τ Rt .
+
+Network. For both the Causal and Joint models, we use a decoder composed of a stack of N DiT-style transformer blocks [26], [18]. Following the divided space-time attention scheme of [27], each block applies temporal self-attention separately along each trajectory, then inter-trajectory self-attention between the robot and object trajectories at each timestep. For the Causal model, a mask on the inter-trajectory attention prevents clean robot tokens from attending to the noisy object, so the robot estimate stays noise-free. Fig. 2 displays the trajectory generation process for a single denois-ing step. 
+
+B. Goal-conditioned guidance 
+
+For mobile robot pushing tasks, we train the planners to imitate expert demonstrations that avoid both overshooting placement and poor pushing approaches. Despite this, the planner still overshoots at inference, as the denoising objec-tive never penalizes it (Sec. V-B). To penalize overshoots, we design a cost function C over predicted trajectories. It is composed of multiple terms (Sec. IV-D), each penalizing a distinct undesirable outcome in pushing such as overshoot, collision, or a poor initial approach. A key property of the Causal design is the chain in Eq. 2, where the gradient of the guidance function is allowed to flow back to the noisy robot trajectory. The result is more successful placements (Sec. V). 
+
+Setup. Following Sec. II-B, we condition the reverse diffusion process on the goal-reached event y with likelihood 
+
+p(y | τ O 
+
+> 0
+
+) ∝ exp( −C (τ O 
+
+> 0
+
+)/λ ) where λ is the Boltzmann temperature [16], [18]. For both planners, y depends on the clean object trajectory τ O 
+
+> 0
+
+rather than on τ Rt directly, so the guidance term ∇τ Rt log p(y | τ Rt ) is intractable. We hereafter write p(y | · ) as shorthand for p(y=1 | · ).
+
+A differentiable guidance chain. In the Causal planner, the Robot phase maps τ Rt to a clean estimate ˆτ R 
+
+> 0
+
+via Eq. (1). The Object phase, conditioned on ˆτ R 
+
+> 0
+
+, produces ˆτ O 
+
+> 0
+
+the same way, completing the differentiable chain τ Rt → ˆτ R 
+
+> 0
+
+→
+
+ˆτ O 
+
+> 0
+
+→ C . By contrast, the Joint denoiser produces both clean estimates in one pass from (τ Rt , τ Ot ), shortening the chain to τ Rt → ˆτ O 
+
+> 0
+
+→ C .
+
+Guidance gradient. The chain bypasses the intractability by substituting each Tweedie estimate for the corresponding clean trajectory throughout the derivation (Sec. IV-C). The DPS approximation [25] is applied once per phase, meaning Causal incurs two approximation errors against the Joint denoiser’s one. We accept this so the object trajectory is generated as a response to the robot plan. Finally by chain rule, 
+
+∇τ Rt C = ∂C
+
+∂ ˆτ O
+
+> 0
+
+| {z } 
+
+> cost gradient
+
+· ∂ ˆτ O
+
+> 0
+
+∂ ˆτ R
+
+> 0
+
+| {z } 
+
+> Object phase backprop
+
+· ∂ ˆτ R
+
+> 0
+
+∂τ Rt
+
+| {z } 
+
+> Robot phase backprop
+
+(2) 
+
+C. Guidance for the Causal Factorization 
+
+In this section, we derive the guidance formulation for the Causal factorization. Throughout this derivation, we apply Decoder     
+
+> Transformer
+> conditions Object Phase
+> Est. of Robot
+> Pose
+> Robot Traj. Process
+> Object Traj. Process
+> Noisy Robot Traj
+> scene context
+> Tweedie
+> Eq. (1)
+> scene context
+> Decoder
+> Transformer Tweedie
+> Eq. (1)
+> Noisy Object Traj
+> Est. of Object
+> Traj
+> Output
+> Robot Trajectory:
+> (Guidance vs Non-guidance )
+> Causal Factorization w/ DPS
+> Robot
+> Process
+> per step
+> Eq. (6)
+> Object
+> Process
+> Diffusion direction:
+> Joint w/ DPS
+> scene context
+> Decoder
+> Transformer
+> Tweedie
+> Eq. (1)
+> Noisy Joint Traj
+> Est. of Joint Traj
+> per step Eq. (6)
+> Output
+> Diffusion direction:
+
+Fig. 2: Architecture diagrams of the Joint prediction and Causal factorization planners. The Joint planner denoises both robot and object trajectories together. In contrast, the Causal planner makes two passes through a shared transformer decoder. The Robot phase runs first and Tweedie’s formula (Eq. (1)) turns this output into a clean robot estimate ˆτ R 
+
+> 0
+
+. The Object phase denoises τ Ot while being conditioned on ˆτ R 
+
+> 0
+
+. The resulting chain τ Rt → ˆτ R 
+
+> 0
+
+→ ˆτ O 
+
+> 0
+
+is differentiable through both decoder passes. 
+
+two conditional independence assumptions: (i) y depends on the true clean trajectories (τ R 
+
+> 0
+
+, τ O 
+
+> 0
+
+), and (ii) once the clean object trajectory is known, the robot trajectory carries little additional information about whether the goal was reached. The robot collision and retreat terms are the exception in C,and we evaluate them on ˆτ R 
+
+> 0
+
+directly. Applying total probability and assumption (i), we expand 
+
+p(y | τ Rt ) to include the clean robot trajectory, and substitut-ing the DPS point estimate ˆτ R 
+
+> 0
+
+for the robot posterior gives 
+
+p(y | τ Rt ) ≈ p(y | ˆτ R 
+
+> 0
+
+). Applying total probability a second time to this allows us to introduce τ O 
+
+> 0
+
+, with assumption (ii) dropping ˆτ R 
+
+> 0
+
+from a term. The Object phase produces ˆτ O
+
+> 0
+
+from a noisy τ Ot , so we expand p(τ O 
+
+> 0
+
+| ˆτ R 
+
+> 0
+
+) over τ Ot by total probability. Substituting this into the previous expression and swapping the order of integration yields 
+
+p(y | ˆτ R 
+
+> 0
+
+) = Eτ Ot ∼p(τ Ot | ˆτ R 
+
+> 0)
+
+ p(y | τ Ot , ˆτ R 
+
+> 0
+
+)  (3) Then, applying the DPS estimate once more within each draw gives p(y | τ Ot , ˆτ R 
+
+> 0
+
+) ≈ p(y | ˆτ O 
+
+> 0
+
+(τ Ot )) , where assumption (ii) is applied to remove ˆτ R 
+
+> 0
+
+. Since ˆτ O 
+
+> 0
+
+depends on τ Ot , the integrand varies across draws. 
+
+K-sample estimate. While the expectation in (3) is over 
+
+τ Ot , the current denoising step supplies only one draw. However, the Causal factorization lets us approximate draws from p(τ Ot | ˆτ R 
+
+> 0
+
+) at the cost of an Object phase forward pass. We renoise the clean estimate ˆτ O 
+
+> 0
+
+to the current noise level t with K independent noise vectors and denoise each with the current ˆτ R 
+
+> 0
+
+as conditioning, resulting in K distinct predictions ˆτ O, (k)0 in one batched pass. We refer to this approach as Monte Carlo (MC) w/ DPS in Table III. Since the goal likelihood is a Boltzmann distribution, the estimate of (3) is a mean of exponentials, and taking its log yields the guidance objective 
+
+Eλ = −λ log 
+
+"
+
+1
+
+K
+
+> K
+
+X
+
+> k=1
+
+exp 
+
+
+
+− C   ˆτ O, (k)0 , ˆτ R
+
+> 0
+
+/λ 
+
+#
+
+(4) We scale the above by λ to make the following gradient simpler: writing Ck = C( ˆ τ O, (k)0 , ˆτ R 
+
+> 0
+
+) and differentiating (4) gives ∂E λ/∂ Ck = softmax( −C k/λ ) which we define as wk.Then by the chain rule, where each ∇τ Rt Ck follows the same differentiable chain as Eq. (2): 
+
+∇τ Rt Eλ =
+
+> K
+
+X
+
+> k=1
+
+wk ∇τ Rt Ck,
+
+> K
+
+X
+
+> k=1
+
+wk = 1 (5) 
+
+Softmax weighting. A point estimate would report the cost of the mean predicted outcome, whereas (4) reports the cost over the distribution of possible outcomes. The two differ in our setting. For instance, the placement term Cplace 
+
+penalizes overshoot more heavily than undershoot, so drawn trajectories that mostly undershoot with a few overshooting have a mean endpoint that escapes the penalty entirely. Evaluating C per draw avoids this, but leaves the question of how to combine the K gradients. Because pushing is multimodal, averaging the K draws yields a direction that suits no single outcome, so (5) weights toward the lowest-cost one instead. A Joint denoiser produces a single coupled 
+
+(τ R, τ O ) pair per pass, whereas the factorization lets us draw 
+
+K object outcomes under one robot plan. 
+
+D. Guidance cost design 
+
+Cost terms. The five terms in C (Table I) each contribute a distinct shaping signal. Cplace uses an asymmetric pinball function [28] to favor undershoot, which another push motion can correct. Cpred adds an earlier signal so the planner can correct for a projected overshoot before Cplace would react. 
+
+Cretreat pulls the robot back from the object after a bad approach for the push. Bad approaches are rare in the expert demonstrations, so the planner has learned limited knowledge of retreat behavior. Without Cretreat , the robot could continue pushing and displace a placed object. 
+
+Per-term gated step schedule. At inference, we compute each cost term separately, averaging it over the K draws with the weights wk of (5). Any term with ¯Ci = P 
+
+> k
+
+wkCi,k < η TABLE I: Summary of the five guidance cost terms. Starred ( ⋆)terms are novel contributions of this work, while the rest are inspired by [18]. Each penalty is followed in italics by the condition under which it is active.                   
+
+> Term Role Penalty
+> C⋆
+> place Push Asymmetric endpoint error along the push axis (overshoot = 25 ×undershoot) plus squared lateral error. Object endpoint near target.
+> C⋆
+> pred Push Penalizes the object’s predicted landing position at the horizon end, assuming it keeps its current along-axis velocity.
+> Lookahead to predict overshoot.
+> C(o)
+> coll Safety Margin violation of the predicted object trajectory against placed objects and obstacles, through the barrier
+> Ψ( x)= ex−x−1.Object penetrates margin.
+> C(r)
+> coll Safety Same barrier on the predicted robot trajectory. Robot penetrates margin.
+> C⋆
+> retreat Retreat Penalizes robot proximity to the target object when retreat is needed. Bad approach, or target object is placed.
+
+is dropped to keep its noisy gradient from contributing to the step. We normalize each remaining weighted gradient to unit norm, scale it by a tuned factor ci, and sum the results: 
+
+∆ = X 
+
+> i: ¯Ci≥η
+
+ci ·
+
+P 
+
+> k
+
+wk∇τ Rt Ci,k 
+
+P 
+
+> k
+
+wk∇τ Rt Ci,k 2 + ε . (6) In Eq. 6, we deviate from the residual-norm recipe of [25] since this scheme generalizes naturally to cost terms with different units and scales. For the Joint planner, C is evaluated on the single ˆτ O 
+
+> 0
+
+the pass produces, so Eq. (6) applies with 
+
+K = 1 . The robot trajectory is then updated as τ Rt−1 ←
+
+DDIM( τ Rt , vθ ) − ∆, applied at each denoising step within the guidance window. V. E XPERIMENTS 
+
+In this section, we evaluate the Causal planner against baselines on non-prehensile tasks, starting with Push-T in simulation. We then run simulated and real-world multi-object pushing experiments with a mobile robot, applying the cost terms of Sec. IV-D in both guidance and best-of-N
+
+sampling. 
+
+A. Push-T Experiments a) Task and Data: In Push-T [1][2], the objective is to align the gray T-block to a green goal region by pushing with a blue cylindrical end effector (see Table II). In the simulation experiments, the cylindrical pusher has a 2D state, while the block state is represented by eight keypoints, each with a 2D state. No image information is used as condi-tioning, and the goal pose is identical in every episode. The success criteria is defined as the T-block achieving at least 95% intersection-over-union (IoU) within 300 environment steps. We refer to the IoU value as coverage throughout this work. The pusht keypoints dataset from Hugging Face was used for training our models. 
+
+b) Metrics: SR denotes success rate, with Wilson 95% confidence intervals shown below each entry. Max and Final are the mean per-episode maximum and terminal coverage, aggregated over all episodes regardless of success. Steps is the mean number of environment steps to completion, computed on successful episodes only, since failures always exhaust the 300 -step cap. The Motion Fidelity metrics are new to the Push-T setting. Contact consistency (CC) mea-sures how often a predicted block trajectory moves despite the pusher not touching it. A step is contact-free if the pusher-to-block surface distance exceeds a small distance threshold, and is violated if the block’s mean per-keypoint displacement over that step exceeds 2 distance units. Object-motion error (OME) is the ℓ2 distance between the predicted and actual block-centroid displacement at the end of each executed action chunk. 
+
+c) Baselines and ablation design: Because the Causal factorization is designed to predict object motion, we first evaluate with best-of-N sampling, selecting the robot tra-jectory whose predicted object trajectory ends closest to the goal. This defers Diffusion Policy [1] to Sec. V-B, since it denoises only the robot trajectory. We instead use Diffusion Forcing [12], which denoises both trajectories and emphasizes causality. We implement its transformer variant, moving the per-token noise schedule from the temporal axis to our two trajectories. Each object token is held at a noise level no lower than the robot tokens, so the object is never resolved ahead of the robot motion producing it. 
+
+TABLE II: Push-T simulation results with each method at its own best-of-N draws per replan, selected by success rate over 
+
+N ∈ { 1, 8, 16 , 32 }: N =16 for Diffusion Forcing [100 DDIM] and Joint [100 DDIM], N =32 for Causal [100 DDIM], and N =8 for Causal [50 DDIM]. Causal consistently has the highest success rate across all batch sizes. Each row pools 75 episodes ( 25 episodes × 3
+
+seeds: 42 , 1000 , 2000 ). Max and Final are reported with their 95% 
+
+confidence intervals (CI), and SR with its Wilson 95% CI. Latency is roughly constant across the different batch sizes for each model. All models have around 17 .8M parameters. Rows are color-coded: baselines , ablations , ours (proposed) . Bolded entries mark the best per column.                             
+
+> Push-T Coverage Task Motion Fidelity
+> Max Final SR Steps CC OME (%) ↑(%) ↑(%) ↑↓(%) ↓↓
+> Diffusion Forcing 91.5
+> ±2.5
+> 85.3
+> ±3.4
+> 44.0
+> [33.3, 55.3] 201.4 29.3 2.64
+> Joint 92.5
+> ±1.3
+> 87.3
+> ±2.5
+> 40.0
+> [29.7, 51.3] 213.1 18.3 3.91 Causal [100 DDIM] 94.1
+> ±0.7
+> 91.6
+> ±1.5
+> 54.7
+> [43.4, 65.4] 190.5 11.6 3.06 Causal [50 DDIM] 92.9
+> ±2.6
+> 89.9
+> ±2.9
+> 53.3
+> [42.2, 64.2] 174.7 10.8 2.96
+
+d) Sim results: Table II reports each method at its best sampling budget. Causal attains the highest success rate while completing in the fewest steps, with tighter confidence intervals on coverage. The sharpest separation, however, is contact consistency. Causal predicts uncaused object motion on 11 .6% of contact-free steps, against 18 .3% and 29 .3% for the baselines, and this ordering holds at every batch size we evaluated. Alongside each rollout, we also log the standard deviation across the N draws for the predicted object tra-jectories. The object spread orders the success rate across all three methods ( 2.79 , 2.98 , 3.71 for Causal, Diffusion Forcing, and Joint). When the N draws disagree, the arg min 
+
+selects the most optimistic object prediction, which may be physically implausible given the robot trajectory. When the two trajectories are consistent, it selects on plan quality. This explains why Causal is the only method that improves from 
+
+N =16 to N =32 , gaining 10 .7 percentage points in SR while Diffusion Forcing and Joint lose 10 .7 and 17 .3.We attribute Causal’s performance improvement to two changes: v-prediction, and the gate blending the clean robot estimate tokens toward a learned null embedding at high diffusion timesteps (Sec. IV-A). In preliminary experiments ablating each factor over 30 episodes per condition, success rate improves from 16 .7% (ϵ-prediction, no gate) to 33 .3% 
+
+with v-prediction alone, 40 .0% with the gate alone, and 
+
+56 .7% with both. We report latency as the wall-clock time for one replan. To roughly match latency across the three methods in Table II, we also report the Causal planner at 50 DDIM steps, which still outperforms the baselines on nearly every metric. Its median latency is 2008 ms, against around 2300 ms for the baselines and 4257 ms for Causal at 100 DDIM steps. Lastly as a reference upper bound, the official leRobot Diffusion Policy for PushT, which uses the same evaluation environment as we do, reports a 65% task success rate and 95.5% mean max coverage over 500 episodes. However, this is with a model that includes image observations and has 0.3B parameters. Causal achieves close to similar results with 17 × fewer parameters. 
+
+B. Mobile Robot Push Experiments a) Task and data: Our scenario is a mobile robot that stages M boxes at target configurations T1, . . . , TM .We model a deployment where each box is handed off to downstream automation the moment it’s placed. Bumping it afterward would be unsafe and stall the pipeline, so we end the trial as soon as any placed box is disturbed. Boxes are 8 cm per side, and each target is the box footprint inflated by a tolerance δ ∈ { 4, 2} cm. Training data consists of roughly 500 human teleoperation episodes at δ = 2
+
+cm, with any episode that bumped a placed box discarded. We evaluate the planners on three environments that share structural elements with the training data, but never appear in their exact configurations. We use the TSP planner to assign boxes to subtasks throughout the experiments. Lastly, all diffusion models are only given a local ego-centric crop when it comes to info on nearby objects. 
+
+b) Metrics: Our primary success metric is the Box Placement Fraction , or BPF. It records the average fraction of boxes placed within their target configurations across all episodes. We prefer this fractional measure over binary episode success because trials end the instant any placed box is disturbed, a rule that mirrors the real-world requirement that each box remain at its target after placement. Binary success would collapse 7 of 8 placed and 0 of 8 placed into the same zero, while BPF preserves credit for place-ments completed before the failure. We also report Shortest Path Length , abbreviated SPL and adapted from [29]. We compute it per box rather than per episode as SPL =
+
+> 1
+> K
+
+PKi=1 Si ℓ⋆i / max( pi, ℓ ⋆i ), where K is the total number of placement attempts across all evaluation episodes, Si ∈{0, 1} indicates whether placement i succeeded, ℓ⋆i is the shortest feasible path that completes placement i, and pi is the path the planner took. 
+
+c) Baselines and ablation design: Our main baseline is Diffusion Policy [1], an established baseline for pushing tasks and one that denoises only the robot trajectory. Since guidance depends on object motion fidelity, we use the joint planner rather than Diffusion Forcing [12]. The joint planner attains better contact consistency, and the OME gap of roughly one distance unit is small relative to the Push-T workspace scale (Table II). In addition, we evaluated a cross-entropy method (CEM) baseline optimizing the same guidance cost (Sec. IV-D), using the simulator as a forward model and rolling out 64 samples × 5 iters = 320 candidates per replan. Our costs give no signal for approach, so a deterministic guide policy handles it, and it uses the true global occupancy map rather than the egocentric crop all diffusion methods see. The ablations instead focus on the diffusion planners, isolating two factors. DPS vs. Best-of-N compares the two ways of applying the cost in Sec. IV-D, as a gradient during denoising or as an objective to minimize over 16 sampled plans. Joint vs. Causal isolates the architecture and tests whether the causal factorization itself contributes to the gain. Lastly, all diffusion-based planners have roughly 
+
+75 –90 M parameters. 
+
+d) Sim results: Table III reports BPF and SPL across three environments, each chosen to probe a different failure mode. U-Shape tests path feasibility, since placed boxes block routes across the U and force the robot to reroute. 
+
+Cross-Dock Staging tests planning over long horizons. Pallet Staging tests overshoot in isolation, since any overshoot wedges the current box against the central pillar. Across the table, all cost-driven diffusion methods outperform the baselines in all trials. Best-of-16 sampling outperforms DPS guidance for both architectures, and the two Best-of-16 variants are comparable, with BPF confidence intervals (CIs) overlapping in every cell of Table III. This gap therefore reflects how the cost is applied rather than the architecture, since guidance is bound to its initial sample while Best-of-16 is not. The separation between Causal and Joint is in efficiency and handling tighter tolerances. At 2 cm, Causal Best-of-16 attains the best placement of any method in two of the three environments, though the margin over Joint falls within our CIs. It also has a higher SPL than Joint Best-of-16 in all six cells, with CIs separating only on U-Shape at 2 cm. These results are all while Causal runs half the denoising steps, 50 against Joint’s 100. In preliminary experiments, Joint performed slightly better at 100 steps than at 50, whereas Causal was comparable at both, matching the trend in the Push-T results (Table II). When comparing Joint and Causal with DPS guidance, we observe similar TABLE III: Simulation results across 3 previously unseen environments at two goal tolerances ( 4 cm, 2 cm), pooled over 150 episodes per cell ( 3 seeds × 50 episodes). All diffusion methods used 100 DDIM steps, unless otherwise stated, and are trained at a tolerance of 2
+
+cm. Diffusion Policy uses FiLM [30] for conditioning whereas Joint and Causal use AdaLN [26]. For best of N sampling, the sample that minimizes the cost function in Sec. IV-D is selected. SPL and BPF are both reported out of 100 and with their 95% CIs. Bolded entries mark the best BPF per (environment, tolerance). Causal w/ MC DPS is run at K = 16 . Rows are color-coded: baselines , ablations , ours (proposed) .                                                                                                                                                                     
+
+> U-Shape Pallet Staging Cross-Dock Staging
+> Method Lat.
+> (ms) ↓
+> Tol.
+> (cm) SPL ↑BPF ↑SPL ↑BPF ↑SPL ↑BPF ↑
+> 461.7 ±2.6 26.1 ±2.8 67.2 ±2.4 36.6 ±3.5 68.0 ±2.3 40.6 ±4.4 CEM (oracle dynamics) 2209 257.6 ±3.2 19.2 ±1.9 64.3 ±2.7 33.1 ±3.6 64.8 ±2.7 29.8 ±2.9
+> 446.7 ±1.8 38.3 ±4.0 48.1 ±2.0 48.0 ±4.8 47.9 ±2.2 47.1 ±5.3
+> Diffusion Policy 716 235.3 ±2.2 21.8 ±2.1 34.3 ±2.6 33.7 ±3.7 34.2 ±2.5 29.8 ±3.8
+> 450.3 ±1.8 41.7 ±4.5 54.3 ±1.7 54.7 ±5.1 52.6 ±2.0 55.4 ±5.3
+> Joint w/ DPS 1893 246.9 ±2.0 31.0 ±3.5 49.7 ±1.9 51.7 ±5.1 50.1 ±2.3 44.6 ±4.7
+> 450.9 ±1.4 54.9 ±5.2 56.7 ±1.4 68.8 ±5.4 54.2 ±1.8 62.8 ±5.5
+> Joint Best-of-16 Sampling 5088 248.0 ±1.7 38.9 ±4.3 54.9 ±1.5 61.8 ±5.5 52.4 ±1.9 55.8 ±5.3
+> 449.7 ±1.9 40.4 ±4.4 52.9 ±1.9 49.7 ±5.3 50.9 ±2.1 56.2 ±5.2
+> Causal w/ MC DPS 4163 249.4 ±2.5 26.7 ±3.2 50.7 ±2.1 45.9 ±4.8 49.0 ±2.2 48.6 ±4.7
+> 453.2 ±2.2 52.8 ±5.0 57.4 ±1.9 66.6 ±5.3 54.7 ±2.3 65.7 ±5.1 Causal Best-of-16 Sampling [50 DDIM] 2812 253.2 ±2.5 40.8 ±4.6 55.6 ±2.4 60.8 ±5.4 54.4 ±2.5 60.7 ±5.2
+
+performance, as the BPF CIs all overlap. Causal w/ MC DPS separates on efficiency in one environment, completing the long-horizon Cross-Dock task in 4.8% fewer environment steps than guided Joint at 4 cm and 12 .2% fewer at 2 cm. However, the clearest separation between the two methods is latency, which we examine next. 
+
+e) Latency: The Causal factorization uses two decoder passes per denoising step, so the DDIM reduction makes the two methods match at 100 decoder passes per replan. However, when averaged across environments and toler-ances, Causal Best-of-16 replans in 2812 ms against Joint’s 
+
+5088 ms, a 1.8× reduction. Two mechanisms produce this gap. Causal skips object denoising on non-pushing replans (i.e., navigation), so 49% of its replans use only 50 decoder passes and cost 1812 ms, rather than the 3776 ms a replan costs when it denoises an object as well. Both methods run 100 decoder passes on a replan that requires denoising an object, but not the same passes. The first pass of each Causal denoising step runs over the robot trajectory alone. As a result, this pass skips the spatial self-attention block and halves the query length of the cross-attention blocks. In contrast, every Joint denoising step runs on both trajectories, so Joint never gets a cheaper pass. Causal’s two passes per denoising step cost 75 ms against Joint’s 51 ms, but it wins on total replan cost by running half as many steps. 
+
+f) Guidance versus conditioning: This is an important comparison, and it is reported in Table III, where guidance (Causal w/ MC DPS) gives an 8.1-point BPF gain on average and up to 18.8 points over Diffusion Policy, an unguided baseline. All models condition on scene occupancy, placed boxes, goal pose, and push direction via cross-attention, and train only on demonstrations in which no box was overshot. Yet, the unguided planners still overshoot, and we demonstrate this in a plan-only test. In each of 50 Pallet Staging episodes, we pause at the last replan step that still determines the first box placement, draw 50 plans from that identical state, and record the predicted along-axis placement error e∥ at the end of the horizon. Despite no overshooting trajectory in training, 3.6% of the 2500 unguided plans land more than 1 cm past the goal and 0.64% more than 2 cm. At identical state and initial noise, guidance drops these to 
+
+2.6% and 0.20% , respectively. 
+
+g) OOD Robot Demo: We recreate a portion of the Cross-Dock Staging environment from Table III and deploy the Causal w/ MC DPS model without fine-tuning it (Fig. 1). An overhead camera tracks AprilTags on the robot and each box at 20 Hz, and a low-level pose controller follows the planner’s predicted trajectory at 30 Hz. We ran 10 trials at a 3 cm tolerance for each Causal w/ MC DPS and Diffusion Policy (DP) on four new objects of differing mass and size: a triangular prism, cylinder, pentagon, and star (Fig. 1). Causal w/ MC DPS achieves an 85 .0 mean BPF with 60% of episodes fully completed, compared to 37 .5 and 0% for DP. Our guidance terms use only the object’s center and the push axis, so guidance transfers to new shapes unchanged while the prior alone does not. These improved rates also benefit from only four goal slots, leaving a less constrained c-space and a lower chance of displacing prior-placed objects. 
+
+h) Failure Modes: We bin each episode into five out-comes: success, a placed box disturbed by the pushed box (or the robot), a timeout with the target wedged (or still moving). For the Best-of-16 planners, the top failure mode is disturbed by the pushed box, at around 33% of all episodes for both Causal and Joint (see Fig. 3a). For the guidance methods (a) Pushed box hits a prior place-ment, failing the episode. 
+
+(b) The robot hits a prior placement while navigating, failing the episode. 
+
+Fig. 3: Failure modes. 
+
+and baselines, the top failure mode is robot disturbance, accounting for roughly 45% of all episodes (see Fig. 3b). 
+
+i) Limitations and Future Work: Our hardware demon-stration relies on an overhead camera tracking AprilTags on the robot and each box, which supplies the global pose estimates that the planner conditions on. An onboard camera deployment is not a drop-in replacement. During a push, the box occludes the goal tag on the floor, so the robot loses sight of the goal precisely when the stopping decision must be made. Closing this gap is the goal of future work. In addition, the binary success rates are low across Table III, ranging from 7% to 37% for Causal Best-of-16. Full task success requires placing every box within tolerance without disturbing any earlier placement, and a trial is considered a failure the instant one is disturbed. The difficulty also com-pounds with each placement, as every box placed narrows the c-space for the robot. VI. C ONCLUSION 
+
+We formalized multi-object pushing as a multi-target assignment problem for a mobile robot, and proposed a diffusion-based planner with a Causal factorization: each robot denoising step is followed by an object step condi-tioned on the current clean robot estimate. This makes the predicted object motion a response to the robot plan, and exposes the object trajectory as a conditional that we can sample repeatedly. On Push-T, our model attains the highest success rate, 10 .7 percentage points over the closest baseline, while having the lowest rate of implausible object motion. Across three new multi-box pushing environments, Causal best-of-16 lifts placement by 21 .5 BPF points on average and up to 30 .9 over an unguided baseline, while matching a joint denoiser on placement performance and replanning 1.8×
+
+faster. Lastly, on a TurtleBot 3 Burger, our guided Causal planner places 85 .0% of objects with geometries absent from training, against 37 .5% for Diffusion Policy. REFERENCES [1] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion Policy: Visuomotor Policy Learning via Action Diffusion,” in Proceedings of RSS , 2023. [2] P. Florence, C. Lynch, A. Zeng, O. Ramirez, A. Wahid, L. Downs, A. Wong, J. Lee, I. Mordatch, and J. Tompson, “Implicit Behavioral Cloning,” in CoRL , 2021. [3] S. Jiang, X. Fang, N. Roy, T. Lozano-P´ erez, L. P. Kaelbling, and S. An-cha, “Streaming Flow Policy: Simplifying diffusion/flow-matching policies by treating action trajectories as flow trajectories,” in CoRL 2025 , Sep. 2025. [4] C. Pan, Z. Yi, G. Shi, and G. Qu, “Model-Based Diffusion for Trajectory Optimization,” in 38th NeurIPS , 2024. [5] J. Wu, X. Sun, A. Zeng, S. Song, J. Lee, S. Rusinkiewicz, and T. Funkhouser, “Spatial Action Maps for Mobile Manipulation,” in 
+
+Proceedings of RSS , 2020. [6] N. Zhong, S. Caro, M. Ramesh, R. Bhatnagar, A. Iskandar, and S. L. Smith, “Bench-Push: Benchmarking Pushing-based Naviga-tion and Manipulation Tasks for Mobile Robots,” in Proceedings of the 23rd Conference on Robots and Vision , may 26 2026, https://crv.pubpub.org/pub/k5sgbi4z. [7] S. Caro and S. L. Smith, “Push Smarter, Not Harder: Hierarchical RL-Diffusion Policy for Efficient Nonprehensile Manipulation,” IEEE RA-L , 2026. [8] Y. Luo, U. A. Mishra, Y. Du, and D. Xu, “Generative Trajectory Stitching through Diffusion Composition,” in 39th NeurIPS , 2026. [9] M. Bauza and A. Rodriguez, “A probabilistic data-driven model for planar pushing,” in 2017 ICRA , 2017, pp. 3008–3015. [10] Q. Clark and F. Shkurti, “What Do You Need for Compositional Generalization in Diffusion Planning?” Feb. 2026. [11] Y. Su, X. Zhan, H. Fang, Y.-L. Li, C. Lu, and L. Yang, “Motion Before Action: Diffusing Object Motion as Manipulation Condition,” 
+
+IEEE RA-L , vol. 10, no. 7, pp. 7428–7435, 2025. [12] B. Chen, D. Mart´ ı Mons´ o, Y. Du, M. Simchowitz, R. Tedrake, and V. Sitzmann, “Diffusion forcing: Next-token prediction meets full-sequence diffusion,” Advances in NeurIPS , vol. 37, pp. 24 081–24 125, 2024. [13] P. Dhariwal and A. Nichol, “Diffusion Models Beat GANs on Image Synthesis,” in NeurIPS , vol. 34, 2021, pp. 8780–8794. [14] J. Ho and T. Salimans, “Classifier-Free Diffusion Guidance,” in 
+
+NeurIPS 2021 Workshop , 2021. [15] D. Epstein, A. Jabri, B. Poole, A. A. Efros, and A. Holynski, “Diffusion Self-Guidance for Controllable Image Generation,” in 37th NeurIPS Conference , 2023. [16] M. Janner, Y. Du, J. B. Tenenbaum, and S. Levine, “Planning with Diffusion for Flexible Behavior Synthesis,” in Proceedings of the 39th ICML , 2022, pp. 9902–9915. [17] B. Yang, H. Su, N. Gkanatsios, T.-W. Ke, A. Jain, J. Schneider, and K. Fragkiadaki, “Diffusion-ES: Gradient-free Planning with Diffusion for Autonomous Driving and Zero-Shot Instruction Following,” Jul. 2024. [18] Y. Zheng, R. Liang, K. Zheng, J. Zheng, L. Mao, J. Li, W. Gu, R. Ai, S. E. Li, X. Zhan, and J. Liu, “Diffusion-Based Planning for Autonomous Driving with Flexible Guidance,” in 13th ICLR , 2025. [19] L. Bergmann, D. Leins, R. Haschke, and K. Neumann, “Precision-Focused Reinforcement Learning Model for Robotic Object Pushing,” in 2025 ICARM , 2025, pp. 758–765. [20] J. Ho, A. Jain, and P. Abbeel, “Denoising Diffusion Probabilistic Models,” in Advances in NeurIPS , vol. 33, 2020, pp. 6840–6851. [21] C. Luo, “Understanding Diffusion Models: A Unified Perspective,” Aug. 2022. [22] J. Song, C. Meng, and S. Ermon, “Denoising Diffusion Implicit Models,” in ICLR , 2021. [23] B. Efron, “Tweedie’s Formula and Selection Bias,” Journal of the American Statistical Association , vol. 106, no. 496, pp. 1602–1614, 2011. [24] T. Salimans and J. Ho, “Progressive distillation for fast sampling of diffusion models,” in ICLR , 2022. [25] H. Chung, J. Kim, M. T. Mccann, M. L. Klasky, and J. C. Ye, “Diffusion Posterior Sampling for General Noisy Inverse Problems,” in The 11th ICLR , 2023. [26] W. Peebles and S. Xie, “Scalable Diffusion Models with Transform-ers,” in Proceedings of the IEEE/CVF International Conference on Computer Vision , 2023, pp. 4195–4205. [27] G. Bertasius, H. Wang, and L. Torresani, “Is Space-Time Attention All You Need for Video Understanding?” in Proceedings of the 38th ICML , 2021, pp. 813–824. [28] R. Koenker and G. Bassett, “Regression quantiles,” Econometrica: Journal of the Econometric Society , vol. 46, pp. 33–50, 1978. [29] P. Anderson, A. Chang, D. S. Chaplot, A. Dosovitskiy, S. Gupta, V. Koltun, J. Kosecka, J. Malik, R. Mottaghi, M. Savva, and A. R. Zamir, “On Evaluation of Embodied Navigation Agents,” https://arxiv.org/abs/1807.06757v1, Jul. 2018. [30] E. Perez, F. Strub, H. De Vries, V. Dumoulin, and A. Courville, “Film: Visual reasoning with a general conditioning layer,” in Proceedings of the AAAI conference on artificial intelligence , vol. 32, no. 1, 2018.
