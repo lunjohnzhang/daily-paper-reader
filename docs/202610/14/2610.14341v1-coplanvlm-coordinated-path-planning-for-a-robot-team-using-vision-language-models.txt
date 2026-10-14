@@ -1,0 +1,244 @@
+Title: CoPlanVLM: Coordinated Path Planning for a Robot Team using Vision Language Models
+
+URL Source: https://arxiv.org/pdf/2610.14341v1
+
+Published Time: Wed, 14 Oct 2026 00:21:40 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# CoPlanVLM: Coordinated Path Planning for a Robot Team using Vision Language Models 
+
+David R. Martin 1, Jared Paquet 2, Mohammad Abdullah Al Faruque 1, Pramod Khargonekar 1,Kyle Volle 3, J. Humberto Ramos 2, and Scott Nivison 4
+
+Abstract — We present CoPlanVLM , which uses a Vision Language Model (VLM) to translate a single natural-language instruction and image into coordinated paths for a team of two robots. While VLMs offer a flexible, natural-language interface for commanding robot teams, their weak spatial reasoning has greatly limited VLM-based path planning. CoPlanVLM im-proves the VLM’s spatial reasoning and path planning abilities through three components: (1) an image overlay marking both free space and obstacles, (2) task classification that selects the most appropriate low-level planner and reasoning prompt for each instruction, and (3) task-specific chain-of-thought reason-ing that prompts the VLM to identify key objects, allocate roles, and verify routes are collision-free before committing to a plan. Together, these components enable the team to complete complex coordinated maneuvers requiring both robots and divide large tasks between robots to increase efficiency. 
+
+CoPlanVLM also supports detailed maneuvers involving specific routes, loops, and coverage of large areas, as well as tasks requiring directional reasoning such as north/south or left/right. We validate CoPlanVLM in both Gazebo simulation and on physical Turtlebot 4 hardware. CoPlanVLM attains an average success rate of 84.4% compared to 50.0% for the closest baseline. On trials where both methods succeed, CoPlanVLM ’s paths are 27% shorter on average. Project code is available at 
+
+github.com/AICPS/CoPlanVLM .
+
+I. I NTRODUCTION 
+
+Multi-robot teams have shown great promise in diverse ap-plication domains such as warehousing [1], UAV swarms [2], and household tasks [3]. Through collaboration, teams are able to complete complex missions which may be impossible for individuals [3]–[5]. However, planning for a collaborative team presents a significant challenge that requires under-standing mission intent, allocating roles, and planning each robot’s motion. Large Language Models (LLMs) have been proposed to address these challenges by enabling robotic systems to interpret complex human instructions, coordinate multiple robots, and adapt to diverse contexts [6]. Vision Language Models (VLMs) can additionally use camera im-ages from the robots or workspace as context to inform planning. LLMs and VLMs have been proposed to generate high-level team plans [3], [4], and navigate individual robots directly from natural-language instructions [7]–[9].     
+
+> 1David Martin, Mohammad Abdullah Al Faruque, and Pramod Khar-gonekar are with the Department of Electrical Engineering and Computer Science, University of California, Irvine.
+> 2Jared Paquet and J. Humberto Ramos are with the Department of Mechanical and Aerospace Engineering at the University of Florida.
+> 3Kyle Volle is with Torch Technologies, LLC in Shalimar, FL.
+> 4Scott Nivison is with the Air Force Research Laboratory, Air Warfare Directorate, Eglin AFB Okaloosa County, Fl. This work was supported in part by the Air Force Research Laboratory, Air Warfare Directorate, Eglin AFB, FL.
+
+However, VLMs often exhibit poor spatial reasoning [10], which limits their ability to generate long-horizon, collision-free paths. Consequently, many approaches do not construct paths with the VLM directly, instead using it to identify goal locations and/or regions to avoid, which form a cost map over which a classical planner routes to the target [8], [11], [12]. While this reduces reliance on VLM spatial reasoning, it reduces the problem to reaching a goal at lowest cost, and struggles to express more complex behaviors. Many approaches to Vision Language Navigation repeatedly query a VLM for the next action [7], [9], [13], [14], or use Vision-Language-Action models trained for next-action prediction [15], [16]. However, these methods do not produce full long-horizon plans and require frequent querying of large models. The authors of [7] and [17] plan paths by prompting a VLM to select ordered waypoints, but both target single robots, with [7] navigating only to a predefined destination and [17] providing no mechanism to ensure obstacle-free paths. To our knowledge, no prior work generates long-horizon paths for a collaborative team directly from natural-language instructions and supports complex maneuvers be-yond point-to-point navigation. 
+
+To address this gap, this work introduces CoPlanVLM ,which leverages a commercially available VLM to plan coordinated maneuvers for a collaborative team of two robots following a single natural-language instruction. 
+
+It is tested on tasks explicitly requiring both robots (e.g. approaching the same target from two different directions), tasks where coordination improves efficiency (e.g. dividing a region to patrol efficiently), and tasks requiring no coor-dination. Additionally, CoPlanVLM enables the performance of detailed maneuvers involving specific routes, loops, and surveying large areas. Experimental results in both simula-tion and real-world scenarios demonstrate that CoPlanVLM 
+
+attains an average success rate of 84.4% compared to 50.0% for the closest baseline [7], and on trials where both methods succeed, CoPlanVLM ’s paths are 27% shorter on average. Hardware experiments demonstrate successful deployment on two Turtlebot 4 robots. CoPlanVLM improves the spa-tial reasoning and path planning capabilities of the VLM through: 1) Image preprocessing that marks free space and detected objects on the image, improving the VLM’s spatial grounding and steering it away from obstacles; 2) Task classification that adaptively selects the best rea-soning prompt and low-level path planner for each in-arXiv:2610.14341v1 [cs.RO] 9 Oct 2026 Fig. 1. Paths planned by CoPlanVLM on six different tasks in simulation and hardware experiments. Two tasks are shown from each of the task categories       
+
+> Nav2Point ,Coverage , and Maneuver .(Top) Offline testing results on three prompts in the Gazebo environment. Dotted lines indicate planned paths and blue dots with alphanumeric labels mark the waypoints selected by the VLM. (Bottom) Hardware test results on three prompts. Dotted lines indicate planned paths, and solid lines mark the true path followed by the robots with magenta and blue paths corresponding to Raph and Donnie respectively. The robots’ start locations are labeled in green, with stop locations in red.
+
+struction, spanning point-to-point navigation, area cov-erage, and route-constrained maneuvers; 3) Task-specific chain-of-thought reasoning in which the VLM identifies key objects, allocates roles, and verifies that selected waypoints are unobstructed. II. R ELATED WORK 
+
+A. LLM Task Planning For Robot Teams 
+
+Large Language Models (LLMs) and Vision-Language Models (VLMs) are increasingly proposed for collaborative robotic systems due to their ability to interpret natural-language instructions and generalize across a wide variety of tasks [6]. A common paradigm employs a centralized planner LLM that decomposes a mission and assigns natural-language subgoals to individual robots, each equipped with a local LLM that reasons about how to accomplish its assigned subtask [3], [4], [18]. However, coordinated path planning using language models remains largely underexplored. The authors in [19] and [20] employ a VLM to coordinate a robot team’s exploration of an unknown region in search of a target object, but the VLM only selects the most promising frontier to explore next, limiting the system’s ability to generalize to other tasks. The authors in [17] use a VLM to plan a path for a single robot, but the proposed method does little to ensure path feasibility and does not coordinate its actions with any other robots. CoPlanVLM expands the generalizability of language models to long-horizon coordinated path planning for a team of two robots. 
+
+B. Vision Language Navigation 
+
+Vision-Language Navigation (VLN) is the problem of converting a free-form natural-language instruction into a sequence of movement decisions that produce a matching path [21]. One common approach repeatedly queries a VLM for the next action the robot should take [7], [9], [13], [14], and more recently, Vision-Language-Action (VLA) models have been trained to output navigation commands directly [15], [16]. However, both strategies produce only the immediate next action rather than a long-horizon plan, which hinders coordination between robots and limits their ability to execute long, complex maneuvers. Another common approach uses a VLM to identify target locations and regions to avoid, producing a cost map over which a classical planner computes a path [8], [11], [12]. This yields efficient, long-horizon paths, but a cost-map planner always returns the shortest, lowest-cost route to the goal, which limits the system to instructions whose solution is simply the most direct path. It cannot express behaviors where the route itself matters, such as patrolling a region, looping around an object, or passing on a specified side of an obstacle (e.g., staying to the right of a rack of boxes). In this work, the VLM instead builds a complete route by selecting as many intermediate waypoints as the task requires, enabling these more complex behaviors. 
+
+C. Spatial Reasoning for VLMs 
+
+A key challenge of using VLMs for path planning is their poor spatial reasoning [10], which often leads them to choose Fig. 2. CoPlanVLM methodology overview. First an overhead image is processed by CLIPSeg [22] to detect obstacles and create the occupancy map. A classifier LLM classifies each instruction into one of three categories (Nav2Point, Coverage, Maneuver) which determines the corresponding executive VLM prompt and low-level path planning algorithm. The executive VLM selects marked regions on the image which are used as inputs to the low-level path planning algorithms. These paths are then processed by low level controllers to send commands to the robots. 
+
+paths that are inconsistent with the instruction, inefficient, or that pass directly through obstacles. Set-of-Mark prompting improves spatial reasoning by overlaying numbered markers on an image [23]. This technique has been applied to path planning in several ways: [17] overlays a labeled grid from which the VLM selects regions, while [7] places numbered marks only in free space. Similarly, [24] converts an agent’s environment into a grid-based chessboard to improve an LLM’s spatial reasoning for low-level control. Building on these ideas, we employ a unique marking approach using a similar chessboard-style notation with distinct markings for free space and objects of interest. III. P ROBLEM FORMULATION 
+
+CoPlanVLM plans coordinated paths for a team of two Turtlebot 4 1 robots, named Raph and Donnie, operating in a shared workspace. Let R = {Raph , Donnie } denote the robot team. 
+
+Inputs: At planning time, the system is given: 1) an overhead RGB image I of the workspace; 2) the pose of each robot r ∈ R , denoted qr = ( xr , y r , θ r );3) a natural-language instruction L describing the task. The overhead camera image I provides a top-down view of the environment which is common in robot planning. Such views arise from overhead cameras in structured settings [17], aircraft or satellite imagery outdoors [11], from gen-erated top-view maps [19] and 2D occupancy maps [20]. 
+
+Outputs: CoPlanVLM leverages a VLM and low-level planners to produce an ordered sequence of waypoints, 
+
+Wr =  w1 
+
+> r
+
+, w 2 
+
+> r
+
+, . . . , w nr
+
+> r
+
+ , wkr = ( xkr , y kr ) ∈ W , (1) for each robot r ∈ R , where nr is the number of waypoints assigned to robot r. Executing Wr drives robot r sequentially through its waypoints. We denote the joint plan by W =
+
+{WRaph , W Donnie }.
+
+Objective: The goal is to produce a joint plan W that accomplishes the instruction L while ensuring the straight-line segment between each pair of consecutive waypoints avoids all obstacles. Planned paths are permitted to intersect 
+
+> 1https://robots.ros.org/turtlebot4/
+
+as inter-robot collision avoidance is enforced after planning through a control barrier function. Among obstacle-free plans that accomplish L, we seek the one that minimizes the makespan, estimated as the longer of the two robots’ total path lengths MS( W ) = max ( ∥WRaph ∥, ∥WDonnie ∥), where 
+
+∥Wr ∥ is the total length of robot r’s waypoint path. IV. M ETHODS 
+
+The overall system architecture is depicted in Figure 2. The overhead image is first preprocessed with CLIPSeg [22] to produce an occupancy map and a marked image for prompting the VLM. A classifier LLM then categorizes the instruction and selects the corresponding VLM prompt and low-level planner. The VLM then selects key waypoints from the marked image for each robot which are combined into efficient, collision-free paths through the low-level planners. 
+
+A. Image Pre-processing 
+
+The overhead image is preprocessed by CLIPSeg [22] to detect obstacles and construct both an occupancy map and a marked image to prompt the VLM. 
+
+1) Semantic Segmentation: CLIPSeg [22] is a vision-language model that uses CLIP as a backbone to perform prompt-based image segmentation. Given an image and a text prompt p, CLIPSeg produces a dense segmentation score C(q, p ) for each pixel q, indicating the degree to which that pixel corresponds to the concept described by 
+
+p. CoPlanVLM is provided a set of traversable prompts Ptrav 
+
+describing navigable terrain, and any pixel whose confidence falls below 0.50 for all such prompts is conservatively treated as untraversable. In this work, all testing is in indoor environments, motivating the use of a single traversable prompt, Ptrav = {“the floor” }. Any pixel with confidence at least 0.50 for “the floor” is treated as traversable and all others as untraversable. 
+
+2) Occupancy Map Construction: To construct an oc-cupancy grid for planning, each CLIPSeg pixel coordinate 
+
+(px, p y ) is converted to a world position (x, y ) using a pinhole model of the overhead camera together with its intrinsics and extrinsics. Assuming a flat floor at constant height h below the camera, the projection is 
+
+x = (px − cx) hfx
+
+, y = − (py − cy ) hfy
+
+, (2) where (fx, f y ) are the camera’s focal lengths, (cx, c y ) is the principal point, and h is the height of the camera above the floor. The projected obstacle locations form an occupancy map at 0.05 m resolution (Figure 3, Top), to which several corrections are applied. Because CLIPSeg is unreliable near the image boundary, detections within 65 pixels of the edge are discarded, obstacles are inflated by 0.45 m for the robot footprint, and cells within 0.25 m of a map edge are marked untraversable. To prevent robots from being detected as obstacles, any detections within a 0.65 m radius ( 0.2 m robot radius + 0.45 m obstacle inflation radius) of each robot’s pose are cleared before inflating the obstacles.      
+
+> Fig. 3. Image preprocessing. (Top) Occupancy map visualization with obstacles detected by CLIPSeg shown in red, and obstacle inflation and the map-edge buffer in yellow. (Bottom) Marked image passed to the executive VLM, with free space marked by blue dots, obstacles by red “x” marks, and robots labeled with their names (“raph” and “donnie”).
+
+3) Mark Overlay Construction: A mark overlay (Figure 3, Bottom) is constructed by superimposing an 8 × 14 grid of labeled points onto the image. Each point is assigned a chessboard-style alphanumeric label (e.g., “C5”; letter for column, number for row) that encodes its grid position symbolically, allowing spatial relationships to be expressed through text. To remove directional ambiguity, the prompt fixes a mapping between cardinal directions and image axes, associating north, south, east, and west with up, down, right, and left, respectively. Free points are rendered as blue dots and blocked regions as red “x” marks, with the executive VLM prompted to select navigation waypoints from the free points. Finally, each robot is labeled with its name at the image location corresponding to its current pose, enabling the VLM to distinguish between them. 
+
+B. Task Classification 
+
+Each task instruction is first categorized by a classifier LLM into one of three categories. The descriptions provided to the LLM are as follows: 
+
+Nav2Point : “Best for tasks where each robot drives to one or more goal locations in order. The destination(s) matter, but the exact path taken does not.” 
+
+Coverage : “Best for tasks that involve patrolling or sweep-ing an area. The planner selects high-level regions to cover rather than a specific path, and a low-level controller ensures all selected regions are visited efficiently.” 
+
+Maneuver : “Best for tasks where the specific route matters, not just the destination. Used when the instruction constrains 
+
+how the robot travels, such as loops, specified routes, or avoidance, ...etc. This category also functions as a catch-all category for tasks that do not fall neatly into the Nav2Point 
+
+or Coverage categories.” 
+
+C. Executive VLM Prompting 
+
+A unique prompt is designed for each of the three task categories listed in Section IV-B and is sent to the execu-tive VLM which selects waypoints from the marks on the overhead image. Full prompts for each of the three classes are available in the project’s GitHub repository. Each prompt sent to the VLM is assembled from six components, in order: 1) Preamble – robot descriptions, image context, and global rules shared across all tasks. 2) Map Overlay Description – an explanation of what the markings on the overlaid image represent. 3) Controller Explanation – a per-category block describ-ing how the controller works, how to select points, the output schema, and a worked example. 4) Operator Instruction – Natural-language instruction L.5) Chain-of-Thought Scaffold – a per-category reasoning scaffold guiding the VLM’s reasoning. 6) Marked Image – the marked overhead image. 
+
+D. Chain of Thought Scaffold 
+
+Before selecting a route, the executive VLM outputs a reasoning trace in text. The CoT reasoning scaffolds differ between the task categories, but follow a similar structure: 1) Grounding - Locates each robot, identifies key objects in the instruction, labels the object at each red “x” marker. 2) Task Allocation - Divides the task between the robots by identifying which robot is best suited for each part. 3) Leg Decomposition (Maneuver only) – Splits each robot’s assigned task into an ordered sequence of legs (e.g., travel to chair, loop around it, travel to person). 4) Route Construction - Lists waypoints for each robot. 5) Verify - Verifies no selected point is blocked, replacing any that are with a nearby unblocked point. E. Low-Level Planners 
+
+Low-level path planners are used to convert the VLM chosen waypoints into efficient paths that avoid blocked regions in the occupancy map (Section IV-A.2). 
+
+1) A* Path Planning: For Nav2Point and Maneuver tasks, the executive VLM outputs an ordered list of waypoints for each robot: a single goal or a few goals for Nav2Point , and a longer sequence specifying a precise route for Maneuver .The A* [25] algorithm then plans collision-free paths through these waypoints in order, beginning from each robot’s initial position. The image marking and chain-of-thought reasoning are designed to steer the VLM away from blocked regions, but in the case a blocked waypoint is selected, the planner first attempts to project that waypoint to the nearest free cell within a 1m radius before dropping it if none exists. This ensures safety while attempting to preserve VLM intent although poor VLM selections can still lead to task failures. 
+
+2) Coverage Path Planning: For Coverage tasks, the robot’s sensing footprint is assumed to match the marking resolution of the overlay, so every marked point within the specified region must be visited, though the visiting order is unconstrained. The VLM outputs an unordered set of regions for each robot, and the planner computes an efficient visiting order by solving an open-path traveling salesman problem anchored at the robot’s initial pose, using nearest-neighbor construction [26] refined by 2-opt [27]. Edge costs are shortest-path distances on the inflated occupancy grid, computed with Dijkstra’s algorithm [28]. 
+
+F. Low-Level Control 1) Path Tracking: Each robot follows its planned path with a 10 Hz proportional controller that steers toward the active goal and sets forward speed proportional to the remaining distance. Forward motion is gated on heading error: while the goal lies more than ψmax = 50 ◦ off the robot’s heading, the robot turns in place before driving, which avoids wide, corner-cutting arcs. Goals are advanced within a 0.1 m capture radius. 
+
+2) Safety filter.: To avoid collisions between robots, the nominal command unom = [ v, ω ]⊤ is filtered by a control-barrier-function (CBF) quadratic program. Following [29], we enforce the barriers on a look-ahead point ℓ = 0 .10 mahead of the robot center. We impose two barriers: one on the peer robot and one on the nearest occupied cell of the occupancy map, ensuring the robot does not drift into obstacles while avoiding its teammate. For each hazard j ∈{peer , obstacle }, let ∆dj be the vector from the look-ahead point to the hazard and define the barrier hj = ∥∆dj ∥2 −R2 
+
+> j
+
+,which is positive when the look-ahead point lies outside the safety radius Rj . Each barrier is enforced through the CBF condition ˙hj (x, u ) ≥ − γ h j , and the filtered command is the solution of the quadratic program: 
+
+u⋆ = arg min  
+
+> u
+
+∥u − unom ∥2
+
+s.t. ˙hpeer (x, u ) ≥ − γ h peer ,
+
+˙hobs (x, u ) ≥ − γ h obs .
+
+(3) V. E XPERIMENTS 
+
+CoPlanVLM is evaluated on two Turtlebot 4 robots in two settings: a simulated warehouse in Ignition Gazebo Fortress [30] populated with people, furniture, and boxes (Figure 1 Top), and real-world experiments with two physical Turtlebots at the University of Florida Autonomous Vehicle Laboratory (AVL) (Figure 1 Bottom). GPT-4o (OpenAI) served as both the classifier LLM and executive VLM in 
+
+CoPlanVLM , and as the VLM for all baselines. 
+
+A. Tasks CoPlanVLM was evaluated on 18 prompts: six Nav2Point 
+
+tasks (travel to specified points), six Coverage tasks (patrol or survey a region), and six Maneuver tasks (follow a specified route), all listed in Table I with half of each task category evaluated in simulation and half in the AVL. The tasks were designed to test different kinds of coordination. Some require both robots to complete the task (prompts 1, 4, 5, 13–17), some can be made more efficient by dividing the work between the robots (prompts 3, 6, 7–12), and some require little coordination (prompts 2, 18). Several tasks (prompts 1, 2, 5, 12, 14–18) also require spatial reasoning about direction, such as north/south or left/right. 
+
+B. Offline Testing 
+
+Because large-scale evaluation on physical robots is time-intensive, the comparison against baseline methods and the ablation study were conducted offline. In this setting, each method is prompted with an overhead image of the workspace and produces a planned path for the robots. With-out executing the plan on the robots, each path is evaluated directly for whether it completes the task instruction and avoids obstacles. Each of the 18 prompts was run ten times per method with results reported in Table I and Figure 4. 
+
+C. Performance Metrics 
+
+All methods were evaluated on two metrics: success rate (SR), which measures whether the task was completed, and normalized makespan, which estimates completion time. 
+
+Success Rate evaluates whether the planned route com-pletes the task described in the instruction without inter-secting any obstacles. Success criteria depend on the task, with evaluation criteria for each task provided on the project GitHub. For Coverage tasks, success additionally requires at least 95% coverage of the grid points in the described area. 
+
+Normalized Makespan measures the efficiency of the planned paths from their lengths. Because the two robots ex-ecute their paths in parallel, the makespan of a single trial is the longer of the two path lengths, MS = max( ℓDonnie , ℓ Raph ).Different prompts demand very different amounts of travel, so raw makespans are not directly comparable across tasks. We therefore define the Normalized Makespan N M S (M, L )
+
+of method M on task L as its mean makespan divided by that of CoPlanVLM on the same task, 
+
+NMS( L, M ) = MS( L, M )MS( L, CoPlanVLM ) , (4) TABLE I 
+
+CoPlanVLM SUCCESS RATES AND AVERAGE MAKESPAN FOR ALL EVALUATION PROMPTS (10 TRIALS PER PROMPT ). 
+
+Prompt Category Env. SR (%) MS (m) Prompt 
+
+1 Nav2Point Sim 100.0 14.6 “Surround the person in the purple shirt by sending robots to the left and right sides of the person.” 2 Nav2Point Sim 80.0 3.6 “Have each robot hide on the left side of the nearest obstacle.” 3 Nav2Point Sim 80.0 8.0 “Visit each of the four colored boxes.” 4 Nav2Point AVL 100.0 3.7 “Send both robots to the white X marked in tape.” 5 Nav2Point AVL 100.0 2.9 “Move one robot to the north of the boxes and one to the south of the boxes.” 6 Nav2Point AVL 50.0 2.8 “Visit each object in the scene.” 7 Coverage Sim 90.0 34.4 “Patrol the perimeter of the map.” 8 Coverage Sim 90.0 17.6 “Patrol around the rack of boxes.” 9 Coverage Sim 70.0 9.8 “Survey the area inside the black and yellow striped tape.” 10 Coverage AVL 90.0 5.9 “Have the robots patrol the area around the chair.” 11 Coverage AVL 70.0 11.5 “Have the robots survey the large square marked in tape on the left side.” 12 Coverage AVL 70.0 22.7 “Patrol the left half of the map.” 13 Maneuver Sim 100.0 19.2 “Have Donnie do a loop around the red and blue boxes and then meet up with Raph.” 14 Maneuver Sim 80.0 18.7 “Have Raph approach the person in white from the left while Donnie passes around the right of the rack of boxes before approaching the same person from the other side.” 15 Maneuver Sim 100.0 24.0 “Have one robot move along the north edge of the map to the person in purple while the other robot travels along the south edge until it is directly south of the same person, then move north to the person.” 16 Maneuver AVL 100.0 6.8 “Have the robots switch places. Have Raph move around the south of the chair and have Donnie move around the north of the chair.” 17 Maneuver AVL 100.0 7.5 “Send both robots to the person. Have one approach around the north of the boxes, and one approach around the south of the boxes.” 18 Maneuver AVL 50.0 11.7 “Have Donnie circle around the box on the left and then go to the chair.” 
+
+Fig. 4. Measured success rates for CoPlanVLM and compared methods on all 18 prompts. 
+
+where MS( L, M ) is the mean makespan of method M on task L. Only successful trials are included in each average. If a baseline fails every trial for a given task, that task is excluded from its average. Consequently, each baseline is compared to CoPlanVLM on a different subset of prompts. By construction, CoPlanVLM has a normalized makespan of 1.0, and values above (or below) 1.0 indicate longer (or shorter) paths relative to CoPlanVLM .
+
+D. Comparison to Existing Methods 
+
+Because no prior work has investigated coordinated path planning from natural language for the types of complex be-havior investigated in this work, CoPlanVLM was compared against three representative approaches for VLM-based path planning that were adapted to the two-robot setting. 
+
+Grid Overlay: The closest work to our problem setting is [17], which uses a VLM to plan paths for a single robot executing complex behaviors described in natural language. A labeled grid is overlaid on the overhead image, and the VLM selects an ordered list of cells whose centroids serve as a sequence of target locations for a PID controller. We adapt this approach to our multi-robot setting by labeling each robot with its name and prompting the VLM to plan routes for both. Because [17] relies on the VLM alone to select obstacle-free routes, initial testing showed very high collision rates. We therefore strengthen this baseline by enforcing obstacle avoidance with the A* planner of Section IV-E.1 for a fairer comparison of the marking and prompting methods. 
+
+CoNVOI Marking: CoNVOI [7] performs single-robot navigation from an ego-centric viewpoint. It uses a VLM to identify the robot’s context (e.g., indoor vs. outdoor) and select appropriate navigation rules. CoNVOI marks only obstacle-free regions of the image with numbers from which the VLM selects navigation waypoints. CoNVOI is adapted to our setting by fixing a single rule set across all prompts, since our scenes are all similar indoor environments. It is extended to two robots by labeling each with its name and prompting the VLM to select a list of waypoints for each to follow. The marking scheme is replicated identically by placing marks only in free cells in the occupancy map. 
+
+Pixel Selection: An alternative to selecting from a set of marks is to have the VLM select waypoints as pixel coordinates on an unmarked image as in [9], [31]. Although these works target single robots, we adapt pixel-coordinate selection to our problem by prompting the VLM to output a sequence of pixel coordinates (px, p y ) for each robot on a normalized 1000 ×1000 scale as in [31]. These are projected to world coordinates (x, y ) and used as waypoints in the same A* planner introduced in Section IV-E.1. Table II reports overall and per-category average success rates and makespan. Figure 4 shows per-prompt success rates. CoPlanVLM achieved the highest overall success rate of 84 .4% with CoNVOI second with 50 .0% . CoPlanVLM ’s strong performance on Coverage tasks likely reflects its dedicated coverage planner, highlighting the benefit of adap-tive planner selection. CoPlanVLM also outperforms the baselines on the other two task types, indicating a supe-rior VLM prompting format. Successful paths produced by 
+
+CoPlanVLM were on average 27% shorter in makespan than CoNVOI marking (1.00 vs. 1.37), largely because 
+
+CoPlanVLM assigns each subtask to the best-suited robot and divides large coverage tasks between the two. In contrast, the baselines frequently sent a robot to a goal closer to its teammate or assigned the same goals to both.                                        
+
+> TABLE II COMPARISON WITH BASELINES ,AVERAGED BY TASK CATEGORY .
+> Method Nav2Point Coverage Maneuver All
+> Average Success Rate (%) ↑
+> CoPlanVLM 85.0 80.0 88.3 84.4
+> Pixel Selection [9], [31] 26.7 25.0 43.3 31.7 Grid Overlay [17] 40.0 25.0 51.7 38.9 CoNVOI Marking [7] 45.0 45.0 60.0 50.0
+> Average Normalized Makespan ↓
+> CoPlanVLM 1.00 1.00 1.00 1.00
+> Pixel Selection [9], [31] 1.34 1.33 0.96 1.22 Grid Overlay [17] 1.58 1.85 1.44 1.61 CoNVOI Marking [7] 1.17 1.69 1.17 1.37
+
+E. Ablation Testing 
+
+Three different configurations of CoPlanVLM isolated the contribution of each component. CoPlanVLM W/O Obs. Marking does not mark detected obstacles with the red “x” symbol as described in Section IV-A.3 and the reasoning step where the VLM names the objects marked by each red “x” is accordingly skipped. CoPlanVLM Maneuver Only retains the same marking, but does away with the task categorization and instead only uses the Maneuver planner which was chosen as the single planner best capable of completing all tasks since the Nav2Point planner is only used to navigate to a few set positions, and the Coverage planner cannot specify an order for the points to be visited. Finally, CoPlanVLM No CoT Reasoning retains the original marking scheme and task categorizer, but removes the CoT reasoning trace, instead prompting the VLM to directly output waypoints. The ablation study (Table III) indicates that each of the three components contribute significantly to the over-all success rate. Removing the marked obstacles reduced the Nav2Point and Maneuver success rates by −40% and 
+
+−18 .3% respectively, largely due to the VLM selecting inaccessible regions or missing crucial objects in the scene. Performance on Coverage tasks improved slightly ( +15% )without obstacle marking. We hypothesize that because the coverage planner drops any unsafe points, the VLM can safely select whole regions without reasoning about individual obstacles, so the additional obstacle-labeling step may introduce noise rather than useful information for these tasks. This supports extending the task specific prompting to adaptively select the best image overlay for each task. Using only the Maneuver prompt and planner for all tasks resulted in −13 .3% SR and −55% SR on Nav2Point and Coverage tasks respectively along with a higher makespan indicating that relying on a single planner for all tasks reduces solution quality. Removing the CoT reasoning had the greatest overall effect with an average of −35 .5% SR over all tasks.                                                                            
+
+> TABLE III ABLATION STUDY OF CoPlanVLM ,AVERAGED BY TASK CATEGORY .
+> Method Nav2Point Coverage Maneuver All
+> Average Success Rate (%) ↑
+> CoPlanVLM 85.0 80.0 88.3 84.4
+> CoPlanVLM w/o Marked Obs. 45.0 95.0 70.0 70.0
+> CoPlanVLM Maneuver Only 71.7 25.0 88.3 61.7
+> CoPlanVLM w/o CoT 53.3 71.7 21.7 48.9
+> Average Normalized Makespan ↓
+> CoPlanVLM 1.00 1.00 1.00 1.00
+> CoPlanVLM w/o Marked Obs. 1.43 1.10 0.99 1.15
+> CoPlanVLM Maneuver Only 1.30 1.49 1.00 1.22
+> CoPlanVLM w/o CoT 1.03 1.25 1.19 1.17 TABLE IV HARDWARE VALIDATION RESULTS .
+> Prompt Category Offline: Successful Plans (out of 10) Hardware: Successful Executions (out of 2)
+> 4Nav2Point 10 25Nav2Point 10 26Nav2Point 5110 Coverage 9211 Coverage 7112 Coverage 7216 Maneuver 10 217 Maneuver 10 218 Maneuver 51
+> Avg. Success Rate (%) 81.1 83.3
+
+F. Robot Deployment CoPlanVLM was deployed on two Turtlebot 4 robots in an indoor robotics laboratory equipped with a motion capture room for robot pose estimation and an overhead camera. GPT-4o was used as both the classifier LLM and the execu-tive VLM. A lab computer was used to perform all calcula-tions, perform API calls to the VLM, and communicate linear and angular velocity commands to the Turtlebots through ROS2 Humble. All nine prompts tested offline on real-world images from the AVL were evaluated twice on hardware with fresh overhead images and newly generated plans for each trial. Hardware deployments (Table IV) demonstrated similar success rates to offline testing: 83 .3% vs. 81 .1% indicating that CoPlanVLM transfers smoothly to physical hardware. The three recorded failures during testing resulted either from missed obstacle detections (prompts 6 and 18) or incomplete coverage (prompt 11) and were visible in the plan before execution. Figure 1 (Bottom) illustrates the paths planned and actual paths for three tasks. VI. C ONCLUSIONS , L IMITATIONS , AND FUTURE WORK 
+
+CoPlanVLM is a method for leveraging VLMs to per-form long-horizon path planning for a collaborative team of two robots. CoPlanVLM improves the spatial reasoning, coordination, and path-planning capabilities of a base VLM through image preprocessing, task categorization, and struc-tured chain-of-thought reasoning leading to improved success rates and more efficient paths compared to baselines. Several limitations remain. Although CoPlanVLM ’s 84.4% success rate outperforms existing approaches, reliability re-mains insufficient for mission-critical deployment. One com-mon failure mode arises when CLIPSeg fails to detect small obstacles: an undetected box drove the 50% success rate on prompts 6 and 18, suggesting CoPlanVLM could benefit from complementary sensing (e.g., LiDAR) to refine the occupancy map. CoPlanVLM also assumes a top-down view of the workspace, access to a cloud-hosted VLM, and was evaluated on only two robots. Future work will address these limitations by fine-tuning VLMs for waypoint selection, investigating edge deployment, and scaling to larger fleets. ACKNOWLEDGMENT Generative AI tools (ChatGPT and Claude) were used to draft and debug portions of the code of CoPlanVLM . All code was validated by the authors. REFERENCES [1] A. Agaskar, S. Siva, W. Pickering, K. O’Brien, C. Kekeh, A. O. G. Barbosa, A. Li, B. G. Sarker, A. Chua, M. Nemade et al. , “Deepfleet: Multi-agent foundation models for mobile robots,” arXiv preprint arXiv:2508.08574 , 2025. [2] M. Rahman, N. I. Sarkar, and R. Lutui, “A survey on multi-uav path planning: Classification, algorithms, open research problems, and future directions,” Drones , vol. 9, no. 4, p. 263, 2025. [3] K. Liu, Z. Tang, D. Wang, Z. Wang, X. Li, and B. Zhao, “Coherent: Collaboration of heterogeneous multi-robot system with large language models,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2025, pp. 10 208–10 214. [4] S. Borate, V. Pardeshi, M. Vadali et al. , “Llm-based generalizable hierarchical task planning and execution for heterogeneous robot teams with event-driven replanning,” arXiv preprint arXiv:2511.22354 , 2025. [5] R. Karam, A. A. Nguyen, R. Lin, D. R. Martin, D. Morales, B. A. Butler, and M. Egerstedt, “Collaboration in multi-robot systems: Tax-onomy and survey over frameworks for collaboration,” arXiv preprint arXiv:2603.23898 , 2026. [6] P. Li, Z. An, S. Abrar, and L. Zhou, “Large language models for multi-robot systems: A survey,” Autonomous Robots , vol. 50, no. 3, p. 30, 2026. [7] A. J. Sathyamoorthy, K. Weerakoon, M. Elnoor, A. Zore, B. Ichter, F. Xia, J. Tan, W. Yu, and D. Manocha, “Convoi: Context-aware navigation using vision language models in outdoor and indoor envi-ronments,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2024, pp. 13 837–13 844. [8] A. Potnis, F. Affonso, S. Gummadi, N. K. Uppalapati, and G. Chowd-hary, “Catnav: Cached vision-language traversability for efficient zero-shot robot navigation,” arXiv preprint arXiv:2603.22800 , 2026. [9] M. Bao, Y. Cai, H. Xu, Z. Li, J. He, J. Tang, C. Lv, J. Zhang, Y. Xie, and W. Wang, “Goal2pixel: Grounding goals to pixels for vision-language navigation,” arXiv preprint arXiv:2606.01621 , 2026. [10] I. Stogiannidis, S. McDonagh, and S. A. Tsaftaris, “Mind the gap: Benchmarking spatial reasoning in vision-language models,” arXiv preprint arXiv:2503.19707 , 2025. [11] M. Elnoor, K. Weerakoon, G. Seneviratne, R. Xian, T. Guan, M. K. M. Jaffar, V. Rajagopal, and D. Manocha, “Vlm-gronav: Robot navigation using physically grounded vision-language models in outdoor envi-ronments,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2025, pp. 2391–2398. [12] R. Rana, J. Quattrociocchi, D. Lee, C. Ellis, A. Adkins, A. Uccello, G. Warnell, and J. Biswas, “Overseec: Open-vocabulary costmap generation from satellite images and natural language,” arXiv preprint arXiv:2602.18606 , 2026. [13] D. Goetting, H. G. Singh, and A. Loquercio, “End-to-end navigation with vision language models: Transforming spatial reasoning into question-answering,” arXiv preprint arXiv:2411.05755 , 2024. [14] X. Tian, J. Gu, B. Li, Y. Liu, Y. Wang, Z. Zhao, K. Zhan, P. Jia, X. Lang, and H. Zhao, “Drivevlm: The convergence of au-tonomous driving and large vision-language models,” arXiv preprint arXiv:2402.12289 , 2024. [15] S. Wang, J. Zhang, M. Li, J. Liu, A. Li, K. Wu, F. Zhong, J. Yu, Z. Zhang, and H. Wang, “Trackvla: Embodied visual tracking in the wild,” arXiv preprint arXiv:2505.23189 , 2025. [16] A.-C. Cheng, Y. Ji, Z. Yang, Z. Gongye, X. Zou, J. Kautz, E. Bıyık, H. Yin, S. Liu, and X. Wang, “Navila: Legged robot vision-language-action model for navigation,” arXiv preprint arXiv:2412.04453 , 2024. [17] A. Pasqualina, A. Peckham, C. Craddock, S. Laxminarayan, K. Win-kleblech, S. S. S. Kumar, H. Chhaya, J. Paquet, J. H. Ramos, and M. Anderson, “Vision-language model informed relative navigation for gps-denied environments,” in 2026 IEEE Aerospace Conference .IEEE, 2026, pp. 1–11. [18] A. A. Khan, M. Andrev, M. A. Murtaza, S. Aguilera, R. Zhang, J. Ding, S. Hutchinson, and A. Anwar, “Safety aware task planning via large language models in robotics,” in 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2025, pp. 21 024–21 031. [19] B. Yu, H. Kasaei, and M. Cao, “Co-navgpt: Multi-robot cooperative vi-sual semantic navigation using large language models,” arXiv preprint arXiv:2310.07937 , vol. 3, 2023. [20] R. Wang, H.-L. Hsu, D. Hunt, J. Kim, S. Luo, and M. Pajic, “Comres-vlm: Coordinated multi-robot exploration and search using vision language models,” arXiv preprint arXiv:2509.26324 , 2025. [21] P. Anderson, Q. Wu, D. Teney, J. Bruce, M. Johnson, N. S¨ underhauf, I. Reid, S. Gould, and A. Van Den Hengel, “Vision-and-language navigation: Interpreting visually-grounded navigation instructions in real environments,” in 2018 IEEE/CVF conference on computer vision and pattern recognition . IEEE, 2018, pp. 3674–3683. [22] T. L¨ uddecke and A. Ecker, “Image segmentation using text and image prompts,” in 2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . IEEE, 2022, pp. 7076–7086. [23] J. Yang, H. Zhang, F. Li, X. Zou, C. Li, and J. Gao, “Set-of-mark prompting unleashes extraordinary visual grounding in gpt-4v,” arXiv preprint arXiv:2310.11441 , 2023. [24] Z. Bai, H. Li, B. Fu, C. Xiong, R. Wang, and X. Chen, “R2c: Mapping room to chessboard to unlock llm as low-level action planner,” in 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . IEEE, 2025, pp. 19 456–19 466. [25] P. E. Hart, N. J. Nilsson, and B. Raphael, “A formal basis for the heuristic determination of minimum cost paths,” IEEE Transactions on Systems Science and Cybernetics , vol. 4, no. 2, pp. 100–107, 1968. [26] D. J. Rosenkrantz, R. E. Stearns, and P. M. Lewis, II, “An analysis of several heuristics for the traveling salesman problem,” SIAM journal on computing , vol. 6, no. 3, pp. 563–581, 1977. [27] G. A. Croes, “A method for solving traveling-salesman problems,” 
+
+Operations research , vol. 6, no. 6, pp. 791–812, 1958. [28] “A note on two problems in connexion with graphs,” in Edsger Wybe Dijkstra: his life, work, and legacy , 2022, pp. 287–290. [29] S. Wilson, P. Glotfelter, L. Wang, S. Mayya, G. Notomista, M. Mote, and M. Egerstedt, “The robotarium: Globally impactful opportunities, challenges, and lessons learned in remote-access, distributed control of multirobot systems,” IEEE Control Systems Magazine , vol. 40, no. 1, pp. 26–44, 2020. [30] N. Koenig and A. Howard, “Design and use paradigms for gazebo, an open-source multi-robot simulator,” in 2004 IEEE/RSJ international conference on intelligent robots and systems (IROS)(IEEE Cat. No. 04CH37566) , vol. 3. Ieee, 2004, pp. 2149–2154. [31] C. Y. Hu, Y.-S. Lin, Y. Lee, C.-H. Su, J.-Y. Lee, S.-R. Tsai, C.-Y. Lin, K.-W. Chen, T.-W. Ke, and Y.-L. Liu, “See, point, fly: A learning-free vlm framework for universal unmanned aerial navigation,” in 
+
+Conference on Robot Learning . PMLR, 2025, pp. 4697–4708.

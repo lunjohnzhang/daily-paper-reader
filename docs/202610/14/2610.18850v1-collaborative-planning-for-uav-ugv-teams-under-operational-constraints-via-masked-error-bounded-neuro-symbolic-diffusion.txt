@@ -1,0 +1,692 @@
+Title: Collaborative Planning for UAV-UGV Teams under Operational Constraints via Masked Error-bounded Neuro-Symbolic Diffusion
+
+URL Source: https://arxiv.org/pdf/2610.18850v1
+
+Published Time: Wed, 14 Oct 2026 04:41:22 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Collaborative Planning for UAV-UGV Teams under Operational Constraints via Masked Error-bounded Neuro-Symbolic Diffusion 
+
+Zihao Deng 1, Qianhuang Li 1, Maggie Wigness 2,John Rogers 2, Donghyun Kim 1, and Hao Zhang 11 University of Massachusetts Amherst  
+
+> 2
+
+U.S. Army DEVCOM Army Research Laboratory 
+
+Abstract: Collaborative planning under operational constraints is essential for heterogeneous robot teams in large-scale missions. Unmanned Aerial Vehicles (UAVs) provide rapid area coverage but are limited by onboard energy, while Un-manned Ground Vehicles (UGVs) can serve as mobile recharging stations yet are constrained by road-network traversability. Effective collaboration must enforce op-erational constraints during execution while enabling parallel, coordinated actions. Masked Diffusion Models (MDMs) have shown promise through token unmasking but have two key limitations: entropy-guided scheduling assumes distributional alignment and reliance on differentiable constraints for diffusion-time optimization. We propose Masked Error-bounded Neuro-Symbolic Diffusion (MEND), which formulates collaborative planning as a conditional masked generative process to generate context-aware action sequences for UAV-UGV teams. MEND introduces a neuro-symbolic diffusion paradigm that constrains conditional masked diffusion policies at execution by reweighting the learned action distribution with a logic-induced admissibility indicator, thereby enforcing compliance with operational constraints. MEND introduces an error-bounded inference scheduling at execution that constructs the unmasking schedule by selecting positions with minimal predic-tive entropy over the constraint-aware action distribution, enhancing collaborative planning optimality under operational constraints. Extensive experimental results in simulation, on real-world maps, and with physical robot teams demonstrate that MEND advances UAV-UGV collaborative planning under operational constraints. More details are available on the website: https://hcrlab.gitlab.io/project/mend. 
+
+Keywords: Heterogeneous Multi-Robot Planning, Neuro-Symbolic Diffusion. 
+
+1 Introduction Start   
+
+> UAV -UGV Team Visit Recharge Traverse
+> UAV2
+> UGV1
+> UGV2
+> UAV1
+> Execution -Time Constraints Satisfaction
+> Heterogenous Coordination
+> Simultaneous Execution
+
+Figure 1: As a collaborative team, traversability-constrained UGVs serve as mobile recharg-ing stations for energy-constrained UAVs, en-abling parallel operation while satisfying energy, traversability, and recharging constraints. Collaborative planning enables multi-robot sys-tems to coordinate actions and share resources for interdependent tasks, supporting parallel op-eration [1], scalability [2], and robustness [3]. In applications such as search and rescue [4–7] and environmental monitoring [8–11], robot teams are often heterogeneous, comprising platforms with complementary capabilities and constraints. For example, Unmanned Aerial Vehicles (UAVs) pro-vide rapid area coverage but are limited by on-board energy, whereas Unmanned Ground Vehi-cles (UGVs) offer substantial power reserves and 
+
+10th Conference on Robot Learning (CoRL 2026), Austin TX, USA. arXiv:2610.18850v1 [cs.RO] 13 Oct 2026 enable in-mission UAV recharging, yet are constrained by road-network traversability. Consequently, collaborative planning must explicitly enforce operational constraints at execution time. To ensure efficiency, multi-robot systems must execute plans in parallel with synchronized actions (Figure 1). Optimization-based methods, e.g., mixed-integer programming [12–14], and symbolic planners, e.g., based on First-Order Logic (FOL) [15–17], provide optimal solutions and constraint satisfaction but scale poorly due to combinatorial search. Reinforcement learning methods [18] often assume greedy recharging, simplify robot motion, or encode constraints only during training. Diffusion models excel in trajectory planning [19–22], while Masked Diffusion Models (MDMs) achieve stronger results via token unmasking [23, 24]. MDMs typically employ entropy-guided inference scheduling [25, 26] to improve sampling quality. However, they assume alignment between the learned and true distributions; when generated actions violate constraints, entropy estimates are distorted, leading to suboptimal solutions that breach operational constraints in collaborative planning. Recent work extends MDMs to constrained generation via classifier-guidance [27] and neuro-symbolic constraint enforcement during sampling [28, 29]. However, a theoretical limitation is that they rely on gradient-based optimization over differentiable constraints in sampling, whereas operational constraints are often discrete, non-differentiable, and not preserved by standard diffusion dynamics. We propose Masked Error-bounded Neuro-Symbolic Diffusion (MEND ), a theoretical approach for collaborative planning in heterogeneous teams under operational constraints. MEND represents interdependent operational contexts as a graph, and formulates collaborative planning as a conditional masked generative process to generate context-aware action sequences for UAVs and UGVs. MEND introduces a neuro-symbolic diffusion paradigm that constrains conditional masked diffusion policies at execution time by reweighting the learned action distribution with a FOL-induced admissibility indicator, thereby enforcing compliance with operational constraints at execution. MEND also introduces an error-bounded inference scheduling strategy at execution that constructs the unmasking schedule by selecting positions with minimal predictive entropy over the constraint-aware action distribution, enhancing collaborative planning optimality under operational constraints. The joint action sequences generated by MEND are executed by UAVs and UGVs simultaneously, which enables parallel operation of heterogeneous robots while satisfying operational constraints. Our contribution is MEND, a novel and principled learning approach for masked error-bounded neuro-symbolic diffusion, to enable collaborative planning for UAV-UGV teams under operational constraints. MEND introduces two key novelties: MEND introduces two key novelties: • Execution-time masked neuro-symbolic diffusion that constrains conditional masked diffusion policies via neuro-symbolic reasoning , reshaping the learned action distribution into a constraint-aware distribution using a logic-induced admissibility indicator. This enables the satisfaction of non-differentiable constraints that cannot be optimized by gradient-based diffusion updates, thereby enforcing operational constraints for UAV-UGV teams. • Execution-time error-bounded inference scheduling , which guarantees that predictive entropy computed under the constraint-aware action distribution incurs a provably smaller sampling error relative to the true distribution. This reduces misalignment between the learned and true action distributions, thereby improving collaborative planning optimality under operational constraints. 
+
+2 Related Work 
+
+Collaborative Planning for Multi-Robot Systems Optimization-based methods formulate UAV-UGV planning as NP-hard routing problems. Mixed Integer Programming (MIP) [12–14, 30], dynamic programming [31–33], and heuristic search methods [34–39] can compute optimal or near-optimal solutions, but their computational cost limits scalability and real-time deployment. Symbolic planning employs predicate-based representations for constraint-guaranteed reasoning. Prior work uses action language BC [40, 41], Planning Domain Definition Language (PDDL) [42, 43], Temporal Logic (TL) [44, 45], and Backus-Naur Form (BNF) [46] to model mission structures and 2operational constraints in multi-robot systems. These formalisms are largely grounded in First-Order Logic (FOL) [15–17], enabling quantified reasoning for constraint-aware multi-robot planning. Reinforcement Learning has been applied to routing tasks [47–49] with energy-constraints [50– 52], combined with Graph Learning to encode context [53–55]. Neuro-symbolic approaches have emerged for both single-robot [56] and multi-robot systems [57–60] for constraint satisfaction. Energy-constrained UAVs with UGV support have been explored [18]. However, these methods are often limited by greedy recharging strategies, simplify UGV traversal as straight-line trajectories, and enforce constraints during training rather than providing execution-time guarantees. 
+
+Masked Diffusion Models. Diffusion models have shown promise in trajectory planning [19–22]. In discrete domains, masked diffusion models (MDMs) achieve competitive results in task and maze planning [23, 24, 61–63]. Recent work extends MDMs to constrained generation via classifier-guidance and neuro-symbolic reasoning [27–29]. However, these approaches rely on differentiable constraints optimized during diffusion via gradient-based updates, whereas operational constraints are often discrete, non-differentiable, and not preserved by standard diffusion dynamics. MDMs support flexible inference schedules, whose choice strongly affects sampling quality, as random unmasking can lead to error propagation [64]. Prior work improves sampling via variable-length generation [24], caching [65], and entropy-guided scheduling [25, 66], with recent theory relating optimal scheduling to predictive entropy [26]. However, existing entropy-guided scheduling assumes alignment between the learned and true data distributions; when constraints are violated, entropy estimates become distorted, resulting in biased unmasking schedules in practice. 
+
+3 Preliminaries 
+
+Masked Diffusion Models (MDMs) [67] define a discrete-time Markov chain a0 → a1 → · · · → aT ,where a0 = ( a10, . . . , a L 
+
+> 0
+
+) ∈ A L is the ground-truth sequence of length L and at ∈ (A ∪ { m})L
+
+for t ∈ { 0, . . . , T }, with vocabulary A and mask token m. The forward process progressively corrupts a0 by replacing tokens with m. At diffusion step t, at is sampled from the distribution 
+
+q(at|a0) = QLi=1 q(ait|ai
+
+> 0
+
+) and q(ait|ai
+
+> 0
+
+) = Cat 
+
+
+
+αt eai 
+
+> 0
+
++ (1 − αt) em
+
+
+
+, where αt ∈ [0 , 1] denotes a predefined noise schedule, and eai 
+
+> 0
+
+and em denote the one-hot vector of ai 
+
+> 0
+
+and m, respectively. The reverse process iteratively reconstructs a0 from a masked sequence aT = ( m, . . . , m ). For any intermediate step s < t , we sample as ∼ q(as | at, a 0) = QLi=1 q(ais | at, a 0), where 
+
+q(ais | at, a 0) = Cat( eait ) if ait̸ = m, and otherwise Cat   1−αs 
+
+> 1−αt
+
+em + αs−αt 
+
+> 1−αt
+
+eai
+
+> 0
+
+. Thus, if ait̸ = m,the token remains unchanged, i.e., ais = ait; otherwise, ais ∈ { m, a i
+
+> 0
+
+} according to αs and αt.
+
+MDM Inference Scheduling At diffusion step t, given a set of masked positions, an inference schedule is a mapping S : {T, . . . , 1} → 2{1,...,L }, where S(t) ⊆ { i ∈ { 1, . . . , L } | ait = m}
+
+specifies the subset of masked positions to be revealed. The reveal set is updated as St+1 = St ∪ S (t),resulting {St}Tt=0 with St ⊆ { 1, . . . , L }. Uniform scheduling [68] uniformly reveals positions it
+
+from the remaining masked set, defined as it ∼ U ({1, . . . , L } \ St) and St+1 = St ∪ { it}. As the prediction ai 
+
+> 0
+
+depends on aSt 
+
+> 0
+
+in the learned distribution p(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+, t ), entropy-guided scheduling 
+
+[25] improves sampling quality by selecting the minimum-entropy position, which is defined as 
+
+St+1 = St ∪ { it} with it ∈ arg min i∈{ 1,...,L }\ St H p(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+, t ).
+
+Symbolic Logic in Robotic Planning can be formalized by a tuple (O, A, Φ, R) [69], where O
+
+is a finite set of symbols representing entities, A denotes a set of grounded actions with a ∈ A 
+
+corresponding to an instantiated operator that induces a discrete decision, and Φ denotes a set of 
+
+grounded predicates ϕ : O → { 0, 1} encoding entity properties or relations. The logic rule set R
+
+consists of symbolic action constraints, where each rule r ∈ R is a formal formula defined over Φ to specify preconditions on A. In this work, R is instantiated using First-Order Logic (FOL) [15, 70], such that each rule takes the form r : ϕ(o) ⇒ a(o), where ϕ(o) is a predicate formula constructed from Φ using logical connectives (∧, ∨, ¬, ⇒) and quantifiers (∀, ∃) over o ∈ O , thereby defining the admissible set of a via constraint satisfaction conditions. 34 Approach 
+
+Problem Definition Let Ua = {uai } denote a team of energy-constrained UAVs tasked with visiting a set of task location points C = {cj }. Let Ug = ugi denote a team of traversability-constrained UGVs that plan trajectories over traversable terrain to rendezvous points P = pk for UAV recharging. Then, the symbol set O = Ua ∪ C ∪ U g ∪ P captures all robotic and task-relevant entities. We represent the operational context as a heterogeneous graph G = {T , Eintra , Euav , Eugv }, where the node set is defined as T = T c ∪ T p ∪ T a ∪ T g . Task nodes T c = {tci } encode tasks ci ∈ C 
+
+with tci = [ dci , δ i], where dci ∈ Rd denotes task coordinates and δi ∈ { 0, 1} indicates visitation status. Path nodes T p = {tpi } encode paths pi ∈ P with tpi denotes the centroid of pi. UAV nodes 
+
+T a = {tai } encode UAVs uai ∈ U a with tai = [ dai , f i], where dai and fi denote UAV coordinates and remaining energy, respectively. UGV nodes T g = {tgi } encode UGVs ugi ∈ U g with tgi = [ dgi , da],where dgi denotes UGV coordinates and da represents the coordinates of all UAVs. The edge sets model heterogeneity and spatial proximity. Eintra = {eintra  
+
+> i,j
+
+} connects ti ∈ T k and tj ∈ T k with 
+
+k ∈ { c, p, a, g }. Euav = {euav  
+
+> i,j
+
+} connects ti ∈ T a to tj ∈ T c ∪ T g . Eugv = {eugv  
+
+> i,j
+
+} connects 
+
+ti ∈ T g to tj ∈ T a ∪ T p. For all edges, ei,j = 1 if ∥di − dj ∥2 < ρ , where ρ is a predefined radius. We define the grounded action set A for the UAV-UGV team with three action types. The UAV action Visit (uai , c j ) denotes uai visiting cj , yielding |U a| × |C| actions. The UGV action 
+
+Traverse (ugi , p j ) denotes ugi traversing to pj , yielding |U g | × |P| actions. The recharge action 
+
+Recharge (uai , u gj ) denotes uai recharging on ugj , yielding |U a| × |U g | actions. We define the grounded predicate set Φ as a relational abstraction for describing domain-specific properties for the entire team. Each predicate is evaluated to a Boolean value based on the current state of the corresponding UAVs, UGVS, tasks, or paths. For example, the predicate UAV (uai ) indicates whether uai exists, and UnderCost (uai , c j ) indicates whether cj is energy-affordable for uai .We define the logic rules set R to formalize operational constraints using FOL, which defines a sufficient condition for the admissibility of an action. For example, the recharging rule, “For the i-th UAV, if no task is under cost, and there exists a j-th UGV that is under cost, then a recharge action with the j-th UGV exists” , can be expressed as UAV (uai ) ∧ ¬∃ ck(Task (ck) ∧ UnderCost (uai , c k)) ∧∃ugj (UGV (ugj ) ∧ UnderCost (uai , u gj ))  ⇒ ∃ ugj Recharge (uai , u gj ).We introduce MEND (Masked Error-bounded Neuro-Symbolic Diffusion ), a novel learning approach as shown in Figure 2. Our goal is to address the collaborative planning for UAV-UGV teams under operational constraints, enabling the following two key multi-robot capabilities: • Heterogeneous Coordination with Simultaneous Execution : The joint planning of Ua
+
+and Ug to execute an interdependent mission while minimizing the total makespan. Plans are executed in parallel, where Ua determine task visitation sequences over C and Ug compute routes over P, enabling continuous task execution and timely in-mission recharging. • Execution-Time Constraint Satisfaction : At execution time, the generated joint plans must satisfy all operational constraints symbolically specified by R, including: (1) UAV energy constraints (e.g., UnderCost (uai , c j )) for Visit (uai , c k), (2) UGV traversabil-ity constraints (e.g., ClosestUGV (ugi , u aj )) for Traverse (ugi , p k), and (3) UAV-UGV recharging constraints (e.g., UnderCost (uai , u gj )) for Recharge (uai , u gj ).
+
+MDM for Collaborative Planning of Heterogeneous Robots We formulate collaborative UAV-UGV planning as learning the conditional distribution p(a|H ) over joint action sequences a =(a1, . . . , a L), where al ∈ A . Due to the combinatorial action space, we approximate p(a|H ) using a conditional masked diffusion model (MDM) for context-aware joint action generation. Given the operational context graph G, we use a heterogeneous graph network ω [71] to compute node embeddings H = {hi} = ω(G) for context-aware planning. Each node attribute ti is projected as zi = Wz ti, where Wz is a learnable matrix. Then zi is transformed into query, key, and value embeddings as qi = Wq zi, ki = Wkzi, and vi = Wv zi, respectively, where Wq , Wk, and 4MDM for UAV-UGV Collaborative Planning                   
+
+> Error-Bounded Inference Scheduling
+> Context-aware embeddings
+> ℋ = 𝜔(𝒢 )
+> HGT 𝜔 [Mask]
+> [Mask]
+> [Mask]
+> [Mask]
+> [Mask]
+> [Mask]
+> [Mask]
+> [Mask]
+> [Mask]
+> Learned
+> distribution
+> 𝑝 𝜃 (𝑎 0𝑖 |𝑎 𝑡 , 𝑡, ℋ)
+> Conditional MDM 𝜓
+> [Mask]
+> [Mask]
+> [Mask]
+> [Mask] Admissibility
+> Indicator
+> 𝐛 𝑖 = {𝑏 𝑖
+> 1, … , 𝑏 𝑖 |𝒜| }
+> Constraint-aware
+> distribution
+> ෤𝑝 ∝ 𝑝 𝜃 ⊙ 𝐛 𝑖
+> 𝑏 𝑖 𝑗 = 1 𝑎 𝑖,𝑗 ⊨ ℛ if 𝑆 𝑡+1 = 𝑆 𝑡 ∪ {𝑖 𝑡 }
+> [Mask]
+> [Mask]
+> [Mask] Constraint-aware
+> Entropy-guided
+> Scheduling
+> 𝑖 𝑡 = argmin(𝐻)
+> 𝐻( ෤ 𝑝(𝑎 0
+> 𝑖 |𝑎 0𝑆 𝑡 )
+> ෤𝑝(⋅ |𝑎 0𝑆 𝑡 )
+> 𝜙: 𝒪 → {0,1}
+> Symbolic Definition
+> Action( 𝓐 )
+> Visit
+> Traverse
+> Recharge
+> Predicate( 𝚽 )
+> First Order Logic( 𝓡 )
+> E.g., UnderCost( 𝑢 𝑖 𝑎 , 𝑐 𝑖 )
+> 𝑟: 𝜙 𝑜 ⇒ 𝑎(𝑜)
+> Symbol( 𝓞 )
+> 𝒰 𝑎
+> 𝒰 𝑔
+> 𝒞
+> 𝒫
+> Diffusion step  𝑡 [Mask]
+> 𝑎 0
+> UAV
+> Edge
+> UGV
+> Edge Intra-
+> type
+> Edge
+> ෤𝑝
+> [Mask]
+> [Mask] [Mask]
+> [Mask]
+> [Mask]
+> [Mask]
+> [Mask]
+> ෤𝑝
+
+Execution Time  Masked Neuro-Symbolic Diffusion 
+
+> 𝑝 𝜃
+
+Figure 2: MEND formulates collaborative planning as a conditional masked generative process for context-aware joint action generation. During execution, a neuro-symbolic diffusion paradigm enforces operational constraints via FOL-induced admissibility indicators, while an error-bounded inference scheduling minimizes entropy to improve planning optimality. 
+
+Wv are learnable matrices. To encode homogeneous and heterogeneous relationships, attention is applied over edges (i, o ) ∈ E intra , (i, k ) ∈ E uav , and (i, n ) ∈ E ugv , with attention weights αi,o =SoftMax o(q⊤ 
+
+> i
+
+ko/√d), βai,k = SoftMax k(q⊤ 
+
+> i
+
+kk/√d), and βgi,n = SoftMax n(q⊤ 
+
+> i
+
+kn/√d), respec-tively, where d denotes the embedding dimension. Then, hi is obtained by attention aggregation with layer normalization LN (·) as hi = LN 
+
+P  
+
+> eintra
+> i,o =1
+
+αi,o vo + P  
+
+> euav
+> i,k =1
+
+βai,k vk + P  
+
+> eugv
+> i,n =1
+
+βgi,n vn
+
+
+
+.We apply the forward process q(ait|ai
+
+> 0
+
+) to the ground-truth action sequence a0 and consider the reverse process q(ais|at, a 0), which defines the posterior for recovering a0. However, a0 is unknown during sampling, and q(ais|at, a 0) does not explicitly incorporate operational context. To address this, we use a denoising network to approximate the reverse process that predicts the distribution 
+
+pθ (ai
+
+> 0
+
+|at, t, H) over ai 
+
+> 0
+
+∈ A , which is learned by minimizing the negative log-likelihood over masked positions: Ea0, t, ∼Unif( {1,...,T }), a t∼q(at|a0)[P 
+
+> i:ait=m
+
+− log pθ (ai
+
+> 0
+
+|at, t, H), where Unif( ·) denotes the uniform distribution. The learned distribution pθ (ai
+
+> 0
+
+|at, t, H) enables collaborative planning for the UAV-UGV team by generating a context-aware joint sequence a through conditioning on H.
+
+Execution-Time Masked Neuro-Symbolic Diffusion As a theoretical limitation, MDMs cannot guarantee ai |= R for samples ai ∼ pθ, since likelihood maximization does not enforce constraints. Moreover, each FOL rule in R induces a discrete admissibility indicator, which is non-differentiable and thus cannot be imposed by gradient-based training or standard diffusion sampling. We propose a neuro-symbolic approach that constrains conditional masked diffusion policies to enforce execution-time constraints for UAV-UGV teams. MEND reshapes the learned distribution 
+
+pθ into a constraint-aware distribution ˜p by reweighting actions probabilities with an admissibility indicator induced by R. By removing inadmissible mass while preserving relative likelihoods over admissible actions, MEND satisfies non-differentiable constraints, i.e., ∀ai ∼ ˜p, a i |= R.Let at denote a partially masked sequence at step t, and M(at) = {i|ait = m} the masked indices. For each i ∈ M (at), the MDM defines a distribution over A as pθ (ai 
+
+> 0
+
+= ai,j |at, t, H), ∀ai,j ∈ A .
+
+This distribution satisfies pθ (·) ≥ 0 and P  
+
+> ai,j ∈A
+
+pθ (ai 
+
+> 0
+
+= ai,j |· ) = 1 . For each position i, define an admissibility indicator bi ∈ { 0, 1}|A| , where bji = 1 iff ai,j |= R. We construct a constraint-aware distribution by masking and renormalizing as ˜pi = pθ (·| at,t, H)⊙bi  
+
+> 1⊤(pθ(·| at,t, H)⊙bi)
+
+. By construction, ˜pi(ai,j ) = 0 
+
+for ai,j ̸ |= R, and for any admissible actions ai,j , a i,k |= R, ˜pi(ai,j )˜pi(ai,k ) = pθ (ai,j |at,t, H)   
+
+> pθ(ai,k |at,t, H)
+
+.
+
+Under the recharging rule, if UAV uai cannot afford any Visit action but an affordable UGV ugj
+
+exists, then Recharge (uai , u gj ) is the only admissible action at position i, with bRecharge  
+
+> i
+
+= 1 and 
+
+bji = 0 otherwise. Thus, ˜p assigns zero probability to ai,j ̸ |= R, MEND explicitly ensures the satisfaction of execution-time operational constraints under the neuro-symbolic diffusion paradigm. 5Table 1: Example FOL rules for UAV-UGV collaborative planning under operational constraints. 
+
+Rule First-order logic 
+
+UAV task visitation [UAV (uai ) ∧ ∃ ck(Task (ck) ∧ UnderCost (uai , c k))] ⇒ ∃ ck Visit (uai , c k)
+
+UGV path traversal [UGV (ugj ) ∧ ∃ uai ∃pl(UAV (uai ) ∧ LowEnergy (uai , f i) ∧ UnderCost (uai , p l) ∧
+
+ClosestUGV (ugj , u ai ))] ⇒ ∃ pl Traverse (ugj , p l)
+
+Recharge collaboration [UAV (uai ) ∧ ¬∃ ck(Task (ck) ∧ UnderCost (uai , c k)) ∧ ∃ugj (UGV (ugj ) ∧
+
+UnderCost (uai , u gj ))] ⇒ ∃ ugj Recharge (uai , u gj )
+
+Execution-Time Error-Bounded Inference Scheduling The quality of MDM sampling depends on the schedule S and revealed sets {St}Tt=0 because pθ (ai
+
+> 0
+
+|aSt 
+
+> 0
+
+, t, H) changes with aSt 
+
+> 0
+
+. Entropy-guided scheduling [25] selects the minimum-entropy position and assumes the sampled distribution ν
+
+from pθ aligns with the ground-truth distribution μ, where a ∼ μ with ai |= R. If pθ assigns mass to 
+
+ai̸ |= R, this entropy deviates from μ(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+), causing suboptimal, constraint-violating samples. To address this theoretical limitation, we introduce a novel error-bounded inference scheduling strategy at execution time that guarantees predictive entropy computed under the constraint-aware distribution ˜p yields a provably smaller mismatch with μ(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+) than entropy computed under pθ .We characterize the effect of {St}Tt=0 on sampling quality by the information curve r = ( r1, . . . , r L),where rj = E|S|=j−1, i / ∈S [I(ai
+
+> 0
+
+; aS 
+
+> 0
+
+)] for j ∈ { 1, . . . , L }, with S ⊆ { 1, . . . , L } and i ∈ { 1, . . . , L } \ 
+
+S sampled uniformly. Given S0 = ∅, St−1 ⊆ St, and Nt = |St|, the schedule-induced approximation 
+
+rT = ( rT 
+
+> 1
+
+, . . . , r TL ) is defined as rTj = rNt−1+1 for Nt−1 < j ≤ Nt. We then quantify the sampling error between the true action distribution μ and the schedule-induced distribution ν{St}Tt=0 :
+
+Lemma 1 (Schedule-Induced Sampling Error) . Let μ be the true distribution over a0 with μ(ai
+
+> 0
+
+̸ |=
+
+R) = 0 , and let {St}Tt=0 be an inference schedule. Let ν{St}Tt=0 denote the distribution induced by sampling from p(·| aSt 
+
+> 0
+
+, t, H). The schedule-induced sampling error is bounded as [26]: 
+
+KL 
+
+
+
+μ ∥ ν{St}Tt=0 
+
+
+
+≤ r − rT 
+
+> 1
+
+. (1) We show that sampling from the constraint-aware distribution ˜p reduces this error through ˜ν{St}Tt=0 :
+
+Theorem 1 (Error Reduction via Constraint-Aware Scheduling) . Let ν{St}Tt=0 (ai |= R) ∈ (0 , 1] 
+
+denote the admissible mass under ν{St}Tt=0 ; hence log ν{St}Tt=0 (ai |= R) ≤ 0. Let ν{St}Tt=0 and 
+
+˜ν{St}Tt=0 be induced by sampling from p(·| aSt 
+
+> 0
+
+, t, H) and ˜p(·| aSt 
+
+> 0
+
+, t, H), respectively. Then: 
+
+KL  μ ∥ ˜ν{St}Tt=0 
+
+ = KL  μ ∥ ν{St}Tt=0 
+
+ + log ν{St}Tt=0 
+
+ ai |= R, (2) 
+
+It follows that constraint-aware scheduling reduces the sampling error: 
+
+KL  μ ∥ ˜ν{St}Tt=0 
+
+ ≤ KL  μ ∥ ν{St}Tt=0 
+
+. (3) 
+
+Proof. See Appendix B for the proofs of Lemma 1 and Theorem 1. 
+
+Lemma 1 shows that the sampling error is governed by the information-curve mismatch ∥r − rT ∥1.Thus, an effective schedule {St}Tt=0 reveals positions with larger mutual information I(ai
+
+> 0
+
+; aS 
+
+> 0
+
+) earlier to minimize ∥r − rT ∥1. Since I(ai
+
+> 0
+
+; aS 
+
+> 0
+
+) = H(ai
+
+> 0
+
+) − H(ai
+
+> 0
+
+|aS 
+
+> 0
+
+) and H(ai
+
+> 0
+
+) is fixed, maximizing 
+
+I(ai
+
+> 0
+
+; aSt 
+
+> 0
+
+) is equivalent to minimizing H(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+). However, if pθ (ai
+
+> 0
+
+|aSt 
+
+> 0
+
+, t, H) assigns nonzero mass to inadmissible actions (ai̸ |= R), then ν{St}Tt=0 may deviate from μ.Theorem 1 addresses this limitation by constructing {St}Tt=0 under the constraint-aware distribution 
+
+˜p, which is provably closer to μ and satisfies ˜p(ai) = 0 for ai̸ |= R while preserving the relative likelihoods among admissible actions. Since μ(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+) is unknown at inference time, H(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+) = 
+
+− P
+
+> ai
+> 0
+
+μ(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+) log μ(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+) is intractable. MEND approximates it using H(˜ p(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+, t, H)) and constructs {St}Tt=0 via St+1 = St ∪ { it}, where it ∈ arg min i∈{ 1,...,L }\ St H(˜ p(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+, t, H)) .
+
+As a result, this error-bounded schedule constructed under ˜p reduces the misalignment between pθ
+
+and the true conditional distribution μ(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+). Then, the joint action sequence a is generated by sampling ai ∼ ˜p(ai
+
+> 0
+
+|aSt 
+
+> 0
+
+, t, H), which is executed by UAVs and UGVs simultaneously, enabling parallel operation of heterogeneous robots while satisfying operational constraints. 6T45 -P10, A1 -G1  T45 -P10, A2 -G1  T45 -P10, A2 -G2  T45 -P10, A4 -G2 T15 -P5, A4 -G2 T15 -P5, A2 -G2 T15 -P5, A2 -G1 T15 -P5, A1 -G1 Figure 3: Unity-ROS results with Starling UAVs and Warthog UGVs under different missions. Green circles denote recharge locations, colored curves UAV trajectories, and black lines UGV paths. Table 2: Quantitative comparison of MEND against baseline methods, evaluated in simulations.                                                                                                                                                                 
+
+> Mission Method 1UAV–1UGV 2UAV–1UGV 2UAV–2UGV 4UAV–2UGV
+> TCR Makespan Energy TCR Makespan Energy TCR Makespan Energy TCR Makespan Energy T15-P5 GLS [34] 100.00 8085.33 12989.03 100.00 6024.59 12729.46 100.00 5833.05 17161.64 100.00 4571.07 17878.57 TS [35] 100.00 7664.21 12634.75 100.00 5673.36 13409.86 100.00 4841.66 15068.19 100.00 4874.15 19424.62 SA [36] 100.00 8830.71 12287.40 100.00 6700.42 14045.45 100.00 5418.23 15704.10 100.00 5268.51 16712.98 VMDM (baseline) 92.32 7355.55 8120.37 90.33 5478.12 9222.99 81.33 4050.49 8515.34 89.83 3412.35 9420.57 EMDM (baseline) 97.72 6917.06 6543.11 98.17 4395.18 9744.47 97.33 3955.99 6909.90 93.50 3190.77 8350.71 MEND (ours) 100.00 6650.30 5893.97 100.00 4026.77 9079.82 100.00 3917.65 6878.65 100.00 2772.57 6966.35
+> T45-P10 GLS [34] 100.00 11702.12 14997.32 100.00 10655.58 26200.28 100.00 9105.88 23768.90 100.00 8941.05 27142.22 TS [35] 100.00 12502.38 15908.72 100.00 9401.59 21203.38 100.00 9770.71 27174.47 100.00 8091.14 28972.64 SA [36] 100.00 13271.41 16731.31 100.00 12669.44 27797.87 100.00 8396.62 22683.09 100.00 8855.78 33757.12 VMDM (baseline) 62.56 10184.85 10496.56 70.28 6356.85 14536.87 73.83 5518.29 10206.61 72.44 4716.66 13771.02 EMDM (baseline) 89.61 10157.86 7826.26 78.67 6093.69 10932.93 77.16 5506.65 9773.20 82.59 4601.49 12435.69 MEND (ours) 100.00 10108.99 7502.81 100.00 5957.50 10555.20 100.00 5290.29 9110.07 100.00 4555.97 12114.19
+
+5 Experiments 
+
+Experimental Setups We evaluate MEND in a high-fidelity Unity-based 3D multi-robot simulator in ROS, using real-world maps reconstructed from 3D LiDAR scans, and on physical robot teams. Mission complexity ranges from 15 tasks with 5 paths to 45 tasks with 10 paths, and team size from 1 UAV-1 UGV to 4 UAV-2 UGV. Experiments are conducted in a 10 , km × 10 , km region, where UAVs and UGVs operate at fixed speeds of qa = 10 m/s and qg = 4 .5 m/s, with energy capacities of 287 .7 kJ and 36 ,810 kJ, respectively. UAV and UGV energy consumption are modeled as 0.0461( qa)3 − 0.5834( qa)2 − 1.8761 qa + 229 .6 and 464 .8qg + 356 .3, respectively [72]. In all scenarios, UAVs visit tasks while UGVs provide recharging support along road networks under operational constraints. To obtain expert data, we adopt MIP for constrained UAV task assignment and UGV path planning. While effective offline, MIP is unsuitable for real-time execution. See Appendices D and E for implementation and training details. We compare MEND against three metaheuristics planners and two baselines: (1) Guided Local Search 
+
+(GLS ) [34], which augments the routing with penalties to bias the search away from repeatedly selected task assignments; (2) Tabu Search (TS ) [35], which performs an iterative neighborhood search with a tabu list; (3) Simulated Annealing (SA ) [36], which allows early exploration via probabilistic acceptance of worse routes and tightens acceptance over iterations; (4) Vanilla MDM 
+
+(VMDM ): a baseline method performs diffusion sampling from the learned distribution using a uniform scheduling; and (5) Entropy-guided MDM (EMDM ), a baseline method (presented in the preliminary based on [25]), which replaces uniform scheduling with entropy-guided scheduling while sampling from the unconstrained learned distribution. We quantitatively evaluate and compare MEND with other methods using three metrics: (1) Task Completion Rate (TCR ) [73] is defined as the ratio of completed tasks to all required tasks, measured as a percentage; (2) Makespan [74] is defined as the total time required to complete all task visits, and is reported only for scenarios in which all methods achieve full task completion, measured in seconds; (3) Energy [75] is defined as the cumulative energy consumption of all UAVs and UGVs over the mission horizon, measured in kilojoules. We present three example First-Order Logic (FOL) rules used in MEND to encode operational constraints, as summarized in Table 1: (1) UAV task visitation , which restricts UAVs to energy-affordable tasks; (2) UGV path traversal , which allows UGV movement only when a UAV requires recharging support; and (3) Recharge collaboration , which enforces that a recharging event occurs when a UAV is about to deplete its energy. 7UAV -UGV Team      
+
+> Recharge Event T45 -P5
+> 2UAV -2UGV 29 sec 110 sec 187 sec 256 sec
+
+Figure 4: Results for collaborative planning under operational constraints. The first column shows the team configuration and a recharge event, while the remaining columns show different timestamps. UAV-UGV Team    
+
+> UAV -UGV Team
+> Task Planning 60 sec 121 sec
+> UAV-UGV Team
+> UAV-UGV Team Task Planning Path Planning
+> UAV -UGV Team
+> 170 sec 420 sec
+> T15 -P5
+> 2UAV -2UGV
+> T45 -P10
+> 4UAV -2UGV
+
+Figure 5: Qualitative results in unseen environments with different depots and road networks: a city scenario with 2 UAV-2 UGV and 15 tasks, and a suburban scenario with 4 UAV-2 UGV and 45 tasks. 0 sec 
+
+> Start
+> Task Location
+
+Figure 6: MEND demonstrates generalizability on a 3D LiDAR-scanned map of a real, unseen university campus. This validation scenario consists of 15 tasks executed by 4 UAV-2 UGV. 
+
+Results under Various Task and Team Configurations We evaluate MEND in ROS-integrated Unity 3D simulations with energy-constrained Starling-2 UAVs and terrain-constrained Warthog UGVs across varying missions and team sizes. Figure 3 demonstrates scalable collaborative planning under operational constraints, Figure 4 presents a time-stamped scenario illustrating timely in-mission recharging, and Table 2 reports quantitative results. In the 15-task mission, metaheuristic methods achieve perfect TCR but incur the highest makespan and energy due to suboptimal coordination and routing. Diffusion baselines improve efficiency, with EMDM outperforming VMDM, but still suffer TCR degradation from constraint violations. MEND achieves 100 % TCR with the lowest makespan and energy across all settings. In the 45-task mission, MEND further widens the performance gap, demonstrating its effectiveness under operational constraints. 
+
+Results on Unseen Simulation and Real-World Environments We evaluate the generalizability of MEND in unseen environments with different depots and road networks. Trained on the rural map in Figure 3, MEND is evaluated on two additional maps in Figure 5, featuring novel road layouts (e.g., a city map with two distinct paths) and depots (e.g., a suburban map with a central team start). We further evaluate MEND on an unseen 3D-scanned LiDAR campus map, as shown in Figure 6. The 3D-scanned environment enables evaluation under real-world deployment conditions using physical robot models, where the Starling UAV has a 106 .6 kJ capacity with 198 .6 kJ /h consumption at 10 m /s,and the Warthog UGV has a 36 ,810 , kJ capacity with 2,680 .3, kJ /h consumption at 5 m /s (See Appendix F for additional experimental results). These results demonstrate that MEND generalizes effectively to unseen simulations and real-world environments. 
+
+Case Studies on Physical UAV-UGV Teams We validate MEND through real-world case studies using a team of two Crazyflie UAVs and two Limo UGVs controlled through ROS2. As shown in Figure 7, experiments are conducted in a mixed-reality setup, where projected outdoor environments are overlaid onto the physical workspace and robot poses are tracked via a motion capture system. Tasks are distributed across the map, including regions that are non-traversable for the Limo UGVs. The team successfully and efficiently visits all 15 tasks under operational constraints, with the fourth subfigure illustrating a recharging event and demonstrating MEND’s capability for collaborative planning and applicability to real-world deployment. 824 sec 0 sec  39 sec  90 sec 54 sec Limo UGV 
+
+> Crazyflie UAV
+
+Figure 7: Qualitative results of MEND in real-world mixed-reality case studies using two Crazyflie UAVs and two Limo UGVs controlled via ROS2. 
+
+Figure 8: Runtime analysis. 
+
+Scalability We evaluate MEND’s scalability across team configu-rations and mission complexities in Figure 8, which reports execu-tion frequency (Hz) for four team configurations under two mission complexities (see Appendix C for time complexity analysis). MEND maintains a planning frequency of 7.8 Hz for A1-G1 with T15-P5 and 
+
+2.8 Hz for A4-G2 with T45-P10. Compared with ground-truth MIP on A4-G2 with T45-P10, MEND achieves near-optimal makespan and energy, with 4.28% and 5.95% gaps, respectively, while running 472 ×
+
+faster. On T15-P5 with 2 UAVs and 1 UGV, MEND achieves 1.9% makespan and 3.9% energy gaps while planning 14 .5× faster. These results demonstrate MEND’s scalability to larger UAV-UGV teams.   
+
+> (a) No NS/EGS (b) EGS only (c) Full MEND
+
+Figure 9: Ablation on neuro-symbolic (NS) and entropy-guided scheduling (EGS). Dashed lines denote plans violating operational constraints. 
+
+Ablation Study We conduct an ablation study to evaluate the contributions of the neuro-symbolic (NS) module and entropy-guided scheduling (EGS) in MEND, as shown in Fig-ure 9. Dashed lines indicate model-predicted plans that violate operational constraints. Fig-ure 9(a) illustrates the variant without NS or EGS, which results in imbalanced UAV work-loads and energy violations. Figure 9(b) shows the variant with EGS but without NS, which im-proves plan quality yet still fails to satisfy operational constraints. In contrast, Figure 9(c) shows that the full MEND policy achieves effective collaborative planning while satisfying operational constraints, highlighting the necessity of both NS and EGS. 
+
+6 Limitation 
+
+MEND has two main limitations. First, MEND plans over a fixed-length masked sequence with a static task set within each planning episode; although replanning can accommodate new tasks, dynamic task arrivals are not explicitly modeled. Second, while MEND supports decentralized execution via local graph communication, planning relies on joint inference, which potentially limits robustness under communication constraints. Future work will investigate online task insertion with variable-length masked diffusion models for horizon-agnostic planning and graph-factorized masked diffusion for fully decentralized planning under limited communication. 
+
+7 Conclusion 
+
+We propose MEND, a theoretical approach for collaborative planning in heterogeneous robot teams under operational constraints. MEND formulates collaborative planning as a conditional masked generative process for context-aware planning of both UAVs and UGVs. It introduces a neuro-symbolic diffusion paradigm that constrains masked diffusion policies to enforce compliance with operational constraints during execution, together with an error-bounded inference scheduling strategy to improve collaborative planning optimality under these constraints. Extensive experiments in simulation, on real-world maps, and with physical robots demonstrate that MEND advances UAV-UGV collaborative planning under operational constraints. 9Acknowledgments 
+
+This work was partially supported by NSF CAREER Award IIS-2308492, DEVCOM ARL TBAM CRA Award W911NF-25-2-0024, DARPA Award N65236-26-9-0001, and NSF Award IIS-2404386. 
+
+References 
+
+[1] C. Pinciroli, V. Trianni, R. O’Grady, G. Pini, A. Brutschy, M. Brambilla, N. Mathews, E. Fer-rante, G. Di Caro, F. Ducatelle, et al. Argos: A modular, parallel, multi-engine simulator for multi-robot systems. Swarm Intelligence , 6:271–295, 2012. [2] Y. Chen, J. Arkin, Y. Zhang, N. Roy, and C. Fan. Scalable multi-robot collaboration with large language models: Centralized or decentralized systems? In IEEE International Conference on Robotics and Automation , 2024. [3] P. Gao, S. Siva, A. Micciche, and H. Zhang. Collaborative scheduling with adaptation to failure for heterogeneous robot teams. In IEEE International Conference on Robotics and Automation ,2023. [4] G. S. Kashyap, D. Mahajan, O. C. Phukan, A. Kumar, A. E. Brownlee, and J. Gao. From simu-lations to reality: enhancing multi-robot exploration for urban search and rescue. International Journal of Information Technology , pages 1–12, 2025. [5] C. Cai, J. Chen, Q. Yan, and F. Liu. A multi-robot coverage path planning method for maritime search and rescue using multiple auvs. Remote Sensing , 15(1):93, 2022. [6] J. P. Queralta, J. Taipalmaa, B. C. Pullinen, V. K. Sarker, T. N. Gia, H. Tenhunen, M. Gabbouj, J. Raitoharju, and T. Westerlund. Collaborative multi-robot search and rescue: Planning, coordination, perception, and active vision. IEEE Access , 8:191617–191643, 2020. [7] C. Luo, A. P. Espinosa, D. Pranantha, and A. De Gloria. Multi-robot search and rescue team. In 
+
+IEEE International Symposium on Safety, Security, and Rescue Robotics , 2011. [8] S. Asadzadeh, W. J. de Oliveira, and C. R. de Souza Filho. Uav-based remote sensing for the petroleum industry and environmental monitoring: State-of-the-art and perspectives. Journal of Petroleum Science and Engineering , 208:109633, 2022. [9] K. Liu and J. Zheng. Uav trajectory optimization for time-constrained data collection in uav-enabled environmental monitoring systems. IEEE Internet of Things Journal , 9(23):24300– 24314, 2022. [10] A. Fascista. Toward integrated large-scale environmental monitoring using wsn/uav/crowdsensing: A review of applications, signal processing, and future perspectives. 
+
+Sensors , 22(5):1824, 2022. [11] R. Eskandari, M. Mahdianpari, F. Mohammadimanesh, B. Salehi, B. Brisco, and S. Homayouni. Meta-analysis of unmanned aerial vehicle (uav) imagery for agro-environmental monitoring using machine learning and statistical models. Remote Sensing , 12(21):3511, 2020. [12] S. G. Manyam, K. Sundar, and D. W. Casbeer. Cooperative routing for an air–ground ve-hicle team—exact algorithm, transformation method, and heuristics. IEEE Transactions on Automation Science and Engineering , 17(1):537–547, 2019. [13] L. Di Puglia Pugliese and F. Guerriero. Last-mile deliveries by using drones and classical vehicles. In International Conference on Optimization and Decision Science , 2017. [14] G. Cl´ ımaco, L. Simonetti, and I. Rosseti. A branch-and-cut and mip-based heuristics for the prize-collecting travelling salesman problem. RAIRO-Operations Research , 55:S719–S726, 2021. 10 [15] A. B. Corrˆ ea and G. De Giacomo. Lifted planning: recent advances in planning using first-order representations. In Proceedings of the 33rd International Joint Conference on Artificial Intelligence , 2024. [16] Y. Lesp´ erance, G. De Giacomo, M. Rostamigiv, and S. M. Khan. Abstraction of situation calculus concurrent game structures. In Proceedings of the AAAI Conference on Artificial Intelligence , 2024. [17] G. V´ azquez, R. Calinescu, and J. C´ amara. Scheduling of missions with constrained tasks for heterogeneous robot systems. arXiv , 2022. [18] M. S. Mondal, S. Ramasamy, L. Russo, J. D. Humann, J. M. Dotterweich, and P. Bhounsule. How to coordinate uavs and ugvs for efficient mission planning? optimizing energy-constrained cooperative routing with a drl framework. 2025. [19] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song. Diffusion policy: Visuomotor policy learning via action diffusion. The International Journal of Robotics Research , page 02783649241273668, 2023. [20] J. Carvalho, A. T. Le, M. Baierl, D. Koert, and J. Peters. Motion planning diffusion: Learning and planning of robot motions with diffusion models. In IEEE/RSJ International Conference on Intelligent Robots and Systems , 2023. [21] Z. Xian and N. Gkanatsios. Chaineddiffuser: Unifying trajectory diffusion and keypose prediction for robotic manipulation. In Conference on Robot Learning/Proceedings of Machine Learning Research , 2023. [22] X. Fang, C. R. Garrett, C. Eppner, T. Lozano-P´ erez, L. P. Kaelbling, and D. Fox. Dimsam: Diffusion models as samplers for task and motion planning under partial observability. In 
+
+IEEE/RSJ International Conference on Intelligent Robots and Systems , 2024. [23] O. Kitouni, N. S. Nolte, A. Williams, M. Rabbat, D. Bouchacourt, and M. Ibrahim. The factorization curse: Which tokens you predict underlie the reversal curse and more. Advances in Neural Information Processing Systems , 37:112329–112355, 2024. [24] J. Kim, L. Cheuk-Kit, C. Domingo-Enrich, Y. Du, S. Kakade, T. Ngotiaoco, S. Chen, and M. Albergo. Any-order flexible length masked diffusion. arXiv , 2025. [25] J. Kim, K. Shah, V. Kontonis, S. Kakade, and S. Chen. Train for the worst, plan for the best: Understanding token ordering in masked diffusions. arXiv , 2025. [26] S. Chen, K. Cong, and J. Li. Optimal inference schedules for masked diffusion models. arXiv ,2025. [27] Y. Schiff, S. S. Sahoo, H. Phung, G. Wang, S. Boshar, H. Dalla-torre, B. P. de Almeida, A. Rush, T. Pierrot, and V. Kuleshov. Simple guidance mechanisms for discrete diffusion models. arXiv ,2024. [28] J. K. Christopher, M. Cardei, J. Liang, and F. Fioretto. Neuro-symbolic generative diffusion models for physically grounded, robust, and safe generation. arXiv , 2025. [29] M. Cardei, J. K. Christopher, T. Hartvigsen, B. Kailkhura, and F. Fioretto. Constrained discrete diffusion. arXiv , 2025. [30] C. C. Murray and A. G. Chu. The flying sidekick traveling salesman problem: Optimization of drone-assisted parcel delivery. Transportation Research Part C: Emerging Technologies , 54: 86–109, 2015. [31] Z. Liang, Y. Dong, and D. Zhang. An algorithm combining deep reinforcement learning and dynamic programming for solving tsp-d. In IEEE Smart World Congress , 2024. 11 [32] W. Kool, H. van Hoof, J. Gromicho, and M. Welling. Deep policy dynamic programming for ve-hicle routing problems. In International Conference on Integration of Constraint Programming, Artificial Intelligence, and Operations Research , 2022. [33] G. Lera-Romero, J. J. Miranda Bront, and F. J. Soulignac. Dynamic programming for the time-dependent traveling salesman problem with time windows. INFORMS Journal on Computing ,34(6):3292–3308, 2022. [34] F. Arnold and K. S¨ orensen. Knowledge-guided local search for the vehicle routing problem. 
+
+Computers & Operations Research , 105:32–46, 2019. [35] M. Gmira, M. Gendreau, A. Lodi, and J.-Y. Potvin. Tabu search for the time-dependent vehicle routing problem with time windows on a road network. European Journal of Operational Research , 288(1):129–140, 2021. [36] E. Ya˘ gmur and S. E. Kesen. Multi-trip heterogeneous vehicle routing problem coordinated with production scheduling: Memetic algorithm and simulated annealing approaches. Computers & Industrial Engineering , 161:107649, 2021. [37] P. Maini and P. Sujit. On cooperation between a fuel constrained uav and a refueling ugv for large scale mapping applications. In International Conference on Unmanned Aircraft Systems ,2015. [38] F. Ropero, P. Munoz, and M. D. R-Moreno. Terra: A path planning algorithm for cooperative ugv–uav exploration. Engineering Applications of Artificial Intelligence , 78:260–272, 2019. [39] M. S. Mondal, S. Ramasamy, J. D. Humann, J.-P. F. Reddinger, J. M. Dotterweich, M. A. Childers, and P. Bhounsule. Optimizing fuel-constrained uav-ugv routes for large scale coverage: Bilevel planning in heterogeneous multi-agent systems. In International Symposium on Multi-Robot and Multi-Agent Systems , 2023. [40] Y. Jiang, H. Yedidsion, S. Zhang, G. Sharon, and P. Stone. Multi-robot planning with conflicts and synergies. Autonomous Robots , 43(8):2011–2032, 2019. [41] S. Zhang, Y. Jiang, G. Sharon, and P. Stone. Multirobot symbolic planning under temporal uncertainty. In AAMAS , 2017. [42] F. Jovan and S. Bernardini. Adaptive temporal planning for multi-robot systems in operations and maintenance of offshore wind farms. In Proceedings of the AAAI Conference on Artificial Intelligence , 2023. [43] D. Mateu-Gomez, F. J. Mart´ ınez-Peral, and C. Perez-Vidal. Multi-arm trajectory planning for optimal collision-free pick-and-place operations. Technologies , 12(1):12, 2024. [44] D. Sun, J. Chen, S. Mitra, and C. Fan. Multi-agent motion planning from signal temporal logic specifications. IEEE Robotics and Automation Letters , 7(2):3451–3458, 2022. [45] M. Sewlia, C. K. Verginis, and D. V. Dimarogonas. Maps2: Multi-robot autonomous motion planning under signal temporal logic specifications. The International Journal of Robotics Research , page 02783649251393343, 2025. [46] Y. Zhang and L. E. Parker. Iq-asymtre: Forming executable coalitions for tightly coupled multirobot tasks. IEEE Transactions on Robotics , 29(2):400–416, 2012. [47] W. Kool, H. Van Hoof, and M. Welling. Attention, learn to solve routing problems! arXiv ,2018. [48] Z. Zhang, G. Qi, and W. Guan. Coordinated multi-agent hierarchical deep reinforcement learning to solve multi-trip vehicle routing problems with soft time windows. IET Intelligent Transport Systems , 17(10):2034–2051, 2023. 12 [49] D. Fuertes, C. R. del Blanco, F. Jaureguizar, J. J. Navarro, and N. Garcia. Solving rout-ing problems for multiple cooperative unmanned aerial vehicles using transformer networks. 
+
+Engineering Applications of Artificial Intelligence , 122:106085, 2023. [50] M. L. Betalo, S. Leng, A. M. Seid, H. N. Abishu, A. Erbad, and X. Bai. Dynamic charging and path planning for uav-powered rechargeable wsns using multi-agent deep reinforcement learning. IEEE Transactions on Automation Science and Engineering , 2025. [51] M. Fan, Y. Wu, T. Liao, Z. Cao, H. Guo, G. Sartoretti, and G. Wu. Deep reinforcement learning for uav routing in the presence of multiple charging stations. IEEE Transactions on Vehicular Technology , 72(5):5732–5746, 2022. [52] S. Brotee, F. Kabir, M. A. Razzaque, P. Roy, M. Mamun-Or-Rashid, M. R. Hassan, and M. M. Hassan. Optimizing uav-ugv coalition operations: A hybrid clustering and multi-agent reinforcement learning approach for path planning in obstructed environment. Ad Hoc Networks ,160:103519, 2024. [53] M. Prates, P. H. Avelar, H. Lemos, L. C. Lamb, and M. Y. Vardi. Learning to solve np-complete problems: A graph neural network for decision tsp. In AAAI Conference on Artificial Intelligence , 2019. [54] J. Luo, C. Li, Q. Fan, and Y. Liu. A graph convolutional encoder and multi-head attention decoder network for tsp via reinforcement learning. Engineering Applications of Artificial Intelligence , 112:104848, 2022. [55] M. Boffa, Z. B. Houidi, J. Krolikowski, and D. Rossi. Neural combinatorial optimization beyond the tsp: Existing architectures under-represent graph structure. arXiv , 2022. [56] C. Wang, K. Ji, J. Geng, Z. Ren, T. Fu, F. Yang, Y. Guo, H. He, X. Chen, Z. Zhan, et al. Imperative learning: A self-supervised neuro-symbolic learning framework for robot autonomy. 
+
+The International Journal of Robotics Research , page 02783649251353181, 2024. [57] R. Wang, B. He, and M. Pajic. Neuro-symbolic deadlock resolution in multi-robot systems. 
+
+Proceedings of Machine Learning Research , 283:1–12, 2025. [58] D. Bai, I. Singh, D. Traum, and J. Thomason. Twostep: Multi-agent task planning using classical planners and large language models. arXiv , 2024. [59] X. Zhang, H. Qin, F. Wang, Y. Dong, and J. Li. Lamma-p: Generalizable multi-agent long-horizon task allocation and planning with lm-driven pddl planner. In IEEE International Conference on Robotics and Automation , 2025. [60] Z. Guo, ˙ I. Is ¸ık, H. Ahmad, and W. Li. One subgoal at a time: Zero-shot generalization to arbitrary linear temporal logic requirements in multi-task reinforcement learning. arXiv , 2025. [61] S. Nie, F. Zhu, C. Du, T. Pang, Q. Liu, G. Zeng, M. Lin, and C. Li. Scaling up masked diffusion models on text. arXiv , 2024. [62] S. Gong, S. Agarwal, Y. Zhang, J. Ye, L. Zheng, M. Li, C. An, P. Zhao, W. Bi, J. Han, et al. Scaling diffusion language models via adaptation from autoregressive models. arXiv , 2024. [63] J. Ye, J. Gao, S. Gong, L. Zheng, X. Jiang, Z. Li, and L. Kong. Beyond autoregression: Discrete diffusion for complex reasoning and planning. arXiv , 2024. [64] J. Shi, K. Han, Z. Wang, A. Doucet, and M. Titsias. Simplified and generalized masked diffusion for discrete data. Advances in Neural Information Processing Systems , 37:103131–103167, 2024. [65] S. Hayakawa, Y. Takida, M. Imaizumi, H. Wakaki, and Y. Mitsufuji. Demystifying maskgit sampler and beyond: Adaptive order selection in masked diffusion. arXiv , 2025. 13 [66] K. Zheng, Y. Chen, H. Mao, M.-Y. Liu, J. Zhu, and Q. Zhang. Masked diffusion models are secretly time-agnostic masked models and exploit inaccurate categorical sampling. arXiv , 2024. [67] S. Sahoo, M. Arriola, Y. Schiff, A. Gokaslan, E. Marroquin, J. Chiu, A. Rush, and V. Kuleshov. Simple and effective masked diffusion language models. Advances in Neural Information Processing Systems , 37:130136–130184, 2024. [68] A. Swerdlow, M. Prabhudesai, S. Gandhi, D. Pathak, and K. Fragkiadaki. Unified multimodal discrete diffusion. arXiv , 2025. [69] B. Li, T. Silver, S. Scherer, and A. Gray. Bilevel learning for bilevel planning. 2025. [70] J. Barwise. An introduction to first-order logic. In Studies in Logic and the Foundations of Mathematics . 1977. [71] Z. Hu, Y. Dong, K. Wang, and Y. Sun. Heterogeneous graph transformer. In International World Wide Web Conference , 2020. [72] A. M. Hurwitz, J. M. Dotterweich, and T. A. Rocks. Mobile robot battery life estimation: battery energy use of an unmanned ground vehicle. In Energy Harvesting and Storage: Materials, Devices, and Applications XI , 2021. [73] C. Chen, S.-F. Cheng, A. Gunawan, A. Misra, K. Dasgupta, and D. Chander. Traccs: a framework for trajectory-aware coordinated urban crowd-sourcing. In Proceedings of the AAAI Conference on Human Computation and Crowdsourcing , 2014. [74] F. Kudo and K. Cai. A tsp-based online algorithm for multi-task multi-agent pickup and delivery. 
+
+IEEE Robotics and Automation Letters , 8(9):5910–5917, 2023. [75] Y. Qi, H. Jiang, G. Huang, L. Yang, F. Wang, and Y. Xu. Multi-uav path planning consid-ering multiple energy consumptions via an improved bee foraging learning particle swarm optimization algorithm. Scientific Reports , 15(1):1–16, 2025. 14

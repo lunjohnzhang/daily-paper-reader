@@ -1,0 +1,339 @@
+Title: Red-Teaming of Vision-Language-Action Models via Quality Diversity Environment Generation
+
+URL Source: https://arxiv.org/pdf/2610.14415v1
+
+Published Time: Wed, 14 Oct 2026 00:27:37 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Red-Teaming of Vision-Language-Action Models via Quality Diversity Environment Generation 
+
+Shihan Zhao 1∗, Henry Chen 1, Ya-Chuan Hsu 1, Minjune Hwang 1, Siddharth Srikanth 12 
+
+Freddie Liang 1, Akanksha Saran 3, Aaquib Tabrez 4†, Stefanos Nikolaidis 1†, Daniel Seita 1†
+
+Abstract — A long-standing goal in robotics is to develop generalist robots that can perform tasks across a wide range of settings, flexibly specified with images and text. Vision-Language-Action (VLA) models offer a promising path toward this goal by training on large collections of robot demonstra-tions. However, while VLAs perform well in-distribution, they often fail under minor test-time shifts, such as changes in object positions, lighting, textures, and camera poses. To address this, we propose Quality Diversity for Diverse Environment Generation (Q-DEG), a method for improving VLA robustness by generating adversarial environments and fine-tuning the VLA on its own successful rollouts. Q-DEG uses Quality Diver-sity (QD) optimization to find a set of high-failure environments, while promoting diversity using policy embeddings extracted from the VLA. These environments expose vulnerabilities that can be mitigated through self-imitation fine-tuning, thereby improving the VLA’s robustness. In simulation, we conduct experiments across three representative VLA models, and our results indicate that Q-DEG improves robustness to out-of-distribution (OOD) adversarial environments compared to the base VLA and VLAs fine-tuned using data collected from two red-teaming baselines. Furthermore, we demonstrate that improving VLA robustness through Q-DEG facilitates sim-to-real transfer. Our anonymous project website is at: https: //qd-env.github.io/qdeg/ .
+
+I. I NTRODUCTION 
+
+Vision-Language-Action (VLA) models [1]–[7] have emerged as a promising mode for robot control. By leverag-ing Vision-Language Models (VLMs) pretrained on internet-scale data, VLAs have access to cross-domain visual and se-mantic knowledge, and generalize across multiple tasks and robot embodiments. However, despite strong in-distribution performance, VLAs frequently fail when test scenarios differ from training data in peripheral ways such as object posi-tions, textures and colors, lighting, and camera poses. Prior work has characterized this vulnerability by analyz-ing VLA failure modes in OOD environments [8], [9], but these environments are hand-designed for benchmarking and not designed to elicit failures in a specific VLA and improve its robustness. Fine-tuning VLAs using reinforcement learn-ing objectives can improve their robustness end-to-end [10]– [12], but these methods do not expose model vulnerabilities by identifying failure-inducing environments. Red-teaming methods probe policy-specific weaknesses through genera-tive visual edits [13] and video world model rollouts [14], but     
+
+> 1Thomas Lord Department of Computer Science, University of Southern California. 2Columbia University. 3Adobe Research 4Cornell University.
+> †Equal advisement. ∗Corresponding author. Inquiries should be emailed to
+
+shihanzh@usc.edu .
+
+they do not search over interpretable environment parameters in a physics simulator. Prior work established Quality Diversity (QD) optimiza-tion as a framework for testing robotic systems by discov-ering diverse scenarios [15]–[19]. We extend QD to VLA environmental red-teaming and propose Quality Diversity for 
+
+Diverse Environment Generation (Q-DEG). Q-DEG searches for environment parameterizations that cause a target VLA to fail frequently while inducing diverse initial policy em-beddings, extracted from the VLA’s pre-action-layer acti-vations. The search prioritizes environments that still yield occasional successful rollouts and caches these trajectories for subsequent self-imitation fine-tuning to improve VLA robustness. Q-DEG organizes the generated environments into a heatmap (Figure 1) that maps policy embeddings to success rates, facilitating analysis of model vulnerabilities. It uses episode-level task success as its performance feedback and policy embeddings for diversity, requiring no action log-probabilities and thus supporting both autoregressive and flow-based VLAs. To summarize, our contributions are: (1) Q-DEG, a method that formulates VLA environmental red-teaming as a Quality Diversity search over environment parameterizations; (2) a self-imitation [20] procedure that improves VLA robustness by fine-tuning on the VLA’s own successful rollouts saved during QD search; and (3) an evaluation of Q-DEG across three VLAs in LIBERO [21], showing advantage over base-lines in environmental diversity, robustness improvement, and sim-to-real transfer. II. R ELATED WORKS 
+
+a) Vision-Language-Action (VLA) Models: VLAs aim to provide general-purpose robot control by mapping visual observations and language instructions directly to robot ac-tions. Examples of such VLAs include OpenVLA [1], the 
+
+π family [2]–[4], SmolVLA [5], and MolmoAct models [6], [7]. These models are trained on broad robot datasets for language-conditioned manipulation. Techniques such as fine-tuning [22] and steering [23] further improve their success rate and adaptability on downstream tasks. However, making VLAs robust remains challenging because even large robot datasets [24], [25] cover only a limited subset of possible ob-ject poses, lighting conditions, camera viewpoints, textures, and scene layouts. Consequently, VLAs remain brittle [8]– [10] under minor environment shifts even when they do not alter the semantic task. To address this, Q-DEG searches for physical environment variations that expose failures, then arXiv:2610.14415v1 [cs.RO] 10 Oct 2026 Fig. 1. Q-DEG generates diverse failure-inducing environments by perturbing parameters such as object placement, background, and camera and light source poses. New perturbations are generated from previously discovered environments, which act as “stepping stones” that facilitate exploration. 
+
+uses the VLA’s successful rollouts in those environments to improve robustness. 
+
+b) Quality Diversity Optimization: Quality Diversity (QD) methods search for collections of high-quality solu-tions that differ along specified measures, often by dis-cretizing the measure space into an archive of cells to be filled through iterative evolution [26]. The search efficiency may be improved with covariance matrix adaptation [27], [28], gradient-based optimization [29], and in-context learn-ing [30]. Compared with pure optimization, QD’s diversity incentive makes it well suited to generating scenarios and inputs that elicit diverse responses from a policy. QD has been used to generate scenarios that probe collaborative strategies in multi-agent systems [16] and expose failures in robot-assisted work settings [15], [31]. See [17] for a review of QD-based scenario generation and testing. These works use QD primarily to characterize a policy’s behavior and lim-itations with respect to user-specified diversity measures. In contrast, Q-DEG searches for diverse, challenging scenarios to generate training data for improving a VLA’s robustness, using the VLA’s policy embeddings as diversity measures. Recently, QD has also been applied to instruction red-teaming for foundation models. Rainbow Teaming [18] gen-erates prompts that elicit unsafe responses from an LLM, and Q-DIG [19] generates instructions that describe the task accurately but still cause a VLA to fail. Q-DEG complements these works by extending QD to environmental red-teaming for VLAs, searching over environment parameters that in-duce VLA failures while keeping the instruction fixed. 
+
+c) Environment Design: A complementary line of work develops simulated environments and benchmarks for evalu-ating language-conditioned robot policies. Benchmarks such as LIBERO [21], LIBERO-PRO [9], and RoboCasa [32] provide valuable testbeds for measuring generalization across tasks, scenes, and physical reasoning challenges. However, these benchmarks are mainly designed for evaluation, with environment variations specified by benchmark designers rather than searched to target a VLA’s failure modes, and the resulting failures are not directly converted into fine-tuning data. Other works on unsupervised environment de-sign automatically generate challenging tasks or curricula for reinforcement learning agents [33], [34] but do not target modern VLA policies. Complementary works study geo-metric red-teaming for robot manipulation [35], generative simulation for robot learning [36], and world simulators for policy evaluation [14]. Within this landscape, Q-DEG searches over interpretable simulator parameters, using QD to promote diversity among the VLA policy embeddings induced by the resulting envi-ronments. III. P ROBLEM FORMULATION AND ASSUMPTIONS 
+
+We assume the following as part of our problem setting. (1) A visual-semantic robot task Ec(θ), defined by a language instruction c and parameterized by interpretable environment parameters (e.g., object and camera poses) θ ∈ Θ. (2) A task success indicator 1succ (ζ) ∈ { 0, 1}, where ζ denotes a trajectory. (3) A base Vision-Language-Action (VLA) model 
+
+π(a | o, c) that maps an observation o and instruction c to a robot action a and is capable of succeeding on Ec(θ0),where θ0 ∈ Θ is the default task parameterization. Under this setting, the failure rate of the base VLA is 
+
+P fail (θ) = Eζ∼π, Ec(θ) [1 − 1succ (ζ)] . (1) We address two problems: (1) Under a fixed c, generate a col-lection of diverse environments parameterized by {θi ∈ Θ}
+
+in which the base VLA achieves high failure rates P fail (θi).We exclude maximally adversarial environments that yield a Fig. 2. Overview of Q-DEG . a) CMA-ES [37] proposes environment parameters such as object locations, background, lighting, and camera pose; invalid proposals are repaired to restore task-relevant spatial relations. b) The VLA is rolled out in each proposed environment to obtain feasibility-aware failure rate ˆP fail and policy embeddings. c) Q-DEG adds each environment to the QD archive based on its policy embeddings, and rewards CMA-ES with its failure rate improvement ∆ ˆP fail over predecessors with similar embeddings. d) Successful trajectories from archived environments are collected into a fine-tuning dataset for improving the VLA’s robustness. 
+
+100% failure rate to prioritize feasibly adversarial environ-ments near the boundary of the base VLA’s capabilities. (2) Improve the base VLA’s robustness to environment variations within Θ.IV. M ETHOD : Q-DEG Q-DEG improves a base VLA by using a parameterized simulator to propose and repair task-consistent environment configurations (Sec. IV-A), rolling out the VLA to estimate feasibility-aware failure rates and extract policy embed-dings (Sec. IV-B), archiving diverse adversarial environments through QD search (Sec. IV-C), and fine-tuning the VLA on its own successful rollouts from those environments (Sec. IV-D). See Figure 2 for an overview. 
+
+A. Environment Generation 
+
+At the start of each iteration, Q-DEG generates a batch of B candidate environments parameterized by {θi}Bi=1 .Following common axes of variation studied for policy ro-bustness [38], we perturb object placements ( xy coordinates of each object), camera pose ( xyz coordinates and axis-angle orientation), light-source position ( xyz coordinates), table-background RGB, and reflective specular RGB, yielding a 25-dimensional continuous search space. To prevent these perturbations from violating the original task semantics, we repair each candidate θi using a mixed-integer quadratic pro-gram (MIQP) [39] that enforces semantic constraints while minimizing edit distance ∥θrepaired  
+
+> i
+
+− θi∥22. For example, if the task is “pick up bowl next to plate,” but a perturbed candidate places the two objects far apart, MIQP will minimally modify the objects’ coordinates such that the distance between them is sufficiently small to be considered as “close.” Q-DEG is not tied to the parameterization considered in this work: different parameters may be perturbed depending on the robustness axes of interest, and MIQP repair is unnecessary when the perturbed parameters do not affect task semantics (e.g., when only background color is perturbed). 
+
+B. Feedback Metrics 
+
+On each of the B proposed environments, the base VLA 
+
+π is rolled out k times to obtain two feedback metrics. 
+
+Failure Rate: To evaluate an environment’s adversarial 
+
+quality with respect to the VLA π, π’s empirical failure rate ˆP fail on the environment is estimated over trajectories 
+
+{ζj }kj=1 . Q-DEG prioritizes environments that are feasible enough to yield successful rollouts for later self-imitation, so we modify ˆP fail with a condition that hard-sets it to 0 if all rollouts fail, as defined in Eq. 2. 
+
+ˆP fail (θ) = 
+
+(
+
+0 if Vkj=1 ¬1succ (ζj )1 − Pkj=1 1succ (ζj )/k otherwise. (2) 
+
+Policy Embeddings: For evaluating an environment’s di-versity , we use π’s pre-action layer activations at the start of each rollout, which we refer to as policy embeddings .Intuitively, policy embeddings represent the VLA’s “first impression” on each environment, and our goal is to diversify policy embeddings so that our adversarial environments induce diverse experience on the VLA. Our choice of pre-action-layer activations as policy embeddings is motivated by prior work on foundation model anomaly detection [40], [41], which suggests that intermediate activations encode rich information about the model’s internal processing and exhibit behaviorally meaningful local structure. We follow SAFE [40] and use activations from the final hidden layer before the VLA’s action decoder as policy embeddings. For each environment, we mean-pool these activations across k
+
+rollouts to obtain an embedding vector ψ. Since raw embed-dings are high-dimensional and QD algorithms often suffer from the curse of dimensionality [42], [43], we project raw policy embeddings into a low-dimensional space using linear Principal Component Analysis (PCA) before QD search. We denote the projected embedding with Aψ + b, with A being the principal component projection matrix and b being the centering offset. See App. I for more details. 
+
+C. Quality Diversity (QD) Optimization 
+
+Q-DEG populates an archive A with environment pa-rameterizations {θi} that induce high VLA failure rates 
+
+{ ˆP fail (θi)} and diverse policy embeddings {ψi} well dis-persed throughout the VLA policy embedding space. Fol-lowing QD conventions [26], we define A as a grid of cells obtained by discretizing the embedding space at a specified resolution. Each cell stores environments whose policy em-beddings fall within its embedding space region. The sum of the highest failure rate found within each occupied cell captures the archive’s adversarial coverage across distinct policy embeddings, without allowing similar environments to inflate the objective more than once. Q-DEG therefore maximizes X
+
+> cell ∈A
+
+max 
+
+> i:ψi∈cell
+
+ˆP fail (θi) (3) We use Covariance Matrix Adaptation Evolution Strategy (CMA-ES) [37], a black-box optimizer effective in low-dimensional continuous search spaces with rugged objective landscapes, to search for candidate environments that im-prove Eq. 3. CMA-ES maintains a multivariate Gaussian distribution over environment parameters and samples abatch of environments {θi}Bi=1 at each iteration, as described in Sec. IV-A. It then adapts this distribution using scalar feedback from the sampled candidates. A natural feedback signal is each candidate’s failure-rate improvement over the highest-failure incumbent in its assigned cell, corresponding to its marginal contribution to Eq. 3. However, because ˆP fail 
+
+is estimated from few rollouts, it takes on a small number of discrete values. Improvement over the incumbent therefore produces sparse and frequently tied feedback, providing little signal for CMA-ES adaptation. To provide denser feedback, we follow the QD algorithm CMA-MAE [27], [28] and associate each cell with a thresh-old tcell , initialized to 0. After evaluating ˆP fail (θi) and ψi,we assign θi to cell i ← T (Aψi + b), where T maps PCA-projected policy embeddings to cell indices. We then return to CMA-ES the threshold-relative improvement score 
+
+∆ ˆP fail (θi) = ˆP fail (θi)−tcell i . After receiving a candidate, the cell’s threshold is updated according to tcell i ← (1 −α)tcell i +
+
+α max   ˆP fail (θi), t cell i
+
+. The threshold rises gradually as more high-failure candidates are observed, rather than immediately jumping to the highest observed failure rate. The threshold can therefore take on intermediate values that reflect how consistently high-failure candidates have been found within the cell. Consequently, a candidate receives a high improve-ment score when it induces a high failure rate or maps to a cell with few prior high-failure candidates. Using these threshold-relative improvement scores as feedback, CMA-ES adapts its sampling distribution toward environments that are more adversarial or induce novel policy embeddings. If a candidate undergoes MIQP repair, we subtract its edit distance from its CMA-ES feedback to discourage the generation of invalid environments. When CMA-ES stag-nates (i.e. no sampled environment has positive improvement score), we sample an occupied cell from the archive and restart CMA-ES by centering its distribution on the cell’s highest-failure environment parameterization. This resumes QD search from a “stepping stone” environment known to be the most adversarial within an embedding space region. 
+
+D. Self-Imitation Fine-Tuning 
+
+Q-DEG also improves the robustness of the base VLA π
+
+to failure modes uncovered during QD search. It does so by fine-tuning π to imitate its own successful trajectories on generated adversarial environments. Specifically, for each environment in A satisfying 0 < ˆP fail < 1, we retain the shortest successful trajectory among its k rollouts to con-struct the fine-tuning dataset D. Environments with ˆP fail = 0 
+
+are not adversarial, whereas those with ˆP fail = 1 provide no successful trajectory to imitate. We use only the short-est successful trajectory per environment while excluding longer trajectories, as multiple different demonstrations on the same environment can lead to action divergence, which undermines imitation learning [44]. To mitigate forgetting, we add to D 10% of π’s original training data for the default tasks [45]. We then fine-tune π on D using standard behavior cloning. Notably, the environmental diversity promoted by Q-DEG translates into trajectory diversity within D, helping prevent behavior collapse during self-imitation [46]. Alg. 1 summarizes our method. V. E XPERIMENTS 
+
+Our experiments are designed to answer the following questions: 1) Red-teaming: Can Q-DEG generate diverse adversarial environments? 2) Robustness: Does Q-DEG improve the base VLA’s robustness against OOD adversarial environments? 3) Sim-to-real: Does the improved robustness resulting from Q-DEG facilitate VLA sim-to-real transfer? 
+
+A. Baselines 
+
+Due to the lack of prior works that red-team VLAs through perturbing simulation environment parameters, we implement two environmental red-teaming baselines to ablate the effect of QD optimization employed by Q-DEG:  
+
+> •
+
+Randomization: This baseline samples environments from fixed Gaussian distributions centered at the default parameters of each LIBERO-Spatial task. The environ-ments are rolled out to compute the benchmark metrics, but randomization neither adapts its environment distri-butions nor performs QD search.  
+
+> •
+
+CMA-ES: This baseline adapts the environment distri-butions using CMA-ES but optimizes only the failure rate. It therefore searches for adversarial environments without the diversity incentives provided by QD. All methods search within the same 25-dimensional environ-ment parameter space and use MIQP to repair invalid object Algorithm 1: Q-DEG 
+
+input : QD iterations N , measure space dimension 
+
+M , CMA-ES batch size B, base VLA π,rollouts per environment k, initial environment parameters θ0, CMA-ES initial step size σ0, CMA-MAE learning rate α.
+
+result: Archive of adversarial environments A;fine-tuning dataset D. 
+
+> 1
+
+Initialize CMA-ES with distribution N (θ0, σ 20 I). 
+
+> 2
+
+Initialize CMA-MAE thresholds {tcell ← 0}cell ∈A . 
+
+> 3
+
+Collect sample policy embeddings {ψi} by rolling out π for one step in random environments.  
+
+> 4
+
+(A, b) ← PCA( {ψ}, M ) 
+
+> 5
+
+for n ← 1 to N do  
+
+> 6
+
+{θi}Bi=1 ← CMA-ES-Ask( B) 
+
+> 7
+
+{θrepaired  
+
+> i
+
+}Bi=1 ← Repair( {θi}Bi=1 ) 
+
+> 8
+
+for i ← 1 to B do  
+
+> 9
+
+Obtain failure rate ˆP fail  
+
+> i
+
+, policy embeddings 
+
+ψi, and trajectories {ζji }kj=1 by rolling out π
+
+on environment θrepaired  
+
+> i
+
+k times.  
+
+> 10
+
+cell i ← T (Aψi + b) 
+
+> 11
+
+A[cell i] ← θrepaired  
+
+> i
+> 12
+
+∆ ˆP fail  
+
+> i
+
+← ˆP fail  
+
+> i
+
+− tcell i − ∥ θrepaired  
+
+> i
+
+− θi∥22 
+
+> 13
+
+tcell i ← (1 − α)tcell i + α max( ˆP fail  
+
+> i
+
+, t cell i ) 
+
+> 14
+
+if 0 < ˆP fail  
+
+> i
+
+< 1 then  
+
+> 15
+
+Add the shortest successful ζ to D 
+
+> 16
+
+CMA-ES-Tell( {(θi, ∆ ˆP fail  
+
+> i
+
+)}Bi=1 ) 
+
+> 17
+
+if CMA-ES-Stagnate() then  
+
+> 18
+
+Reset CMA-ES to N (θ∗, σ 20 I) around the highest-failure env. θ∗ from cell ∼ A 
+
+placements (see Sec. IV-A). The initial environment distri-bution is N (θ0, 0.02 2I), where θ0 is the default LIBERO-Spatial parameters. We use k = 4 rollouts to compute the feedback for each environment and sample environments in batches of B = 8 . Since Q-DEG performs QD search using PCA-projected policy embeddings, we sample 32 
+
+environments from N (θ0, 0.04 2I) for each task and fit PCA to the corresponding policy embeddings. We then initialize 
+
+A by discretizing the subspace spanned by the top M = 2 
+
+principal components into 100 × 100 equally sized cells. We use α = 0 .1 as Q-DEG’s threshold learning rate. 
+
+B. Simulation Experiments 
+
+We address the first two questions in simulation us-ing LIBERO-Spatial [21], which consists of 10 language-conditioned pick-and-place tasks. We choose LIBERO-Spatial due to its prevalence as a VLA benchmark and its compatibility with our environment parameterizations. To demonstrate Q-DEG’s application toward multiple VLA ar-chitectures, we experiment using two autoregressive models, 
+
+π0-FAST [3] and OpenVLA-OFT [1], [22], and one flow-matching model, π0.5 [4]. 
+
+Evaluating red-teaming: We compare the methods using two metrics computed over the environments they generate under the same VLA evaluation budget ( 3,200 rollouts): (1) the number of feasibly adversarial environments satisfying 
+
+0 < ˆP fail < 1, and (2) the average pairwise DINOv2 embed-ding distance . For the latter, we pass the first-step overview image from each environment through dinov2 vitb14 
+
+and compute the average pairwise cosine distance among the resulting embeddings. We use DINOv2 because its se-mantically structured representation space allows embedding distance to capture visual-semantic dissimilarity [47]. 
+
+Evaluating robustness: Following Sec. IV-D, we fine-tune the base VLA on successful trajectories collected from each method’s rollouts. We train for 10 ,000 steps using behavior cloning with rank-16 LoRA and a batch size of 
+
+32 . For each method, we reserve 20% of its adversarial environments for evaluation and exclude their trajectories from the corresponding fine-tuning dataset. We evaluate the base and fine-tuned VLAs on the default LIBERO-Spatial tasks and the held-out environments from each method’s evaluation set, and report the success rate for every VLA ×
+
+evaluation set combination. Success rates on the 10 LIBERO-Spatial tasks are evaluated over 50 trials each, whereas success rates on held-out environments are evaluated over 
+
+4 trials each due to the large number of environments. 
+
+C. Real-World Experiments 
+
+To investigate whether Q-DEG improves VLA sim-to-real transfer, we construct a real-world test setting in which the VLA controls a Kinova JACO Gen2 arm to either grab the bowl from table center (Task 1) or grab the bowl next to the plate (Task 2). We modify LIBERO to create simulated digi-tal twins of both tasks. To obtain a base VLA with reasonable success rates, we fine-tune the pi05 base checkpoint on 
+
+40 manually collected simulated demonstrations per task. We train for 10 ,000 steps using behavior cloning with a batch size of 32 and rank-16 LoRA. For each method, we then red-team the base VLA in simulation under a budget of 
+
+832 VLA rollouts and fine-tune for another 10 ,000 steps on successful trajectories to improve VLA robustness. The base model is also fine-tuned for another 10 ,000 steps on the original demonstration to even the amount of training. We then evaluate the base and fine-tuned VLAs on the two tasks in the real world, and report success rates over 20 trials on each VLA-task combination. A trial is successful if the robot navigates its gripper around the rim of the correct bowl within 3 minutes. We interleave trials between the two tested VLAs to control biases from external factors [48]. VI. R ESULTS 
+
+Red-teaming: As shown in Figure 3, all methods find hundreds of feasibly adversarial environments in which the VLAs fail, revealing their vulnerabilities to our environ-mental perturbations despite their near-perfect performance on default LIBERO-Spatial. Q-DEG consistently finds en-vironments more diverse than the baselines across VLAs, as reflected by higher pairwise embedding distances. Ran-domization does not adapt its environment distribution, so it only generates near-distribution environments around the default LIBERO-Spatial configurations. Such environments TABLE I VLA SUCCESS RATES ON THE DEFAULT LIBERO-S PATIAL TASKS AND ADVERSARIAL EVALUATION SETS GENERATED BY RANDOMIZATION (RAND ), CMA-ES, AND Q-DEG. R OWS DENOTE EVALUATION SETS AND COLUMNS DENOTE VLA CHECKPOINTS .
+
+π0-FAST OpenVLA-OFT π0.5
+
+Eval. set base rand CMA-ES Q-DEG base rand CMA-ES Q-DEG base rand CMA-ES Q-DEG default 96.80 68.60 82.60 89.60 96.20 94.80 86.70 93.80 98.40 85.60 93.60 95.60 rand 29.15 39.40 37.79 48.73 56.25 82.29 68.75 78.13 77.38 77.98 83.33 88.09 CMA-ES 27.90 38.46 24.81 29.82 45.75 52.52 48.27 75.79 54.98 49.39 69.17 58.00 Q-DEG 54.83 51.28 36.89 56.13 47.19 50.77 55.61 69.13 38.03 61.82 70.45 81.81 average 52.17 49.44 45.52 56.07 61.35 70.10 64.83 79.21 67.20 68.70 79.14 80.88 
+
+not only lack diversity but also induce few failures in the stronger OpenVLA-OFT and π0.5 VLAs. On the other hand, the failure-maximizing baseline CMA-ES matches Q-DEG in the number of feasibly adversarial environments found, but its environments tend to cluster around a few configurations that induce the most VLA failures, resulting in lower environmental diversity. The advantage of Q-DEG over baselines is most evident on π0.5, for which finding feasibly adversarial environments is more challenging due to the model’s robustness. In this case, Q-DEG’s environmental diversity translates into a larger number of environments found, outperforming even the failure-maximizing baseline 
+
+CMA-ES . This can be explained by the role of diverse environments as “stepping stones” that enable exploration toward niche configurations. Figure 1 shows examples of adversarial environments found by Q-DEG on π0.5. Addi-tional visualizations are available on our anonymous project website: https://qd-env.github.io/qdeg/ .     
+
+> Fig. 3. Number of feasibly adversarial environments (top) found by ran-domization ,CMA-ES , and Q-DEG, and the corresponding average pairwise DINOv2 cosine distance among environments (bottom), plotted against the number of VLA rollouts. Shaded regions denote 95% confidence intervals aggregated over three independent trials.
+
+Robustness: Table I reports VLA success rates across evaluation sets and checkpoints. Rows denote the default LIBERO-Spatial tasks and the held-out adversarial envi-ronments generated by randomization , CMA-ES , and Q-DEG, while columns denote the base VLA and the VLAs fine-tuned on successful trajectories collected from each method’s rollouts. Across all three VLA models, Q-DEG consistently improves the base VLA in adversarial evaluation sets, with gains up to 43 .78% . Compared to VLAs fine-tuned using baseline methods, VLAs fine-tuned using Q-DEG also generalize better between evaluation sets, often matching or outperforming baselines even on their respective evaluation sets. These results suggest that the lack of diversity in the fine-tuning datasets collected by baselines causes their VLAs to overcommit to a narrower range of failure modes. Fine-tuning on additional adversarial environments causes some forgetting, so all methods slightly reduce success rates on the default LIBERO-Spatial tasks. However, Q-DEG causes less degradation than baselines, and this minor drop is outweighed by substantial robustness gains on adversarial evaluation sets. 
+
+Sim-to-real: Figure 4 reports real-world success counts for the base VLA trained on the JACO tasks in simulation and the VLAs further fine-tuned for robustness using trajecto-ries from Randomization , CMA-ES , and Q-DEG. The final gripper position in each trial is marked with a green dot for success or a red dot for failure. The gripper positions of the base VLA and the VLAs fine-tuned using the baseline methods often cluster at incorrect locations. For example, in Task 2, the base VLA frequently moves toward the empty region to the upper right of the target bowl, whereas the VLA fine-tuned using CMA-ES often ends up to its lower right. These clusters suggest that the VLAs overfit to spatial patterns in their respective fine-tuning datasets, weakening sim-to-real transfer. In contrast, fine-tuning with Q-DEG im-proves robustness to variations in object placement, allowing the VLA to navigate the gripper more consistently toward the target bowl rather than toward fixed locations.     
+
+> Fig. 4. Success counts and final gripper positions when evaluating the base VLA and VLAs fine-tuned with randomization (rand ), CMA-ES , and Q-DEG on real-world tasks. Successful trials are shown in green, and failed trials are shown in red.
+
+VII. C ONCLUSION AND LIMITATIONS 
+
+In this work, we present Q-DEG, a method that red-teams VLAs by using Quality Diversity optimization to search for diverse, feasibly adversarial environments, and improves robustness by fine-tuning the VLA on its own successful rollouts in those environments. Across three representative VLA models, Q-DEG finds more diverse adversarial environ-ments than baselines and improves VLA robustness to OOD environments in both simulated and real-world manipulation tasks, outperforming the base VLA and VLAs fine-tuned on baseline data. A limitation with Q-DEG is that it fine-tunes only on successful rollouts, and does not use failed trajectories despite their information about actions to avoid. Future work could incorporate these failures by forming pairs of successful and failed trajectories for preference learning methods [49]. A second limitation is that Q-DEG uses PCA to reduce the dimensionality of policy embeddings before the discretization-based CMA-MAE search, potentially dis-carding task-relevant information. Recent discretization-free QD algorithms, such as Soft QD [43], could obviate this dimensionality reduction and enable diversification in full embedding space. APPENDIX IPOLICY EMBEDDING EXTRACTION AND COMPRESSION 
+
+We extract embeddings from π0-FAST, OpenVLA-OFT, and π0.5 as follows: 
+
+π0-FAST: During autoregressive action decoding, the final transformer block preceding the action head in π0-FAST produces a 2048 -dimensional hidden state at each FAST-token decoding step. We average the hidden states across all decoding steps prior to the EOS token, yielding a 2048 -dimensional policy embedding. 
+
+OpenVLA-OFT: The final transformer block preceding the action head outputs hidden states of shape Rda×dc×4096 ,where da and dc denote the action dimension and action chunk size. We average over the first two dimensions to obtain a 4096 -dimensional policy embedding. 
+
+π0.5 : Unlike the π0-FAST and OpenVLA-OFT, π0.5 incor-porates robot state information as part of its action expert during conditional flow-matching. To ensure that the policy embeddings capture all information relevant to action gener-ation, we extract activations from the final layer before ve-locity prediction at the first Euler integration step, yielding a 
+
+1024 -dimensional policy embedding. Because flow-matching is initialized from a standard Gaussian source distribution, the resulting activations can exhibit stochastic variation un-related to the observation. To obtain more consistent embed-dings, we perform a separate flow evaluation initialized from the zero vector rather than a Gaussian sample. This auxiliary evaluation is used solely for embedding extraction and does not affect the actions generated by the policy. Discretizing the high-dimensional raw policy embedding space would require a prohibitively large number of QD archive cells to achieve adequate coverage [42], [43]. Follow-ing prior work [50], we therefore fit PCA to the raw policy embeddings and project them onto the low-dimensional subspace spanned by the top M = 2 principal compo-nents. Although this projection discards substantial infor-mation, we find that the first two principal components consistently capture a large fraction of the variation among policy embeddings collected from sampled environments 
+
+Ec(θ ∼ N (θ0, 0.04 2I)) , explaining approximately 50% of the total variance, while subsequent components contribute substantially less, as shown in Figure 5.       
+
+> Fig. 5. Variance explained by the first 10 principal components of raw policy embeddings extracted from π0-FAST, OpenVLA-OFT, and π0.5.Results are aggregated over three independent trials, each sampling 320
+> environments. Error bars denote 95% confidence intervals.
+
+APPENDIX II UNIFORM SAMPLING BASELINE 
+
+We explored an additional baseline uniform , which was similar to rand , but sampled parameters uniformly within each dimension’s validity range instead of near the default values. Uniform generated diverse but OOD environments on which VLAs failed consistently, so few of uniform ’s environments counted as feasibly adversarial. After 3,200 
+
+rollouts, uniform yielded 0 ± 0, 29 .0 ± 7.9, and 179 .3 ± 13 .5
+
+feasibly adversarial environments for π0-FAST, OpenVLA-OFT, and π0.5, respectively, across three trials. The cor-responding average pairwise DINOv2 embedding distances were 0±0, 0.255 ±0.015 , and 0.291 ±0.002 . After robustness fine-tuning on successful trajectories, uniform ’s π0.5 check-point achieved success rates of 94 .00% , 76 .79% , 60 .19% ,and 71 .67% on the default, rand , CMA-ES , and Q-DEG evaluation sets, respectively. We did not run robustness fine-tuning experiments on π0-FAST or OpenVLA-OFT due to 
+
+uniform ’s low numbers of feasibly adversarial environments, and by extension self-imitable trajectories on these models. Overall, uniform performed poorly in both red-teaming and robustness improvement for the weaker VLA models and was only comparable to rand on π0.5.REFERENCES [1] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster et al. , “OpenVLA: An open-source vision-language-action model,” in Conference on Robot Learning (CoRL) ,2024. [2] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom et al. , “ π0: A Vision-Language-Action Flow Model for General Robot Control,” in Robotics: Science and Systems (RSS) ,2025. [3] K. Pertsch, K. Stachowicz, B. Ichter, D. Driess, S. Nair, Q. Vuong, O. Mees, C. Finn et al. , “FAST: Efficient Action Tokenization for Vision-Language-Action Models,” in Robotics: Science and Systems (RSS) , 2025. [4] P. Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail, M. Equi et al. , “ π0.5: a Vision-Language-Action Model with Open-World Generalization,” in Conference on Robot Learning (CoRL) , 2025. [5] M. Shukor, D. Aubakirova, F. Capuano, P. Kooijmans, S. Palma, A. Zouitine, M. Aractingi, C. Pascal et al. , “SmolVLA: A Vision-Language-Action Model for Affordable and Efficient Robotics,” arXiv preprint arXiv:2506.01844 , 2025. [6] J. Lee, J. Duan, H. Fang, Y. Deng, S. Liu, B. Li, B. Fang, J. Zhang 
+
+et al. , “Molmoact: Action reasoning models that can reason in space,” 
+
+arXiv preprint arXiv:2508.07917 , 2025. [7] H. Fang, J. Duan, D. Clay, S. Wang, S. Liu, W. Huang, X. Fan, W.-C. Tsai et al. , “MolmoAct2: Action Reasoning Models for Real-world Deployment,” arXiv preprint arXiv:2605.02881 , 2026. [8] J. Gao, S. Belkhale, S. Dasari, A. Balakrishna, D. Shah, and D. Sadigh, “A taxonomy for evaluating generalist robot policies,” arXiv preprint arXiv:2503.01238 , 2025. [9] X. Zhou, Y. Xu, G. Tie, Y. Chen, G. Zhang, D. Chu, P. Zhou, and L. Sun, “Libero-pro: Towards robust and fair evaluation of vision-language-action models beyond memorization,” arXiv preprint arXiv:2510.03827 , 2025. [10] J. Liu, F. Gao, B. Wei, X. Chen, Q. Liao, Y. Wu, C. Yu, and Y. Wang, “What can rl bring to vla generalization? an empirical study,” arXiv preprint arXiv:2505.19789 , 2025. [11] G. Lu, W. Guo, C. Zhang, Y. Zhou, H. Jiang, Z. Gao, Y. Tang, and Z. Wang, “Vla-rl: Towards masterful and general robotic ma-nipulation with scalable reinforcement learning,” arXiv preprint arXiv:2505.18719 , 2025. [12] Y. Chen, S. Tian, S. Liu, Y. Zhou, H. Li, and D. Zhao, “Conrft: A reinforced fine-tuning method for vla models via consistency policy,” 
+
+arXiv preprint arXiv:2502.05450 , 2025. [13] A. Majumdar, M. Sharma, D. Kalashnikov, S. Singh, P. Sermanet, and V. Sindhwani, “Predictive red teaming: Breaking policies without breaking robots,” arXiv preprint arXiv:2502.06575 , 2025. [14] G. R. Team, K. Choromanski, C. Devin, Y. Du, D. Dwibedi, R. Gao, A. Jindal, T. Kipf et al. , “Evaluating Gemini Robotics Policies in a Veo World Simulator,” arXiv preprint arXiv:2512.10675 , 2026. [15] M. C. Fontaine and S. Nikolaidis, “A Quality Diversity Approach to Automatically Generating Human-Robot Interaction Scenarios in Shared Autonomy,” in Robotics: Science and Systems (RSS) , 2021. [16] M. C. Fontaine, Y.-C. Hsu, Y. Zhang, B. Tjanaka, and S. Nikolaidis, “On the importance of environments in human-robot coordination,” in 
+
+Robotics: Science and Systems (RSS) , 2021. [17] S. Nikolaidis, “Algorithmic Scenario Generation as Quality Diversity Optimization,” 2024. [Online]. Available: https://arxiv.org/abs/2409. 04711 [18] M. Samvelyan, S. C. Raparthy, A. Lupu, E. Hambro, A. H. Markosyan, M. Bhatt, Y. Mao, M. Jiang et al. , “Rainbow Teaming: Open-Ended Generation of Diverse Adversarial Prompts,” in Neural Information Processing Systems (NeurIPS) , 2024. [19] S. Srikanth, F. Liang, Y.-C. Hsu, V. Bhatt, S. Zhao, H. Chen, B. Tjanaka, M. Hwang et al. , “Red-Teaming Vision-Language-Action Models via Quality Diversity Prompt Generation for Robust Robot Policies,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2026. [20] J. Oh, Y. Guo, S. Singh, and H. Lee, “Self-Imitation Learning,” in 
+
+International Conference on Machine Learning (ICML) , 2018. [21] B. Liu, Y. Zhu, C. Gao, Y. Feng, Q. Liu, Y. Zhu, and P. Stone, “LIBERO: Benchmarking knowledge transfer for lifelong robot learn-ing,” in Neural Information Processing Systems (NeurIPS) , 2023. [22] M. J. Kim, C. Finn, and P. Liang, “Fine-Tuning Vision-Language-Action Models: Optimizing Speed and Success,” in Robotics: Science and Systems (RSS) , 2025. [23] W. Chen, J. S. Bhatia, C. Glossop, N. Mathihalli, R. Doshi, A. Tang, D. Driess, K. Pertsch et al. , “Steerable Vision-Language-Action Poli-cies for Embodied Reasoning and Hierarchical Control,” arXiv preprint arXiv:2602.13193 , 2026. [24] A. Khazatsky, K. Pertsch, S. Nair, A. Balakrishna, S. Dasari, S. Karam-cheti, S. Nasiriany, M. K. Srirama et al. , “DROID: A Large-Scale In-The-Wild Robot Manipulation Dataset,” in Robotics: Science and Systems (RSS) , 2024. [25] O. X.-E. Collaboration, A. O’Neill, A. Rehman, A. Gupta, A. Mad-dukuri, A. Gupta, A. Padalkar, A. Lee et al. , “Open X-Embodiment: Robotic Learning Datasets and RT-X Models,” in IEEE International Conference on Robotics and Automation (ICRA) , 2024. [26] J.-B. Mouret and J. Clune, “Illuminating search spaces by mapping elites,” arXiv preprint arXiv:1504.04909 , 2015. [27] M. Fontaine and S. Nikolaidis, “Covariance matrix adaptation map-annealing,” in Conference on Genetic and Evolutionary Computation (GECCO) , 2023. [28] S. Zhao, B. Tjanaka, M. C. Fontaine, and S. Nikolaidis, “Covariance matrix adaptation map-annealing: Theory and experiments,” ACM Transactions on Evolutionary Learning , vol. 5, no. 1, pp. 1–53, 2025. [29] M. Fontaine and S. Nikolaidis, “Differentiable Quality Diversity,” in 
+
+Neural Information Processing Systems (NeurIPS) , 2021. [30] B. Lim, M. Flageat, and A. Cully, “Large language models as in-context ai generators for quality-diversity,” arXiv preprint arXiv:2404.15794 , 2024. [31] V. Bhatt, H. Nemlekar, M. C. Fontaine, B. Tjanaka, H. Zhang, Y.-C. Hsu, and S. Nikolaidis, “Surrogate Assisted Generation of Human-Robot Interaction Scenarios,” in Proceedings of The 7th Conference on Robot Learning , ser. Proceedings of Machine Learning Research, vol. 229. PMLR, 2023, pp. 513–539. [Online]. Available: https://proceedings.mlr.press/v229/bhatt23a.html [32] S. Nasiriany, A. Maddukuri, L. Zhang, A. Parikh, A. Lo, A. Joshi, A. Mandlekar, and Y. Zhu, “Robocasa: Large-scale simulation of everyday tasks for generalist robots,” in Robotics: Science and Systems (RSS) , 2024. [33] M. Jiang, E. Grefenstette, and T. Rockt¨ aschel, “Prioritized level replay,” in International Conference on Machine Learning (ICML) ,2021. [34] J. Parker-Holder, M. Jiang, M. Dennis, M. Samvelyan, J. Foerster, E. Grefenstette, and T. Rockt¨ aschel, “Evolving curricula with regret-based environment design,” in International Conference on Machine Learning (ICML) , 2022. [35] D. Goel, Y. Wang, T. Wu, H. Qiao, P. Piliptchak, D. Held, and Z. Erickson, “Geometric Red-Teaming for Robotic Manipulation,” in 
+
+Conference on Robot Learning (CoRL) , 2025. [36] P. Katara, Z. Xian, and K. Fragkiadaki, “Gen2Sim: Scaling up Robot Learning in Simulation with Generative Models,” in IEEE Interna-tional Conference on Robotics and Automation (ICRA) , 2024. [37] N. Hansen, “The CMA Evolution Strategy: A Tutorial,” arXiv preprint arXiv:1604.00772 , 2023. [38] J. Chen, I.-C. A. Liu, G. Sukhatme, and D. Seita, “CRAFT: Video Diffusion for Bimanual Robot Data Generation,” in IEEE/RSJ Inter-national Conference on Intelligent Robots and Systems (IROS) , 2026. [39] G. L. Nemhauser and L. A. Wolsey, Integer and Combinatorial Optimization . John Wiley & Sons, 1988. [40] Q. Gu, Y. Ju, S. Sun, I. Gilitschenski, H. Nishimura, M. Itkina, and F. Shkurti, “SAFE: Multitask Failure Detection for Vision-Language-Action Models,” in Neural Information Processing Systems (NeurIPS) ,2025. [41] Y. Ming, Z. Cai, J. Gu, Y. Sun, W. Li, and Y. Li, “Delving into out-of-distribution detection with vision-language representations,” Advances in neural information processing systems , vol. 35, pp. 35 087–35 102, 2022. [42] G. Paolo, A. Laflaquiere, A. Coninx, and S. Doncieux, “Unsupervised learning and exploration of reachable outcome space,” in IEEE Inter-national Conference on Robotics and Automation (ICRA) , 2020. [43] S. Hedayatian and S. Nikolaidis, “Soft Quality-Diversity Opti-mization,” in International Conference on Learning Representations (ICLR) , 2026. [44] S. Belkhale, Y. Cui, and D. Sadigh, “Data quality in imitation learning,” in Neural Information Processing Systems (NeurIPS) , 2023. [45] H. Liu, C. Kim, B. Liu, M. Liu, and Y. Zhu, “Pretrained vision-language-action models are surprisingly resistant to forgetting in continual learning,” arXiv preprint arXiv:2603.03818 , 2026. [46] Z. Yuan, H. Yuan, C. Li, G. Dong, K. Lu, C. Tan, C. Zhou, and J. Zhou, “Scaling relationship on learning mathematical reasoning with large language models,” arXiv preprint arXiv:2308.01825 , 2023. [47] M. Oquab, T. Darcet, T. Moutakanni, H. Vo, M. Szafraniec, V. Khali-dov, P. Fernandez, D. Haziza et al. , “Dinov2: Learning robust visual features without supervision,” arXiv preprint arXiv:2304.07193 , 2023. [48] H. Kress-Gazit, K. Hashimoto, N. Kuppuswamy, P. Shah, P. Horgan, G. Richardson, S. Feng, and B. Burchfiel, “Robot Learning as an Em-pirical Science: Best Practices for Policy Evaluation,” arXiv preprint arXiv:2409.09491 , 2024. [49] R. Rafailov, A. Sharma, E. Mitchell, C. D. Manning, S. Ermon, and C. Finn, “Direct preference optimization: Your language model is secretly a reward model,” in Neural Information Processing Systems (NeurIPS) , 2023. [50] L. Grillotti and A. Cully, “Unsupervised behavior discovery with quality-diversity optimization,” IEEE Transactions on Evolutionary Computation , vol. 26, no. 6, pp. 1539–1552, 2022.

@@ -1,0 +1,480 @@
+Title: Adaptive Event-Triggered Model Predictive Coverage Control with Average Update-Rate Regulation
+
+URL Source: https://arxiv.org/pdf/2610.15325v1
+
+Published Time: Wed, 14 Oct 2026 01:28:54 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Adaptive Event-Triggered Model Predictive Coverage Control with Average Update-Rate Regulation 
+
+Pengbo Zhu 1, Jicheng Shi 2, Colin N. Jones 2, and Andreas A. Malikopoulos 3
+
+Abstract — Model predictive coverage control for multi-agent systems operates under tight communication and computation budgets, which requires it to balance the load of optimization against responsiveness to varying spatial priorities. With a fixed event threshold, the update rate varies with operating condi-tions, making a prescribed average update budget difficult to maintain. We propose threshold-adaptive event-triggered model predictive control (MPC), which adjusts the threshold online in proportion to the difference between the target average period and the latest inter-event interval. We prove convergence of the empirical average update period to any feasible prescribed target and establish initialization-dependent one-sided bounds on the cumulative average. A nonlinear benchmark illustrates these budget guarantees. We then apply the mechanism to coverage MPC using a task-aware statistic that captures robot motion and changes in spatial importance. In a five-agent moving-density study, the adaptive policy uses 204.7 global MPC updates on average against a target of 200, compared with 266.7 for a fixed-threshold policy using the same statistic and initial threshold. It also reduces coverage cost relative to periodic schedules with exactly matched update counts. These results demonstrate direct average-budget regulation and effective task-dependent scheduling of MPC updates. 
+
+I. I NTRODUCTION 
+
+A. Background 
+
+Coverage control coordinates mobile robots to distribute sensing or service over an area according to spatial de-mand. A spatial importance density assigns greater weight to regions requiring closer coverage; Voronoi partitions and density-weighted centroids provide a classical means of or-ganizing the robots [1]. When the density varies, the desired configuration changes with the task [2]. Maintaining cover-age therefore requires refreshed position information, spatial references, and control decisions. Frequent coordination can burden communication, while repeated optimization adds computational cost. Event-triggered control (ETC) schedules updates according to observed need rather than a fixed clock [3]. Its relevance to coverage is demonstrated by asynchronous event-triggered broadcasting [4] and event-                      
+
+> This research was supported in part by the National Science Foun-dation under Grants CNS-2401007, CMMI-2348381, and IIS-2415478; by MathWorks; and by the Swiss National Science Foundation (SNSF) through project P500-2_235379 and NCCR Automation, a National Centre of Competence in Research, under Grant 51NF40_180545.
+> 1Pengbo Zhu is with the School of Civil & Environmental Engineering, Cornell University, Ithaca, NY, USA (e-mail: pz283@cornell.edu ).
+> 2Jicheng Shi and Colin N. Jones are with the Automatic Control Lab, EPFL, Switzerland (e-mail: jicheng.shi@epfl.ch ,
+> colin.jones@epfl.ch ).
+> 3Andreas A. Malikopoulos is with Applied Mathematics, Systems En-gineering, Mechanical Engineering, Electrical & Computer Engineering, and the School of Civil & Environmental Engineering, Cornell University, Ithaca, NY, USA (e-mail: amaliko@cornell.edu ).
+
+and self-triggered control and communication for speed-constrained unicycle robots [5]. 
+
+B. Related Work 1) Model predictive coverage control: Model predictive control (MPC) incorporates robot dynamics and constraints into the coverage problem, but each update entails solving an optimization problem for each participating robot. Carron and Zeilinger [6] combine centroid-based coverage with tracking MPC. Subsequent architectures address learning in unknown environments [7] and multirate planning and tracking for time-varying coverage [8]. These developments make the choice of when to refresh references and recompute control plans an important part of resource-aware coverage. 
+
+2) Resource budgets and event-triggered MPC: This pa-per considers a prescribed average update period as a simple resource specification: recompute the MPC plan once every 
+
+α sampling steps on average, where α ≥ 1 is a user-specified target. This specifies a long-run update rate rather than a hard limit on concurrent computations, as considered in [9]. For a synchronously updated team of M agents, each global MPC update entails M local solves. The update count therefore provides a computational resource measure, and total communication also depends on the implementation of trigger monitoring. Event-triggered MPC recomputes a control plan when a triggering condition is met, for example when a state-prediction error exceeds a threshold [10]. Adaptive triggering has also been studied for perturbed nonlinear systems [11]. However, selecting a threshold does not directly specify the resulting average update period. A fixed threshold may require offline calibration, and the resulting rate can change with the disturbance regime or task evolution. Average-rate design has precedents: Brunner et al. [12] develop robust event-triggered MPC with a guaranteed average sampling rate, while Deng et al. [13] use the disturbance distribution to construct triggering sets for a prescribed expected inter-execution time. Our objective is instead to regulate the realized empirical average period through online threshold feedback, without requiring a disturbance distribution. The coverage control problem highlights why both task sensitivity and update rate matter. A moving density can change the desired configuration even when robots follow their predicted dynamics exactly; prediction error alone may therefore miss a relevant task change. A task-aware statistic can detect that change, but its growth rate also depends on robot motion and density evolution. A threshold calibrated for one density speed may consequently produce a different arXiv:2610.15325v1 [eess.SY] 11 Oct 2026 update rate at another speed. Adapting the threshold from realized inter-event intervals addresses this budget mismatch. Periodic scheduling can also meet an average target, but event-based scheduling retains the freedom to place updates when they are useful to the coverage task. 
+
+C. Contributions and Organization 
+
+We propose threshold-adaptive event-triggered MPC that adjusts its threshold using the difference between the de-sired average period and the latest inter-event interval. The feedback principle is related to our disturbance-adaptive predictive control work [14], [15], which regulates average constraint violations; here, the regulated quantity is the average inter-event period. Our contributions are: 1) A threshold-adaptation mechanism that regulates the average MPC update period to a prescribed tar-get without requiring a disturbance distribution. Un-der bounded-trigger and executable-plan assumptions, we establish asymptotic average-period tracking and initialization-dependent one-sided bounds. 2) A task-aware application to multi-agent coverage MPC, with a sufficient trigger bound and a global MPC update-budget interpretation. 3) Complementary numerical evidence: a nonlinear benchmark illustrates the timing guarantees, while moving-density coverage demonstrates budget regula-tion under a task-speed change and improved coverage relative to periodic schedules with matched update counts. The remainder of this paper is organized as follows. Section II presents the problem formulation, and Section III presents the method and its theoretical guarantees. Section IV evaluates the nonlinear benchmark. Section V presents the coverage formulation, the triggering mechanism, and the associated case study. Section VI concludes the paper and outlines future work. II. P RELIMINARIES AND PROBLEM FORMULATION 
+
+Consider a discrete-time plant with bounded additive dis-turbance, 
+
+xk+1 = f (xk, u k) + wk, ∥wk∥s ≤ γ, (1) with admissible states and inputs in X ⊆ Rn and U ⊆
+
+Rm. The subscript k indexes sampling instants, whereas 
+
+i indexes events. At each event time ki, an inner MPC generates an executable N -step input plan. Let uk|ki denote the planned input for sampling instant k, generated at ki.The corresponding nominal state prediction is initialized as 
+
+ˆx(ki | ki) = xki and propagated as 
+
+ˆx(k + 1 | ki) = f (ˆ x(k | ki), u k|ki ). (2) Between events, the plant applies the stored plan, so uk =
+
+uk|ki for ki ≤ k < k i+1 . The original trigger statistic is the nominal prediction error 
+
+ei(k) = ∥xk − ˆx(k | ki)∥s ≥ 0. (3) 
+
+Algorithm 1 Threshold-adaptive event-triggered MPC 
+
+Require: α ≥ 1, η > 0, finite ε0; a ≤ Nmax ≤ N ; inner MPC π. 
+
+> 1:
+
+Set i = 0 , k0 = 0 ; measure x0. 
+
+> 2:
+
+loop  
+
+> 3:
+
+Solve π(xki ) for a length-N input plan and its nom-inal state predictions.  
+
+> 4:
+
+for j = 1 , . . . , N max do  
+
+> 5:
+
+Apply uki+j−1|ki ; measure xki+j . 
+
+> 6:
+
+Evaluate ei(ki + j) using (3).  
+
+> 7:
+
+if ei(ki + j) > ε i or j = Nmax then  
+
+> 8:
+
+∆i+1 = j; ki+1 = ki + j. 
+
+> 9:
+
+εi+1 = εi + η(α − j). 
+
+> 10:
+
+i ← i + 1 ; break the inner loop.  
+
+> 11:
+
+end if  
+
+> 12:
+
+end for  
+
+> 13:
+
+end loop 
+
+No new MPC solve occurs while the old plan is being executed. The maximum allowed inter-event interval Nmax 
+
+satisfies ⌈α⌉ ≤ Nmax ≤ N , where α ≥ 1 is the requested average period. For convenience, define a := ⌈α⌉. The ex-istence of such plans throughout operation is an assumption on the inner MPC. Let k0 = 0 denote the mandatory initial event and ∆i =
+
+ki − ki−1, i ≥ 1. Hence ∑ij=1 ∆j = ki. Given α, the three design aims are Aim 1: lim  
+
+> i→∞
+
+ki/i = α, (4) Aim 2: ki/i ≥ α for all i ≥ 1, (5) Aim 3: ki/i ≤ α for all i ≥ 1. (6) The last two are alternative one-sided guarantees selected by initialization. An average-period lower bound limits cu-mulative event frequency from the initial time; it is not a minimum bound on every individual interval or a budget for every sliding window. III. T HRESHOLD -ADAPTIVE EVENT -TRIGGERED MPC 
+
+A. Threshold adaptation and implementation 
+
+Algorithm 1 implements the proposed threshold-adaptive event-triggered MPC. In cycle i, it chooses 
+
+∆i+1 = min (Ji ∪ { Nmax }), (7) where Ji = {j ∈ { 1, . . . , N max } : ei(ki + j) > ε i}. It updates the threshold at the completed event: 
+
+εi+1 = εi + η(α − ∆i+1 ), 0 < η < ∞. (8) A shorter-than-target interval raises the threshold; a longer one lowers it. The maximum interval prevents exhaustion of the available plan. The comparison is strictly >, not ≥.Negative thresholds are allowed: they force a next-sample event, not a zero-time event. 
+
+Remark 1. Algorithm 1 only requires that π(·) produce a valid open-loop input sequence of length at least Nmax . The budget guarantee is therefore independent of the MPC for-mulation. The MPC layer is responsible for state-constraint satisfaction, recursive feasibility, and stability; Algorithm 1 is responsible for the average period budget. B. Assumption and main theorem 
+
+Assumption 1. For every admissible event cycle with the same applied inputs in plant and predictor, there is a uniform finite εmax ≥ 0 such that 
+
+0 ≤ ei(ki + j) ≤ εmax , 1 ≤ j ≤ a. (9) 
+
+Every executed update supplies an executable plan of length at least Nmax , and these properties hold throughout opera-tion. 
+
+Define the initialization thresholds 
+
+εmin = η(α − Nmax ) =: L ≤ 0, (10) 
+
+εmax ,2 = εmax + η(α − 1) =: U ≥ εmax . (11) 
+
+Theorem 1 (Three budget guarantees) . Under Assumption 1, 
+
+1 ≤ α ≤ Nmax ≤ N , and finite positive η, Algorithm 1 satisfies: 
+
+1) Aim 1 for every finite ε0;
+
+2) Aim 2 if ε0 ≥ U ;
+
+3) Aim 3 if ε0 ≤ L.Moreover, for every event index i ≥ 0,
+
+εi ∈ [min( ε0, L ), max( ε0, U )] . (12) 
+
+Proof. Part 1: reduce the three aims to threshold properties. 
+
+Summing (8) and using k0 = 0 yields 
+
+εi = ε0 + η
+
+> i
+
+∑
+
+> j=1
+
+(α − ∆j )= ε0 + η(αi − ki). (13) Thus, for i ≥ 1,
+
+ki
+
+i = α + ε0 − εi
+
+ηi . (14) Three sufficient properties follow. T1: a uniformly bounded threshold sequence gives Aim 1. T2: if εi ≤ ε0 for every i,then Aim 2 holds. T3: if εi ≥ ε0 for every i, then Aim 3 holds. No statistical disturbance distribution is used. 
+
+Part 2: establish a forward-invariant threshold interval. 
+
+Let I = [ L, U ]. Every interval is in [1 , N max ]. Consider three regions of the real line. 
+
+Case 1: εi ≥ εmax . By (9), strict signal crossing cannot occur during the first a steps. A forced event at Nmax = a
+
+is possible, so ∆i+1 ≥ a ≥ α. Consequently, 
+
+εi+1 ≤ εi,εi+1 ≥ εi + η(α − Nmax ) ≥ εmax + L ≥ L. (15) 
+
+Case 2: εi < 0. Nonnegativity gives ei(ki +1) > ε i, hence 
+
+∆i+1 = 1 . Since α ≥ 1,
+
+εi ≤ εi+1 = εi + η(α − 1) < η (α − 1) ≤ U. (16) 
+
+Case 3: 0 ≤ εi < ε max . Using only 1 ≤ ∆i+1 ≤ Nmax 
+
+gives 
+
+L ≤ εi+1 < ε max + η(α − 1) = U. (17) If εi ∈ I, each case keeps εi+1 in I. Above U , Case 1 makes the threshold non-increasing without crossing below 
+
+L. Below L, Case 2 makes it non-decreasing without crossing above U . Therefore, the larger interval in (12) is also forward invariant, proving T1 for every finite initialization. Finite-time entry into I is not needed. For example, at α = 1 anegative threshold remains constant; the interval still equals one. Uniform boundedness and (14) prove Aim 1. If ε0 ≥ U ,then [L, ε 0] is forward invariant: Case 1 cannot increase the threshold and Cases 2–3 cannot exceed U . Thus T2 proves Aim 2. If ε0 ≤ L, the symmetric invariant interval [ε0, U ]
+
+and T3 prove Aim 3. 
+
+Remark 2 (Finite-run update counts) . With B =max {0, ε 0 − L, U − ε0}/η , (12) –(14) give 
+
+|ki − αi | ≤ B, |ki/i − α| ≤ B/i (i ≥ 1) . (18) 
+
+Define ST = # {i : ki < T }, including the initial update but not a terminal event at T . For the last update ki < T , we have ST = i + 1 and 0 < T − ki ≤ Nmax ; hence 
+
+|ST − T /α | ≤ 1 + ( B + Nmax )/α. (19) 
+
+Thus ST /T → 1/α , although a finite run need not contain exactly T /α updates. The bound is conservative when the signal bound is conservative. C. Computing the prediction-error bound 
+
+The following elementary recursion, used in robust MPC analyses such as [16], can be used to verify Assumption 1. 
+
+Lemma 1 (Prediction-error propagation) . Suppose 
+
+∥f (x, u ) − f (y, u )∥s ≤ Lf ∥x − y∥s on a domain containing all relevant real and nominal trajectories, and ∥wk∥s ≤ γ.For equal initial states and the same input sequence, 
+
+∥xk+j − ˆx(k + j | k)∥s ≤ Ej := γ
+
+> j−1
+
+∑
+
+> r=0
+
+Lrf . (20) 
+
+Proof. Write dj = ∥xk+j − ˆx(k + j | k)∥s. The triangle inequality and common-input Lipschitz bound give dj+1 ≤
+
+Lf dj + γ, with d0 = 0 . Induction yields (20). Since Lf ≥ 0, Ej is nondecreasing and one may take 
+
+εmax = Ea =
+
+{
+
+γ(Laf − 1) /(Lf − 1) , Lf̸ = 1 ,aγ, Lf = 1 . (21) For differentiable f on an appropriate convex state domain, a uniform induced-norm bound on ∂f /∂x supplies Lf . If 
+
+Lf < 1, Ej ≤ γ/ (1 − Lf ); global contraction is not required because a is finite. Bounds must hold on the prediction and actual domains; imposing soft constraints does not by itself establish that fact. IV. C ASE I: NONLINEAR BUDGET VERIFICATION 
+
+We use a perturbed variant of the nonlinear benchmark in [16]: 
+
+x1,k +1 = 0 .55 x1,k + 0 .12 x2,k 
+
++ (0 .01 − 0.6x1,k + x2,k )uk + w1,k , (22) 
+
+x2,k +1 = 0 .67 x2,k + (0 .15 + x1,k − 0.8x2,k )uk + w2,k .
+
+(23) The input satisfies |uk| ≤ 0.1, and wk = (0 .1, 0.1) on input steps k mod 23 < 3, zero otherwise. We set N = Nmax =15 . The zero-reference stage cost uses state/input weights 2I
+
+and 1; The terminal state weight is also 2I.The trigger is ei(k) = ∥xk − ˆx(k | ki)∥∞. The maximum absolute row sum of the state Jacobian over |u| ≤ 0.1 is 0.85 ,giving εmax = 0 .1(1 − 0.85 ⌈α⌉)/(1 − 0.85) by Lemma 1. Runs last T = 1000 steps, with η = 0 .01 , α ∈ { 2, 5.5, 8},and ε0 ∈ { L, 0, U }. We use nine deterministic initial states: 
+
+(−1.5, −1.5) , (0 .9, −1.5) , (−1.5, 1.5) , (0 .9, 1.5) , (0 .9, 0) ,
+
+(−1.5, 0) , (0 , 1.5) , (0 , −1.5) , and (0 .6, 0.8) . These 81 runs test the three aims. A further 324 runs scan 36 fixed thresh-olds, 0, 0.01 , . . . , 0.30 and 0.0999 , 0.1001 , 0.4, 0.5, 0.6, at the same starts and inner MPC settings. Figure 1 shows tracking from both prescribed sides and from zero initialization, including the noninteger target α =5.5. All event-wise one-sided checks pass, and the largest residual in (13) is 4.4 × 10 −15 . At α = 5 .5, final average periods are approximately 5.391 , 5.451 , and 5.701 for lower, zero, and upper initialization, respectively, illustrating the finite-run transient around the asymptotic target. The sampled threshold-to-period map shows pronounced plateaus: selecting a threshold is not equivalent to selecting an average period. In contrast, the proposed method accepts 
+
+α directly without constructing that map. V. C ASE II: BUDGETED MULTI -AGENT COVERAGE CONTROL 
+
+A. Coverage objective and MPC architecture 
+
+Let M agents with positions pm cover a compact convex region A ⊂ R2 with nonnegative spatial importance ϕk(q).The locational coverage cost is 
+
+H(p, k ) = 
+
+∫
+
+> A
+
+min  
+
+> m
+
+∥q − pm∥22ϕk(q) dq. (24) At a global event ki, a central coordinator forms Voronoi cells Wi,m from current positions and computes 
+
+cm(Wi,m , ϕ k) = 
+
+∫ 
+
+> Wi,m
+
+qϕ k(q) dq 
+
+∫ 
+
+> Wi,m
+
+ϕk(q) dq . (25) Building on the centroid-tracking MPC architecture of Car-ron and Zeilinger [6], each local tracking MPC receives 
+
+cm(Wi,m , ϕ ki ) as its fixed position reference and zero ve-locity reference. Plans, cells, and references are held until the next global event. In [6], tracking MPC is solved every sample while centroid references are updated conditionally. Here the adaptive trigger schedules both reference refresh and replanning, using a simplified fixed-reference MPC rather than the artificial-steady-state and terminal-set design of that work (see details in Appendix A). Here M = 5 ,
+
+A = [0 , 10] 2, Ts = 0 .2 s, and 
+
+pm,k +1 = pm,k + Tsvm,k + 12 T 2 
+
+> s
+
+um,k + wpm,k ,vm,k +1 = vm,k + Tsum,k + wvm,k . (26) The predictor sets wp = wv = 0 . Each local MPC uses 
+
+N = Nmax = 15 , componentwise velocity/input limits 1
+
+m/s and 1 m/s 2, and stage weights 2I, 0.5I, and 0.1I for position error, velocity, and input. Terminal position/velocity weights and velocity limits are identical. All policies use this same MPC, implemented with CasADi/IPOPT (solver tolerance 10 −6). The plant dynamics are independent but references are spatially coupled. A global MPC update is one centrally coordinated event: the cells and references are refreshed and all M agents each solve one local MPC problem. Thus ST
+
+global updates mean M S T local solves (5 per update here). Between events, agents continue applying their stored input sequences. 
+
+B. Task-aware triggering and its budget guarantee 
+
+Moving density can make a reference ineffective even when the robot follows its prediction exactly. We therefore use 
+
+epi (k) = max  
+
+> m
+
+∥pm(k) − pm(ki)∥2, (27) 
+
+eri (k) = max  
+
+> m
+
+∥pm(k) − ˆpm(k | ki)∥2, (28) 
+
+eci (k) = max  
+
+> m
+
+∥cm(Wi,m , ϕ k) − cm(Wi,m , ϕ ki )∥2, (29) 
+
+si(k) = max {epi (k), e ri (k), e ci (k)}. (30) These are displacement, position-prediction difference, and centroid drift (units: m). The centroid term uses event-held cells to detect density changes within the current Voronoi partition. Current density is known at each monitoring sam-ple; future motion is not used. Both adaptive and fixed policies use the same statistic. We substitute si for ei in Algorithm 1. 
+
+Corollary 1 (Budget regulation for the coverage trigger) . If the nonnegative statistic (30) has a uniform bound Ecov over the first a steps of each cycle, then Theorem 1 and (19) apply to the global update sequence with εmax = Ecov , under the same recursion, strict crossing, interval cap, and executable-plan assumptions. Proof. Identity (13) is unchanged. The three-region proof uses only the statistic’s upper bound, nonnegativity, and interval limits, respectively, so the same invariant interval and budget conclusions hold with si replacing prediction error. For the disturbance-free moving-density case, the plant and predictor coincide under the same inputs, so eri =0. With a = 6 and η = 0.01 , the sufficient one-sided initializations are L = −0.09 m and U ≈ 14 .192 m (see details in the Appendix B). Fig. 1. Case I: average-period tracking and the sampled fixed-threshold map. Thin lines show all nine starts; bold lines use (.9, 0) . Dashed lines are target periods. The rightmost panel connects mean final periods at 36 tested thresholds, with individual starts shown faintly. 
+
+Fig. 2. Moving-density coverage with a common signal and initial threshold. (a) Global MPC updates; gray lines pair ten initializations, and the target is 200. One global update contains five local solves. (b) Cost gaps against each policy’s own exactly count-matched periodic schedules: small points are seeds, large points are means, and bars are 95% confidence intervals. Negative gaps favor event-based timing; the two columns have different baselines. (c) Cumulative average interval ki/i at event times; the target is 6 steps. Fig. 3. Adaptive/task-aware coverage response. Trails accumulate from k = 194 to each displayed state ( t = 38 .8, 42 .8, 62 .2 s) within a 240 s run. Numbered disks are agents, open circles mark trail origins, and diamonds mark Gaussian centers. Dashed Voronoi boundaries come from the latest executed update at or before each state. The display grid is 201 × 201 ; the evaluation grid remains 40 × 40 .
+
+C. Experimental setup 
+
+The main density is a mixture of three isotropic Gaussians. Two unit-amplitude components remain at (2 , 2) and (8 , 2) ; a third, of amplitude 1.2, moves horizontally between (3 , 7.5) 
+
+and (7 , 7.5) . All standard deviations are 1.2 m. Beginning at k = 0 , 97 , 194 , . . . , motion occurs at 1 m/s for 20 steps, reversing direction at each burst, with stationary intervals between bursts. The main case has no plant disturbance. Runs last T = 1200 steps (240 s), with α = 6 , η = 0 .01 , initial positions uniform on [1 .5, 8.5] 2, and zero initial velocities. Test seeds are 0 through 9, paired across policies. The fixed threshold is calibrated offline using density speed 0.6 m/s. We select the threshold that minimizes the mean absolute deviation of the global MPC update count from the target T /α = 200 . The search uses the candidates 
+
+{0, 0.001 , 0.01 , 0.03 , 0.1, 0.3, 0.6, 1} m, followed by four midpoint refinements around the target count. This procedure gives ε0 = 0 .2125 m. In the evaluation runs, both policies use the same den-sity speed of 1 m/s, controller, trigger statistic, and initial threshold ε0 = 0.2125 m. The fixed policy retains this threshold, whereas the adaptive policy updates it online. The common signal, controller, and initialization isolate the effect of adaptation under the task-speed change. To isolate update placement, each policy/seed with S
+
+actual global MPC updates has its own integer periodic schedule with intervals dℓ = ⌊(ℓ + 1) T /S ⌋ − ⌊ ℓT /S ⌋,
+
+ℓ = 0 , . . . , S − 1. Cyclic rotations by 0, ⌊S/ 3⌋, ⌊2S/ 3⌋ are averaged within seed. Each has exactly S global updates, including k = 0 but excluding k = T . This count matching holds update quantity constant. The full-run metric is 
+
+J = 1
+
+T
+
+> T
+
+∑
+
+> k=1
+
+H(p(k), k )
+
+∫ 
+
+> A
+
+ϕk(q) dq , (31) evaluated on a 40 ×40 midpoint grid with the current-position partition. This measures density-weighted squared distance to the nearest agent over the full run, rather than the local MPC tracking objective; lower is better. For policy π and seed r, the matched-count gap is 
+
+gπ,r = 100 
+
+( Jπ,r 
+
+¯Jperiodic (Sπ,r , r ) − 1
+
+)
+
+%. (32) The denominator averages the three periodic rotations with that policy’s realized update count. We report the mean gap and paired-seed Student-t 95% confidence interval ( n = 10 ). 
+
+D. Results and interpretation 
+
+As shown in Fig. 2(a), each point counts global MPC updates in one full run, and each gray line pairs the same initial configuration across policies. The target 200 corre-sponds to an average period of six sampling steps (1.2 s), or 1000 individual MPC solves over 240 s. The adaptive policy uses 204.7 global updates on average, whereas the calibrated fixed policy uses 266.7. Mean count deviations are 2.35% 
+
+and 33 .35% . The adaptive policy uses fewer global updates relative to the fixed policy’s mean count. It illustrates the closeness to the requested budget under the density-speed change, rather than fewer updates irrespective of the target. Periodic updates can meet an average budget, so the relevant question is whether event-dependent timing uses the same number of updates more effectively. In Fig. 2(b), against its own exact-count periodic comparator, the adaptive policy achieves lower cost in all ten runs. The benefit therefore persists when the number of global updates, and hence individual MPC solves, is exactly equal. Fixed task-aware triggering improves over its own periodic comparator by 3.14%. Each column uses its own matched-count baseline; the difference between the two plotted mean gaps is not a direct adaptive–fixed cost comparison. The test in Fig. 2(a) isolates budget adaptation at a common signal, while the test in Fig. 2(b) demonstrates task-dependent update placement within each realized budget. The red curve in Fig. 2(c) is the cumulative mean of completed intervals, ki/i , plotted against simulation step 
+
+ki for one representative initialization, not an average over seeds or an instantaneous interval. It approaches the re-quested 6-step period, while the fixed policy remains near 4.5 steps and therefore updates more frequently. The remaining fluctuations are compatible with average-period regulation: individual intervals can vary with task motion. Together with the ten-seed counts in the test in Fig. 2(a) , this trajectory illustrates both the transient adjustment and its finite-run outcome. Figure 3 shows the upper agents responding to density motion while lower agents stay near the stationary com-ponents; the trails display one response window within the 240 s run. In ten additional runs with ε0 = 0 , the adaptive policy uses 208.1 global updates on average and reduces cost by 5.00% against its own count-matched schedules. This supports operation without scenario-specific threshold initialization in this case. VI. C ONCLUSION 
+
+Coverage control must respond to changing spatial de-mand while managing the cost of repeated coordination and optimization. Event triggering allows update times to follow task changes, while threshold adaptation regulates their average frequency as operating conditions vary. The proposed threshold-adaptive event-triggered MPC makes the desired long-run average update period a direct design input, with asymptotic tracking and initialization-dependent one-sided guarantees under the stated assumptions, without re-quiring a disturbance distribution. The nonlinear benchmark illustrates these timing properties. In the moving-density coverage study, adaptation maintains the update count near the requested budget when the density moves faster than in calibration, while event-dependent timing improves coverage relative to periodic schedules with matched update counts. The principal benefit is a direct update-budget interface that retains the responsiveness of event-triggered MPC. Future work will address stability-certified implementations, asyn-chronous agent updates, and solver execution costs. APPENDIX ACOVERAGE OBJECTIVE AND MPC ARCHITECTURE 
+
+At each global event, each agent solves a fixed-reference tracking problem. For the sake of clarification, omitting the agent index, the objective is 
+
+min     
+
+> {xj,u j,σ j}
+> N−1
+
+∑
+
+> j=0
+
+(
+
+∥pj − ci∥2 
+
+> Qp
+
++ ∥vj ∥2 
+
+> Qv
+
++ ∥uj ∥2 
+
+> R
+
++ ρσ 2
+
+> j
+
+)
+
++ ∥pN − ci∥2 
+
+> Qp
+
++ ∥vN ∥2 
+
+> Qv
+
++ ρσ 2 
+
+> N
+
+,
+
+(33) subject to x0 = xki , the nominal dynamics in (26), and 
+
+∥uj ∥∞ ≤ 1, j = 0 , . . . , N − 1,
+
+(34) 
+
+∥vj ∥∞ ≤ 1, j = 0 , . . . , N, (35) 
+
+(0 .5 − σj )1 ≤ pj ≤ (9 .5 + σj )1, j = 0 , . . . , N, (36) 
+
+σj ≥ 0, j = 0 , . . . , N. (37) Here ∥z∥2 
+
+> Q
+
+= z⊤Qz , Qp = 2 I, Qv = 0 .5I, R = 0 .1I,
+
+ρ = 200 , and N = Nmax = 15 . And ci is for each agent’s event-time centroid. A scalar slack softens both position coordinates at each stage, including the terminal stage. The reference ci is held until the next global event. APPENDIX BCOVERAGE BOUND 
+
+For the disturbance-free coverage example, the plant and predictor use identical dynamics and inputs, giving eri (k) = 0 in exact arithmetic. Let a = ⌈α⌉. Under the stated componentwise velocity and input bounds, the displacement over the first a steps satisfies 
+
+epi (ki + j) ≤ jT s
+
+√2 + 12 jT 2
+
+> s
+
+√2, 1 ≤ j ≤ a. (38) If the centroids and fallback sites lie in A = [0 , 10] 2, their separation is bounded by diam( A) = 10 √2. Consequently, a sufficient trigger bound is 
+
+Ecov = max 
+
+{
+
+aT s
+
+√2 + 12 aT 2
+
+> s
+
+√2, 0, 10 √2
+
+}
+
+. (39) For a = 6 and Ts = 0 .2 s, the displacement bound is ap-proximately 1.867 m, so Ecov = 10 √2 m. The initialization bounds in Theorem 1 therefore become 
+
+L = η(α − Nmax ) = −0.09 m , (40) 
+
+U = Ecov + η(α − 1) ≈ 14 .192 m . (41) The value U is a sufficient initialization for the one-sided average-period guarantee, not the initialization used in the coverage experiments. The tested initial thresholds, 0.2125 
+
+m and zero, illustrate average-period regulation from general initializations. REFERENCES [1] J. Cortés, S. Martínez, T. Karatas, and F. Bullo, “Coverage control for mobile sensing networks,” IEEE Trans. Robot. Autom. , vol. 20, no. 2, pp. 243–255, 2004. [2] S. G. Lee, Y. Diaz-Mercado, and M. Egerstedt, “Multirobot control using time-varying density functions,” IEEE Trans. Robot. , vol. 31, no. 2, pp. 489–493, 2015. [3] W. P. M. H. Heemels, K. H. Johansson, and P. Tabuada, “An introduc-tion to event-triggered and self-triggered control,” in Proc. 51st IEEE Conf. Decis. Control , 2012, pp. 3270–3285. [4] M. Ajina, D. Tabatabai, and C. Nowzari, “Asynchronous distributed event-triggered coordination for multiagent coverage control,” IEEE Trans. Cybern. , vol. 51, no. 12, pp. 5941–5953, 2021. [5] Y. Zhou, L. Kong, S. Sosnowski, Q. Liu, and S. Hirche, “Distributed event- and self-triggered coverage control with speed constrained unicycle robots,” arXiv:2107.14580, 2021. [Online]. Available: https://arxiv.org/abs/2107.14580 [6] A. Carron and M. N. Zeilinger, “Model Predictive Coverage Control,”  
+
+> IFAC-PapersOnLine , vol. 53, no. 2, pp. 6107–6112, 2020. [7] R. Rickenbach, J. Köhler, A. Scampicchio, M. N. Zeilinger, and A. Carron, “Active learning-based model predictive coverage control,”
+> IEEE Trans. Autom. Control , vol. 69, no. 9, pp. 5931–5946, 2024.
+
+[8] P. B. Eberhard, J. Köhler, O. Hüsser, M. N. Zeilinger, and A. Carron, “Time-varying coverage control: A distributed tracker-planner MPC framework,” arXiv:2507.01567, 2025. [Online]. Available: https://arxiv.org/abs/2507.01567 [9] A. Gräfe and S. Trimpe, “Event-triggered robust model predictive con-trol under hard computation resource constraints,” in Proc. European Control Conf. , 2025, pp. 465–470. [10] D. Lehmann, E. Henriksson, and K. H. Johansson, “Event-triggered model predictive control of discrete-time linear systems subject to disturbances,” in Proc. European Control Conf. , 2013, pp. 1156–1161. [11] P. Li, Y. Kang, T. Wang, and Y.-B. Zhao, “Disturbance prediction-based adaptive event-triggered model predictive control for perturbed nonlinear systems,” IEEE Trans. Autom. Control , vol. 68, no. 4, pp. 2422–2429, 2023. [12] F. D. Brunner, W. P. M. H. Heemels, and F. Allgöwer, “Robust event-triggered MPC with guaranteed asymptotic bound and average sampling rate,” IEEE Trans. Autom. Control , vol. 62, no. 11, pp. 5694– 5709, 2017. [13] L. Deng, Z. Shu, and T. Chen, “Event-triggered robust model predic-tive control for linear discrete-time systems with a guaranteed average inter-execution time,” Int. J. Robust Nonlinear Control , vol. 32, no. 6, pp. 3969–3985, 2022. [14] J. Shi and C. N. Jones, “Disturbance-adaptive model predictive control for bounded average constraint violations,” arXiv:2503.24169, 2025. [Online]. Available: https://arxiv.org/abs/2503.24169 [15] J. Shi, C. Salzmann, and C. N. Jones, “Disturbance-adaptive data-driven predictive control: Trading comfort violation for savings in building climate control,” IEEE Trans. Control Syst. Technol. , vol. 34, no. 3, pp. 1419–1434, 2026. [16] D. Limón Marruedo, T. Álamo, and E. F. Camacho, “Input-to-state stable MPC for constrained discrete-time nonlinear systems with bounded additive uncertainties,” in Proc. 41st IEEE Conf. Decis. Control , 2002, pp. 4619–4624.
