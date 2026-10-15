@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-14</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-15</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 17 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 9 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-14 22:17:45 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-15 22:31:06 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,10 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日筛选17篇多智能体与机器人论文，精读6篇、速读11篇，其中两篇多智能体路径规划研究拿下满分。最值得看的是拥挤动态空间下的兼容相遇空间分配，以及共享空间场驱动的大规模终身路径规划，均直指多机器人协同效率瓶颈。普通读者可先关注这两篇精读，再扫读多机器人探索与视觉-语言-动作模型红队测试方向。</p>
+<p>今日共生成 9 篇推荐（精读 3 篇，速读 6 篇）</p>
+<p>精读：《Optimistic Distributed Submodular Coordination with Applications to Multi-Target Tracking with Multiple Robots》（8.0/10）, 《FPTAS for Polygonal Multi-Robot Motion Planning》（8.0/10）</p>
+<p>速读：《Who to Trust in Multi-Robot Systems: Joint Robot and Object Hypothesis Trust Inference via Neural-Symbolic Cross-Validation》（7.0/10）, 《Distributed area coverage path planning subject to the inclusion of a headland path》（7.0/10）, 《HM3D-M3: A Benchmark for Multi-Agent, Multi-Modal, Multi-Object Goal Navigation》（7.0/10）</p>
+<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +74,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Multi-Agent Path Planning via Compatible Encounter-Space Allocation in Crowded Spaces Dynamically Occupied by Work Activities">Multi-Agent Path Planning via Compatible Encounter-Space Allocation in Crowded Spaces Dynamically Occupied by Work Activities</span></li><li><span class="dpr-home-dashboard-paper-title" title="Reinforcement Learning for Large-Scale Lifelong Multi-Agent Path Finding with Shared Spatial Fields">Reinforcement Learning for Large-Scale Lifelong Multi-Agent Path Finding with Shared Spatial Fields</span></li><li><span class="dpr-home-dashboard-paper-title" title="Akule: Fast and Scalable Multi-Robot Motion Planning via Sparse Interaction Diffusion">Akule: Fast and Scalable Multi-Robot Motion Planning via Sparse Interaction Diffusion</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Optimistic Distributed Submodular Coordination with Applications to Multi-Target Tracking with Multiple Robots">Optimistic Distributed Submodular Coordination with Applications to Multi-Target Tracking with Multiple Robots</span></li><li><span class="dpr-home-dashboard-paper-title" title="FPTAS for Polygonal Multi-Robot Motion Planning">FPTAS for Polygonal Multi-Robot Motion Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="DD-GBP: Anytime Multi-Arm Planning and Continuous Execution via Distributed Dynamic Gaussian Belief Propagation">DD-GBP: Anytime Multi-Arm Planning and Continuous Execution via Distributed Dynamic Gaussian Belief Propagation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +87,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">11 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Mobility-Budget-Constrained Submodular Maximization for Distributed Semantic Multi-Robot Exploration">Mobility-Budget-Constrained Submodular Maximization for Distributed Semantic Multi-Robot Exploration</span></li><li><span class="dpr-home-dashboard-paper-title" title="Red-Teaming of Vision-Language-Action Models via Quality Diversity Environment Generation">Red-Teaming of Vision-Language-Action Models via Quality Diversity Environment Generation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Before We Act: Learning Action-Conditioned Team-Response Beliefs for Decentralized Multi-Robot Manipulation">Before We Act: Learning Action-Conditioned Team-Response Beliefs for Decentralized Multi-Robot Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Who to Trust in Multi-Robot Systems: Joint Robot and Object Hypothesis Trust Inference via Neural-Symbolic Cross-Validation">Who to Trust in Multi-Robot Systems: Joint Robot and Object Hypothesis Trust Inference via Neural-Symbolic Cross-Validation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed area coverage path planning subject to the inclusion of a headland path">Distributed area coverage path planning subject to the inclusion of a headland path</span></li><li><span class="dpr-home-dashboard-paper-title" title="HM3D-M3: A Benchmark for Multi-Agent, Multi-Modal, Multi-Object Goal Navigation">HM3D-M3: A Benchmark for Multi-Agent, Multi-Modal, Multi-Object Goal Navigation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>11</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 </div>
 

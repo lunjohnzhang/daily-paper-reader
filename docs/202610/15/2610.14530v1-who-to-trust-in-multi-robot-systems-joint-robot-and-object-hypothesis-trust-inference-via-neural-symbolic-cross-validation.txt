@@ -1,0 +1,657 @@
+Title: Who to Trust in Multi-Robot Systems: Joint Robot and Object Hypothesis Trust Inference via Neural-Symbolic Cross-Validation
+
+URL Source: https://arxiv.org/pdf/2610.14530v1
+
+Published Time: Wed, 14 Oct 2026 00:42:22 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Who to Trust in Multi-Robot Systems: Joint Robot and Object Hypothesis Trust Inference via Neural-Symbolic Cross-Validation 
+
+Ruiyang Wang, Hao-Lun Hsu, Haocheng Meng, Songqiao Xie and Miroslav Pajic 
+
+Abstract —Multi-robot systems (MRS) offer significant ad-vantages over single-robot platforms by enabling information sharing and coordination for different tasks in complex en-vironments. However, reliable cooperation critically depends on inferring trust over both information sources and their reported hypotheses, particularly under partial observability and potential adversarial interference. Existing approaches frequently depend on pre-established trust relationships or side-channel information, which may not be available or reliable in realistic MRS deployments. This work introduces NeST-Bayes , a neural-symbolic framework that jointly infers robot and hypothesis trust using only inter-robot observation consistency, without requiring preassigned robot trust, reputation information, or side-channel identity signals. NeST-Bayes infers instantaneous trust evidence scores for robots and object hypotheses by reasoning over ego-centric relational graphs constructed from cross-robot observa-tion consistency. These evidence scores are accumulated over time through Bayesian updates of Beta-distributed trust beliefs to maintain temporally consistent trust estimates. Extensive evaluations show that NeST-Bayes achieves the highest mean object precision and robot recall across all benchmark settings, and the highest robot precision and object recall in most settings, compared to trust-based methods. Under aggressive optimized attacks, it achieves 98.8%/93.8% robot precision/recall and 98.3%/95.4% object precision/recall. In an occlusion-rich Webots warehouse, it maintains 92.5%/92.0% robot precision/recall and 97.3%/85.0% object precision/recall. This shows joint improve-ments in the reliability and coverage of retained information. 
+
+I. I NTRODUCTION 
+
+By enabling coordinated decision-making and information exchange among multiple robots, multi-robot systems (MRS) achieve performance gains over single-robot platforms in per-ception, exploration, coverage, and planning. Seminal works [1], [2] established the value of cooperation in distributed robot teams, while more recent efforts improved perceptual robust-ness through multi-view sensing [3] and enhanced search effi-ciency via information sharing and coordinated planning [4]. While multi-viewpoint aggregation overcomes individual sensing limitations, real-world MRS must operate under partial observability and sensing uncertainty [5], unreliable commu-nication [6], and restricted fields of view [7]. More critically, shared estimation and planning become vulnerable in con-tested environments and scenarios, where adversarial robots may inject/utilize misleading information; e.g., Sybil attacks distort collective objectives through false identities [8], and Byzantine behaviors corrupt distributed diffusion and state estimation [9], [10]. Any mechanism aggregating inter-robot information should therefore infer trust over both the robots providing reports and the hypotheses they produce. Existing trust inference approaches in MRS typically rely on assumptions that limit their applicability in realistic settings. Early works [11]–[13] treat trust as a pre-established or reputation-based quantity, while more adaptive methods [14], [15] infer it from hand-designed models or specifications of nominal behavior. Recent resilient hypothesis-testing meth-ods [16], [17] exploit side-channel information that is often unavailable. Complementary sensor-fusion approaches reject inconsistent measurements without explicitly estimating the reliability of their sources [18], [19]. Bayesian methods such as MATE [20] already use observation consistency to jointly estimate agent and track trust, with each estimate informing the other. However, their mappings from consistency checks to trust evidence rely on hand-designed rules. A critical limitation is the lack of methods to learn how typed consistency and contradiction relations can be combined, to infer robot and object hypothesis trust under potential adversarial reporting. Consequently, in this work, we introduce NeST-Bayes , a Neural Symbolic Trust inference framework that learns rela-tional evidence to jointly estimate robot and object-hypothesis trust from cross-robot observation consistency, with Bayesian temporal evidence accumulation through updates to Beta-distributed trust beliefs. For each robot, we construct an ego-centric heterogeneous graph whose typed edges encode obser-vation agreement and contradiction using geometric and field-of-view (FoV) checks. A triplet encoder initializes node repre-sentations from their symbolic relation profiles, and relation-specific graph attention propagates evidence across robot and hypothesis nodes to produce instantaneous trust scores. These scores are accumulated as fractional pseudo-counts in Beta distributions to maintain temporal trust beliefs. 
+
+NeST-Bayes requires no preassigned robot trust or side-channel identity signals at inference time. Evaluations under noisy sensing, normal and optimized adversarial reporting, increased adversarial ratios, and occlusion-rich Webots simula-tions show that NeST-Bayes generally achieves the highest pre-cision while also leading in recall among trust-based methods. Component ablation studies show that relational propagation improves recall while maintaining high precision. In summary, the main contributions of this work include:  
+
+> •
+
+A neural-symbolic trust inference framework that com-bines symbolic relation profiles with heterogeneous graph attention to jointly infer robot and object-hypothesis evidence, integrating the learned scores with Bayesian temporal evidence accumulation.  
+
+> •
+
+An extensive evaluation against No Trust , Na¨ ıve Bayesian , and MATE baselines under sensing noise, normal and optimized adversarial reporting, increased adversarial ratios, and occlusion-rich Webots simulations, together with component ablations demonstrating how symbolic relation initialization and typed relational prop-agation contribute to precision and recall. arXiv:2610.14530v1 [cs.RO] 10 Oct 2026 II. R ELATED WORK 
+
+A. MRS Vulnerabilities 
+
+MRS are sensitive to sensing noise and partial observability [21], communication uncertainty [22], [23], and malicious interference [24]. False data injection can destabilize co-ordination and navigation [25], and adversarial perception attacks inject spurious measurements that disrupt coopera-tive decision-making [19]. Byzantine behaviors in distributed estimation and learning have also been studied [26], [27], where even a few compromised robots degrade performance by injecting false positives or omitting valid observations. These results motivate principled trust mechanisms that operate under limited information and unreliable sensing, without assuming nominal-mode behavior. 
+
+B. Trust in MRS 
+
+Trust estimation in MRS remains an open problem. Exist-ing approaches derive trust evidence from explicitly defined behaviors or task specifications [15], [28], or exploit side-channel information that effectively fingerprints the robot identity [16], [17]. More recent methods [20], [29], [30] cross-validate observations across robots, but rely on hand-designed rules for trust updates that, as we show, can be brittle when adversaries are numerous or cross-robot validation is sparse. NeST-Bayes instead learns how symbolic consistency and contradiction relations combine through heterogeneous message passing, producing joint robot and object-hypothesis evidence for temporal trust updates. 
+
+C. Neural-Symbolic AI 
+
+Neural-symbolic methods combine the interpretability of symbolic reasoning with the representational flexibility of neural networks [31], [32], and have proven effective for logical inference [33], probabilistic logic programming [34], and relational reasoning [35]. In robotics, they have succeeded in task planning [36], visual and relational reasoning [37], [38], and manipulation [39], [40]. Neural Logic Machines (NLMs) [41] learn multi-step relational reasoning by com-posing symbolic predicates over a shared entity domain. Trust inference in MRS instead involves heterogeneous robot and object-hypothesis entities connected by typed observation and consistency relations. Relation-aware graph neural networks with heterogeneous message passing [42]–[44] provide asparse substrate for this setting. NeST-Bayes is conceptually related to NLM-style relational reasoning, but operates over ego-centric heterogeneous graphs rather than using the explicit predicate operators of an NLM. III. P ROBLEM FORMULATION 
+
+We consider a multi-robot system R = {ri}Mi=1 operating in a workspace W ⊂ Rd over a finite horizon t ∈ { 0, . . . , T }.The environment contains a set of dynamic objects O, where each object o ∈ O is represented by its position state po(t) ∈W and unique identifier id (o) ∈ I gt . Each robot ri has state 
+
+si(t) =  pi(t), θ i(t), R sen  
+
+> i
+
+, Φi
+
+, (1) where pi(t) is its position, θi(t) is its heading, and (Rsen  
+
+> i
+
+, Φi)
+
+define its range- and angle-limited FoV, namely Ai(t). The visible ground-truth objects are 
+
+Oi(t) = {o ∈ O | po(t) ∈ Ai(t)}. (2) 
+
+A. Noisy Sensing and Local Information 
+
+Each robot ri, whether legitimate or adversarial, first re-ceives a nominal detector output Znat  
+
+> i
+
+(t). Let λs 
+
+> FN ,i
+
+and λs
+
+> FP ,i
+
+denote its nominal sensor false-negative and false-positive rates, respectively. For each visible object o ∈ Oi(t), the detector produces a noisy measurement (id (o), ˆpi,o (t)) with probability 1 − λs
+
+> FN ,i
+
+, where ˆpi,o (t) = po(t) + ϵi,o (t). The detector may also produce persistent sensor artifacts Zsi (t)
+
+with false-positive rate λs
+
+> FP ,i
+
+, giving 
+
+Znat  
+
+> i
+
+(t) = Zgt  
+
+> i
+
+(t) ∪ Z si (t). (3) Here Zgt  
+
+> i
+
+(t) collects the true-positive detections of visible objects retained with probability 1 − λs
+
+> FN ,i
+
+, and Zsi (t) collects nominal sensor false positives. Robots communicate with neighbors Ni(t) = {rj̸ = ri |∥pi(t) − pj (t)∥ ≤ Rcom } within the communication range 
+
+Rcom . Each robot forms its reported track set and broadcasts 
+
+μi(t) =  si(t), Zi(t), Zi(t) = {τ ki (t)}Ni(t) 
+
+> k=1
+
+, (4) where 
+
+τ ki (t) =  id ki , ˆpki (t) (5) denotes the k-th local track reported by robot ri, consisting of an object identifier and its estimated position. Here, id ki
+
+denotes a persistent track label supplied by the perception and association front end, rather than a ground-truth object identity available to the trust inference module. We assume that such labels can be matched across robot reports, while allowing residual association errors, including missed, incorrect, or duplicate associations. A track is active at time t if it is included in Zi(t).
+
+B. Reporting Policies 
+
+The robots are partitioned as R = Rleg ∪ R adv , where the robot type is unknown to the trust inference algorithm. A legitimate robot does not manipulate its detector output: 
+
+Zi(t) = Znat  
+
+> i
+
+(t), ri ∈ R leg . (6) Following the perception-level attacks of [19], [20], adver-sarial robots receive nominal outputs from the same sensing model but manipulate which hypotheses they report, while their broadcast states si(t) remain authentic, e.g., verifiable through inter-robot localization [15]. Let F denote the set of persistent adversarial false hypothe-ses, with |F| ≈ λa
+
+> FP
+
+|O| and identifiers disjoint from Igt .Let Fi(t) ⊆ F be the false hypotheses in ri’s FoV. Conse-quently, multiple adversarial robots may report and mutually support the same persistent false hypothesis. These induce adversarial false-positive track observations ZadvFP  
+
+> i
+
+(t) =
+
+{(id (f ), ˆpf (t)) | f ∈ Fi(t)} while suppressed nominal detections form ZadvFN  
+
+> i
+
+(t) ⊆ Z nat  
+
+> i
+
+(t).In this work, we consider two standard adversarial policies. Under the normal adversarial policy , robot ri randomly sup-presses nominal detections with probability λa 
+
+> FN
+
+and injects visible persistent false hypotheses: 
+
+Zi(t)=  Znat  
+
+> i
+
+(t) \ Z advFN  
+
+> i
+
+(t) ∪ Z advFP  
+
+> i
+
+(t), r i ∈ R adv . (7) Under the optimized adversarial policy , ri selects reports in 
+
+Ci(t) = Znat  
+
+> i
+
+(t) ∪ Z advFP  
+
+> i
+
+(t), (8) where Znat  
+
+> i
+
+(t) contains nominal detector hypotheses and 
+
+ZadvFP  
+
+> i
+
+(t) contains persistent adversarial false hypotheses visible to ri. For each h ∈ C i(t), let xh ∈ { 0, 1} indicate whether h is reported. Let Yj (t) = {id | (id, ˆp) ∈ Z j (t)}
+
+denote the identifiers reported by neighbor rj . Using current neighbor states and one-step delayed reports, ri computes 
+
+n+ 
+
+> i
+
+(h, t ) = X 
+
+> rj∈N i(t)
+
+1[ˆ ph(t) ∈ Aj (t)] 1[id (h) ∈ Y j (t − 1)] ,n− 
+
+> i
+
+(h, t ) = X 
+
+> rj∈N i(t)
+
+1[ˆ ph(t) ∈ Aj (t)] 1[id (h) /∈ Y j (t − 1)] .
+
+The optimized adversary then solves 
+
+max 
+
+> {xh}h∈C i(t)
+
+X 
+
+> h∈Z advFP
+> i(t)
+
+xh
+
+ δ+(1 + n+ 
+
+> i
+
+(h, t )) − n− 
+
+> i
+
+(h, t )+
+
+X 
+
+> h∈Z nat
+> i(t)
+
+(1 − xh) δ−(1 + n− 
+
+> i
+
+(h, t )) − n+ 
+
+> i
+
+(h, t )
+
+s.t. X 
+
+> h∈Z advFP
+> i(t)
+
+xh + X 
+
+> h∈Z nat
+> i(t)
+
+(1 − xh) ≤ Bi,xh ∈ { 0, 1}, ∀h ∈ C i(t).
+
+(9) Here δ+ weights the benefit of promoting adversarial false hypotheses, δ− weights the benefit of suppressing nominal hypotheses, and Bi limits the number of manipulations per step for stealthiness. The reported set is 
+
+Zi(t) = {h ∈ C i(t) | xh = 1 } ri ∈ R adv . (10) 
+
+C. Trust Inference Objective 
+
+A central trust module estimates a robot trust score γi(t) ∈
+
+[0 , 1] for each ri, while each robot ri maintains track trust scores κki (t) ∈ [0 , 1] for its local tracks τ ki (t). These scores are inferred at deployment from cross-robot observation con-sistency, without requiring prior trust, reputation, or ground-truth labels at inference time. Given threshold ψ, the inferred legitimate robot set is 
+
+bRleg (T ) = {ri ∈ R | γi(T ) ≥ ψ}. (11) For evaluation, local tracks are grouped into fused hypotheses 
+
+bOall . For each fused hypothesis ¯o, let P¯o be the set of reporting robot-track pairs. Its credibility is 
+
+Γ¯o(T ) = 
+
+P  
+
+> (i,k )∈P ¯o:γi(T)≥ψ
+
+γi(T )κki (T )
+
+P  
+
+> (i,k )∈P ¯o:γi(T)≥ψ
+
+γi(T ) , (12) and zero if the denominator is zero. The credible object set is 
+
+bOfused (T ) = {¯o ∈ bOall | Γ¯o(T ) ≥ ψ}. (13) The objective is to identify legitimate robots and credible object hypotheses despite natural sensor artifacts and adver-sarial false hypotheses. IV. N EST-B AYES : N EURAL -S YMBOLIC TRUST WITH 
+
+BAYESIAN EVIDENCE ACCUMULATION 
+
+We introduce NeST-Bayes , a trust inference framework based on ego-centric relational graphs encoding cross-robot observation consistency (Fig. 1). At each step, a centralized Trust Aggregation Module (TAM) constructs Gi(t) for each robot ri from ri’s own and neighboring reports and applies a shared neural-symbolic model to reason through each graph, accumulating ego-robot evidence in a system-wide registry while returning validated track evidence to ri, whose track beliefs are maintained onboard. The TAM could equally be replicated onboard each robot; we centralize it to obtain a single system-level trust estimate per robot, leaving the full decentralized deployment to future work. 
+
+A. Single Step Neural-Symbolic Reasoning 1) Ego-Centric Graph Construction: At each time step t,the TAM constructs for robot ri a directed, heterogeneous ego-centric graph Gi(t) = ( Vi(t), Ei(t)) from ri’s message 
+
+μi(t) and the messages {μj (t)}rj ∈N i(t) of its neighbors, where each message contains the robot state and reported tracks. The graph translates the reported observations into a symbolic topology that facilitates trust inference. 
+
+Vi(t) = {ri} ∪ N i(t) ∪ eT fused  
+
+> i
+
+(t), (14) where eT fused  
+
+> i
+
+(t) is obtained by grouping the tracks reported by {ri} ∪ N i(t) according to their persistent identifiers. Let 
+
+Ii(t) denote the set of identifiers appearing in these reports. For each id ∈ I i(t), define 
+
+Rid i (t) = rj ∈ { ri} ∪ N i(t) ∃ τ kj (t) =  id, ˆpkj (t) ∈ Z j (t) ,
+
+eτ id i (t) = 
+
+id, 1
+
+|R id i (t)|
+
+X  
+
+> rj∈R id i(t)
+
+ˆpid j (t), Rid i (t)
+
+ ,
+
+where ˆpid j (t) is the position estimate associated with id in robot rj ’s report. The fused track set is eT fused  
+
+> i
+
+(t) = {eτ id i (t) |
+
+id ∈ I i(t)}, where id is the persistent track label of Sec. III; residual missed, incorrect, or duplicate associations thus man-ifest as track-level false negatives or positives, so NeST-Bayes 
+
+operates on potentially imperfect associations.                
+
+> TABLE I SYMBOLIC EDGE SEMANTICS IN THE EGO -C ENTRIC GRAPH
+> Relation Category Edge Type Condition & Interpretation
+> Robot–Track Relations (Sensing Consistency)
+> Observation InFoV_Observed A robot reports observing a fused track within its FoV.
+> Refutation InFoV_Missed A robot fails to observe a fused track within its FoV.
+> Robot–Robot Relations (Cross-Robot Consistency)
+> Consistency Co-Detected Both robots report observation of a fused track within their FoV.
+> Conflict Contradicted A robot reports observation that an-other robot refutes within its FoV. Fig. 1. NeST-Bayes pipeline: ego-centric graph construction, neural-symbolic evidence inference, and Bayesian evidence accumulation.
+
+The edges Ei(t) represent specific symbolic relations de-rived from geometric consistency checks and FoV analysis. These relations encode the logical “evidence” for or against a node’s trustworthiness. To enable bidirectional information flow, in which robots validate tracks and tracks reciprocally validate robots, we model each relationship as a pair of directed edges (forward and reverse). This yields eight directed edge types, with the four forward relations defined in Table I. The TAM constructs this graph (Alg. 1, lines 1–7) and then performs inference on it. 
+
+2) Neural-Symbolic Reasoning: This stage maps the sym-bolic abstraction of Sec. IV-A into instantaneous evidence scores for both robots and object hypotheses, which are sub-sequently accumulated via Beta updates (Sec. IV-B). Rather than applying fixed aggregation rules to individual relations, we cast trust inference as typed relational reasoning over the ego-centric graph. Geometric and FoV consistency checks pro-vide interpretable symbolic predicates, while stacked relation-specific message passing learns how local predicates combine into broader multi-hop evidence. This construction is inspired by neural-logic relational reasoning, but does not instantiate the explicit predicate operators of an NLM. In node feature initialization, as in the Triplet Encoder section in Fig. 1, the semantic profile of a node is defined by the set of symbolic relations it participates in. For each node u ∈ V i(t), we represent each relation from node u to any other node v as a symbolic triplet: 
+
+η(u, v ) = [ ϕ(u), e (ρ), ϕ (v)] ∈ { 0, 1}10 (15) where ϕ(·) is a one-bit node-type indicator (robot or track), and e(ρ) is an 8-bit one-hot encoding of the relation type ρ
+
+defined in Table I and their reverses. These triplets form an unordered bag of symbolic predicates, Hu, that characterize the local consistency context of a node u.Let c = type( u) ∈ { robot , track }. Each triplet η ∈ H u
+
+is embedded by a type-specific two-layer MLP gc and pooled 
+
+Algorithm 1 Single Step Neural-Symbolic Reasoning 
+
+Require: Neighbor messages μj (t) for all rj ∈ { ri} ∪ N i(t)
+
+Ensure: Validated evidence scores Ωi = {(u, s u)}
+
+Phase 1: Ego-Centric Graph Construction  
+
+> 1:
+
+Vi(t) ← { ri} ∪ N i(t) ∪ eT fused  
+
+> i
+
+(t), Ei(t) ← ∅  
+
+> 2:
+
+for each (u, v ) ∈ V i(t) × V i(t) do  
+
+> 3:
+
+if relation ρ holds (Table I) then  
+
+> 4:
+
+Ei(t) ← E i(t) ∪ { (u, ρ, v ), (v, ρ −1, u )} 
+
+> 5:
+
+end if  
+
+> 6:
+
+end for Phase 2: Neural-Symbolic Reasoning  
+
+> 7:
+
+H ← ExtractTriplets (Ei(t))  
+
+> 8:
+
+h(0) ← AttentionPooling (H) 
+
+> 9:
+
+h(1) ← HeteroGAT (1)  h(0) , Ei(t) 
+
+> 10:
+
+for ℓ = 2 to L do  
+
+> 11:
+
+ˆh(ℓ) ← HeteroGAT (ℓ) h(ℓ−1) , Ei(t) 
+
+> 12:
+
+h(ℓ) ← ˆh(ℓ) + h(ℓ−1)  
+
+> 13:
+
+end for Phase 3: Validity Filtering  
+
+> 14:
+
+Ωi ← ∅  
+
+> 15:
+
+for each eligible node u do  
+
+> 16:
+
+if IsValidNode (u, Ei(t)) then  
+
+> 17:
+
+su ← σ MLP type( u)(h(L) 
+
+> u
+
+) 
+
+> 18:
+
+Ωi ← Ωi ∪ { (u, s u)} 
+
+> 19:
+
+end if  
+
+> 20:
+
+end for  
+
+> 21:
+
+return Ωi ▷ Output evidence scores according to 
+
+aη = w⊤ 
+
+> c
+
+tanh( Wcgc(η)) , πη = exp( aη )
+
+P 
+
+> η′∈H u
+
+exp( aη′ ) ,
+
+h(0)  
+
+> u
+
+= Wo,c 
+
+X
+
+> η∈H u
+
+πη gc(η).
+
+(16) This permutation invariant pooling produces a 128 dimen-sional initial embedding for the robot and track nodes. The embeddings are processed by L = 3 relation-specific Hetero GAT layers. Each layer applies standard graph attention independently over each directed relation type using K = 4 
+
+heads. Head outputs and incoming relation representations are mean-aggregated, followed by ReLU and type-specific batch normalization. Residual connections are applied after the second and third layers, allowing evidence to propagate from local consistency relations to broader multi-hop consensus. The final node embeddings, h(L) 
+
+> u
+
+, are passed to type-specific MLP heads with a Sigmoid activation function σ(·) to produce scalar evidence scores su ∈ [0 , 1] .
+
+su = σ MLP type( u)(h(L) 
+
+> u
+
+) (17) 
+
+3) Validity Filtering: The output of neural-symbolic rea-soning is filtered before the trust update. Validity is defined differently for robots and tracks:  
+
+> •
+
+Robots: The ego robot ri is considered valid for a robot trust update only if it has at least one incident edge involving a neighboring robot in Ni(t). 
+
+> •
+
+Tracks: A local track τ ki (t) ∈ Z i(t) is considered valid for a track trust update only if its corresponding fused track node is connected to the ego robot and at least one neighboring robot in Ni(t).Although the GNN scores all nodes in Gi(t), only the valid ego-robot score and ri’s local-track scores are retained. The TAM applies the ego score to ri’s system-level trust belief, ensuring at most one robot update per step, and maps each valid fused-track score by its persistent identifier back to the local track τ ki (t) for ri’s onboard update. 
+
+B. Bayesian Temporal Evidence Accumulation 
+
+To accumulate instantaneous neural evidence over time, we maintain a Bayesian trust belief for each node u, represented by a Beta distribution over its trustworthiness ξu ∈ [0 , 1] :
+
+f (ξu; αu(t), β u(t)) = ξαu(t)−1 
+
+> u
+
+(1 − ξu)βu(t)−1
+
+Beta( αu(t), β u(t)) (18) where αu(t) represents the accumulated positive evidence and 
+
+βu(t) represents the accumulated negative evidence up to time 
+
+t. Accordingly, the TAM maintains (αi, β i) in a system-wide robot-trust registry, while each robot ri maintains (αki , β ki )
+
+for its own local tracks. This division provides a globally consistent robot-trust estimate while keeping track beliefs colocated with the local perception and planning modules that consume them. Each newly encountered robot or track is initialized with the symmetric prior (α0, β 0) = (1 , 1) ,corresponding to a neutral trust score of 0.5. Entities receiving no valid cross-robot evidence retain this prior. The Hetero GAT output score su ∈ [0 , 1] is interpreted as the instantaneous evidence score. To ensure that evidence reinforces the correct belief parameter, we accumulate it as fractional pseudo-counts in the style of Beta-reputation and subjective-logic systems [45]: 
+
+αu(t) = αu(t − 1) + su, βu(t) = βu(t − 1) + (1 − su) (19)  
+
+> Fig. 2. Example simulation environment. Robots are shown as blue squares with shaded fields of view, ground-truth objects as green points, and false positive objects as red points.
+
+This update is only applied to nodes that satisfy the validity constraints defined in Alg. 1. For non-valid nodes, the α and 
+
+β parameters remain unchanged. The final trust score ˆyu(t) used for decision-making is the expected value of the Beta belief: 
+
+ˆyu(t) = E[ξu] = αu(t)
+
+αu(t) + βu(t) (20) Over the horizon, the TAM repeats single-step reasoning for every robot, applies the update in Eq. (19) to each validated evidence pair, and reports the final robot and track trust scores as the Beta expectations in Eq. (20), i.e., γi(T ) and κki (T )
+
+in Eqs. (11)–(12). This ensures trust reflects accumulated evidence rather than any single snapshot. V. E VALUATIONS 
+
+We first train and validate NeST-Bayes in a controlled 100 ×
+
+100 2D environment (Fig. 2). Each robot has an occlusion-free FoV of π/ 3 and 50 -unit range, with 80 -unit communi-cation range; we fix |O| = 2 |R| and sample |R| ∈ [5 , 20] .Robots and objects follow random start–goal motions over 100 
+
+steps. During both training and testing, nominal sensor false-positive and false-negative rates are independently sampled from [0 .01 , 0.05] for every robot, including legitimate and adversarial robots. Training samples the adversarial ratio m ∈
+
+[0 .1, 0.3] and, for normal adversaries, λa
+
+> FP
+
+, λ a 
+
+> FN
+
+∈ [0 .1, 0.3] ,with scenarios split evenly between normal and optimized aggressive policies. From 10 ,000 scenarios we extract 71 ,940 
+
+valid ego-centric graphs, partitioned 80 /20 by scenario into train/validation. The model is supervised only on valid nodes (Sec. IV-A3) via: 
+
+Li = 5 X
+
+> r∈V tr
+> R,i
+
+ℓBCE (yr , s r ) + X 
+
+> ˜τ∈V tr
+> T ,i
+
+ℓBCE (y˜τ , s ˜τ ), (21) where y = 1 marks legitimate robots and real hypotheses; the factor 5 balances the single ego-robot label against multiple track labels, and the Beta updates add no learned parameters. 
+
+A. Baselines and Evaluation Metrics 
+
+In addition to a No Trust baseline, which indiscriminately trusts all robots and therefore propagates adversarial observa-tions, we also compare the proposed NeST-Bayes method with TABLE II PRECISION AND RECALL UNDER NORMAL AND OPTIMIZED ADVERSARIAL POLICIES . E ACH ENTRY REPORTS PRECISION ± STANDARD DEVIATION FOLLOWED BY RECALL ± STANDARD DEVIATION , IN PERCENT . E ACH SETTING IS EVALUATED OVER 100 INDEPENDENTLY GENERATED SCENARIOS .                                                                            
+
+> Setting Entity Precision ±Std. / Recall ±Std. (%) No Trust Na¨ ıve Bayesian MATE NeST-Bayes Normal Adversarial Policy Nominal Robot 85 .3±5.5/100 .0±0.093 .3±8.8/79 .2±20 .695 .0±7.8/84 .4±17 .298 .6±3.7/95 .8±8.2
+> Object 83 .3±5.5/100 .0±0.094 .7±7.4/95 .1±10 .995 .0±7.5/87 .1±11 .498 .0±5.0/93 .7±8.4
+> High FP Injection (λa
+> FP ↑)
+> Robot 85 .3±5.5/100 .0±0.095 .7±8.0/77 .1±22 .195 .3±7.5/84 .3±17 .299 .0±3.4/94 .9±9.7
+> Object 67 .1±4.3/100 .0±0.089 .1±13 .6/94 .5±11 .790 .9±13 .7/86 .7±11 .196 .9±9.6/93 .6±8.4
+> High FN Suppression (λa
+> FN ↑)
+> Robot 85 .3±5.5/100 .0±0.097 .4±14 .2/75 .5±25 .197 .9±5.3/81 .5±20 .299 .4±2.2/94 .3±10 .7
+> Object 83 .4±5.2/100 .0±0.095 .5±7.3/91 .5±16 .295 .7±7.2/80 .5±14 .199 .1±3.3/93 .3±8.7
+> Optimized Adversarial Policy Conservative Policy Robot 85 .1±5.6/100 .0±0.088 .8±8.1/86 .9±17 .083 .8±9.1/83 .3±18 .986 .5±7.6/92 .5±11 .4
+> Object 88 .3±7.4/100 .0±0.095 .5±5.9/94 .5±12 .196 .3±5.4/87 .9±11 .397 .0±5.1/94 .4±7.4
+> Moderate Policy
+> (δ+, δ −↑)
+> Robot 85 .1±5.6/100 .0±0.093 .2±6.7/83 .1±19 .090 .8±9.0/80 .2±18 .396 .0±5.9/92 .9±10 .4
+> Object 87 .1±7.2/100 .0±0.095 .8±5.5/93 .5±13 .197 .8±4.6/83 .5±13 .597 .9±4.2/94 .0±7.9
+> Aggressive Policy
+> (δ+, δ −↑↑ )
+> Robot 85 .1±5.6/100 .0±0.096 .5±5.3/79 .9±21 .093 .6±8.6/80 .7±18 .298 .8±4.2/93 .8±10 .4
+> Object 86 .1±6.9/100 .0±0.097 .1±5.2/93 .5±13 .197 .6±4.5/83 .7±13 .598 .3±3.7/95 .4±6.7
+> High Adv. Ratio
+> (m∈[0 .4,0.5])
+> Robot 62 .1±4.0/100 .0±0.073 .8±34 .9/49 .3±30 .458 .9±25 .4/59 .0±27 .889 .1±15 .2/85 .9±16 .2
+> Object 80 .6±5.6/100 .0±0.086 .2±21 .2/82 .2±23 .881 .5±21 .4/67 .4±23 .693 .3±8.3/86 .5±13 .3
+
+two representative trust aggregation approaches commonly used in multi-robot systems: (i) Na¨ ıve Bayesian , similar to [15], that maintains independent trust estimates for robot and track nodes by directly accumulating positive and negative evidence over time to update the beta trust distribution: 
+
+Co-Detected and InFoV_Observed edges are treated as positive evidence for robot and track nodes respectively, while 
+
+Contradicted and InFoV_Missed edges are treated as negative evidence. Importantly, this baseline consumes exactly the same symbolic relations as NeST-Bayes but weights them by fixed rules and treats each robot and track as an independent evidence accumulator. Any gap therefore reflects how the evidence is interpreted rather than the evidence itself; (ii) MATE [20] is a rule-based trust estimation method that maps perception consistency checks into trust pseudomeasurements (PSMs) and updates trust scores for its underlying beta distri-butions through hand-designed aggregation rules. In all tests, trust is accumulated over a horizon of 100 time steps. Final classifications use the fixed threshold ψ = 0 .5. We report precision and recall for both robot and object classification to separately measure the reliability of the retained information and the coverage of legitimate robots and ground-truth objects. Precision is averaged over scenarios and scored 0 for both robots and objects when a method retains no robot. 
+
+B. Generalization with Normal Adversaries 
+
+We evaluate normal adversaries that consistently report vis-ible false-positive hypotheses while suppressing nominal de-tections with probability λa
+
+> FN
+
+. Each setting uses 100 scenarios; results are in Table II. Across all three settings, NeST-Bayes 
+
+achieves the highest mean robot precision (98.6–99.4%) and recall (94.3–95.8%) among trust-based methods, together with the highest object precision (96.9–99.1%). Under high false-positive injection ( λa 
+
+> FP
+
+∈ [0 .4, 0.8] ), it achieves 96.9%/93.6% object precision/recall, compared with 89.1%/94.5% for Na¨ ıve Bayesian and 90.9%/86.7% for MATE . Under high false-negative suppression ( λa 
+
+> FN
+
+∈ [0 .4, 0.8] ), NeST-Bayes leads in both precision and recall for both entity types. The comparison with Na¨ ıve Bayesian , which accumulates identical symbolic evidence, demonstrates the value of learned relational reason-ing for both the reliability and coverage of retained informa-tion (Sec. V-D). 
+
+C. Generalization with Optimized Adversaries 
+
+We next evaluate adversaries that optimize both the timing and type of their manipulations via Eq. (9), with δ+ =
+
+δ− ∈ { 1, 2, 3} yielding conservative, moderate, and aggres-sive policies and the attack budget fixed at Bi = 5 . More aggressive policies are preferable when the adversary seeks to maximally disrupt neighbors’ motion planning: false positives divert robots toward nonexistent obstacles, while suppressed detections conceal real hazards. Results are shown in Table II. The conservative policy selectively injects false hypothe-ses that neighbors already appear to support and suppresses nominal detections lacking neighbor corroboration, producing few observable inconsistencies. Across trust-based methods, robot precision remains close to the 85.1% No Trust baseline (83.8–88.8%), indicating limited robot-level discrimination in this setting. NeST-Bayes achieves 86.5% robot precision with 92.5% recall. At the object level, it increases precision from 88.3% for No Trust to 97.0%, while retaining 94.4% recall. This is the highest mean object precision among trust-based methods, compared with 95.5% for Na¨ ıve Bayesian and 96.3% for MATE . Its object recall is comparable to Na¨ ıve Bayesian ’s 94.5% and exceeds MATE ’s 87.9%. These results show that object-hypothesis validation remains effective when robot-level discrimination is limited. As δ+ and δ− increase, attacks become more detectable through cross-robot disagreement. NeST-Bayes robot precision rises from 86.5% under conservative attacks to 98.8% under aggressive attacks, a 12.3-percentage-point gain compared with 7.7 points for Na¨ ıve Bayesian (88.8% to 96.5%). Object precision increases from 97.0% to 98.3%. Under aggressive attacks, NeST-Bayes also achieves the highest robot and object TABLE III COMPONENT ABLATION OVER 100 COMPREHENSIVE SCENARIOS .RESULTS ARE REPORTED AS MEAN ± STANDARD DEVIATION .                                
+
+> Method Precision / Recall (%) Robot Object
+> No Trust 84 .7±5.4/100 .0±0.086 .2±5.4/100 .0±0.0
+> No Hetero GAT 95 .0±11 .7/75 .4±26 .198 .5±3.6/89 .3±12 .6
+> Homogeneous GAT 86 .8±12 .7/78 .7±23 .287 .0±5.8/96 .1±6.6
+> Type Embeddings Only 95 .8±7.1/91 .3±10 .798 .2±4.0/94 .4±7.1
+> NeST-Bayes (Full) 97 .2±6.2/95 .5±8.899 .0±2.9/94 .8±7.8
+
+recall among trust-based methods (93.8% and 95.4%). With the adversarial ratio increased to m ∈ [0 .4, 0.5] , NeST-Bayes 
+
+leads in all four metrics: 89.1% robot precision with 85.9% recall and 93.3% object precision with 86.5% recall. Compared with Na¨ ıve Bayesian , robot precision and recall improve by 15.3 and 36.6 percentage points, respectively. These joint gains demonstrate effective filtering and retention of legitimate information when adversaries are numerous. 
+
+D. Ablation Studies 
+
+We evaluate each ablation over 100 scenarios, evenly split between normal and optimized adversaries, with the latter equally sampling conservative, moderate, and aggressive poli-cies. Table III shows that the full model achieves the highest mean robot precision and recall among learned variants (97.2% and 95.5%), together with the highest object precision (99.0%) and 94.8% object recall. Removing the Hetero GAT reduces the model to node-wise MLPs and lowers robot recall from 95.5% to 75.4% and object recall from 94.8% to 89.3%. These 20.1 and 5.5 percentage gains demonstrate the contribution of cross-node evidence propagation. Compared with a Ho-mogeneous GAT, which collapses all relation types into a single edge type, typed relations improve robot precision and recall by 10.4 and 16.8 percentage points, respectively, and object precision by 12.0 points, showing the value of dis-tinguishing agreement from contradiction. Replacing triplet-based initialization with learned node-type embeddings low-ers robot precision from 97.2% to 95.8% and recall from 95.5% to 91.3%, demonstrating the benefit of encoding local symbolic relation profiles. Together, these results support the complementary contributions of symbolic initialization and heterogeneous relational reasoning. 
+
+E. High Fidelity Simulations 
+
+We also evaluate NeST-Bayes without retraining in a high-fidelity Webots [46] warehouse simulation with 5 Spot robots and 26 ground-truth objects, including dynamic (walking workers) and static objects (e.g., cardboard boxes falling from shelves), as in Fig. 3. Each robot uses two head-mounted cameras ( π/ 4 FoV, 20 m range), with FoV and occlusion rea-soning from a known warehouse layout used only for visibility checks. Observations follow the same nominal sensing-noise model as in the previous sections. In each of 100 scenarios, two robots follow an optimized policy sampled from the conservative, moderate, and aggressive settings of Sec. V-C. The results are reported in Table IV.                               
+
+> Fig. 3. Webots warehouse simulation environment with five Spot robots and a mixture of objects. Occlusions from shelves and dynamic human agents create partial observability and asymmetric sensing among robots. TABLE IV PRECISION AND RECALL IN THE WEBOTS SIMULATIONS OVER 100
+> SCENARIOS . R ESULTS ARE REPORTED AS MEAN ±STANDARD DEVIATION .
+> Method Precision / Recall (%) Robot Object
+> No Trust 60 .0±0.0/100 .0±0.071 .4±6.3/100 .0±0.0
+> Na¨ ıve Bayesian 87 .7±32 .7/61 .3±33 .787 .7±32 .7/81 .6±31 .5
+> MATE 67 .0±47 .3/47 .0±40 .867 .0±47 .3/38 .1±28 .8
+> NeST-Bayes (Ours) 92 .5±13 .1/92 .0±14 .3 97 .3±5.4/85 .0±7.5
+
+Frequent occlusions, limited FoV overlap, and dynamic objects create sparse cross-robot validation in Webots. NeST-Bayes achieves the highest mean precision and recall for both entity types among trust-based methods: 92.5% robot precision with 92.0% recall, and 97.3% object precision with 85.0% recall. Relative to Na¨ ıve Bayesian , robot precision and recall improve by 4.8 and 30.7 percentage points, re-spectively, while object precision and recall improve by 9.6 and 3.4 points. NeST-Bayes also exhibits lower variability in robot precision (13.1 percentage points standard deviation) than Na¨ ıve Bayesian (32.7) and MATE (47.3). These results demonstrate effective transfer without retraining, improving both information reliability and coverage in an occlusion-rich environment. VI. D ISCUSSION AND CONCLUSION 
+
+This paper presented NeST-Bayes , a neural-symbolic frame-work that jointly infers robot and object-hypothesis trust from cross-robot observation consistency. By encoding observation agreement and contradiction as symbolic relations in ego-centric heterogeneous graphs and accumulating the resulting neural evidence through Bayesian updates of Beta-distributed trust beliefs, NeST-Bayes operates without prior trust assign-ments, side-channel information, or hand-designed nominal behavior specifications. Comparisons against Na¨ ıve Bayesian ,which accumulates identical symbolic evidence, demonstrate the benefits of learned relational reasoning for both precision and recall, including under occlusion-rich conditions. Compo-nent ablations show that heterogeneous relational propagation improves the coverage of legitimate robots and real objects. Across the benchmark settings, NeST-Bayes achieves the high-est mean object precision and robot recall among trust-based methods, while also leading in robot precision and object recall in most settings. Future work will explore trust-aware active verification, directing robots to obtain additional viewpoints or revisit uncertain detections under sparse cross-robot evidence. REFERENCES [1] W. Burgard, M. Moors, C. Stachniss, and F. E. Schneider, “Coordinated multi-robot exploration,” IEEE Transactions on robotics , vol. 21, no. 3, pp. 376–386, 2005. [2] J. Cort´ es and M. Egerstedt, “Coordinated control of multi-robot sys-tems: A survey,” SICE Journal of Control, Measurement, and System Integration , vol. 10, no. 6, pp. 495–503, 2017. [3] Y. Zhou, J. Xiao, Y. Zhou, and G. Loianno, “Multi-robot collaborative perception with graph neural networks,” IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 2289–2296, 2022. [4] R. Wang, H.-L. Hsu, D. Hunt, J. Kim, S. Luo, and M. Pajic, “Comres-vlm: Coordinated multi-robot exploration and search using vision lan-guage models,” arXiv preprint arXiv:2509.26324 , 2025. [5] Z. Xu, X. Lin, and V. Tzoumas, “Bandit submodular maximization for multi-robot coordination in unpredictable and partially observable environments,” in Robotics: Science and Systems , 2023. [6] A. Mannucci, L. Pallottino, and F. Pecora, “Provably safe multi-robot coordination with unreliable communication,” IEEE Robotics and Au-tomation Letters , vol. 4, no. 4, pp. 3232–3239, 2019. [7] M. Catellani and L. Sabattini, “Distributed control of a limited angular field-of-view multi-robot system in communication-denied scenarios: A probabilistic approach,” IEEE Robotics and Automation Letters , vol. 9, no. 1, pp. 739–746, 2023. [8] S. Gil, S. Kumar, M. Mazumder, D. Katabi, and D. Rus, “Guaranteeing spoof-resilient multi-robot networks,” Autonomous Robots , vol. 41, no. 6, pp. 1383–1400, 2017. [9] J. Li, W. Abbas, M. Shabbir, and X. D. Koutsoukos, “Resilient distributed diffusion for multi-robot systems using centerpoint.” in 
+
+Robotics: science and systems , vol. 2020. Corvalis, OR, 2020. [10] A. Mitra, J. A. Richards, S. Bagchi, and S. Sundaram, “Resilient distributed state estimation with mobile agents: overcoming byzantine adversaries, communication losses, and intermittent measurements,” 
+
+Autonomous Robots , vol. 43, no. 3, pp. 743–768, 2019. [11] C. Burnett, T. J. Norman, and K. Sycara, “Trust decision-making in multi-agent systems,” in Proceedings of the twenty-second international joint conference on artificial intelligence-volume volume one , 2011, pp. 115–120. [12] Y. Yao, H. Tong, X. Yan, F. Xu, and J. Lu, “Matri: a multi-aspect and transitive trust inference model,” in Proceedings of the 22nd international conference on World Wide Web , 2013, pp. 1467–1476. [13] S. Asiri and A. Miri, “An iot trust and reputation model based on recommender systems,” in 2016 14th Annual Conference on Privacy, Security and Trust (PST) . IEEE, 2016, pp. 561–568. [14] A. Pierson and M. Schwager, “Adaptive inter-robot trust for robust multi-robot sensor coverage,” in Robotics research: The 16th international symposium ISRR . Springer, 2016, pp. 167–183. [15] M. Cheng, C. Yin, J. Zhang, S. Nazarian, J. Deshmukh, and P. Bogdan, “A general trust framework for multi-agent systems,” in Proceedings of the 20th International Conference on Autonomous Agents and MultiA-gent Systems , 2021, pp. 332–340. [16] M. Cavorsi, F. Mallmann-Trenn, D. Saldana, and S. Gil, “Dynamic crowd vetting: Collaborative detection of malicious robots in dynamic communication networks,” in 2023 62nd IEEE Conference on Decision and Control (CDC) . IEEE, 2023, pp. 7546–7553. [17] M. Cavorsi, O. E. Akg¨ un, M. Yemini, A. J. Goldsmith, and S. Gil, “Exploiting trust for resilient hypothesis testing with malicious robots,” 
+
+IEEE Transactions on Robotics , vol. 40, pp. 3514–3536, 2024. [18] Y. Tian, Y. Chang, F. H. Arias, C. Nieto-Granda, J. P. How, and L. Carlone, “Kimera-multi: Robust, distributed, dense metric-semantic slam for multi-robot systems,” IEEE Transactions on Robotics , vol. 38, no. 4, 2022. [19] R. Bahrami and H. Jafarnejadsani, “Multi-robot coordination with ad-versarial perception,” in 2025 International Conference on Unmanned Aircraft Systems (ICUAS) . IEEE, 2025, pp. 370–377. [20] R. S. Hallyburton and M. Pajic, “Security-aware sensor fusion with mate: the multi-agent trust estimator,” in Proc. the 2025 ACM SIGSAC Conf. on Computer and Communications Security , 2025, pp. 2009–2023. [21] M. Lauri, D. Hsu, and J. Pajarinen, “Partially observable markov deci-sion processes in robotics: A survey,” IEEE Transactions on Robotics ,vol. 39, no. 1, pp. 21–40, 2022. [22] Y. Zhang and L. E. Parker, “Iq-asymtre: Forming executable coalitions for tightly coupled multirobot tasks,” IEEE Transactions on Robotics ,vol. 29, no. 2, pp. 400–416, 2012. [23] Y. Yan and Y. Mostofi, “Robotic router formation in realistic commu-nication environments,” IEEE Transactions on Robotics , vol. 28, no. 4, pp. 810–827, 2012. [24] N. Bezzo, J. Weimer, M. Pajic, O. Sokolsky, G. J. Pappas, and I. Lee, “Attack resilient state estimation for autonomous robotic systems,” in 
+
+2014 IEEE/RSJ International Conference on Intelligent Robots and Systems . IEEE, 2014, pp. 3692–3698. [25] D. Yeke, K. A. Pant, M. O. Ozmen, H. Kim, J. M. Goppert, I. Hwang, A. Bianchi, and Z. B. Celik, “Automated discovery of semantic attacks in {Multi-Robot } navigation systems,” in 34th USENIX Security Sym-posium (USENIX Security 25) , 2025, pp. 3959–3978. [26] G. Deng, Y. Zhou, Y. Xu, T. Zhang, and Y. Liu, “An investigation of byzantine threats in multi-robot systems,” in Proc. 24th int. symposium on research in attacks, intrusions and defenses , 2021, pp. 17–32. [27] J. Li, W. Abbas, M. Shabbir, and X. Koutsoukos, “Byzantine resilient distributed learning in multirobot systems,” IEEE Transactions on Robotics , vol. 38, no. 6, pp. 3550–3563, 2022. [28] Y. Guo, X. J. Yang, and C. Shi, “Enabling team of teams: A trust infer-ence and propagation (tip) model in multi-human multi-robot teams,” in 
+
+Robotics: science and systems , 07 2023. [29] R. S. Hallyburton and M. Pajic, “Trust-based assured sensor fusion in distributed aerial autonomy,” in Proc. the ACM/IEEE 16th International Conference on Cyber-Physical Systems (ICCPS) , 2025, pp. 1–12. [30] ——, “Bayesian methods for trust in collaborative multi-agent auton-omy,” in 63rd IEEE Conference on Decision and Control (CDC) , 2024, pp. 470–476. [31] T. R. Besold, S. Bader, H. Bowman, P. Domingos, P. Hitzler, K.-U. K¨ uhnberger, L. C. Lamb, P. M. V. Lima, L. de Penning, G. Pinkas et al. ,“Neural-symbolic learning and reasoning: A survey and interpretation 1,” in Neuro-symbolic artificial intelligence: The state of the art . IOS press, 2021, pp. 1–51. [32] A. Garcez, M. Gori, L. Lamb, L. Serafini, M. Spranger, and S. Tran, “Neural-symbolic computing: An effective methodology for principled integration of machine learning and reasoning,” Journal of Applied Logics , vol. 6, no. 4, pp. 611–631, 2019. [33] T. Rockt¨ aschel and S. Riedel, “End-to-end differentiable proving,” 
+
+Advances in neural information processing systems , vol. 30, 2017. [34] R. Manhaeve, S. Dumancic, A. Kimmig, T. Demeester, and L. De Raedt, “Deepproblog: Neural probabilistic logic programming,” Advances in neural information processing systems , vol. 31, 2018. [35] A. Santoro, D. Raposo, D. G. Barrett, M. Malinowski, R. Pascanu, P. Battaglia, and T. Lillicrap, “A simple neural network module for re-lational reasoning,” Advances in neural information processing systems ,vol. 30, 2017. [36] A. Capitanelli and F. Mastrogiovanni, “A framework for neurosymbolic robot action planning using large language models,” Frontiers in Neu-rorobotics , vol. 18, 2023. [37] Y. Liang, N. Kumar, H. Tang, A. Weller, J. B. Tenenbaum, T. Silver, J. F. Henriques, and K. Ellis, “Visualpredicator: Learning abstract world models with neuro-symbolic predicates for robot planning,” arXiv preprint arXiv:2410.23156 , 2024. [38] R. Wang, B. He, and M. Pajic, “Neuro-symbolic deadlock resolution in multi-robot systems,” in Proceedings of the 7th Annual Learning for Dynamics & Control Conference , 2025, pp. 1066–1077. [39] K. Namasivayam, H. Singh, V. Bindal, A. Tuli, V. Agrawal, R. Jain, P. Singla, and R. Paul, “Learning neuro-symbolic programs for language guided robot manipulation,” in 2023 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2023, pp. 7973–7980. [40] T. Silver, A. Athalye, J. B. Tenenbaum, T. Lozano-P´ erez, and L. P. Kaelbling, “Learning neuro-symbolic skills for bilevel planning,” in 6th Annual Conference on Robot Learning , 2023. [41] H. Dong, J. Mao, T. Lin, C. Wang, L. Li, and D. Zhou, “Neural logic machines,” in Int. Conf. on Learning Representations (ICLR) , 2019. [42] P. Veliˇ ckovi´ c, G. Cucurull, A. Casanova, A. Romero, P. Lio, and Y. Ben-gio, “Graph attention networks,” arXiv preprint arXiv:1710.10903 , 2017. [43] X. Wang, H. Ji, C. Shi, B. Wang, Y. Ye, P. Cui, and P. S. Yu, “Hetero-geneous graph attention network,” in The world wide web conference ,2019, pp. 2022–2032. [44] Z. Hu, Y. Dong, K. Wang, and Y. Sun, “Heterogeneous graph trans-former,” in Proceedings of the web conference , 2020, pp. 2704–2710. [45] A. Josang and R. Ismail, “The beta reputation system,” in 15th bled electronic commerce conference , vol. 5, 2002, pp. 2502–2511. [46] Webots, “http://www.cyberbotics.com,” open-source Mobile Robot Simulation Software. [Online]. Available: http://www.cyberbotics.com

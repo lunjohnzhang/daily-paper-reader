@@ -1,0 +1,1625 @@
+Title: DD-GBP: Anytime Multi-Arm Planning and Continuous Execution via Distributed Dynamic Gaussian Belief Propagation
+
+URL Source: https://arxiv.org/pdf/2610.20460v1
+
+Published Time: Thu, 15 Oct 2026 02:06:58 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+> DD-GBP: ONLINE MULTI-ARM PLANNING 1
+
+# DD-GBP: Anytime Multi-Arm Planning and Continuous Execution via Distributed Dynamic Gaussian Belief Propagation 
+
+Zhao Jin, Fengyi Dai, Yuetong Yin, Yunan Wang, Wenjie Chen, Chuxiong Hu 
+
+Abstract —Safely executing long-horizon multi-arm tasks online in complex dynamic environments remains challenging. We pro-pose a new distributed dynamic Gaussian belief propagation (DD-GBP) method that directly plans joint-space trajectories through parallel local inference. A unified Gaussian-process (GP) param-eterization connects adaptive planning horizons, interpolation-time factors, and continuous execution. Each robot maintains a local tree-structured factor graph and exchanges messages asynchronously over active inter-arm links. Dynamic subnet re-construction and event-triggered updates reduce communication and inference costs while responding to moving obstacles. We also provide theoretical analyses of local inference accuracy, anytime early stopping, triggered-replanning consistency, and GP-consistent execution. In 50 long-horizon, multi-target four-arm scenes with moving obstacles, DD-GBP achieves 92 .5% collision-free all-target com-pletion and the highest success rate among six representative baselines. Scenario ablations demonstrate long-horizon safety and robustness to communication impairment and extreme condi-tions; success remains 86 .0% under 90% packet loss. Execution results further show substantially suppressed extreme velocity and acceleration peaks relative to Syn-GBP. On one workstation, obstacle-free tests with 30 coexisting arms retain 99 .87% success and a 15 .80 ms mean warm solve, exceeding 60 Hz and outperforming the compared methods in scalability. Dual-arm transport experiments under dynamic interference demonstrate online response and practical deployability. To the best of our knowledge, these results establish a new state of the art for online long-horizon multi-arm planning in dynamic scenes. 
+
+Index Terms —Online motion planning, Gaussian belief propa-gation, Autonomous cyber-physical systems, Collision avoidance, Distributed dynamic planning. 
+
+I. I NTRODUCTION 
+
+# MULTI-MANIPULATOR collaboration improves flexi-bility and productivity in cooperative handling [1], logistics [2], [3], and manufacturing [4]–[6]. In confined workspaces without physical separation, each arm’s motion changes the space available to its neighbors, so collision avoidance requires coordination throughout the task. The plan-ner must maintain this coordination while responding online to moving obstacles and disturbances, making fast solution updates and safety over long-horizon execution essential. 
+
+> The authors are with the State Key Laboratory of Tribology in Advanced Equipment, Department of Mechanical Engineering, Tsinghua University, Beijing, 100084, China, Beijing Key Laboratory of Transformative High-end Manufacturing Equipment and Technology, Department of Mechanical Engineering, Tsinghua University, Beijing 100084, China, and also with State Key Laboratory of High-end Heavy-load Robots, Midea Group, Foshan 528300, China. Corresponding author: Chuxiong Hu (email: cxhu@tsinghua.edu.cn).
+
+Centralized planners jointly optimize all robots’ trajectories and constraints [7]–[9], which allows interactions to be consid-ered within one planning problem. Their computational cost, however, grows with the coupled state space and can limit online multi-arm planning [10]. Distributed planners reduce this burden by assigning a local planning problem to each robot, while using inter-robot communication to coordinate the resulting trajectories [11], [12]. Insufficient coordination can still cause collisions in dense workspaces. To coordinate coupled trajectories, optimization-based dis-tributed methods decompose planning into per-robot subprob-lems. The nonlinear variant (NADMM) of the alternating direction method of multipliers (ADMM) [13], [14] coordi-nates these subproblems through consensus constraints and repeated information exchange. For high-degree-of-freedom (DoF) manipulators, collision constraints couple many joint variables and make the local subproblems highly nonconvex, complicating convergence and exposing poor local minima. For online operation, model predictive control (MPC) repeat-edly optimizes a finite trajectory horizon, executes its first part, and updates the plan using new observations. Distributed MPC (DMPC) [14], [15] applies this procedure to coordi-nated per-robot problems, balancing horizon length against the cost of repeated solves. Short horizons reduce each update’s computation but can restrict coordination over longer motions, motivating solvers that exploit trajectory structure to make fre-quent distributed updates affordable. For manipulators, Gafur et al. [16] combine distributed nonlinear MPC (NMPC) with dynamic collision and deadlock avoidance, providing a directly relevant constrained-optimization baseline. A different way to reduce online computation is to learn planning policies from data. Learning-based planners have been demonstrated in grid-based multi-agent pathfinding [17] and dual-arm operation [18], [19], with a graph neural network (GNN)-based planner coordinating up to eight arms in static scenes [20]. Their performance in new task distributions depends on how well the training data and learned policies generalize to the new geometry. Model predictive path integral (MPPI) planning offers another route to frequent online up-dates. MR-STORM [21] uses graphics processing unit (GPU)-accelerated sampling to extend predictive control to decoupled multi-arm planning, evaluating candidate motions against other arms’ predicted trajectories. Efficient computational structures and mature optimizers also accelerate planning. GPMP2 [22] uses continuous GP trajectory parameterization to construct sparse Bayesian factor graphs for single-arm maximum a posteriori (MAP) opti-arXiv:2610.20460v1 [cs.RO] 14 Oct 2026 DD-GBP: ONLINE MULTI-ARM PLANNING 2
+
+mization with GTSAM [23]. Centralized extensions explore robot formations [24] and 2D multi-robot scenarios [25]; high-dimensional coupling and local minima remain challenges for centralized optimization. We likewise use GP trajec-tory parameterization, but go beyond sparse representation by further exploiting its advantages for asynchronous multi-arm coordination, collision queries, adaptation, and consistent execution. This representation naturally matches our local Gaussian message passing. For continuously updated coordination, Gaussian Belief Propagation (GBP) provides a distributed inference formula-tion over continuous states through Gaussian graphical models [26]–[29]. Its local message structure allows neighboring vari-ables to exchange information without global consensus vari-ables or task-specific training, and has supported localization of planar automated guided vehicle (AGV) teams [30], [31] and collaborative planning [32]. For manipulators, GP-based replanning by Bari et al. [33] remains single-arm, whereas Prados et al. [34] coordinate learned short-horizon policies rather than joint-space trajectories. Direct multi-arm plan-ning further requires coupled joint motions, adaptive horizons and interaction neighborhoods, and a consistent inference– execution representation. Our Syn-GBP study [35] explored short-horizon dual-arm assembly; extending it to scalable multi-arm planning calls for a new architecture and accom-panying theoretical analysis. Building on but differing from that preliminary study, we propose DD-GBP as a more complete algorithmic and theoretical framework. Its tree-directed local solve, dynamic interaction subnets, adaptive horizons, and common GP ex-ecution model target scalable multi-arm coordination and safe long-horizon execution; the experiments verify substantial performance gains. The new contributions are as follows. 1) Adaptive factor-graph planning with replanning con-sistency. We formulate multi-arm trajectory planning as MAP inference over a changing factor graph, with geometry-aware collision factors and adaptive planning horizons. We prove that pruning inactive inter-arm fac-tors preserves the complete gated objective (Prop. 2) and establish a local bound on the change from the time-aligned previous trajectory after a replanning trigger (Prop. 3). This links online network adaptation to a well-defined objective and a quantitative measure of replanning consistency. 2) Distributed multi-arm network scheduling and any-time planning. We design a network update procedure that combines event-triggered subnet selection, local backward–forward inference, and asynchronous inter-arm message exchange. Each robot solves its fixed linearized local tree and communicates only on active links. We derive residual-based early-stopping bounds (Prop. 1), giving deadline-limited updates a quantitative inference-error criterion while keeping coordination lo-calized as the team grows. 3) Consistent continuous-trajectory optimization and execution. We optimize joint-space trajectories through GP support states, whose adaptive process scale reflects the acceleration-driven motion amplitude, and use the same parameterization for interpolation-time collision factors, timestamp-aligned inter-arm queries, and exe-cution references. We establish the connection between planning and execution by showing that, for the adopted prior, the conditional GP mean is the cubic Hermite trajectory sent to the tracking controller (Prop. 4). This makes continuous trajectory evaluation part of the planning model and preserves that model when robots exchange and execute their plans. To our knowledge, we provide the first matched evalu-ation spanning six representative multi-arm planning base-lines: NADMM [14], DMPC [14], [15], GPMP2 [22], Syn-GBP [35], MR-STORM [21], and Gafur’s NMPC [16]. DD-GBP establishes a new state of the art among these evaluated baselines, with the highest success rate in the matched four-arm benchmark and the strongest observed scalability. We fur-ther examine mechanism and scenario ablations and physical deployment on dual Franka Emika Panda arms. II. P RELIMINARIES ON GAUSSIAN BELIEF PROPAGATION 
+
+A. Inference Problem and Gaussian Belief Propagation 
+
+Let X = {xi}ni=1 denote the unknown variables and 
+
+Z = {zj }mj=1 the observations. The inference problem is to determine the distribution of X given Z. A factor graph expresses the conditional-independence structure of the model by writing the posterior as a product of local factors [26], 
+
+p(X | Z) = 1
+
+L
+
+> m
+
+Y
+
+> j=1
+
+fj (Xj , zj ), (1) where L is the normalization constant and Xj ⊆ X contains the variables involved in factor fj . For Gaussian measurement errors or quadratic penalty models, the factors take the residual form 
+
+fj (Xj , zj ) = Kj exp 
+
+
+
+− 12 ∥zj − hj (Xj )∥2
+
+> Λj
+
+
+
+, (2) where ∥r∥2 
+
+> Λj
+
+= r⊤Λj r, Kj > 0, zj , hj (Xj ) ∈ RNj , and 
+
+Λj ∈ RNj ×Nj is a fixed precision matrix. Belief propagation (BP) uses this factorization to infer marginal distributions through local message passing. For continuous variables, its marginalization integrals generally have no closed form. When 
+
+hj is affine, the residual factors are Gaussian in the state variables, and Gaussian belief propagation (GBP) evaluates the message products and marginalizations analytically [29]. Nonlinear functions are locally linearized to obtain the same Gaussian form, as described in Sec. II-B4. Taking the negative logarithm gives − log p = log L −P 
+
+> j
+
+log fj . Collecting terms independent of X into C =log L − P 
+
+> j
+
+log Kj yields 
+
+− log p(X | Z) = C + E(X),E(X) = 12
+
+> m
+
+X
+
+> j=1
+
+∥zj − hj (Xj )∥2 
+
+> Λj
+
+. (3) Thus, maximizing the posterior is equivalent to minimizing its negative logarithm, giving the maximum a posteriori (MAP) solution 
+
+X⋆ = arg max  
+
+> X
+
+p(X | Z) = arg min  
+
+> X
+
+E(X). (4) DD-GBP: ONLINE MULTI-ARM PLANNING 3
+
+x1 f1 x2 f2 x3
+
+f0           
+
+> Fig. 1. Factor tree for f(x1,x2,x3)∝f0(x1)f1(x1,x2)f2(x2,x3).Circles denote variable nodes and squares denote factor nodes. Messages pass in both directions along each edge.
+
+For each Gaussian posterior with a positive-definite pre-cision matrix, the mean is its unique MAP solution. After factor linearization, the corresponding weighted residual ob-jective is quadratic, which connects the inference problem to quadratic penalty optimization. GBP nevertheless solves this model through Gaussian products and marginalizations, so an individual message update is not equivalent to a gradient-descent step. On a tree, these operations recover the exact marginal means and covariances. These are general properties of Gaussian inference. For the proposed DD-GBP method, when the coupled message iteration satisfies the convergence conditions discussed in Sec. IV-A, its fixed-point means re-cover the MAP solution of the current linearized Gaussian model. These properties support using the inferred means as trajectory estimates for each Gaussian planning model and publishing the latest means as anytime trajectories. 
+
+B. Message Passing and Updates on Factor Graphs 
+
+A factor graph makes the factorization in (1) explicit as a bipartite graph. A circular variable node vi represents xi ∈
+
+RNxi , and a square factor node wj represents fj . An edge connects vi to wj precisely when xi ∈ Xj . We also use Xj
+
+for its stacked vector, with dimension NXj = P 
+
+> xi∈Xj
+
+Nxi .Fig. 1 illustrates a simple tree with unary and pairwise factors. Inference passes messages along edges and updates variable beliefs, with local relinearization for nonlinear factors. We omit normalization constants and use Gaussian information form N −1(x | η, Λ), where Λ = Σ−1 and η = Λμ for mean μ and covariance Σ. The superscript −1 denotes infor-mation form, not a reciprocal density. Each node maintains 
+
+b(xi) = N −1(xi | ηi, Λi). Below, the given zj is omitted from the arguments of fj .
+
+1) Messages from Variable Nodes to Factor Nodes: The message mvi→wj (xi) is the product of incoming messages except that from wj , with information form 
+
+N −1(xi| X  
+
+> wk∈N(vi)\wj
+
+ηwk →vi , X  
+
+> wk∈N(vi)\wj
+
+Λwk →vi ), (5) where N (vi) is the neighboring factor set, and ηwk →vi and 
+
+Λwk →vi are the information parameters of mwk →vi .
+
+2) Messages from Factor Nodes to Variable Nodes: The message mwj →vi (xi) from a factor node wj to a variable node vi is computed by marginalization, giving 
+
+Z
+
+· · · 
+
+Z
+
+fj (Xj ) Y   
+
+> vk∈N(wj)\vi
+
+mvk →wj (xk) d( Xj \ xi), (6) where N (wj ) is the neighboring variable set, and the integral marginalizes all variables except xi. For affine hj , including the local affine approximation of a nonlinear function in Sec. II-B4, the factor N −1(Xj | ηj , Λj ) gives a Gaussian message with information parameters 
+
+ηwj →vi = ηij −Λi, ¬ij Λ−1
+
+> s
+
+η¬ij + X   
+
+> vk∈N(wj)\vi
+
+ηvk →wj
+
+ ,
+
+Λwj →vi = Λi,i j −Λi, ¬ij Λ−1 
+
+> s
+
+(Λi, ¬ij )⊤,
+
+(7) where ηj =[ ηij ; η¬ij ] ∈ RNXj and Λj =
+
+"
+
+Λi,i j Λi, ¬ij
+
+(Λi, ¬ij )⊤ Λ¬i, ¬ij
+
+#
+
+are the information vector and precision matrix, Λs=Λ¬i, ¬ij +P    
+
+> vk∈N(wj)\vi
+
+Λvk →wj , and i, ¬i denote the parts correspond-ing to xi and the remaining variables in Xj , respectively. Incoming information matrices are embedded in the corre-sponding blocks of the stacked variable space before addition. 
+
+3) Variable Belief Update: The variable belief is updated by taking the product of all incoming factor messages, giving 
+
+ηi = P   
+
+> wj∈N(vi)
+
+ηwj →vi and Λi = P   
+
+> wj∈N(vi)
+
+Λwj →vi .This belief is the Gaussian marginal estimate for xi, with mean 
+
+μi = Λ−1 
+
+> i
+
+ηi and covariance Σi = Λ−1 
+
+> i
+
+available directly for state estimation and subsequent inference. 
+
+4) Factor Linearization: At the current belief means X0 
+
+> j
+
+,linearize the nonlinear measurement function as hj (Xj ) ≈
+
+hj (X0 
+
+> j
+
+)+ Jj (Xj −X0 
+
+> j
+
+), where Jj is its Jacobian. The resulting Gaussian factor has information parameters 
+
+η′ 
+
+> j
+
+= J⊤ 
+
+> j
+
+Λj
+
+ Jj X0 
+
+> j
+
++ zj − hj (X0 
+
+> j
+
+) ∈ RNXj ,
+
+Λ′ 
+
+> j
+
+= J⊤ 
+
+> j
+
+Λj Jj ∈ RNXj ×NXj . (8) Substituting this Gaussian factor into (6) gives the closed-form update (7) by the Schur complement [36]. Supplemen-tary Material, Sec. S3, provides the collision-factor Jacobian derivation and a numerical calculation example. III. D ISTRIBUTED DYNAMIC MULTI -ARM MOTION 
+
+PLANNING METHOD 
+
+This section presents the planning problem and the oper-ations of DD-GBP in the order shown in Fig. 2. We first formulate multi-arm motion planning as inference over GP trajectory parameters, then define the local and inter-arm factors that form the DD-GBP net. Finally, we describe how robots reconstruct their active subnets, schedule local inference and message exchange, and generate continuous execution ref-erences. Section IV analyzes the resulting inference accuracy, switching consistency, and connection between GP planning and execution. Unlike MPC methods that explicitly formulate planning as nonlinear programs [14], [15], DD-GBP uses an inference– execution–retriggering loop: GP support states represent the trajectory, weighted factors encode boundary, motion, and collision requirements, and local message exchange refines the trajectory through distributed Gaussian inference. Our inference formulation enables asynchronous coordination and flexible anytime online planning. DD-GBP: ONLINE MULTI-ARM PLANNING 4   
+
+> DD-GBP planning
+> Four-arm scene
+> Continuous execution
+> Dynamic subgraph reconstruction Adaptive time grid and initialization
+> DD-GBP network inference Robot kRobot j
+> Collect messages / observations Relinearize local factors Backward–forward Gaussian inference Publish belief / trajectory Collect messages / observations Relinearize local factors Backward–forward Gaussian inference Publish belief / trajectory
+> Iterate: local stop / budget
+> GP / Hermite reference Low-level tracking Robots
+> Current plan
+> Replanning triggers Predicted collisions, new goals, neighborhood changes
+
+Fig. 2. DD-GBP planning and execution, with an illustrative four-arm scene at the upper right. Each local Gaussian update uses one backward–forward sweep with fixed linearizations and received messages. Robot-wise iterations stop at a local criterion or budget. Blue dashed links exchange messages; gray dashed feedback triggers reconstruction. GP interpolation provides continuous references. 
+
+A. GP-Parameterized Planning as MAP Inference 
+
+We consider a multi-arm motion planning problem where multiple arms {R}Kk=1 are required to move to their target states {xgoal  
+
+> k
+
+}Kk=1 from their initial states {xinit  
+
+> k
+
+}Kk=1 while avoiding collisions with each other and the environment obsta-cles {O}Mm=1 . When the goal state is reached, the arm will con-tinue to patrol among multiple target states, depending on the task requirements. The ideal task is to find continuous joint-space trajectories {xk(t)}Kk=1 satisfying these requirements. The finite-dimensional, soft-constraint approximation used by DD-GBP is defined below. For arm Rk, we use support states 
+
+{xk(tki )}Nk −1 
+
+> i=0
+
+at timestamps tki = tk 
+
+> 0
+
++ i∆tk. Both Nk and 
+
+∆tk are selected at a replanning trigger and held fixed during the local solve. Each state xk(tki ) = [ qk(tki ); ˙ qk(tki )] ∈ RNdim 
+
+contains Nq joint angles and velocities, with Ndim = 2 Nq .These support states parameterize a continuous trajectory under the GP prior in Sec. III-B5. In single-arm formulas below, ti and ∆t denote the corresponding support timestamps and current interval. Let Xk = {xk(ti)}Nk −1 
+
+> i=0
+
+denote the support states of arm Rk, and let X = {Xk}Kk=1 collect all arms’ support states. Each Xk parameterizes a continuous GP trajectory rather than an independent list of waypoints, as detailed in Sec. III-B5. At each replanning instant, inference over these finite-dimensional parameters minimizes 
+
+X⋆t ∈ arg min  
+
+> X
+
+Et(X),Et(X) = 
+
+> K
+
+X
+
+> k=1
+
+
+
+Φk 
+
+> init
+
++ Φ k 
+
+> goal
+
++ X
+
+> i
+
+Φk,i 
+
+> box
+
++ X
+
+> i
+
+Φk,i  
+
+> obs
+
++ X
+
+> i
+
+Φk,i 
+
+> mt
+
+
+
++ X
+
+> (k,j )∈E (t)
+
+X
+
+> i
+
+Φk,j,i 
+
+> inter
+
+.
+
+(9) In the obstacle-cost sum, i indexes both support-state and selected intermediate-time evaluations; the latter depend on their two adjacent support states through GP interpolation. The 
+
+Fig. 3. Illustration of the proposed multi-arm DD-GBP factor graph network. Solid circles denote each robot’s own variable nodes, while dashed circles represent locally stored remote variable nodes from other robots; hexagons and parallelograms denote different types of factor nodes corresponding to motion and interaction constraints. Dashed arrows indicate inter-arm communication links for distributed inference. For clarity, the schematic omits the interpolated obstacle factors connecting adjacent support states. 
+
+factors below encode desired conditions as zero-target resid-uals. Setting zj = 0 in (2) gives Φ(·) = 12 ∥h(·)∥2 
+
+> Λ(·)
+
+. A zero residual therefore represents satisfaction of the corresponding condition. The interaction edge set E(t) changes with the range rc and event triggers (Sec. III-B). Initial and goal states, joint and velocity limits, and collision avoidance enter through finite-weight factors. The motion-transition factor supplies the GP prior, while the factor weights determine the relative em-phasis on boundary accuracy, motion regularity, and collision avoidance. Increasing a weight penalizes departures from its associated condition more strongly, allowing the planner to adjust the balance among these requirements. DD-GBP performs distributed Gaussian inference to solve this switching MAP problem through local tree updates and inter-arm message exchange, as detailed in Sec. III-C. 
+
+B. Multi-arm DD-GBP Net 
+
+Fig. 3 shows one active DD-GBP subnet. For robot Rk, the local graph contains its own trajectory variables {vxik }Nk −1 
+
+> i=0
+
+,the associated self factors, and remote copies {vxi 
+
+> rj
+
+}Nk −1 
+
+> i=0
+
+of neighboring trajectories inside the current interaction range. Static self factors remain attached to the trajectory chain, whereas obstacle and inter-arm factors together with the corre-sponding remote nodes are inserted, removed, or relinearized online as the geometry changes. This trajectory chain and its attached branches determine the local inference schedule described in Sec. III-C2. Dashed arrows indicate the state mes-sages sent from Rk to the corresponding remote copies stored by neighboring robots. The factor graph network distinguishes five factor types according to their residuals. For clarity, the subscript k in xik is omitted when presenting variables and factors in the single-arm local graph, as it remains identical across all arms Rk.
+
+1) Initial and Goal Factor: The boundary residuals are 
+
+hinit (x0) = x0 − xinit and hgoal (xNk −1) = xNk −1 − xgoal .Their information matrices are Λinit = Λgoal = λpINdim .A large λp > 0 gives boundary accuracy a high weight in DD-GBP: ONLINE MULTI-ARM PLANNING 5𝑶𝑶𝒎𝒎   
+
+> Bounding spheres
+> ·
+> 𝝏𝝏 𝑹𝑹𝒌𝒌
+> ·
+> (a) Collision geometry (b) Triggered neighborhoods
+> (c) Example layouts: 8 arms (left), 20 arms (right) Fig. 4. (a) Robots are encapsulated by bounding spheres, with robot-obstacle and inter-robot distances defined by the minimum separation between their boundaries. (b) Triggered robots and their local interaction neighborhoods. (c) Illustrative multi-arm simulation scenes; scalability tests omit the external obstacles shown here.
+
+the objective, keeping the inferred endpoint states close to the prescribed initial and goal states. 
+
+2) Box Factor: Box factor penalizes any violation of joint or velocity limits through 
+
+hbox (xi) = max  xi − ¯x, 0 + min  xi − x, 0 (10) where xi = [ qi, ˙qi]. x = [ q, ˙q] and ¯x = [¯ q, ¯˙q] are the joint position and velocity limits, and the precision matrix is Λbox =
+
+λbINdim , where λb > 0.
+
+3) Obstacle Collision Factor: Obstacle and inter-robot col-lision factors share the hinge residual 
+
+hc = [1 − dc/ϵ c]+, c ∈ { obs , inter }, (11) where [a]+ = max( a, 0) . For obstacles, dobs =
+
+dobs (xi, {Om}Mm=1 ) is the minimum signed arm–obstacle dis-tance. The safety margin ϵobs > 0 sets the penalty and trigger threshold, with precision Λobs = λoI1×1, λo > 0. For one obstacle, 
+
+dobs (xi, O m) = 
+
+
+
+min  
+
+> p∈∂R k, q ∈∂O m
+
+p(xi) − q 2 , p / ∈ Om,
+
+− min  
+
+> p∈∂R k, q ∈∂O m
+
+p(xi) − q 2 , p ∈ Om,
+
+(12) where the symbol ∂ denotes the spherical set’s boundary in the space the object covers, as illustrated in Fig. 4(a); if a collision occurs, the signed obstacle distance is negative. We encapsulate each joint of the robot in spheres, which permits efficient distance and gradient computation. The overall obsta-cle distance is dobs (xi, {Om}Mm=1 )= min m(dobs (xi, O m)) .
+
+4) Inter-robot Collision Factor: In (11), dinter =
+
+dinter (xik, xij ) is the minimum signed distance between two arms, computed as in (12). Its margin is ϵinter > 0, with precision Λinter = λiI1×1, λi > 0. Fig. 4(a) shows the bounding-sphere model, while Fig. 4(b) illustrates the local interaction neighborhoods used for triggered replanning. 
+
+5) Motion Transition Factor: The motion-transition factor is a linear Gaussian prior linking consecutive position–velocity support states. It supplies the continuous GP trajectory model; online topology switching supplies the dynamic interaction structure. The prior is induced by the linear time-varying stochastic differential equation 
+
+˙x(t) = A(t)x(t)+ F (t)w(t), w(t) ∼ GP (0 , Q d δ(t−t′)) ,
+
+(13) where w(t) is a zero-mean Gaussian white-noise process with spectral density Qd, δ(t − t′) denotes the Dirac delta, and the noise enters only through the acceleration channel. In the implementation used here, A(t) and F (t) reduce on each interval to the constant-velocity model, so the GP prior between two consecutive support states is represented exactly by the motion transition factor hd(xi, xi+1 ) = Φ(ti+1 , t i)xi−
+
+xi+1 , where Φ(ti+1 , t i) = 
+
+INq ∆tINq
+
+0Nq INq
+
+
+
+, ∆t = ti+1 −ti
+
+is the time interval between two consecutive waypoints and 
+
+Λd =
+
+ 13 ∆t3Qd 12 ∆t2Qd 
+
+> 12
+
+∆t2Qd ∆tQ d
+
+−1
+
+and Qd = λ−1 
+
+> d
+
+INq , λ d > 0.The precision weight λd controls motion regularity relative to the boundary and collision factors: larger precision favors smaller velocity changes, while lower precision allows greater trajectory flexibility. DD-GBP adapts this weight to the time grid, as described in Sec. III-C1. Together, the support states and motion prior define acontinuous GP trajectory, allowing collision factors to be evaluated at selected intermediate times ti < τ < t i+1 without adding independent trajectory variables. Following [22], the GP conditional mean is x(τ ) = Li(τ )xi + Li+1 (τ )xi+1 ,where the interpolation matrices are determined by the prior and timestamps. Substituting this state into the obstacle resid-ual in Eq. (11) gives a binary factor connecting the two adjacent support states. These intermediate states are evaluated analytically through local matrix operations. The same GP map supplies remote-state queries and execution references, as described in Sec. III-C3 and Prop. 4. 
+
+C. Distributed and Dynamic Planning with GBP 
+
+DD-GBP operates as an event-triggered receding-horizon loop. A new target, a predicted local collision, or a neigh-borhood change triggers reconstruction of the affected subnet 
+
+Gtr . Each robot linearizes its active factors and performs backward–forward inference with the current remote messages held fixed during the sweep. The resulting support-state mean is passed to GP-consistent Hermite interpolation and the low-level tracking controller. Robots exchange updated messages only along active inter-arm couplings. The outer loop selects the active subnet, while repeated local sweeps and message exchanges refine its trajectory estimate. Alg. 1 summarizes the procedure. 
+
+1) Dynamic Reconstruction and Replanning Mechanism: 
+
+Event-triggered replanning. Initially, all robots are trigger sources. Thereafter, a robot becomes a trigger source when it receives a new target, predicts a near-future collision over its first Nh intervals, or detects a new neighbor in its adjacency list. Each trigger starts a new round of subnet extraction and DD-GBP: ONLINE MULTI-ARM PLANNING 6
+
+Algorithm 1 Multi-Arm Planning with DD-GBP 
+
+Require: Initial state {x0 
+
+> k
+
+}Kk=1 , goal states {xgoal  
+
+> k
+
+}Kk=1 , interaction range rc, max iteration N max iter , triggered ← true . 
+
+> 1:
+
+while triggered do  
+
+> 2:
+
+triggered ← false . 
+
+> 3:
+
+Identify trigger sources Rtr (all robots initially); use Alg. 2 to obtain affected robots S and subnet Gtr . 
+
+> 4:
+
+for all Rk ∈ S in parallel do  
+
+> 5:
+
+Niter ← 0, ∆Ek ← ∞ . 
+
+> 6:
+
+while ∆Ek ≥ ϵE and Niter ≤ N max iter do  
+
+> 7:
+
+Using Alg. 3 to pass message and update Gk , get new energy Enew  
+
+> k
+
+and beliefs {bnew  
+
+> k
+
+(xik )}Nk −1 
+
+> i=0
+
+. 
+
+> 8:
+
+∆Ek ← | Enew  
+
+> k
+
+− Eold  
+
+> k
+
+|, Eold  
+
+> k
+
+← Enew  
+
+> k
+
+, Niter ← Niter + 1  
+
+> 9:
+
+Exchange messages of remote variable nodes with con-nected arms.  
+
+> 10:
+
+end while  
+
+> 11:
+
+Extract {xk (ti)}Nk −1 
+
+> i=0
+
+← { bnew  
+
+> k
+
+(xik )}Nk −1 
+
+> i=0
+
+and interpolate to get continuous trajectory xk (t). 
+
+> 12:
+
+Execute the GP-interpolated reference with the low-level tracking controller (Sec. III-C3).  
+
+> 13:
+
+if ∃i ∈ { 0, . . . , N h − 1} : d(qik ) < ϵ obs or new target received or new neighbors detected then  
+
+> 14:
+
+triggered ← true . 
+
+> 15:
+
+end if  
+
+> 16:
+
+end for  
+
+> 17:
+
+end while 
+
+reconstruction, avoiding graph rebuilding when nothing locally relevant has changed. 
+
+Localized subnet extraction. At the graph level, each trigger rebuilds only the active interaction neighborhood illustrated in Fig. 4(b). Each robot selects up to Nnk nearby neighbors within rc, then runs a bounded breadth-first search (BFS) with maximum depth dmax and activated-count cap N max 
+
+> act
+
+from the trigger source to extract the affected subnet Sk. The resulting replanning scope therefore depends on the active neighborhood rather than the full team size. When the BFS subnets initiated by neighbouring triggers overlap, every robot is assigned to at most one active subnet via the smallest trigger-source identifier rule, so that each variable is updated by a unique scheduler within one replanning cycle and message duplication is avoided. The per-robot cost of subnet extraction is O(N max act Nnk ), independent of the team size K, which helps enable the observed scalability up to K=30 arms reported in Sec. V. The distance threshold removes interactions that have no collision penalty, while the neighbor and BFS caps bound the amount of work assigned to a triggered update. Section IV-B distinguishes these two roles by establishing when threshold pruning preserves the complete objective and quantifying the trajectory change induced by a new local planning problem. In the layouts considered here, the spatial extent and packing of the arms limit the number of nearby interacting neighbors, motivating the caps as bounds on local work. The pruning result applies when these caps retain all contributing collision factors. 
+
+Adaptive planning horizon. For each robot in the extracted subnet, we adapt the planning horizon to the remaining mo-tion by jointly selecting the support count Nk and interval 
+
+∆tk. Let ¯vk,a > 0 be the velocity limit of joint a, with 
+
+Nmax ≥ Nmin ≥ 3 and ∆tmax ≥ ∆tmin > 0. We estimate the 
+
+Algorithm 2 Triggered Replanning Subnet Extraction 
+
+Require: Triggered robots Rtr , Graph Net G
+
+Ensure: Affected robots S and rebuilt subnet Gtr  
+
+> 1:
+
+Initialize edge sets Ek ← ∅ for all Rk ∈ R tr  
+
+> 2:
+
+for all robot Rk ∈ R tr do  
+
+> 3:
+
+Neighbor set Rnk = {Rj | dinter (xk , xj ) < r c} 
+
+> 4:
+
+Get top Nnk closest robots: Rnk ← sort (Rnk )[: Nnk ] 
+
+> 5:
+
+Ek ← E k ∪ (Rk , R j ), Ej ← E j ∪ (Rj , R k ) for all Rj ∈ R nk 
+
+> 6:
+
+end for  
+
+> 7:
+
+for all robot Rk ∈ R tr do  
+
+> 8:
+
+Initialize Sk ← { Rk }, queue Qk ← { Rk }, search depth 
+
+dk ← 0, activated number Nact ← 1 
+
+> 9:
+
+while Qk̸ = ∅ and dk ≤ dmax do  
+
+> 10:
+
+Pop Ri from Qk 
+
+> 11:
+
+for all (Ri, R j ) ∈ sort (Ei) and Nact ≤ N max  
+
+> act
+
+do  
+
+> 12:
+
+Sk ← S k ∪ { Rj }, Qk ← Q k ∪ { Rj }, Nact ← Nact + 1  
+
+> 13:
+
+end for  
+
+> 14:
+
+dk ← dk + 1  
+
+> 15:
+
+end while  
+
+> 16:
+
+end for  
+
+> 17:
+
+Set S = S  
+
+> Rk∈R tr
+
+Sk ; for each Rk ∈ S , select (Nk , ∆tk ) by Eq. (14).  
+
+> 18:
+
+Construct Gtr ← G [S] on the new timestamps; initialize support states and update the GP and collision factors. 
+
+remaining motion time Tk = max a |qgoal  
+
+> k,a
+
+− q0
+
+> k,a
+
+|/¯vk,a from the joint displacements and velocity limits, then set 
+
+ρk = clip [0 ,1] 
+
+ Tk
+
+(Nmax − 1) ¯∆k
+
+
+
+,Nk = round( Nmin + ρk(Nmax − Nmin )) ,
+
+∆tk = clip [∆ tmin , ¯∆k ]
+
+ Tk
+
+Nk − 1
+
+
+
+.
+
+(14) where clip [a,b ](z) = min {b, max( a, z )} and round se-lects the nearest integer. The joint-adaptation defaults are 
+
+Nmin = 3, ∆tmin = 0.01 s , and ∆tmax = 0.6 s . Nor-mally, ¯∆k = ∆tmax . If a near-obstacle cap is enabled and the current obstacle clearance ck < d cap , we first set 
+
+¯∆k = max {∆tmin , min(∆ tmax , ∆tobs )} and use this bound throughout Eq. (14). Far from the goal, more support states and larger intervals cover a longer motion. As the goal approaches, fewer states are needed and their spacing is reassigned from the remaining time; after Nk reaches Nmin , the interval can continue to decrease to ∆tmin . Retaining at least three states leaves an interior state available for inference between the start and goal, avoiding a single-interval trajectory. The resulting horizon is Hk = ( Nk − 1)∆ tk; when the remaining time exceeds its allowed span, receding-horizon updates continue progress toward the goal. 
+
+Adaptive GP scaling. Let ¯a be the prescribed acceleration bound. Omitting the robot index as above, we set 
+
+λd(∆ t) = σ2
+
+> z
+
+¯a2∆t , Qd(∆ t) = λd(∆ t)−1I. (15) For the prior velocity increment ∆v, each joint’s interval-averaged acceleration disturbance aav = ∆ v/ ∆t has standard deviation 1/√λd∆t = ¯ a/σ z . With σz = 3 , the prior assigns approximately 99 .73% probability to |aav | ≤ ¯a per joint and interval. A larger allowed ¯a lowers the norm of Λd and softens DD-GBP: ONLINE MULTI-ARM PLANNING 7         
+
+> Fig. 5. Backward–forward message passing for each arm’s local tree-structured graph. The process consists of a peripheral initialization step (black arrows), followed by a backward pass from the goal to the start (blue arrows), and a forward pass from the start to the goal (green arrows), and state exchanges at the beginning and end (dashed arrows).
+
+the trajectory, allowing stronger responses to obstacles. Exces-sive softness can amplify oscillations or lengthen execution. Adapting λd therefore balances responsiveness and trajectory sensitivity at the prescribed acceleration scale, updating the motion covariance and precision before collision evaluation on the new grid. 
+
+Initialization and graph update. For a newly assigned goal, the trajectory is initialized with a straight-line joint-space seed, whereas replanning toward an unchanged goal is warm-started by evaluating the previous GP trajectory at the new support timestamps using the same interpolation map as online execution. The self-factor chain is resized to the selected grid; obstacle/ inter-arm factors and the corresponding remote vari-able nodes are inserted, removed, or relinearized as the local geometry changes. Neighbor states are aligned by timestamp on this grid, providing the remote inputs for the message-passing procedure below. 
+
+2) Distributed Message Passing and Updating: In DD-GBP, message passing and belief updates dominate the online cost. We propose a tree-directed local schedule that replaces the synchronous updates of our Syn-GBP planner [35]. Fig. 5 and Alg. 3 show the procedure. For robot Rk, the active subgraph Gk contains its trajec-tory chain, boundary, box, obstacle, and inter-arm factors, with neighbors represented by remote variable nodes. Each backward–forward sweep fixes the factor linearizations and received neighbor messages, propagates information from the goal and then from the start, and recovers the local Gaus-sian marginal means and covariances. Updated messages are exchanged only along active inter-arm links; relinearization and subsequent exchanges refine the coupled trajectories. Section IV-A relates this block schedule to convergence of the coupled graph. 
+
+Remark 1: In the state exchange step, each arm Rk may have a different support count Nk and interval ∆tk. Since each local plan is a parameterized GP trajectory rather than a fixed index sequence, message exchange is aligned by timestamp. When 
+
+Rk needs the state of a neighbor Rj at its own timestamp 
+
+tki , it queries or interpolates xj (tki ) from Rj ’s current GP support states over the shared time window. Therefore different 
+
+Nk̸ = Nj or ∆tk̸ = ∆ tj do not create ambiguity; robots exchange only the beliefs needed to reconstruct time-aligned remote states. Beyond a neighbor’s available horizon, its last available joint position is held with zero velocity, correspond-ing to the assumption that it remains stationary after reaching its terminal state. For each arm, subgraph updates continue whenever new remote messages arrive and repeat until the local state remains stable after incorporating all updates or the maximum iteration is reached. 
+
+Algorithm 3 Backward–Forward Message Passing for Gk
+
+Require: Previous beliefs {bold (xik )} and messages, local graph Gk
+
+Ensure: Updated beliefs {bnew (xik )} and energy Enew  
+
+> k
+> 1:
+
+bnew (xik ) ← bold (xik ), warm start mw→v , m v→w 
+
+> 2:
+
+Collect neighbor messages and obstacle observations; linearize local factors via (8) and compute peripheral messages. Keep factors and remote messages fixed for this sweep.  
+
+> 3:
+
+Backward pass:  
+
+> 4:
+
+for i = Nk − 1 down to 1 do  
+
+> 5:
+
+Update variable belief bnew (xik ) as in Sec. II-B3  
+
+> 6:
+
+Pass message xik → f i−1,i  
+
+> d
+
+, f i−1,i  
+
+> d
+
+→ xi−1 via Eq. (5)-(6)  
+
+> 7:
+
+end for  
+
+> 8:
+
+Forward pass:  
+
+> 9:
+
+for i = 0 to Nk − 1 do  
+
+> 10:
+
+Update bnew (xik ) with all incoming messages  
+
+> 11:
+
+Pass messages to all neighbor factors except f i−1,i  
+
+> d
+
+if exists.  
+
+> 12:
+
+Using the fixed linearization, pass f i,i +1 d to xi+1  
+
+> k
+
+if it exists.  
+
+> 13:
+
+end for  
+
+> 14:
+
+return {bnew (xik )} and compute the total factor energy Enew  
+
+> k
+
+.
+
+3) GP-Consistent Interpolation and Online Execution: 
+
+After a local update, the robot uses the inferred position– velocity support-state means to construct a continuous refer-ence through Eq. (24). The reference xr (t) = [ qr (t); ˙ qr (t)] 
+
+passes through a joint-velocity saturation limiter before be-ing supplied to the low-level tracking controller. For the adopted constant-velocity prior driven by white acceleration, the nominal cubic Hermite reference before saturation is the GP conditional mean, as established in Prop. 4. Intermediate-time collision evaluation, timestamp-aligned remote-state queries, and warm-start transfer use the same interpolation map. With remote messages or trajectories frozen during a local sweep, each local interpolation factor acts on its adjacent support pair; factors on that pair are combined with the motion-transition factor to retain the local tree structure. New targets, predicted near-future collisions, and neighbor-hood changes trigger updates of the affected subnet. If the prescribed iteration budget is reached before convergence, the current mean remains an executable anytime trajectory; the time-aligned warm start then carries it into subsequent cycles for continued refinement. Section IV states the conditions for exact local inference and the bounds used to assess an early-terminated update. IV. I NFERENCE ACCURACY AND TRAJECTORY 
+
+CONSISTENCY OF DD-GBP This section examines how the DD-GBP design supports accurate local updates and consistent trajectory execution. We first analyze the Gaussian chain solve and its anytime error bounds, then quantify the effect of subnet changes DD-GBP: ONLINE MULTI-ARM PLANNING 8
+
+on successive plans, and finally establish the common GP representation used for planning and execution. 
+
+A. Convergence and Anytime Planning 
+
+For nonlinear GBP on loopy graphs, convergence under repeated relinearization and topology changes remains an open problem in general. For the fixed Gaussian models covered by Weiss and Freeman [37], converged belief means recover the Gaussian MAP solution even when the covariance esti-mates are approximate. Walk-summability and strict diagonal dominance provide sufficient convergence conditions [38], while analyses of different factorizations, schedules, damp-ing choices, and variable groupings further clarify how the inference design affects convergence [27], [28], [39], [40]. In dynamic multi-arm planning, we regard a timely, usable trajectory estimate as sometimes more important than waiting for full convergence while obstacles and neighboring arms continue to move. The iterative structure of GBP supports this choice, as each completed local sweep provides an estimate for its current Gaussian subproblem, which remains available if the distributed iteration is interrupted. We carry this estimate into the next planning cycle through the time-aligned GP warm start, allowing refinement to continue as new information arrives. We organize these updates through the robot-wise schedule in Fig. 2. Before each local solve, a robot collects updated neighbor beliefs or trajectories and obstacle observations as external information. It then holds this information fixed and linearizes its local factors about the current trajectory. By combining interpolation-time factors on each adjacent support pair with the corresponding motion-transition factor, we retain a chain on which one backward–forward sweep gives exact local Gaussian marginals [26]. The robot then publishes its updated belief or trajectory to its neighbors. These alternating local solves and message exchanges form block-wise Gaussian inference. Multivariate GaBP studies relate convergence to variable grouping [40], motivating our robot-wise blocks: each local solve groups a coupled trajectory chain, while neighbor messages convey cross-robot influence. Each completed sweep returns the MAP trajectory estimate for that robot’s current fixed Gaussian subproblem. When an iteration cap or deadline interrupts the coupled solve, the following proposition bounds the remaining error using the assembled residual and local linearization mismatch. 
+
+Prop. 1 (Anytime early-stopping bound): Consider one re-linearization cycle at instant t with linearized per-cycle energy 
+
+Elin  
+
+> t
+
+(X) = 12 X⊤HtX − g⊤ 
+
+> t
+
+X, where Ht = P 
+
+> f
+
+J⊤ 
+
+> f
+
+Λf Jf ⪰
+
+mI for a common lower bound m > 0, and assume the underlying nonlinear per-cycle energy Et is m-strongly convex over the current trust region with linearization mismatch 
+
+∥∇ Et(X) − ∇ Elin  
+
+> t
+
+(X)∥2 ≤ δt there. Let Xτ be the trajectory after τ inner GBP sweeps and rτ = HtXτ − gt the assembled linear-system residual, let X⋆t = H−1 
+
+> t
+
+gt be the linearized minimizer, and let X⋆ 
+
+> nl ,t
+
+be an interior local minimizer of Et.Assume that this minimizer and Xτ lie in the same strongly convex region. Then 
+
+∥Xτ − X⋆t ∥2 ≤ 1 
+
+> m
+
+∥rτ ∥2, (16) and the same iterate satisfies the nonlinear early-stopping bound 
+
+∥Xτ − X⋆
+
+> nl ,t
+
+∥2 ≤ 1
+
+> m
+
+ ∥rτ ∥2 + δt
+
+. (17) 
+
+Proof: Since Xτ − X⋆t = H−1 
+
+> t
+
+rτ and ∥H−1 
+
+> t
+
+∥2 ≤ 1/m ,Eq. (16) follows. Strong convexity and ∇Et(X⋆
+
+> nl ,t
+
+) = 0 imply 
+
+m ∥Xτ − X⋆
+
+> nl ,t
+
+∥2 ≤ ∥∇ Et(Xτ )∥2. (18) Writing ∇Et(Xτ ) = rτ + et, where et = ∇Et(Xτ ) −∇Elin  
+
+> t
+
+(Xτ ) satisfies ∥et∥2 ≤ δt, bounds the right-hand side by ∥rτ ∥2 + δt. Division by m proves Eq. (17). In our DD-GBP construction, boundary anchoring and the GP transition model provide the positive definiteness needed for each local Gaussian solve. During the solve, factor lin-earizations and positive-semidefinite incoming remote infor-mation remain fixed, so the information matrix is assembled from positive semidefinite contributions. With positive-definite process covariances and a positive-definite full-state boundary factor, a zero-cost perturbation must vanish at the anchored state and satisfy δxi+1 = Φ(ti+1 , t i)δxi, so it vanishes along the entire chain. The information matrix is therefore positive definite, and additional positive semidefinite factors preserve this property. These modeling choices give each local solve a strongly convex quadratic objective and a unique mean/ MAP solution. In our method, the anchored GP prior provides a source of curvature for the nonlinear model as well. The nonlinear bound applies in a smooth local region where this curvature dominates the residual-weighted second-order terms. We use the time-aligned GP warm start and repeated relinearization to keep successive expansion points close to the current trajectory; with bounded residuals and Lipschitz-continuous Jacobians, small departures from these points make the gra-dient mismatch δt small. The assembled residual and δt then separate the remaining Gaussian inference error from the local approximation error, giving us a basis for choosing a stopping tolerance and assessing the estimate available at a planning deadline. 
+
+B. Topology-Switching Consistency under Replanning 
+
+We dynamically extract local subgraphs in DD-GBP to focus computation on the interactions relevant to the current update. This gated topology extraction preserves the complete global gated objective when all contributing active factors, free variables, and fixed boundary information are retained, as established in Prop. 2. We then examine how observations and factor updates affect successive plans. Prop. 3 bounds the difference between the updated local quadratic trajectory and the time-aligned previous trajectory. Together, these results explain the objective represented by each reconstructed graph and the trajectory change between successive planning cycles. 
+
+Prop. 2 (Equivalence of hard-gated threshold-aware subnet switching): Let Efull = {(k, j ) : k < j } and Φkj 
+
+> inter
+
+(X) =  
+
+> 12
+
+∥hkj 
+
+> inter
+
+(X)∥2 
+
+> Λi
+
+. Define gc(z) = 1{z≤rc}, with rc ≥ ϵinter ,and Esw (X) = {(k, j ) ∈ E full : dkj (X) ≤ rc}. Suppose subnet extraction retains every factor in this active set, with DD-GBP: ONLINE MULTI-ARM PLANNING 9
+
+the same free variables and fixed boundary information. Then the gated full energy and switched energy satisfy 
+
+Efull  
+
+> t
+
+(X) = Elocal  
+
+> t
+
+(X) + X
+
+> (k,j )∈E full
+
+gc
+
+ dkj (X)Φkj 
+
+> inter
+
+(X)= Elocal  
+
+> t
+
+(X) + X 
+
+> (k,j )∈E sw (X)
+
+Φkj 
+
+> inter
+
+(X) = Esw  
+
+> t
+
+(X).
+
+(19) Their gradients and Hessians coincide wherever defined. If the activation distance ensures that each inter-arm loss vanishes for dkj (X) ≥ ϵinter and is Cp, switching introduces no additional discontinuity through order p. In regions where omitted residuals and Jacobians are zero, pruning also leaves the linearized Gaussian problem unchanged. 
+
+Proof: The gate equals one exactly on Esw (X), giving the energy identity and hence equality of its derivatives wher-ever they exist. Under the vanishing-loss condition, the gate changes only where the loss is already zero; multiplication by the gate therefore preserves its Cp regularity. An omitted factor with zero residual and Jacobian contributes zero information to the linearized model. In local DD-GBP updates, outside-robot trajectories enter as fixed boundary information, and the neighbor and BFS caps are intended to cover the nearby arms allowed by the physical layout. Prop. 2 applies when all contributing active factors are retained. For a capped set Eret ⊆ Esw , the additional approximation is exactly the omitted contribution P  
+
+> (k,j )∈E sw \E ret
+
+Φkj 
+
+> inter
+
+, unless these terms vanish on the com-parison domain or remain as fixed boundary factors. To study consistency from one replanning cycle to the next, express the two fixed linearizations in a common time-aligned local coordinate vector X. The previous trajectory supplies the warm start ¯X = Sτshift (X⋆t ) through the same GP interpolation used for execution, where τshift is the elapsed time between planning origins. When the support count or spacing changes, this transfer evaluates the previous trajectory at the new timestamps and places both models in the same support-state coordinates. The following result then relates the new quadratic solution to the transferred trajectory through its remaining gradient imbalance and the factors modified by the trigger. 
+
+Prop. 3 (Trajectory consistency across triggered replan-ning updates): Let E−(X) = P 
+
+> f
+
+Φ− 
+
+> f
+
+(X) and E+(X) = 
+
+P 
+
+> f
+
+Φ+ 
+
+> f
+
+(X) be the pre-update reference and updated local quadratic models, where 
+
+Φ± 
+
+> f
+
+(X) = 12 ∥A± 
+
+> f
+
+X − b± 
+
+> f
+
+∥2Λ±
+
+> f
+
+. (20) Use the union of their factor indices, assigning zero contri-butions to absent factors, and let Fchg include every added, removed, or modified factor. In particular, a changed lin-earization, weight, observation, or time alignment counts as a modification. Assume H+ = P 
+
+> f
+
+(A+ 
+
+> f
+
+)⊤Λ+ 
+
+> f
+
+A+ 
+
+> f
+
+⪰ mI with 
+
+m > 0, and let X⋆ 
+
+> +
+
+minimize E+. Define g− = ∇E−( ¯X)
+
+and ∆gf = ∇Φ+ 
+
+> f
+
+( ¯X) − ∇ Φ− 
+
+> f
+
+( ¯X). Then 
+
+∥X⋆ 
+
+> +
+
+− ¯X∥2 ≤ 1
+
+m ∥∇ E+( ¯X)∥2
+
+≤ 1
+
+m
+
+∥g−∥2 + X 
+
+> f∈F chg
+
+∥∆gf ∥2
+
+ .
+
+(21) For a prefix of 1 ≤ n ≤ N support states, the consistency metric satisfies 
+
+Cn(t, t + 1) = 
+
+> n−1
+
+X
+
+> ℓ=0
+
+∥x⋆ 
+
+> +,ℓ
+
+− ¯xℓ∥2 ≤ √n ∥X⋆ 
+
+> +
+
+− ¯X∥2. (22) 
+
+Proof: Since E+ is quadratic, its gradient is affine and satisfies ∇E+( ¯X) − ∇ E+(X⋆
+
+> +
+
+) = H+( ¯X − X⋆
+
+> +
+
+). The second gradient is zero at the minimizer, so inversion of H+ and 
+
+∥(H+)−1∥2 ≤ 1/m give the first inequality in Eq. (21). To obtain the second, subtract the two factor sums at the same point ¯X. Every unchanged factor cancels, and the definitions of g− and ∆gf give 
+
+∇E+( ¯X) = g− + X 
+
+> f∈F chg
+
+∆gf . (23) Applying the triangle inequality yields the stated bound. For the prefix metric, Cauchy–Schwarz bounds the sum of n state-error norms by √n times their joint Euclidean norm. This prefix norm is no larger than ∥X⋆ 
+
+> +
+
+− ¯X∥2, which proves Eq. (22). Prop. 3 quantifies trajectory consistency between successive planning cycles. When the warm-start imbalance and changed-factor gradient increments are small, the updated quadratic trajectory remains close to the time-aligned previous plan, and the prefix bound measures the change in the portion used for near-term execution. Reusing the previous GP trajectory and updating the factors affected by a trigger make these two sources of change explicit in DD-GBP. If the returned iterate is bX+, its additional error relative to X⋆ 
+
+> +
+
+is bounded by ∥∇ E+( bX+)∥2/m , as in Prop. 1. The same calculation can therefore assess each triggered update using its current model and residual. 
+
+C. Consistency of GP Interpolation and Continuous Execution 
+
+In DD-GBP, we use the inferred means of position–velocity support states to parameterize a continuous GP trajectory. Its motion-transition prior comes from a second-order SDE driven by white Gaussian acceleration, as described in Sec. III-B5. The Markov structure allows the conditional prior mean within each support interval to be evaluated from its two endpoint states. Prop. 4 shows that this evaluation is linear in those states and equals the cubic Hermite reference used in Sec. III-C3. This gives us a direct and efficient connection from the inferred trajectory to continuous execution. 
+
+Prop. 4 (GP–Hermite execution consistency): On an in-terval [ti, t i+1 ] of length h > 0, let ˙q = v and ˙v = w,where w is zero-mean white Gaussian acceleration with a constant spectral-density matrix Qd ≻ 0. Condition the prior on the endpoint position–velocity states xi = [ qi; ˙ qi] and DD-GBP: ONLINE MULTI-ARM PLANNING 10 
+
+xi+1 = [ qi+1 ; ˙ qi+1 ]. With s = ( t − ti)/h , its conditional position mean is 
+
+qr (t) = (2 s3 − 3s2 + 1) qi + ( s3 − 2s2 + s)h ˙qi
+
++ ( −2s3 + 3 s2)qi+1 + ( s3 − s2)h ˙qi+1 , (24) and its conditional velocity mean is ˙qr (t). Hence evaluating the prior’s conditional mean at the inferred support states gives exactly the cubic Hermite reference used for execution. 
+
+Proof: Set u = t−ti. Let Φ(u) and Q(u) be the transition matrix and process covariance of Sec. III-B5, evaluated over duration u, and define B(u) = Q(u)Φ(h − u)⊤Q(h)−1. The Gaussian conditioning formula [22] gives 
+
+¯x(t) = Φ(u)xi + B(u) xi+1 − Φ(h)xi. (25) In the position block, the constant Qd cancels between the covariance product and inverse, yielding 
+
+[I, 0] B(u) = (3 s2 − 2s3)I, h (s3 − s2)I. (26) Substitution into the position block of Eq. (25) and collection of the four endpoint coefficients gives Eq. (24). Its time derivative equals the velocity block of the conditional mean. The interpolation map is linear in the endpoint states, so it also carries their inferred means to the execution mean. For collision evaluation, the chain rule transfers the residual Jacobian at each interpolated state to both endpoints, allowing obstacle penalties inside an interval to adjust the endpoint positions and velocities. These denser evaluations improve the temporal resolution of collision assessment while retaining the same support-state dimension and local factor structure. With a common prior and consistent timestamps, collision factors, remote-state queries, and controller references therefore share the same optimized GP trajectory throughout planning, com-munication, and execution. V. S IMULATIONS AND EXPERIMENTS 
+
+a) Compared Method Design: The baselines are Syn-GBP [35], GPMP2 [22], Gafur’s NMPC [16], DMPC [14], [15], MR-STORM [21], and NADMM [14]. Syn-GBP uses synchronous messages and adaptive support count at fixed 
+
+∆t = 0.6 s, without interpolation-time collision factors. Our multi-arm GPMP2 adaptation centrally solves a coupled graph using the official GTSAM optimization library; MR-STORM uses GPU-accelerated MPPI. We retain and tune core formulations for Panda/ Gazebo under shared scenes, targets, and execution limits (Supplement S1). 
+
+b) Experimental Settings: Figs. 2 and 4(c) show the simulation layouts. Method and mechanism comparisons use 50 matched long-horizon scenes: four 7-DoF Panda arms on a 2 × 2 grid with 0.8 m nearest-neighbor spacing, facing the origin from identical fixed joint configurations. The minimum initial sphere-surface gap is 0.204 m, leaving 0.104 m beyond the 0.10 m inter-arm safety-trigger threshold. Each arm is tasked with visiting three sequential joint-space targets within 60 s of simulation time while maintaining safety throughout execution. The M = 4 spherical obstacles, with robs = 0 .08 mand vobs = 0 .20 m/s, repeatedly rebound within the 2 × 2 mregion [−1, 1] 2.DD-GBP uses N max iter = 20 , ϵE = 10 −3, ϵc = 0 .10 m, 
+
+rc = 0 .4 m, N max act = 8 additional activations per trigger source, Nmin = 3 , and ∆tk ∈ [0 .01 , 0.6] s. Boundary-position and other factor weights are λinit  
+
+> p
+
+= 10 4, λgoal  
+
+> p
+
+= 5000 ,
+
+λb = 500 , λo = λi = 400 , and λd from Eq. (15); the fixed-GP ablation uses λd = 125 . Prescribed velocity and acceleration bounds are ρ = 0 .3 times the Panda’s physical limits. GP interpolation uses nint = 3 internal monitoring points per interval, over N int obs = 3 and N int inter = 2 leading intervals, with λint  
+
+> o
+
+= λo and λint  
+
+> i
+
+= 10 λi. These factors preserve the support-state dimension and sparse inference. Coarse-to-fine tuning selects fixed comparison parameters; settings and sensitivity plots are in Supplement S1–S2. DD-GBP disables obstacle-state prediction by default. Simulation uses Gazebo/ ROS on an Intel Core i9-14900KF workstation. The GBP and optimization baselines use central processing unit (CPU) execution, whereas MR-STORM uses an NVIDIA GeForce RTX 4080 SUPER GPU with 16 GB memory. The physical platform consists of two Franka Emika Panda arms, a camera for obstacle detection at 30 Hz, and Transmission Control Protocol/ Internet Protocol (TCP/IP) communication with the robot controllers. 
+
+c) Metrics: The average per-arm performance metrics are: (1) Task success Succ. : completion of all assigned tar-gets within the run budget while maintaining d(q(t)) >
+
+0 throughout execution. (2) Conditional clearance ¯ds = 
+
+> 1
+> |∆T|
+
+R 
+
+> ∆T
+
+d(q(t)) dt , where ∆T = {t ∈ [0 , T sum ] : d(q(t)) ≤
+
+ϵc} and Tsum is the elapsed execution time until all targets are reached or the run budget expires. (3) Cold/ warm solve times 
+
+Tc/T w: mean solve times for the first planning call after target initialization or switching, and for calls with a warm initial tra-jectory, respectively. (4) Goal count Cg: the number of reached targets. (5) Path length Lg: joint-space trajectory length per reached goal. (6) Time per goal Tg = Tsum /C g. (7) Com-munication throughput Cm: delivered trajectory-message bytes per arm per second. (8) Tracking error eq: seven-joint position root-mean-square (RMS) error after reference-lag alignment; the underlying arm impedance controller introduces approx-imately 0.1 s of filtering-related tracking lag. (9) Peak ve-locity vpk = max t ∥ ˙q(t)∥∞. (10) Peak acceleration apk =max t ∥¨q(t)∥∞, estimated by timestamp-aware velocity differ-ences. Both peaks cover each arm’s full execution window and are averaged across arms. 
+
+A. Exp. I: Method Comparison and Scalability 1) Method Comparison: DD-GBP leads the four-arm dy-namic benchmark in Succ. ( 92 .5% ), conditional clearance (0.0735 m), mean goal count ( 3.00 ), and measured tracking error ( 2.41 mrad; Tab. I(a)). Its path length and time per goal are also near the best, without excessive detours to avoid neighboring arms and obstacles. Shorter paths and faster com-pletion than the MPC/ MPPI baselines demonstrate efficient long-horizon progress while preserving safety. Supplementary videos demonstrate diverse multi-arm execution scenarios. Syn-GBP and GPMP2 omit interpolation-time collision factors, shortening solves but yielding only 53 .5% and 23 .0% DD-GBP: ONLINE MULTI-ARM PLANNING 11 0.5 1520                                       
+
+> Peak velocity (rad/s)
+> Methods Ablations
+> DD-GBP
+> Syn-GBP GPMP2 Gafur MR-STORM DMPC NADMM w/ prediction w/o tree msgs w/o trigger fixed N full connect. fixed GP fixed Δt w/o interp.
+> 10 100 1000
+> Peak acceleration (rad/s²) 124812 16 20 30
+> Number of arms, K
+> 110 100 1000
+> Solve time (ms)
+> (a) Solve time
+> TcTw
+> 124812 16 20 30
+> Number of arms, K
+> 025 50 75 100
+> Task success (%)
+> 99.17%
+> (b) Task success
+> DD-GBP Syn-GBP w/o tree messages GPMP2 DMPC NADMM MR-STORM Gafur (NMPC) 10 20 30
+> 10 20 30
+> .65 .7 .75 .8 (i) Spacing (m) 050 100
+> 65 82 86.5 92.5
+> .1 .2 .3 .4 (ii) Speed (m/s)
+> 96 93.5 92.5 81 55 26.5
+> 0.3 .6 .9 (iii) Loss rate
+> 92.5 90.5 89 84.587 86
+> 012345(iv) Delay (cycles) 050 100 92.5 85 86.5 88.5 8789
+> 0369(v) Noise SD (cm)
+> 92.5 86.5 82.5 77.5 70.5 59
+> 12345(vi) Targets/arm
+> 93.5 88 92.5 86 80
+> Succ. (%)
+> Tw (ms)
+> Succ. TwRef.
+
+(a) Executed kinematic peaks (b) Obstacle-free scalability (c) Scenario sensitivity 
+
+Fig. 6. (a) Per-arm execution peaks in Tab. I order: circles show medians, diamonds show maxima. Gray lines mark DD-GBP’s mean peaks. (b) Scaling: dashed/ solid curves show Tc/ Tw, alongside Succ. (c) Scenario sensitivity: boxes show per-scene Succ.; blue/ orange curves show mean Succ./ Tw (right axis); diamonds mark the reference. TABLE I 50-SCENE METHODS (A) AND ABLATIONS (B). W/ AND W /O: WITH AND WITHOUT . B OLD : GROUP BEST .
+
+(a) Method Succ. ↑ ¯ds ↑ Tc ↓ Tw ↓ Cg ↑ Lg ↓ Tg ↓ eq ↓ vpk ↓ apk ↓
+
+(%) (mm) (ms) (ms) (rad) (s) (mrad) (rad/s) (rad/s 2)
+
+DD-GBP 92.5 73.5 25.8 16.3 3.00 4.14 5.88 2.41 0.77 15.6 
+
+Syn-GBP 53.5 58.0 15.5 7.5 2.99 4.04 5.77 5.26 1.0 48.3 GPMP2 23.0 29.9 22.6 15.1 2.93 4.10 7.13 15.81 1.4 109.8 Gafur 19.5 48.9 111.0 88.0 2.05 11.78 27.51 7.59 2.2 357.5 MR-STORM 9.5 25.4 24.3 24.1 2.95 5.32 13.14 6.86 0.81 59.4 DMPC 2.0 39.9 191.8 229.0 2.24 6.47 28.42 4.53 0.67 28.8 NADMM 0.0 37.0 607.2 559.2 1.05 11.46 56.75 4.41 0.78 22.8 DD-GBP data in (a) also serve as (b)’s reference; Cm = 2 .59 MB/s. (b) Variant Succ. ↑ ¯ds ↑ Tc ↓ Tw ↓ Cg ↑ Lg ↓ Tg ↓ Cm ↓ eq ↓ vpk ↓ apk ↓
+
+(%) (mm) (ms) (ms) (rad) (s) (MB/s) (mrad) (rad/s) (rad/s 2)
+
+w/ obs pred. 98.0 87.4 25.8 17.2 2.99 4.10 5.88 2.64 2.43 0.79 17.8 w/o tree msgs. 90.0 72.4 34.8 20.7 3.00 4.14 5.85 2.73 2.53 0.80 19.0 w/o trigger 89.0 72.7 25.9 13.3 3.00 4.17 6.26 2.78 1.98 0.70 16.9 
+
+w/o adapt. N 87.0 72.1 24.1 18.9 3.00 4.37 7.43 3.64 4.60 0.83 25.2 w/o subgraph 83.5 70.9 37.9 23.9 3.00 4.30 6.31 4.82 2.76 0.84 22.2 w/o GP scaling 80.0 69.0 18.3 12.9 3.00 3.97 6.00 2.49 2.11 0.77 20.6 w/o adapt. ∆t 77.5 67.4 20.2 14.1 3.00 4.37 5.73 2.40 2.30 0.83 26.9 w/o interp. 64.0 62.2 12.8 7.1 2.99 4.02 5.96 4.00 4.35 0.96 49.8 
+
+success. Support-only checks can miss obstacles; GPMP2 can also settle in poor local solutions. Syn-GBP needs more cold iterations ( 14 .26 ± 2.38 versus DD-GBP’s 10 .61 ± 3.69 ). The schedule-only w/o tree messages retains all other DD-GBP mechanisms yet is slower and less successful (Tab. I(b), right). Gafur, DMPC, and NADMM require longer warm solves, follow longer paths, and spend more time per goal while reaching fewer goals. These results are consistent with slow updates hindering collision-constrained progress as obstacles move. MR-STORM reaches almost all targets with approxi-mately 24 ms native four-arm GPU updates, but its low Succ. is dominated by collisions. Its sampled policies provide insuf-ficient collision-avoidance response in these rapidly changing scenes; fast native updates alone do not ensure safe execution. Fig. 6(a) compares per-arm joint-velocity and acceleration peaks throughout execution. DD-GBP has the smallest upper-tail peaks and interquartile spreads among the baselines; its worst peaks of 0.900 rad/s and 53 .2 rad/s 2 are markedly lower than Syn-GBP’s 7.40 rad/s and 761 rad/s 2. Long planning times and slow response reduce DMPC’s command-update frequency, helping explain its lower mean velocity peak; nevertheless, substantial extreme excursions remain. Adaptive planning and GP-consistent continuous execution suppress these transients in DD-GBP, enabling smoother, more stable execution. 
+
+2) Failure Analysis: Of 200 DD-GBP arm runs, 14 con-tact moving obstacles; one further arm remains safe but is blocked from its final target by neighboring arms. No inter-arm collision occurs in these monitored runs. Isolated encounters generally leave room to maneuver; failures occur more often when several obstacles and arms interfere simultaneously, sharply restricting both avoidance space and response time. The success loss above 0.25 m/s (Fig. 6(c)) suggests that the 0.20 m/s reference already imposes substantial dynamic difficulty under the prescribed motion limits. Even so, DD-GBP achieves 92 .5% collision-free all-target completion. 
+
+3) Scalability: Fig. 6(b) tests 1–30 arms without exter-nal obstacles in compact industrial-style workspaces ( 1.0 mnearest-neighbor spacing; 50 planned scenes per method/ size). DD-GBP retains 99 .17 –100% success and 4.61 –15 .80 ms warm solves. The w/o tree messages variant costs more at similar success. Interpolation-free Syn-GBP is faster for K ≥
+
+2, but large-team completion declines. GPMP2’s centralized optimization slows sharply with state dimension and graph size. DMPC improves in larger teams but, like NADMM, remains computation-heavy. MR-STORM and Gafur show lower large-team completion. 
+
+B. Exp. II: Mechanism and Scenario Ablations 1) Mechanism Ablations: Tab. I(b) reports obstacle predic-tion and seven component ablations on the same 50 scenes, using DD-GBP in Tab. I(a) as the shared reference. Removing support-count, time-step, or adaptive GP scaling fixes N = 10 ,
+
+∆t = 0 .6 s, or λd = 125 ; these fixed settings are also selected by tuning. The w/o subgraph variant sets rc = ∞ and removes the neighbor cap for full-team connectivity, retaining tree-directed local sweeps. Other variants replace triggering with continual replanning or remove interpolation. Details are in Supplement S1. Removing interpolation gives the lowest success ( 64 .0% )despite a 7.1 ms warm solve. Fixing the time step or GP weight gives 77 .5% or 80 .0% , demonstrating the value of DD-GBP: ONLINE MULTI-ARM PLANNING 12 
+
+temporal collision checks and adaptation. Without subgraph localization, redundant inter-arm links increase inference and communication work, with 83 .5% success and 4.82 MB/s communication versus DD-GBP’s 2.59 MB/s. Continual re-planning without triggering lowers success to 89 .0% and increases communication and time per goal. Together, in-terpolation, adaptation, localization, and selective replanning reinforce safety and task efficiency. The w/o tree messages variant records 90 .0% success, with 
+
+15 .53 ± 2.03 cold and 10 .19 ± 1.66 warm iterations, versus 
+
+10 .61 ±3.69 and 7.71 ±1.72 for DD-GBP. With the same factor types and graph-construction rules, DD-GBP also records a lower normalized optimization loss ( Eng .∗ = 1 .071 versus 
+
+4.216 ), demonstrating the tree-directed schedule’s solution quality and inference efficiency. The graph readily incorporates time-indexed obstacle-state prediction, achieving 98 .0% task success with 17 .2 ms warm solves and further improving safety and completion. As Fig. 6(a) shows, removing adaptation, localized con-nectivity, or GP interpolation can reintroduce velocity or acceleration excursions. Nevertheless, these variants generally retain smaller typical peaks than Gafur’s NMPC, illustrating the value of the common execution framework. The com-plete design combines tight peak distributions with higher task success; adding prediction preserves low typical peaks while further improving completion. These complementary mechanisms support smooth execution as well as effective coordination. 
+
+2) Scenario Sensitivity: Fig. 6(c) reports task success and warm solve time in three groups of stress tests. Extreme scenes: spacing decreases to 0.65 m, leaving only 0.054 minitial inter-arm clearance, below the replanning margin; ob-stacle speed increases to 0.40 m/s. DD-GBP still achieves 
+
+65 .0% success at the tightest spacing. The sharp decline above 
+
+0.25 m/s indicates that these tightly shared scenes approach the tested configuration’s dynamic-response limit under bounded arm speeds. Several fast obstacles and neighboring arms can jointly narrow the available space and leave insufficient time for avoidance. As discussed in Sec. V-A2, higher arm-speed limits, wider spacing, or obstacle prediction could extend this response range. 
+
+Communication and sensing robustness: success remains 
+
+86 .0% under 90% packet loss and 85 .0–89 .0% with one to five skipped send cycles, while warm solves remain 16 .0–16 .6 ms. Even 5 cm obstacle-position noise permits 77 .5% success. These results demonstrate robust coordination under stale neighbor information and substantial observation disturbances. 
+
+Long-horizon safety: each arm continuously visits up to five sequential targets, with 80 .0% of arms completing every target without collision, compared with 93 .5% for one target. Sustained success through repeated goal switches demon-strates DD-GBP’s ability to maintain safe, uninterrupted long-horizon execution. 
+
+C. Exp. III: Real-World Multi-Robot Deployment 
+
+We evaluate DD-GBP through transport and disturbance tests on two opposing Panda arms sharing a narrow worktable                           
+
+> Fig. 7. Intersecting transport (A1–A5, B1–B5) and multi-obstacle interference ((a)–(j)). Robot arrows indicate approximate future motion; yellow circles/ arrows mark detected obstacles/ disturbance directions; insets show the planning scene. Full executions appear in the supplementary videos. 0.0 0.6 1.2
+> (a) Clearance (m)
+> Arm 1
+> Inter-arm Obstacle Margin
+> Arm 2
+> Current clearance Trajectory look-ahead Topology update
+> −1 01
+> (b) Velocity / limit
+> 010 20 30
+> Time (s)
+> −1 01
+> (c) Acceleration / reference  J1 J2 J3 J4
+> 0510 15 20
+> Time (s)
+> J5 J6 J7
+> Fig. 8. Execution under interference: (a) sphere-surface clearances and replanning triggers (shading); (b,c) joint velocities/ accelerations, normalized by per-joint velocity limits/ acceleration references (coefficients 0.2/0.3); dotted lines mark ±1. Joint colors are shared by both arms.
+
+(supplementary videos). At 0.9 m base spacing, their initial sphere-surface clearance is 0.180 m, only 0.080 m beyond the 0.10 m planning margin. We model the tabletop as a planar ground obstacle and declare a target reached when 
+
+∥q −qgoal ∥∞ ≤ 0.04 rad. The velocity coefficient is 0.2; other planning parameters match the simulations, including the GP acceleration scale of 0.3.
+
+1) Pick-and-Place Tasks in a Compact Workspace: Given grasp, release, and return poses, DD-GBP plans paths and timing without prescribed avoidance or passage order. In Fig. 7, sequence A1–A5 shows front-to-rear transfers with closely spaced, collision-prone grasp configurations; B1–B5 shows staggered front/ rear crossing transfers requiring larger mutual-avoidance motions. 
+
+2) Dynamic Obstacle Avoidance in Shared Workspaces: 
+
+We introduce random manual disturbances during the B1–B5 task. A camera detects handheld ArUco markers at 30 Hz; ROS publishes 0.08 m-radius obstacle spheres (Fig. 7, (a)–(j)). Current-clearance and trajectory-look-ahead triggers update the remaining motion without obstacle-state prediction. DD-GBP: ONLINE MULTI-ARM PLANNING 13 
+
+In Fig. 8(a), inter-arm clearance remains above the 0.10 mplanning margin, with a minimum of 0.107 m, demonstrating safe separation during transport. Even under sustained hand-driven disturbances that follow the arms and temporarily reduce obstacle clearance below this margin, the arms adjust their motion and recover clearance, retaining positive mini-mum obstacle distances of 0.032 / 0.060 m. The trigger bands distinguish current-proximity responses from trajectory-look-ahead replanning. The planner evaluates the remaining GP trajectory against currently detected ob-stacles and revises affected future segments before the arm reaches them. This anticipatory trajectory query complements reactive avoidance without forecasting future obstacle states. Fig. 8(b,c) shows per-joint velocities/ accelerations normal-ized by their corresponding velocity limits/ nominal accelera-tion references. Velocity changes during obstacle interference demonstrate responsive avoidance. Acceleration ratios stay near zero for most of the execution, indicating that acceler-ations generally remain below their references. Exceedance fractions are 1.44% for velocity and 0.24% for accelera-tion. These results demonstrate largely smooth, timely GP-consistent execution under sustained interference. VI. C ONCLUSION 
+
+DD-GBP combines switching factor-graph inference, adap-tive horizons, and localized backward–forward messages for online multi-arm planning. A common GP representation connects support-state inference, interpolation-time factors, timestamp alignment, and continuous execution, with local replanning-consistency and early-stopping bounds under stated assumptions. On 50 four-arm scenes with four dynamic obstacles, DD-GBP records 92 .5% collision-free all-target completion and 
+
+16 .3 ms mean warm solves. Obstacle-free tests extend to 30 arms with 99 .17 –100% single-arm task success and average planning times of order 10 ms. Mechanism and scenario studies demonstrate robust long-horizon coordination under sensing and communication disturbances. Compact-workspace physical demonstrations further show the integrated architec-ture’s deployability. Future work will advance nonlinear, time-varying GBP convergence theory and multi-robot coordination across heterogeneous platforms. REFERENCES [1] S. Park, S. Jeon, and J. Park, “A constrained motion planning method exploiting learned latent space for high-dimensional state and constraint spaces*,” IEEE/ASME Trans. Mechatronics , vol. 29, no. 4, pp. 3001– 3009, 2024. [2] I.-L. Wang and T.-H. Wang, “Efficient routing in robotic movable fulfillment systems with integer programming: A rolling horizon and heuristic approach,” Robot. Comput.-Integr. Manuf. , vol. 91, p. 102849, 2025. [3] Y. Zhou, H. Hu, Y. Liu, S.-W. Lin, and Z. Ding, “A real-time and fully distributed approach to motion planning for multirobot systems,” IEEE Trans. Syst., Man, Cybern., Syst. , vol. 49, no. 12, pp. 2636–2650, 2019. [4] S. De Witte, T. Van Hauwermeiren, T. Lefebvre, and G. Crevecoeur, “Learning to cooperate: A hierarchical cooperative dual robot arm ap-proach for underactuated pick-and-placing,” IEEE/ASME Trans. Mecha-tronics , vol. 27, no. 4, pp. 1964–1972, 2022. [5] Y. Dong, Z. Yu, X. Chen, X. Zhu, C. Wang, P. Gergondet, and Q. Huang, “Bimanual continuous steering wheel turning by a dual-arm robot,” 
+
+IEEE/ASME Trans. Mechatronics , vol. 29, no. 3, pp. 1773–1784, 2024. [6] X. Zhao, Y. Song, and H. Ye, “Adaptive distributed event-triggered cooperative manipulation of multiple manipulators under partial time-interval error constraints,” IEEE Trans. Syst., Man, Cybern., Syst. ,vol. 55, no. 12, pp. 9309–9323, 2025. [7] G. Wagner and H. Choset, “M*: A complete multirobot path planning algorithm with performance bounds,” in Proc. IEEE/RSJ IROS , 2011, pp. 3260–3267. [8] B. Chen, H. Zhang, F. Zhang, Y. Jiang, W. He, C. Yang, and Y. Wang, “Cimap: A high-performance motion planning algorithm for robotic ma-nipulators in complex environments using clearance inference network,” 
+
+IEEE Trans. Syst., Man, Cybern., Syst. , vol. 55, no. 9, pp. 6383–6396, 2025. [9] K. Solovey, O. Salzman, and D. Halperin, “Finding a needle in an exponential haystack: Discrete rrt for exploration of implicit roadmaps in multi-robot motion planning,” Int. J. Robot. Res. , vol. 35, no. 5, pp. 501–513, 2016. [10] Z. Jin, J. Yu, Y. Liang, Y. Wang, Z. Wang, and C. Hu, “Co-dosp: A hierarchical optimization-based motion planner for multi-robot manipu-lation in confined and task-constrained workspace,” Adv. Eng. Inform. ,vol. 69, p. 103923, 2026. [11] S. Zhang and F. Pecora, “Online and scalable motion coordination for multiple robot manipulators in shared workspaces,” IEEE Trans. Autom. Sci. Eng. , 2023. [12] L. Wei, Y. Wang, Y. Hu, T. L. Lam, and Y. Wei, “Online dual robot–human collaboration trajectory generation by convex optimiza-tion,” Robot. Comput.-Integr. Manuf. , vol. 91, p. 102850, 2025. [13] S. Boyd, N. Parikh, E. Chu, B. Peleato, and J. Eckstein, “Distributed optimization and statistical learning via the alternating direction method of multipliers,” Found. Trends Mach. Learn. , vol. 3, no. 1, pp. 1–122, 2011. [14] L. Ferranti, L. Lyons, R. R. Negenborn, T. Keviczky, and J. Alonso-Mora, “Distributed nonlinear trajectory optimization for multi-robot motion planning,” IEEE Trans. Control Syst. Technol. , vol. 31, no. 2, pp. 809–824, Mar. 2023. [15] W. Schwarting, J. Alonso-Mora, L. Pauli, S. Karaman, and D. Rus, “Parallel autonomy in automated vehicles: Safe motion generation with minimal intervention,” in Proc. IEEE ICRA , 2017, pp. 1928–1935. [16] N. Gafur, G. Kanagalingam, A. Wagner, and M. Ruskowski, “Dynamic collision and deadlock avoidance for multiple robotic manipulators,” 
+
+IEEE Access , vol. 10, pp. 55 766–55 781, 2022. [17] H. Jiang, Y. Wang, R. Veerapaneni, T. H. Duhan, G. A. Sartoretti, and J. Li, “Deploying ten thousand robots: Scalable imitation learning for lifelong multi-agent path finding,” in Proc. IEEE ICRA , 2025. [18] E. Aljalbout, M. Karl, and P. van der Smagt, “Clas: Coordinating multi-robot manipulation with central latent action spaces,” 2022. [Online]. Available: https://arxiv.org/abs/2211.15824 [19] H. Lee, C. Luo, and H. Jung, “Multi-agent deep reinforcement learn-ing for collision-free posture control of multi-manipulators in shared workspaces,” Sensors , vol. 25, no. 22, 2025. [20] M. Lai, K. Go, Z. Li, T. Kr¨ oger, S. Schaal, K. Allen, and J. Scholz, “Roboballet: Planning for multirobot reaching with graph neural net-works and reinforcement learning,” Sci. Robot. , 2025. [21] D. Evron, E. Goldsztejn, and R. I. Brafman, “Decoupled MPPI-based multi-arm motion planning,” arXiv:2602.10114, 2026. [22] M. Mukadam, J. Dong, X. Yan, F. Dellaert, and B. Boots, “Continuous-time gaussian process motion planning via probabilistic inference,” Int. J. Robot. Res. , vol. 37, no. 11, pp. 1319–1340, 2018. [23] F. Dellaert, “Factor graphs: Exploiting structure in robotics,” Annu. Rev. Control Robot. Auton. Syst. , vol. 4, no. 1, pp. 141–166, 2021. [24] S. Guo, B. Liu, S. Zhang, J. Guo, and C. Wang, “Continuous-time Gaussian process trajectory generation for multi-robot formation via probabilistic inference,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS) , 2021, pp. 9247–9253. [25] W. Wang and B. Hu, “Multi-manipulator motion planning based on Gaussian process with probabilistic inference,” in Proc. WRC Symp. Adv. Robot. Autom. (WRC SARA) , 2022, pp. 221–226. [26] C. M. Bishop, Pattern Recognition and Machine Learning . Springer, 2006. [27] Q. Su and Y.-C. Wu, “On convergence conditions of gaussian belief propagation,” IEEE Trans. Signal Process. , vol. 63, no. 5, pp. 1144– 1155, 2015. [28] J. Du, S. Ma, Y.-C. Wu, S. Kar, and J. M. F. Moura, “Convergence analysis of distributed inference with vector-valued gaussian belief propagation,” J. Mach. Learn. Res. , vol. 18, no. 172, pp. 1–38, 2018. [Online]. Available: https://jmlr.org/papers/v18/16-556.html [29] J. Ortiz, T. Evans, and A. J. Davison, “A visual introduction to gaussian belief propagation,” 2021. DD-GBP: ONLINE MULTI-ARM PLANNING 14 
+
+[30] A. J. Davison and J. Ortiz, “Futuremapping 2: Gaussian belief propaga-tion for spatial ai,” 2022. [31] R. Murai, J. Ortiz, S. Saeedi, P. H. J. Kelly, and A. J. Davison, “A robot web for distributed many-device localisation,” IEEE Trans. Robot. ,vol. 40, pp. 121–138, 2024. [32] A. Patwardhan, R. Murai, and A. J. Davison, “Distributing collaborative multi-robot planning with gaussian belief propagation,” IEEE Robot. Autom. Lett. , vol. 8, no. 2, pp. 552–559, 2023. [33] S. Bari, V. Gabler, and D. Wollherr, “Probabilistic inference-based robot motion planning via Gaussian belief propagation,” IEEE Robot. Autom. Lett. , vol. 8, no. 8, pp. 5156–5163, 2023. [34] A. Prados, G. Espinoza, L. Moreno, and R. Barber, “Coordination of learned decoupled dual-arm tasks through Gaussian belief propagation,” in Proc. IEEE/RSJ IROS , 2025, pp. 15 917–15 924. [35] Z. Jin, F. Dai, Y. Liang, Z. Sun, Z. Wang, and C. Hu, “Distributed safety-aware motion planning for dual-arm systems via Gaussian belief propagation with application to catenary dropper assembly,” IEEE Robot. Autom. Lett. , vol. 11, no. 11, pp. 12 791–12 798, 2026. [36] F. Zhang, Ed., The Schur Complement and Its Applications . Springer, 2005. [37] Y. Weiss and W. T. Freeman, “Correctness of belief propagation in gaussian graphical models of arbitrary topology,” Neural Comput. ,vol. 13, no. 10, pp. 2173–2200, 2001. [38] D. M. Malioutov, J. K. Johnson, and A. S. Willsky, “Walk-sums and belief propagation in Gaussian graphical models,” J. Mach. Learn. Res. ,vol. 7, pp. 2031–2064, 2006. [39] C. C. Moallemi and B. Van Roy, “Convergence of the min-sum algorithm for convex optimization,” IEEE Trans. Inf. Theory , vol. 56, no. 4, pp. 2041–2050, 2010. [40] F. Kamper, S. J. Steel, and J. A. du Preez, “On the convergence of gaussian belief propagation with nodes of arbitrary size,” J. Mach. Learn. Res. , vol. 20, no. 165, pp. 1–37, 2019. [41] F. Dellaert, “Factor graphs and GTSAM: A hands-on introduction,” Georgia Institute of Technology, Tech. Rep. GT-RIM-CP&R-2012-002, Sep. 2012. [Online]. Available: https://hdl.handle.net/1853/45226 DD-GBP: ONLINE MULTI-ARM PLANNING 15 
+
+# Supplementary Material 
+
+Benchmark Details, Additional Statistics, and Linearization Examples S1. B ENCHMARK PROTOCOL AND IMPLEMENTATIONS 
+
+The simulation benchmarks and repeated physical experi-ments share the DD-GBP planning mechanisms below. Phys-ical joint velocities use coefficient 0.2, while the GP acceler-ation scale remains 0.3. Manuscript Exp. III and Figs. 7–8 describe the opposing arms at 0.9 m base spacing, 30 Hz ArUco detection, 0.08 m obstacle spheres, and execution without obstacle prediction. 
+
+Scenes and fair comparison: The method comparison and mechanism ablations use the same 50 seeded scenes: four seven-joint Panda arms at (±0.4, ±0.4, 0) m, facing the origin, with 0.8 m nearest-neighbor spacing. Initial joint configura-tions are identical and fixed. Each arm visits three randomized joint-space targets, screened at 0.2 m clearance; completed arms remain as obstacles. Four spherical obstacles of radius 
+
+0.08 m move at height 0.8 m in [−1, 1] 2 m with speed 
+
+0.20 m/s, continuously rebounding at the region boundaries. We retain each baseline’s core formulation and use the authors’ released implementations where available, adapting robot geometry and simulation interfaces to Panda/ ROS/ Gazebo. All methods receive careful hyperparameter tuning under common scenes, targets, nominal execution limits, and external performance metrics. Their native planning and exe-cution mechanisms are retained rather than replaced by DD-GBP components. Scenario sweeps change only the listed base spacing, ob-stacle speed, packet-loss rate, belief-update delay, observa-tion noise, or target count. At 0.65 m spacing, the initial-clearance screening margin is relaxed to generate starting scenes, without changing the signed-clearance evaluation. Obstacle-free scalability uses three targets per arm and K ∈{1, 2, 4, 8, 12 , 16 , 20 , 30 }, with 50 scenes planned per method/ size. Multi-arm rectangular grids have 1.0 m nearest-neighbor spacing and face the origin; the single arm is placed at the origin. 
+
+Computing and execution: Experiments run on an Intel Core i9-14900KF workstation; MR-STORM uses an NVIDIA GeForce RTX 4080 SUPER GPU with 16 GB memory, and the other solvers use the CPU. The simulation benchmarks use nominal velocity and acceleration coefficients of 0.3 relative to Panda’s physical limits; the physical demonstrations use velocity coefficient 0.2. Each mission has a 60 s simulation-time budget; an arm that does not complete all targets within this budget is counted as a task failure. 
+
+Comparison methods: Syn-GBP follows our earlier plan-ner [35]. It uses synchronous messages without interpolation-time collision factors, and adapts the support count at fixed 
+
+∆t = 0 .6 s. The w/o tree messages ablation instead retains all current DD-GBP mechanisms and changes only the message schedule. 
+
+GPMP2 is our centralized multi-arm adaptation of the GPMP2 formulation [22]. It retains the continuous-time GP prior and maximum a posteriori factor-graph objective, cou-pling all arms through inter-arm collision factors. We imple-                                       
+
+> TABLE S1 DD-GBP REFERENCE SETTINGS .
+> Component Setting Time grid Joint support-count/ interval adaptation;
+> Nmin = 3 ,Nmax = 14 ,∆t∈[0 .01 ,0.6] sInference Backward–forward scheduling; 20-iteration cap; objective-change tolerance 10 −3
+> Replanning Event-triggered; GP-resampled warm starts; linear initialization for a new target Collision model Spheres; margin 0.10 m; obstacle aggregation α= 30
+> Collision precision Obstacle/ inter-arm support-state precision 400; inter-arm interpolation multiplier 10 Interpolation Three internal points per interval; first three obstacle intervals and first two inter-arm intervals Boundary position precision Start 10 4; target 5000 Goal arrival Maximum absolute joint-position error
+> ≤0.07 rad Adaptive GP scaling Qd=λ−1
+> dI,λd(∆ t) = σ2
+> z/(¯ a2∆t),
+> σz= 3 ; fixed-scale ablation: λd= 125
+> Interaction rc= 0 .4m sphere-clearance gate; at most eight neighbors and eight additional activations per trigger source Prediction Disabled by default; measured-velocity forecasting only in its labeled variant
+
+ment the platform-specific factors and use the official GTSAM library [41] with its native Levenberg–Marquardt optimizer, rather than GBP message inference. Panda geometry, inter-arm geometry queries, and ROS/ Gazebo interfaces provide the multi-arm adaptation; the core GP model and numerical optimizer are retained and the parameters are tuned. The tested configuration uses full inter-arm connectivity and adaptive support count at fixed ∆t = 0 .6 s, without interpolation-time collision factors. The authors’ GPMP2 project and maintained repository provide the reference formulation. 
+
+DMPC follows the core distributed predictive-optimization formulations in [14], [15]: joint-velocity inputs, single-integrator dynamics, and linearized sphere-clearance con-straints with nonnegative slack, solved by CasADi/ IPOPT. Careful tuning selects N = 15 , ∆t = 0.08 s, five outer updates, and collision-slack/ state-increment/ goal weights 50/20/50. 
+
+NADMM follows the local predictive subproblems and inter-arm consensus formulation in [14]. Its tuned settings are N = 10 , ∆t = 0 .08 s, five ADMM updates, penalty 
+
+ρ = 0 .01 , relaxation β = 0 .5, and collision/ state-increment/ goal weights 50/20/50. 
+
+MR-STORM [21] uses the authors’ official open-source cuRobo/ MPPI implementation, retaining acceleration-policy sampling, peer-intention exchange, distance-dependent prior-ities, and the released diagonal distribution update. Tuned settings are 400 samples, two MPPI updates, ten steps at 
+
+∆t = 0.1 s, and a 0.1 s replanning period. Policies are DD-GBP: ONLINE MULTI-ARM PLANNING 16 
+
+computed in a shared GPU batch with CUDA Graph capture disabled; the selected next position is sent to the tracking interface. Panda geometry, joint goals, collision costs, and ROS transport provide the benchmark integration; external obstacle positions are held over each horizon. 
+
+Gafur (NMPC) [16] builds on the authors’ open-source Python implementation, retaining joint-acceleration inputs, double-integrator prediction, ellipsoid–line-segment collision constraints, and deadlock coordination. Tuned settings are six steps at ∆t = 0.2 s, a 0.2 s replanning period, ten IPOPT iterations, JIT, MUMPS, projection slope 10, and knot-level collision constraints. Planning acceleration bounds use nominal Panda limits and velocity bounds use coefficient 0.3.A 0.8 s execution prefix uses FollowJointTrajectory 
+
+with velocity-limited integration. Neighbor policies are cached and shifted by the author-derived cycle rule, with a two-phase initial exchange. Panda geometry, seven-joint weights, and ROS interfaces supply the platform adaptation. 
+
+Subgraph and delay ablations: The w/o subgraph variant sets rc = ∞ and removes the separate neighbor cap, giv-ing full-team connectivity. Tree-directed sweeps, triggering, interpolation, the adaptive grid, and the eight-additional-arm activation budget remain unchanged. The extraction routine still runs but no longer localizes the four-arm team. For delay N = 1, . . . , 5, each established directed link skips N send opportunities, holds its previous belief, and then receives a fresh belief. This models stale updates rather than a fixed millisecond network latency; graph reconstruction and shared-state neighbor discovery retain their normal behavior. 
+
+Cold/ warm calls: Tc averages the first solves after target initialization or switching, and Tw averages subsequent calls, first within arms and then across arms. MR-STORM retains GPU-batch durations; Gafur distinguishes non-shifted and shifted initialization through its native interface. S2. A DDITIONAL RESULTS AND PARAMETER SENSITIVITY 
+
+We provide parameter sensitivity, detailed scalability/ sce-nario statistics, and compact tracking/ execution diagnostics. 
+
+Parameter sensitivity and selection 
+
+Nineteen settings vary one parameter at a time around the fixed DD-GBP configuration on the same 50 four-arm, three-target scenes. The four axes are interaction clearance rc, obstacle-distance aggre-gation α, shared obstacle/ inter-arm precision λc, and the leading obstacle-interpolation budget mo. Defaults are 0.4 m, 30, 400, and three intervals, respectively. Fig. S1 and Tab. S2 share the current manuscript DD-GBP reference: 92 .5% Succ., 25 .753 ms cold and 
+
+16 .346 ms warm solve time. Coarse-to-fine selection first identifies useful operating ranges, then refines the safety/ computation trade-off and freezes the configu-ration. The sweeps show a broad favorable region: α = 10 –50 retains 
+
+89 .0–92 .5% success with 16 .3–18 .1 ms warm solves; rc = 0 .2–
+
+0.4 m retains 90 .0–92 .5% success. Smaller neighborhoods reduce anticipatory coordination, while larger ones increase computation without improving success. Collision precision is more sensitive. One to five interpolation intervals retain 89 .0–93 .0% success with 14 .8–
+
+18 .6 ms warm solves. These results favor balanced tuning rather than uniformly increasing weights or budgets. 10 20 30                                 
+
+> Tw (ms)
+> 10 20 30
+> Tw (ms)
+> 10 20 30
+> Tw (ms)
+> 10 20 30
+> Tw (ms)
+> 0.1 0.2 0.3 0.4 0.6 0.8 1.0 ∞
+> (a) Interaction range
+> rc(m)
+> 050 100
+> Succ. (%)  75 90.5 90 92.5 86 85.5 84 83
+> 10 20 30 40 50
+> (b) Obstacle aggregation
+> α
+> 050 100
+> Succ. (%)
+> 89 91 92.5 92 89.5
+> 100 200 400 800 1600
+> (c) Collision precision
+> λc
+> 050 100
+> Succ. (%)  83 84.5 92.5 85.5 89
+> 12345
+> (d) Interpolation budget
+> mo
+> 050 100
+> Succ. (%)
+> 93 92 92.5 89 89
+> 50 scenes / 200 arm trials per setting
+> Scene distribution Succ. mean
+> Twmean DD-GBP reference
+> Fig. S1. Single-parameter sensitivity: boxes summarize per-scene Succ.; blue/ orange curves show mean Succ./ warm solve time; diamonds mark the shared DD-GBP reference. λcchanges obstacle and inter-arm precisions together;
+> ∞removes the interaction-range restriction. TABLE S2 CURRENT ONE -PARAMETER STUDIES : 50 SCENES AND 200 ARMS PER SETTING ;ONE SHARED REFERENCE .
+
+Parameter Value Succ. ↑
+
+(%) 
+
+Tc ↓
+
+(ms) 
+
+Tw ↓
+
+(ms) DD-GBP (ref.) Default 92.5 25.753 16.346 Range rc (m) 0.1 75.0 11.962 12.698 Range rc (m) 0.2 90.5 15.078 14.572 Range rc (m) 0.3 90.0 24.065 15.750 Range rc (m) 0.6 86.0 33.444 21.128 Range rc (m) 0.8 85.5 35.430 22.675 Range rc (m) 1 84.0 38.453 24.729 Range rc (m) ∞ 83.0 37.489 24.728 Aggregation α 10 89.0 25.631 18.123 Aggregation α 20 91.0 25.768 17.094 Aggregation α 40 92.0 24.820 16.598 Aggregation α 50 89.5 25.239 16.405 Precision λc 100 83.0 24.966 15.909 Precision λc 200 84.5 25.007 16.159 Precision λc 800 85.5 25.886 17.231 Precision λc 1600 89.0 25.903 17.838 Interp. budget mo 1 93.0 23.373 14.797 Interp. budget mo 2 92.0 23.963 16.029 Interp. budget mo 4 89.0 27.759 18.018 Interp. budget mo 5 89.0 28.268 18.551 
+
+Scalability and scenario results 
+
+Tabs. S3–S4 detail the scalability and scenario studies in manuscript Fig. 6(b,c). Seven task/ planning metrics are retained; tracking error and kinematic peaks are reported separately. DD-GBP maintains high completion and short warm solves as the team grows, while the scenario sweeps identify its robustness and dynamic-response limits. DD-GBP: ONLINE MULTI-ARM PLANNING 17 
+
+TABLE S3 DETAILED SCALABILITY RESULTS FOR FIG . 6( B). 
+
+K Succ. ↑ ¯ds ↑ Tc ↓ Tw ↓ Cg ↑ Lg ↓ Tg ↓
+
+(%) (mm) (ms) (ms) (rad) (s) 
+
+DD-GBP 
+
+1 100.0 100.0 6.7 4.6 3.00 3.79 4.39 2 100.0 100.0 10.4 9.2 3.00 3.80 4.54 4 100.0 92.7 10.0 11.3 3.00 3.77 4.73 8 99.8 94.8 10.6 11.2 3.00 3.76 4.83 12 99.2 93.3 12.6 12.3 2.99 3.79 4.85 16 99.3 94.1 15.2 15.4 2.99 3.80 4.96 20 99.7 94.3 15.1 14.9 3.00 3.80 4.90 30 99.9 93.3 17.1 15.8 3.00 3.79 4.84 
+
+Syn-GBP 
+
+1 100.0 87.4 9.5 5.0 3.00 3.84 4.77 2 98.0 82.4 10.5 5.2 2.98 3.88 5.37 4 97.5 80.9 10.3 5.5 2.96 3.89 6.15 8 96.8 84.2 11.8 5.5 2.96 3.83 5.53 12 97.3 83.6 13.7 6.2 2.98 3.86 5.49 16 96.0 81.2 14.5 6.6 2.95 3.86 5.71 20 95.1 82.4 15.6 7.1 2.96 3.86 5.52 30 94.2 79.9 17.4 7.5 2.94 3.89 5.97 
+
+GPMP2 
+
+1 100.0 66.7 2.9 3.5 3.00 3.88 4.18 2 82.0 46.2 4.9 4.3 2.97 3.98 5.43 4 76.5 51.1 10.9 8.0 2.97 3.99 6.39 8 68.3 47.7 33.8 22.4 2.96 3.98 7.53 12 69.5 50.7 57.9 37.8 2.91 4.05 9.15 16 67.6 50.7 82.6 54.5 2.92 4.01 9.00 20 63.4 49.5 103.7 74.1 2.86 4.12 11.43 30 30.7 47.9 184.0 121.7 2.30 5.00 21.56 
+
+w/o tree messages 
+
+1 100.0 100.0 13.9 8.5 3.00 3.79 4.39 2 100.0 99.1 19.5 13.7 3.00 3.79 4.55 4 100.0 88.5 21.2 18.6 3.00 3.76 4.75 8 99.5 88.4 23.8 20.9 3.00 3.76 4.85 12 99.5 88.3 25.9 20.8 2.99 3.79 4.83 16 99.1 93.8 23.0 19.3 2.99 3.79 4.99 20 99.5 88.9 24.3 20.4 3.00 3.79 4.92 30 99.8 89.2 28.3 22.1 3.00 3.78 4.86 
+
+DMPC 
+
+1 100.0 99.9 88.3 89.0 3.00 3.94 12.73 2 98.0 94.0 107.0 113.6 2.98 4.02 16.27 4 75.5 86.7 145.1 158.0 2.77 4.42 21.86 8 83.3 85.9 185.7 208.4 2.86 4.24 20.99 12 92.3 83.5 215.6 243.0 2.98 4.04 17.40 16 91.5 82.9 244.2 280.6 2.99 4.01 16.54 20 94.0 84.7 291.0 329.8 2.98 4.01 16.47 30 93.0 84.2 460.6 524.6 2.99 4.04 16.61 
+
+NADMM 
+
+1 98.0 99.7 63.9 58.2 2.98 3.99 12.19 2 49.0 94.1 200.7 187.3 2.43 4.93 25.97 4 13.0 93.5 263.6 342.9 1.66 6.02 42.61 8 0.8 89.3 390.6 589.1 1.24 6.40 53.22 12 1.3 92.5 583.5 823.7 1.14 7.87 53.93 16 0.6 95.3 581.4 1063.7 0.75 7.07 55.19 20 0.1 94.7 771.7 1321.4 0.51 6.50 56.45 30 0.1 95.4 1022.2 2278.8 0.27 6.27 58.02 
+
+MR-STORM 
+
+1 94.0 38.3 22.7 21.0 2.94 5.20 10.33 2 91.0 39.8 22.8 20.4 2.99 5.05 11.27 4 82.5 54.1 20.8 18.2 3.00 5.18 13.56 8 82.5 53.2 24.7 21.9 2.99 5.28 17.03 12 82.5 55.9 40.8 36.8 2.98 5.38 18.26 16 82.6 56.3 59.2 53.3 2.99 5.32 17.18 20 84.1 54.6 80.0 71.5 3.00 5.28 17.03 30 79.3 52.5 133.1 123.3 2.98 5.44 18.45 
+
+Gafur 
+
+1 78.0 78.4 29.7 16.7 2.60 7.79 15.92 2 67.0 85.0 50.8 33.0 2.40 7.19 22.81 4 65.5 77.8 82.8 62.1 2.31 7.37 26.50 8 77.0 78.2 137.2 114.4 2.55 7.84 26.51 12 72.7 77.4 171.5 148.5 2.48 8.26 26.89 16 70.5 73.0 200.0 173.0 2.45 8.56 27.11 20 65.2 72.9 223.5 195.4 2.24 7.61 26.04 30 5.3 66.1 233.1 207.5 0.20 8.83 27.53      
+
+> Runs ending before task initialization are excluded. If a group has no near-contact interval, ¯ds= 100 mm denotes the evaluation cap. GPMP2 at K= 1 : warm times use only arms with warm calls.
+
+TABLE S4 DETAILED SCENARIO RESULTS FOR FIG . 6( C). Setting Succ. ↑ ¯ds ↑ Tc ↓ Tw ↓ Cg ↑ Lg ↓ Tg ↓
+
+(%) (mm) (ms) (ms) (rad) (s) 
+
+(i) Base spacing (m) 
+
+0.65 65.0 64.7 46.2 24.3 2.94 5.27 8.16 0.7 82.0 71.6 35.8 19.7 2.99 4.55 6.61 0.75 86.5 71.3 31.5 18.7 3.00 4.35 6.12 0.8 ⋆ 92.5 73.5 25.8 16.3 3.00 4.14 5.88 
+
+(ii) Obstacle speed (m/s) 
+
+0.1 96.0 84.5 29.8 19.7 3.00 4.13 6.01 0.15 93.5 79.2 40.0 26.3 3.00 4.13 5.91 0.2 ⋆ 92.5 73.5 25.8 16.3 3.00 4.14 5.88 0.25 81.0 64.6 24.8 16.7 3.00 4.23 5.81 0.3 55.0 57.4 29.8 20.4 3.00 4.32 5.97 0.4 26.5 46.5 29.8 20.5 2.99 4.54 6.26 
+
+(iii) Packet-loss rate 
+
+0⋆ 92.5 73.5 25.8 16.3 3.00 4.14 5.88 0.1 90.5 73.7 23.5 15.6 3.00 4.15 5.86 0.3 89.0 73.2 23.2 15.7 3.00 4.18 5.94 0.5 84.5 71.9 21.8 15.2 3.00 4.18 5.91 0.7 87.0 72.8 21.6 14.9 3.00 4.14 5.72 0.9 86.0 73.1 19.3 14.3 3.00 4.18 5.79 
+
+(iv) Belief-update delay (cycles) 
+
+0⋆ 92.5 73.5 25.8 16.3 3.00 4.14 5.88 1 85.0 72.8 24.9 16.6 3.00 4.19 5.83 2 86.5 73.3 24.8 16.0 3.00 4.17 5.91 3 88.5 72.9 24.1 16.0 3.00 4.14 5.77 4 87.0 73.4 24.1 16.3 3.00 4.20 5.95 5 89.0 73.5 25.3 16.4 3.00 4.17 5.81 
+
+(v) Obstacle-noise s.d. (cm) 
+
+0⋆ 92.5 73.5 25.8 16.3 3.00 4.14 5.88 1 86.5 72.2 23.3 16.0 3.00 4.15 5.86 3 82.5 69.3 23.5 16.1 3.00 4.15 5.80 5 77.5 68.1 24.1 16.1 2.99 4.19 6.05 7 70.5 66.7 23.9 16.4 3.00 4.20 5.99 9 59.0 60.3 23.5 16.5 3.00 4.23 6.00 
+
+(vi) Targets per arm 
+
+1 93.5 74.1 27.0 14.8 0.96 3.30 4.55 2 88.0 75.1 23.6 15.3 1.95 4.43 8.33 3⋆ 92.5 73.5 25.8 16.3 3.00 4.14 5.88 4 86.0 72.4 22.9 15.6 4.00 4.24 5.87 5 80.0 71.2 21.8 15.0 5.00 4.28 5.91   
+
+> Each setting has 50 scenes and 200 arms. ⋆denotes the shared DD-GBP reference. Units and metric definitions follow manuscript Tab. I(a).
+
+Tracking and execution quality 
+
+The compact comparison retains aligned and unshifted joint-position root-mean-square (RMS) errors, velocity RMS/ peak, and accel-eration RMS/ peak. Lag alignment uses a configuration-wide lag fitted on separate scene folds; filtering in the impedance controller introduces an approximately 0.1 s response lag. Gafur uses its joint-trajectory controller’s desired reference. DD-GBP combines low aligned tracking error with the smallest extreme execution peaks among the compared methods: 0.900 rad/s and 53 .2 rad/s 2, versus Syn-GBP’s 7.40 rad/s and 760 .7 rad/s 2. Its adaptive planning and GP-consistent continuous execution suppress abrupt velocity and acceleration transients, producing tighter peak distributions while maintaining high task completion (manuscript Tab. I(a) and Fig. 6(a)). DMPC’s slow planning and response reduce its update frequency and typical motion speed, but large extreme peaks remain. Removing adaptation, localized connectivity, or inter-polation can reintroduce execution excursions; the full framework improves execution stability rather than merely lowering average motion speed. DD-GBP: ONLINE MULTI-ARM PLANNING 18    
+
+> TABLE S5 RECORDED EXECUTION DIAGNOSTICS : 50 SCENES AND 200 ARMS PER CONFIGURATION .
+
+Configuration eq (aligned) eraw  
+
+> q
+
+vRMS max | ˙q| aRMS max |¨q|
+
+(mrad) (mrad) (rad/s) (rad/s) (rad/s 2) (rad/s 2)DD-GBP 2.41 ± 1.14 29 .04 ± 2.77 0.286 ± 0.0264 0.900 1.82 ± 0.440 53.2 Syn-GBP 5.26 ± 13 .50 31 .72 ± 8.04 0.296 ± 0.0320 7.40 2.33 ± 1.94 760.7 GPMP2 15 .81 ± 23 .00 36 .13 ± 15 .43 0.280 ± 0.0422 6.10 4.14 ± 3.29 659.9 Gafur (NMPC) 7.59 ± 6.78 7.54 ± 6.75 0.303 ± 0.150 4.99 14 .5 ± 16 .6 880.9 MR-STORM 6.86 ± 1.08 9.65 ± 1.32 0.185 ± 0.0236 4.06 2.34 ± 1.08 527.9 DMPC 4.53 ± 2.53 10 .85 ± 2.16 0.102 ± 0.0104 3.98 2.23 ± 0.529 388.8 NADMM 4.41 ± 0.87 12 .17 ± 3.04 0.115 ± 0.0269 2.96 2.08 ± 0.426 380.4 DD-GBP w/ prediction 2.43 ± 2.09 29 .20 ± 2.99 0.286 ± 0.0261 5.06 1.80 ± 0.602 607.5 w/o tree messages 2.53 ± 0.94 29 .09 ± 2.53 0.288 ± 0.0246 3.03 1.87 ± 0.567 511.3 w/o triggering 1.98 ± 0.83 27 .05 ± 2.32 0.268 ± 0.0215 1.90 1.78 ± 0.427 165.9 w/o adaptive N 4.60 ± 2.17 25 .10 ± 2.86 0.246 ± 0.0275 5.62 2.34 ± 0.773 308.4 w/o subgraph 2.76 ± 4.96 27 .95 ± 3.77 0.275 ± 0.0280 16.0 1.84 ± 0.953 442.5 w/o GP scaling 2.11 ± 1.84 27 .55 ± 2.71 0.272 ± 0.0252 3.37 1.84 ± 0.609 358.5 w/o adaptive ∆t 2.30 ± 1.51 30 .72 ± 2.43 0.303 ± 0.0231 5.85 1.87 ± 0.817 666.5 w/o interpolation 4.35 ± 8.78 29 .81 ± 5.01 0.285 ± 0.0267 6.31 2.33 ± 2.01 888.1   
+
+> RMS: arm mean ±standard deviation; peaks: full-window maxima across 200 arms. Acceleration uses timestamp-aware velocity differences.
+
+S3. C OLLISION -F ACTOR JACOBIANS AND LINEARIZATION 
+
+EXAMPLE 
+
+For either residual in Eq. (11), write d(q) = dc(q), ϵ = ϵc,and x = [ q; ˙ q]. Let nc = dim q, with nc = Nq for one arm and nc = 2 Nq for an inter-arm factor. Away from the activation boundary d(q) = ϵ, differentiation gives the full-state Jacobian 
+
+Jc(x) = 
+
+( −ϵ−1∇q d(q)⊤, 01×nc
+
+ , d(q) < ϵ, 
+
+01×2nc , d(q) > ϵ. (S1) At the boundary, the inactive branch supplies the zero-Jacobian convention. The smoothed distance is d(q) =
+
+−α−1 log P 
+
+> ℓ
+
+exp[ −αd ℓ(q)] , α > 0. Differentiating this smoothed distance yields 
+
+∇q d(q) = 
+
+P 
+
+> ℓ
+
+e−αd ℓ(q)Jp,ℓ (q)⊤nℓ(q)
+
+P 
+
+> ℓ
+
+e−αd ℓ(q) . (S2) Here ∇q dℓ = J⊤
+
+> p,ℓ
+
+nℓ, where Jp,ℓ is the closest-point geometric Jacobian and nℓ the corresponding unit witness direction. For inter-arm distances, q stacks both arms’ joints and the relative-point Jacobian is [Jp,k,ℓ , −Jp,j,ℓ ], with the witness direction oriented from arm j to arm k.For the GP interpolation x(τ ) = Li(τ )xi + Li+1 (τ )xi+1 ,
+
+ti < τ < t i+1 , the obstacle residual has endpoint Jacobians 
+
+Jc(x(τ )) Li(τ ) and Jc(x(τ )) Li+1 (τ ). Although Eq. (S1) has zero columns for the instantaneous velocity, the endpoint velocity columns are generally nonzero because the GP in-terpolation depends on both endpoint velocities. 
+
+A numerical collision-factor linearization 
+
+Consider a planar two-link arm, used here only to make the calculation reproducible, with link lengths l1 = 0 .4 m and 
+
+l2 = 0 .3 m. A collision sphere centered at the endpoint has combined radius ra + ro = 0 .05 m with a spherical obstacle at c = (0 .5, 0.3) m. Define 
+
+p(q) = 
+
+l1 cos q1 + l2 cos( q1 + q2)
+
+l1 sin q1 + l2 sin( q1 + q2)
+
+
+
+,d(q) = ∥p(q) − c∥ − 0.05 .
+
+At q0 = (0 , π/ 2) , p0 = (0 .4, 0.3) , d0 = 0 .05 m, and n =(−1, 0) ⊤. For ϵ = 0 .10 m the active residual is h = ( ϵ −
+
+d)/ϵ = 0 .5. The point and residual Jacobians are 
+
+Jp =
+
+−0.3 −0.30.4 0
+
+
+
+,
+
+∇q d = J⊤ 
+
+> p
+
+n =
+
+0.30.3
+
+
+
+,Jh = −3 −3 0 0
+
+for x = [ q1, q 2, ˙q1, ˙q2]⊤. Hence h(x0 + δx) ≃ 0.5 − 3δq 1 −
+
+3δq 2. For δq = (0 .01 , −0.005) rad, the linear value is 0.485 
+
+and direct nonlinear evaluation gives 0.484014 .

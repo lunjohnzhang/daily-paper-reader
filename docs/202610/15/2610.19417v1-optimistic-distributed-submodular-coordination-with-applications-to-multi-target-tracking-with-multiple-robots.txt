@@ -1,0 +1,1327 @@
+Title: Optimistic Distributed Submodular Coordination with Applications to Multi-Target Tracking with Multiple Robots
+
+URL Source: https://arxiv.org/pdf/2610.19417v1
+
+Published Time: Thu, 15 Oct 2026 00:36:00 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Optimistic Distributed Submodular Coordination with Applications to Multi-Target Tracking with Multiple Robots 
+
+Pranjal Sharma, Atharva Navsalkar, Zirui Xu, Vasileios Tzoumas †
+
+Abstract — We provide a distributed online algorithm for multi-agent submodular coordination in bandit environments, 
+
+i.e. , environments whose evolution is unknown a priori and may even adapt to the agents’ actions. We are motivated by multi-robot tasks such as target tracking, where the optimal actions change over time and the agents must track them rather than a single fixed optimum. To address such problems, we provide the Optimistic Distributed Online Greedy ( O-DOG )algorithm, that leverages predictions about the environment’s behavior and improves regret guarantees. The agents select actions simultaneously over arbitrary, possibly time-varying, network topologies, and each agent acts optimistically , i.e. ,leveraging predictions of its upcoming rewards, e.g. , from forecasts of the targets’ motion and of its neighbors’ actions. We bound O-DOG ’s tracking regret in terms of the agents’ prediction error and the bound never exceeds its prediction-free counterpart. Particularly, it is sublinear even when the optimal action changes at every time step, provided the predictions are accurate enough. We further quantify the suboptimality due to decentralization as a function of the network structure, and show that accurate predictions accelerate convergence. We validate O-DOG in simulated multi-robot target tracking. 
+
+I. I NTRODUCTION 
+
+Teams of robots are increasingly deployed to gather infor-mation in dynamic environments: tracking multiple moving targets [1], [2], exploring and mapping unknown spaces [3], [4], and monitoring environmental phenomena [5], [6]. At every time step t, the robots seek to maximize a shared utility via optimization problems of the form 
+
+max   
+
+> ai,t ∈V i,∀i∈N
+
+ft({ai,t }i∈N ), t = 1 , 2, . . . , (1) where N is the set of robots, Vi the actions available to robot i, ai,t the action it selects at time t, and ft :Πi ∈ N Vi 7 → R is the objective function that captures the task utility. Although eq. (1) is generally NP-hard [7], near-optimal polynomial-time approximation algorithms have been proposed when ft is submodular , a diminishing returns property. For example, the Sequential Greedy ( SG ) algo-rithm [8], in which robots choose their actions sequentially to maximize theire marginal contribution, achieves a 1/2
+
+approximation bound when ft is submodular. All afore-mentioned complex tasks can be modeled as submodular coordination problems. Consequently, ( SG ) and its variants have been commonly adopted in controls, machine learning, and robotics literature [1], [3], [5], [6], [9]–[18]. Three challenges stand between this approach and de-ployment. First, ft is unknown when the robots act: the utility of an action depends on where the targets will be, so the robots must therefore commit to actions before ft             
+
+> †Department of Aerospace Engineering, University of Michigan, Ann Arbor, MI 48109 USA; {spranjal, amnav, ziruixu, vtzoumas}@umich.edu
+
+is revealed and learn from the utilities of their actions in hindsight. Second, communication is a bottleneck: SG and its online counterpart [19] require each robot to wait for the decisions of all preceding robots in the sequence before it can select an action. Therefore, every action selection round incurs a chain of sequential communication rounds whose length grows quadratically with the team size [18]. Consensus-based simultaneous methods, in turn, require connected, undirected networks and operate on a continuous relaxation of the objective [20]. Third, the environment can be adversarial as targets may deliberately evade the robots, reacting to their motion [21], so that the optimal actions may change at nearly every time step. Additionally, the robots are seldom without foresight: motion models [22] and learned predictors [23], [24] forecast the targets’ future positions. But their accuracy cannot be guaranteed when the targets behave adversarially [25]. We therefore seek a bound on the 
+
+tracking regret [26], which compares the robots’ cumulative utility against the near-optimal utility that can be attained by the best sequence of time-varying actions chosen with knowledge of the future. Moreover, we seek a bound that improves as the forecasts become more accurate. To our knowledge, existing methods address at most two of these challenges. Distributed submodular coordination with limited information [9], [10], [14], [16], [18] assumes 
+
+ft is known, and model-based methods plan on forecasts but presume them correct [3], [12]. Online methods handle unknown ft, but some compete only with the best fixed ac-tion [27], [28], including DOG [29]. OSG [19] and its bandit variant [30] bound the tracking regret but decide sequentially, while MA-OSMA [20] decides simultaneously via consensus on a continuous relaxation but requires undirected connected networks and real-valued messages. None of these use fore-casts, and their tracking regret bounds grow linearly in time when the optimal actions change at a constant frequency, 
+
+e.g. , when targets actively evade pursuers. Optimistic online learning makes the regret scale with the error of a forecast of the next loss [31]–[33], but its fast rates in games [34] assume that payoffs are bilinear in the players’ mixed strategies. In contrast, we consider problems where each robot’s utility depends on its teammates’ realized actions. In submodular maximization, optimism so far requires a centralized decision maker and has been limited to weighted threshold potentials, a subclass of submodular functions [35], while MetaBSG [25] accepts or rejects suggested actions as a whole, deciding sequentially. We propose the Optimistic Distributed Online Greedy (O-DOG ) algorithm for eq. (1) (Section III) as an extension of 
+
+DOG [29], which addresses all three challenges. First, O-DOG ’s tracking regret is bounded in terms of the robots’ arXiv:2610.19417v1 [eess.SY] 14 Oct 2026 cumulative forecast error rather than the time horizon (Sec-tion IV). We define the forecast error or accuracy as the cumulative difference between the predicted and true rewards over the time horizon. We prove that accurate forecasts yield a better bound and faster convergence to near optimal actions as compared to the forecast free alternatives. Second, O-DOG applies to arbitrary, possibly directed and time-varying, communication networks, and its approximation guarantee improves as the network becomes more connected. When the network is strongly connected, it matches the bound with the 
+
+1/(1+ κf ) factor of SG , whereas it degrades down to 1−κf
+
+when the robots do not communicate at all (Theorem 2). Third, as in DOG , each robot evaluates its candidate actions against the actions of the robots it can receive information from, so the robots decide and communicate simultaneously rather than in a sequential chain. We evaluate O-DOG in simulated target tracking under 20 and 50 robot scenarios, where a quarter of the targets are active evaders (Section V). With about half of OSG ’s messages per round, O-DOG tracks the targets 27% (20 robots) and 39% (50 robots) closer than O-OSG , i.e., OSG 
+
+equipped with O-DOG ’s optimism framework. Moreover, O-DOG tracks 70% closer than the published OSG . This is achieved by replacing OSG ’s N − 1 sequential communica-tion hops per round with a single simultaneous exchange, which lets O-DOG re-select actions up to 11 times faster. II. D ISTRIBUTED ONLINE SUBMODULAR 
+
+COORDINATION WITH BOUNDED TRACKING REGRET 
+
+We present the problem formulation. To this end, we use the following notation:  
+
+> •
+
+VN ≜ Q  
+
+> i∈ N
+
+Vi is the cross product of sets {V i}i ∈ N . 
+
+> •
+
+[T ] ≜ {1, . . . , T } for any positive integer T ; 
+
+> •
+
+f ( a | A ) ≜ f ( A ∪ { a} ) − f ( A ) is the marginal gain of set function f : 2 V 7 → R for adding a ∈ V to A ⊆ V . 
+
+> •
+
+|A| is the cardinality of a discrete set A. 
+
+> •
+
+E is the set of directed communication edges. We also use the following framework about the agents’ communication network and their global objective f .
+
+Communication neighborhood. When a communication channel exists from agent j to i, i.e. , (j → i) ∈ E , then i
+
+can receive, store, and process information from j. The set of all agents that i can receive information from, possibly via relay ( i.e. , multi-hop communication), is denoted by Ni,t .We refer to Ni,t as agent i’s neighborhood at time step t.
+
+Communication network. The distributed communica-tion network G = {N , E} can be directed and even dis-connected . When the network is fully connected (all agents receive information from all others), we call it fully cen-tralized . In contrast, when the network is fully disconnected (all agents are isolated, receiving information from no other agent), we call it fully decentralized .
+
+Optimism. Before acting at round t, each agent i has access to a prediction ˆri,t of the reward ri,t it is about to receive for any action ai,t ∈ V i. The predictions can be formed using any information available up to round t − 1.The predictions can be supplied by any arbitrary heuristic and our guarantees degrade gracefully with the cumulative prediction error. 
+
+Definition 1 (Normalized and Non-Decreasing Submodular Set Function [8]) . A set function f : 2 V 7 → R is normalized and non-decreasing submodular if and only if  
+
+> •
+
+(Normalization) f ( ∅ ) = 0 ; 
+
+> •
+
+(Monotonicity) f ( A ) ≤ f ( B ), ∀ A ⊆ B ⊆ V ; 
+
+> •
+
+(Submodularity) f ( s | A ) ≥ f ( s | B ), ∀ A ⊆ B ⊆ V ,
+
+s ∈ V .
+
+Intuitively, let f ( A ) measure how closely a set A of robot actions tracks the targets, e.g. , by rewarding robots for staying near them. Adding a robot can only bring more targets within reach, so the tracking quality never decreases; this is the non-decreasing property. Moreover, given a fixed number of targets, a robot contributes less when its team is larger, since those targets gain little from one more pursuer; this is the submodularity property. 
+
+Definition 2 (2nd-order Submodularity [36], [37]) . f :2V 7 → R is 2nd-order submodular if and only if 
+
+f (s | C ) − f (s | A ∪ C ) ≥ f (s | B ∪ C ) − f (s | A ∪ B ∪ C ), (2) 
+
+for any disjoint A, B, C ⊆ V and s ∈ V .
+
+Intuitively, if f ( A ) captures the number of targets tracked by a set A of sensors, then marginal gain of the marginal gains drops when more sensors are already deployed. 
+
+Problem 1 (Distributed Online Submodular Coordination with Predictions) . At each time t ∈ [T ], each agent i
+
+selects an action ai,t online, using a prediction ˆri,t and only information from and about its neighbors Ni,t , to solve 
+
+max    
+
+> ai,t ∈V i,∀i∈N , t ∈[T]
+> T
+
+X
+
+> t=1
+
+ft({ai,t }i∈N ), (3) 
+
+where each ft : VN 7 → R is normalized, non-decreasing, and submodular. ft may be selected adversarially in response to the agents’ past actions, and becomes known only after the agents have executed their actions at time step t. No assumption is made on the accuracy of the predictions ˆri,t .
+
+Problem 1 is a generalization to the problem in [19] by considering (i) the availability of reward predictions, and (ii) an arbitrary rather than a connected network. Additionally, Problem 1 assumes that the agents know the full objective function ft once they have executed their actions for time step t. This assumption is known as the full information 
+
+setting in the literature of online learning [38]. For target tracking, this means that once the targets have moved, each robot can tell how well any of its actions would have tracked. The predictions available to each agent might be in-accurate, e.g. , they might point a robot to the direction opposite to its target. Thus, the algorithm must be resilient against such predictions and match the performance of the corresponding prediction-free algorithm [19]. We achieve this by implementing the two-layer structure of the Fixed Share Forecaster ∗ (FSF ⋆) algorithm [38] along with ensuring that any predictions only affect the current action being played and not the future actions (Section III-A). III. O PTIMISTIC DISTRIBUTED ONLINE GREEDY 
+
+ALGORITHM (O-DOG ) FOR TRACKING REGRET 
+
+We present the Optimistic Distributed Online Greedy algorithm ( O-DOG ) for Problem 1. O-DOG leverages, as a Algorithm 1: Optimistic Fixed Share Forecaster ⋆ (O-FSF ⋆). 
+
+Input: Time steps T ; action set V; and predictions 
+
+ˆrt ∈ [0 , 1] |V| of the reward vector, each available before the step t.
+
+Output: Probability distribution pt ∈ { [0 , 1] |V| : ∥pt∥1= 1 }
+
+over the actions in V at each t = 1 , . . . , T . 
+
+> 1:
+
+J ← ⌈ log 2(2 T )⌉ + 1 , α ← 3 + log e(|V| T ), β ← 1/T ; 
+
+> 2:
+
+γ(j) ← pα/T 2 j−1 for all j = 1 , . . . , J ; 
+
+> 3:
+
+ℓ ← 0, εℓ ← plog e(J), B0 ← 0; 
+
+> 4:
+
+Initialize z1 = [ z1,1, . . . , z J, 1]⊤ with zj, 1 = 1 , for all 
+
+j = 1 , . . . , J ; 
+
+> 5:
+
+Initialize w(j)1 = [ w(j)1,1, . . . , w (j)
+
+> |V| ,1
+
+]⊤ with w(j) 
+
+> i, 1
+
+= 1 ,for all j = 1 , . . . , J and i = 1 , . . . , |V| ; 
+
+> 6:
+
+for each time step t = 1 , . . . , T do  
+
+> 7:
+
+receive the prediction ˆrt of the reward vector at the step t; 
+
+> 8:
+
+˜w(j) 
+
+> t
+
+← w(j) 
+
+> t
+
+⊙ exp ( γ(j) ˆrt), p(j) 
+
+> t
+
+← ˜w(j) 
+
+> t
+
+/∥ ˜w(j) 
+
+> t
+
+∥1,for all j = 1 , . . . , J ; 
+
+> 9:
+
+μj,t ← ˆr⊤ 
+
+> t
+
+p(j) 
+
+> t
+
+for all j, ˜zt ← zt ⊙ exp ( εℓ μt),
+
+qt ← ˜zt/∥˜zt∥1; 
+
+> 10:
+
+pt ← PJj=1 qj,t p(j) 
+
+> t
+
+; 
+
+> 11:
+
+observe the rewards {ri,t }i∈V that the agent receives by selecting any action i ∈ V at the step t; 
+
+> 12:
+
+rt ← [r1,t , . . . , r |V| ,t ]⊤; 
+
+> 13:
+
+for j = 1 , . . . , J do  
+
+> 14:
+
+v(j) 
+
+> i,t
+
+← w(j) 
+
+> i,t
+
+exp ( γ(j)ri,t ), i = 1 , . . . , |V| ; 
+
+> 15:
+
+W (j) 
+
+> t
+
+← v(j)1,t + · · · + v(j)
+
+> |V| ,t
+
+; 
+
+> 16:
+
+w(j) 
+
+> i,t +1
+
+← β W (j) 
+
+> t
+> |V|
+
++ (1 − β) v(j) 
+
+> i,t
+
+, i = 1 , . . . , |V| ; 
+
+> 17:
+
+zj,t +1 ← zj,t exp ( εℓ r⊤ 
+
+> t
+
+p(j) 
+
+> t
+
+); 
+
+> 18:
+
+end for  
+
+> 19:
+
+Bt ← Bt−1 + ∥r⊤ 
+
+> t
+
+Pt − μt∥2
+
+> ∞
+
+, where 
+
+r⊤ 
+
+> t
+
+Pt ≜ [r⊤ 
+
+> t
+
+p(1)  
+
+> t
+
+, . . . , r ⊤ 
+
+> t
+
+p(J) 
+
+> t
+
+]⊤; 
+
+> 20:
+
+if Bt > 4ℓ then  
+
+> 21:
+
+ℓ ← ℓ + 1 , εℓ ← plog e(J)/4ℓ,
+
+zt+1 ← [1 , . . . , 1] ⊤; 
+
+> 22:
+
+end if  
+
+> 23:
+
+end for 
+
+subroutine, an algorithm for the problem of tracking the best expert [38]. Particularly, we provide the optimistic extension of the Fixed Share Forecaster ⋆ (FSF ⋆ [38]) subroutine used by O-DOG . Thus, before presenting O-DOG in Section III-B, we first discuss the problem of tracking the best expert in Section III-A and present the proposed subroutine ( O-FSF ⋆). 
+
+A. The Problem of Tracking the Best Expert Tracking the best expert involves an agent selecting ac-tions to maximize the total reward (utility) across a given number of time steps. However, the challenge is that the reward associated with each action is time-varying and unknown to the agent before the action has been executed. Therefore, to solve the problem, the agent needs to guess the “best expert” actions, i.e. , the actions achieving the highest reward at each time step. To state the problem, we use the following notation:  
+
+> •
+
+V denotes the set of actions available to the agent;  
+
+> •
+
+ri,t denotes the reward that the agent receives by selecting action i ∈ V at the time step t 
+
+> •
+
+rt ≜ r1,t , . . . , r |V| ,t 
+
+⊤ is the vector of all rewards at t; 
+
+> •
+
+i⋆t ∈ arg max i∈V ri,t ; i.e. , i⋆t is the index of the “best expert” action at time t, that is, of the action that achieves the highest reward at time t; 
+
+> •
+
+1(·) is the indicator function, i.e. , 1(x) = 1 if the event x
+
+is true, otherwise 1(x) = 0 . 
+
+> •
+
+P (T ) ≜ PT −1 
+
+> t=1
+
+1(i⋆t̸ = i⋆t+1 ); i.e. , P (T ) counts how many times the best action changes over T time steps. 
+
+Problem 2 (Tracking the Best Expert [39]) . Assume a time horizon H of operation discretized to T time steps. The agent selects an action at online at each time step t = 1 , . . . , T 
+
+to solve the optimization problem 
+
+max 
+
+> at∈V , t =1 ,...,T T
+
+X
+
+> t=1
+
+rat,t , (4) 
+
+where {ri,t }i∈V can take any value and become known to the agent only once the agent has executed action at.
+
+Algorithm 1 guarantees a suboptimality bound when solv-ing Problem 2 despite the “best expert” actions i⋆
+
+> 1
+
+, . . . , i ⋆T
+
+being unknown a priori to the agent, i.e. , despite the chal-lenge that the rewards {ri,t }i∈V become known only once 
+
+the agent has executed action at. To this end, the algorithm provides the agent with a probability distribution pt over the action set V at each time step t, from which the agent draws an action at. Algorithm 1 additionally makes use of a prediction 
+
+ˆrt ≜ [ˆ r1,t , . . . , ˆr|V| ,t ]⊤ ∈ [0 , 1] |V| (5) of the reward vector rt that the agent computes before the time step t from the information it has already observed. No assumption is made on the accuracy of ˆrt: it may be produced by any heuristic, and it enters the guarantee only through the prediction error budget 
+
+D(T ) ≜
+
+> T
+
+X
+
+> t=1
+
+∥rt − ˆrt∥2
+
+> ∞
+
+, (6) which accumulates how far the predictions fall from realized rewards over T time steps. Since rt and ˆrt both lie in 
+
+[0 , 1] |V| , we have D(T ) ≤ T . Thus, the prediction error budget is bounded by T regardless the prediction accuracy. 
+
+Intuition Behind Algorithm 1. O-FSF ⋆ runs J base learners in parallel. Base learner j keeps a weight w(j) 
+
+> i,t
+
+for each action 
+
+i, which grows the more reward action i has received relative to the others (lines 14–16). The learning rate γ(j) sets how strongly each new reward moves these weights, so larger rates adapt faster to a changing environment. The prediction enters only in the distribution the agent plays (lines 8–10): at line 8, the weights are tilted by ˆrt, as though ˆrt had already been observed. Since line 14 updates the weights 
+
+w(j) 
+
+> i,t
+
+unaffected by ˆrt, a poor prediction only affects the round at which it was issued, which is why D(T ) sums per-round errors. Large rates suit environments whose best action changes often (large P (T )) and predictably (small D(T )), which make it safe to react quickly. Small rates suit the opposite, Algorithm 2: Optimistic Distributed Online Greedy (O-DOG ) for agent i.
+
+Input: Time steps T ; agent i’s action set Vi; and agent i’s neighborhood Ni.
+
+Output: Agent i’s action aO−DOG  
+
+> i,t
+
+at each t = 1 , . . . , T . 
+
+> 1:
+
+Initialize an O-FSF ⋆ ith the value of the parameters T
+
+and Vi, denoted by O-FSF ⋆|i; 
+
+> 2:
+
+for each time step t = 1 , . . . , T do  
+
+> 3:
+
+form the prediction ˆr(i) 
+
+> t
+
+∈ [0 , 1] |V i| of the reward vector at step t, using information observed up to step t − 1; 
+
+> 4:
+
+input ˆr(i) 
+
+> t
+
+to O-FSF ⋆|i (per line 7 of Algorithm 1);  
+
+> 5:
+
+get the output p(i) 
+
+> t
+
+from O-FSF ⋆|i; 
+
+> 6:
+
+draw an action aO−DOG  
+
+> i,t
+
+from the distribution p(i) 
+
+> t
+
+,and execute it;  
+
+> 7:
+
+send aO−DOG  
+
+> i,t
+
+to the out-neighbors of i, and relay 
+
+the actions received from other agents, until 
+
+AO−DOG  
+
+> Ni,t
+
+≜ {aO−DOG  
+
+> j,t
+
+}j∈N i has been received;  
+
+> 8:
+
+observe the objective function ft : VN 7 → R; 
+
+> 9:
+
+for every a ∈ V i do  
+
+> 10:
+
+r(i) 
+
+> a,t
+
+← ft(a | A O−DOG  
+
+> Ni,t
+
+); 
+
+> 11:
+
+end for  
+
+> 12:
+
+r(i) 
+
+> t
+
+← { r(i)
+
+> a,t
+
+}a∈V i ; 
+
+> 13:
+
+input r(i) 
+
+> t
+
+to O-FSF ⋆|i (per line 11 of Algorithm 1);  
+
+> 14:
+
+end for 
+
+making the algorithm resilient against harmful predictions. 
+
+Adapting to Unknown P (T ) and D(T ). A meta learner combines the base learners into pt, itself tilted by ˆrt (lines 9– 10). This is the distribution that is played by algorithm every round. Since P (T ) is never observed, the meta hedges across all rates; since D(T ) is, the meta’s own rate shrinks as the observed prediction error grows (lines 18–20) via a doubling trick [39]. This two-layer structure of J base learners combined with a meta learner allows O-FSF ⋆ to operate in adversarial environments and converge towards a near-optimal sequence of actions. 
+
+B. O-DOG Algorithm 
+
+We now introduce the Optimistic Distributed Online Greedy ( O-DOG ) algorithm (Algorithm 2). O-DOG retains the simultaneous decision structure of Distributed Online Greedy ( DOG ) [29] and equips each agent with an optimistic tracking learner, extending DOG ’s guarantees from static regret to the tracking regret of Problem 1 by leveraging at the agent level O-FSF ⋆ (Algorithm 1). In O-DOG , agent i instead scores its actions’ marginal gain given the actions of the its local communication neigh-borhood Ni,t ,
+
+r(i) 
+
+> a,t
+
+= ft(a | A O−DOG  
+
+> Ni,t ,t
+
+), a ∈ V i, (7) which involves no ordering of the agents. All agents evaluate eq. (7) at the same time, as soon as their neighbors’ actions have been received, enabling simultaneous decision making. In more detail, O-DOG starts by instructing each agent i ∈N to initialize an O-FSF ⋆ — we denote the O-FSF ⋆ onboard each agent i by O-FSF ⋆|i. Specifically, agent i initializes O-FSF ⋆|i with its action set Vi and with the number T of total time steps (line 1). Then, at each time step t = 1 , . . . , T , all agents in parallel:  
+
+> •
+
+Each agent i forms a prediction ˆr(i) 
+
+> t
+
+of its reward vector from the information it has observed up to t − 1, inputs it to O-FSF ⋆|i per line 7 of Algorithm 1, and draws an action 
+
+aO-DOG  
+
+> i,t
+
+given the probability distribution p(i) 
+
+> t
+
+output by 
+
+O-FSF ⋆|i (lines 3–6).  
+
+> •
+
+All agents execute their actions {aO-DOG  
+
+> i,t
+
+}i∈N simulta-neously and broadcast them, so that each agent i receives the neighbors’ actions AO-DOG  
+
+> Ni,t ,t
+
+within the time step t.The agents then observe ft : 2 VN 7 → R (lines 7–8).  
+
+> •
+
+Each agent i computes the marginal gain in eq. (7) of each of its actions a ∈ V i (lines 9–12). No agent waits on any other as the computation requires only the neighbors’ actions, which have already been received.  
+
+> •
+
+Finally, each agent i makes the vector of its computed marginal gains observable to O-FSF ⋆|i per line 11 of Algorithm 1 (line 13). With this input, O-FSF ⋆|i will compute p(i)
+
+> t+1
+
+, i.e. , the probability distribution over the agent i’s actions for the next time step t + 1 .IV. P ERFORMANCE GUARANTEES OF O-DOG 
+
+We bound O-DOG ’s suboptimality with respect to the opti-mal actions the agents would select if they knew {ft}t=1 ,...,T 
+
+a priori. Particularly, we bound O-DOG ’s tracking regret ,proving that it gracefully degrades with the environment’s capacity to select {ft}t=1 ,...,T adversarially, and improves 
+
+with the accuracy of the agents’ predictions. We proceed in two steps. First, we bound the tracking regret of O-FSF ⋆ at the level of a single agent (Theo-rem 1). Then, we bound the tracking regret of the network (Theorem 2), which requires quantifying the environment’s capacity to select {ft}t=1 ,...,T adversarially and the agents’ capacity to predict it. To these ends, we use the notation:  
+
+> •
+
+AOPT  
+
+> t
+
+∈ arg max ai,t ∈V i, ∀i∈N ft({ai,t }i∈N ); i.e. , AOPT 
+
+> t
+
+is the set of optimal actions the agents would select at time step t if they knew the ft a priori;  
+
+> •
+
+aOPT  
+
+> i,t
+
+is agent i’s action among the actions in AOPT  
+
+> t
+
+; 
+
+> •
+
+At ≜ {ai,t }i∈N ; i.e. , At is the set of all agents’ actions at time step t.
+
+Definition 3 (α-Approximate Tracking Regret) . Consider any sequence of action sets {A t}t=1 ,...,T , and let α ∈ (0 , 1] .Then, {A t}t=1 ,...,T ’s α-approximate tracking regret is 
+
+TReg (α) 
+
+> T
+
+({A t}t=1 ,...,T ) ≜ α
+
+> T
+
+X
+
+> t=1
+
+ft(AOPT  
+
+> t
+
+) −
+
+> T
+
+X
+
+> t=1
+
+ft(At).
+
+(8) Equation (8) evaluates {A t}t=1 ,...,T ’s suboptimality with respect to the optimal actions {A OPT  
+
+> t
+
+}t=1 ,...,T the agents would select if they knew {ft}t=1 ,...,T a priori. The optimal value value PTt=1 ft(AOPT  
+
+> t
+
+) is discounted by a factor of α
+
+in eq. (8) since solving Problem 1 exactly is NP-hard even when {ft}t=1 ,...,T are known a priori [40]. Specifically, the best possible approximation bound in polynomial time is 
+
+1 − 1/e [40], while Sequential Greedy and OSG achieve the near-optimal bound 1/2 [19]. In this paper, we establish 
+
+α = 1 /(1 + κf ), where κf ∈ [0 , 1] is the curvature of 
+
+f (Definition 7). This is the curvature-dependent guarantee equals 1/2 in the worst case κf = 1. In contrast to Sequential Greedy and OSG , however, O-DOG attains it without ordering the agents. 
+
+Definition 4 (Environment’s Total Adversarial Effect) . The environment’s total adversarial effect over T time steps is 
+
+∆( T ) ≜ 
+
+> T−1
+
+X
+
+> t=1
+
+X
+
+> i∈N
+
+1(aOPT 
+
+> i,t
+
+̸ = aOPT 
+
+> i,t +1
+
+). (9) 
+
+∆( T ) counts how many times the optimal actions of the agents must shift across the T steps to adapt to the changing 
+
+f(·). The larger it is, the more frequently the agents need to change actions to remain optimal. 
+
+Definition 5 (Network Prediction Error) . Agent i’s predic-tion error over T time steps is Di(T ) ≜ PTt=1 ∥r(i) 
+
+> t
+
+−ˆr(i) 
+
+> t
+
+∥2
+
+> ∞
+
+,and the network’s prediction error is 
+
+D(T ) ≜ X
+
+> i∈N
+
+E[ max {Di(T ), 1}]. (10) 
+
+D(T ) is the network counterpart of D(T ) in eq. (6). Since 
+
+r(i) 
+
+> t
+
+, ˆr(i) 
+
+> t
+
+∈ [0 , 1] |V i|, we have D(T ) ≤ |N | T regardless of prediction accuracy. 
+
+Theorem 1 (Agent-Level Approximation Performance) .
+
+Consider O-FSF ⋆ (Algorithm 1) run on the reward sequence 
+
+{rt}Tt=1 ⊆ [0 , 1] |V| with predictions {ˆrt}Tt=1 ⊆ [0 , 1] |V| , and let {i⋆t }Tt=1 be any comparator sequence that changes value at most P (T ) times. Then, 
+
+> T
+
+X
+
+> t=1
+
+ri⋆t ,t −
+
+> T
+
+X
+
+> t=1
+
+r⊤ 
+
+> t
+
+pt ≤ ˜O
+
+hq 
+
+(1 + P (T )) ¯D(T )
+
+i
+
+, (11) 
+
+where ¯D(T ) = max {D(T ), 1} and ˜O[·] hides log terms. The bound holds for every realization, with no assumption on how the rewards or predictions are generated. 
+
+Theorem 1 is in order the same as [38, Corollary 1] with the horizon T replaced by the prediction error ¯D(T ). O-FSF ⋆ rovides a ˜O[p(1 + P (T )) ¯D(T )] regret against the prediction-free ˜O[p(1 + P (T )) T ] regret of FSF ⋆. Since 
+
+¯D(T ) ≤ T , it is never weaker. The proof is in Appendix I. We also need the following definitions to present the approximation performance of O-DOG .
+
+Definition 6 (Centralization of Information, adapted from [18]) . For each time step t ∈ [T ], consider a func-tion ft : VN 7 → R and communication neighborhoods 
+
+{N i,t }i ∈ N , where each agent i ∈ N has selected an action 
+
+ai,t , and let N ci,t ≜ N \ (Ni,t ∪ { i}). Then, at time t, agent 
+
+i’s centralization of information is defined as 
+
+coin ft,i (Ni,t ) ≜ ft(ai,t ) − ft(ai,t | { aj,t }j ∈ N ci,t ). (12) To capture the suboptimality cost of decentralization, 
+
+coin ft,i measures how much ai,t can overlap with the actions of agents that are not agent i’s neighbors at time t. In the best scenario, where ai,t does not overlap with other actions at all, i.e. , ft(ai,t | { aj,t }j ∈ N ci,t ) = ft(ai,t ), then coin ft,i = 0 .In the worst case instead where ai,t is fully redundant, i.e. ,
+
+ft(ai,t | { aj,t }j ∈ N ci,t ) = 0 , then coin ft,i = ft(ai,t ).
+
+Definition 7 (Curvature [41]) . The curvature of a normalized submodular function f : 2 V 7 → R is defined as 
+
+κf ≜ 1 − min  
+
+> v∈V
+
+[f (V) − f (V \ { v})] /f (v). (13) 
+
+κf measures how far f is from modularity: if κf = 0 ,then f (V) − f (V \ { v}) = f (v), ∀v ∈ V , i.e. , f is modular. In contrast, κf = 1 in the extreme case where there exist v ∈V such that f (V) = f (V \ { v}), i.e. , v has no contribution in the presence of V \ { v}.
+
+Theorem 2 (Network-Level Approximation Performance) .
+
+Over t ∈ [T ], given the communication neighborhoods 
+
+{N i,t }i∈N , O-DOG instructs each agent i ∈ N to select actions {ai,t }t∈[T ] that guarantee  
+
+> •
+
+If the network is fully centralized , i.e. , Ni,t = N \ { i} for all t ∈ [T ],
+
+E
+
+h 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ft(At)
+
+i
+
+≥ 11 + κf
+
+E
+
+h 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ft(AOPT  
+
+> t
+
+)
+
+i
+
+− ϕ(T ).
+
+(14)  
+
+> •
+
+If the network is fully decentralized , i.e. , Ni,t = ∅ for all 
+
+t ∈ [T ],
+
+E
+
+h 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ft(At)
+
+i
+
+≥ (1 − κf ) E
+
+h 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ft(AOPT  
+
+> t
+
+)
+
+i
+
+− χ(T ).
+
+(15)  
+
+> •
+
+If the network is anything in between fully centralized and fully decentralized, i.e. , Ni,t ⊆ N \ { i}, and ft is 2nd-order submodular (Definition 2), 
+
+E
+
+h 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ft(At)
+
+i
+
+≥ 11 + κf
+
+E
+
+h 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ft(AOPT  
+
+> t
+
+)
+
+i
+
+− κf
+
+1 + κf
+
+E
+
+h 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+X
+
+> i∈N
+
+coin ft,i (Ni,t )
+
+i
+
+− ψ(T ). (16) 
+
+where ϕ(T ), χ (T ), ψ (T ) = ˜O
+
+pD(T )[ E[∆( T )]+ |N | ] / T
+
+
+
+,
+
+κf ≜ max t∈[T ] κft , and ∆( T ) and D(T ) are given in Definitions 4 and 5. Particularly, the expectation is due to O-DOG ’s internal randomness and the environment’s, and ˜O(·) hides log terms. 
+
+Theorem 2 is the counterpart of [29, Theorem 1] with the static optimum AOPT replaced by the time-varying optimum AOPT  
+
+> t
+
+. Relative to the tracking-regret bound 
+
+˜O{p|N | T [∆( T ) + |N | ]} of OSG [19, Theorem 1], the product |N | T is replaced by D(T ) ≤ |N | T .The role of prediction is to make ϕ(T ), χ(T ) and ψ(T )
+
+vanish in regimes where they would otherwise not. Without prediction, D(T ) = Θ( |N | T ) and the rate vanishes only if ∆( T ) grows sublinearly in T , which fails when the environment reacts to the agents, for example when targets evade the robots tracking them. Since ∆( T ) ≤ |N | (T −
+
+1) unconditionally, the rate vanishes whenever D(T ) =˜o(T / |N | ), regardless of how ∆( T ) grows : an environment that changes frequently but predictably is trackable. The bound in eq. (16) depends on coin ft,i capturing the suboptimality due to decentralization. eqs. (14) to (16) imply O-DOG ’s suboptimality will improve if the agents have larger multi-hop coordination neighborhoods. Importantly, the 1/(1 + κf ) suboptimality bound with a fully connected network recovers the bound in [41] and is near-optimal as the best possible bound for eq. (3) is 1 − κf /e [40]. 1
+
+The proof of Theorem 2 follows [29, Theorem 1], bound-ing the network’s tracking regret by the agents’ individ-ual tracking regrets plus a decentralization term, with two changes: the comparator AOPT  
+
+> t
+
+is time-varying, and each agent’s regret is bounded by Theorem 1, valid for every realization of the environment and neighbor action sequence. Summing over agents via Cauchy–Schwarz yields the rates. V. N UMERICAL EVALUATION 
+
+We compare O-DOG with OSG [19] and its optimistic version O-OSG , which uses O-FSF ⋆ as the agent-level sub-routine instead of FSF ⋆. We scale the multi-robot target-tracking scenario in [19] to N = 20 robots and 16 targets in a 300 m radius arena, and to N = 50 robots and 40 targets in a 474 m radius arena. The specific radius for N = 50 was chosen to simulate a similar density as the 20 agent scenario. 
+
+Setup. The robots observe the targets’ current positions but not their future motion. Each robot is a unicycle whose action is one of 31 (speed, turn-rate) commands. Speeds are chosen from {0, 4, 8, 12 , 16 } m/s, turn rates from 
+
+{0, ±0.35 , ±1, ±2} rad/s, and we limit v|ω|≤ 20 m/s 2. An agent holds its chosen action for one decision period P . The world evolves in steps of 0.1 s over a 120 s episode, so each learner plays T = 120 s /P rounds. Half of the targets move 
+
+randomly (a new heading and a speed in [4 , 12] m/s every 2 s on average), a quarter follow polylines with 1–4 turns, and a quarter are adversarial : they move at 8 m/s by default, but evade at 12 m/s for 6 s when a robot comes within 20 m. This evasion is in the direction that most reduces the team’s coverage of them. Their evasion has a 6 s cooldown, as in [19]. The robots maximize 
+
+ft(A) = X
+
+> q
+
+h
+
+dmax −
+
+ P 
+
+> i∈C q,t
+
+∥xi,t − yq,t ∥−1+d−1max 
+
+−1i
+
+,
+
+(17) where Cq,t = {i ∈ N : ∥xi,t − yq,t ∥≤ r} is the set of robots within the coverage radius r = 150 m of target q. A robot outside Cq,t does not contribute to target q, while ft remains monotone submodular. Equation (17) is a bounded variant of the objective of [19], with dmax = 300 m. A robot’s reward is its marginal gain on the targets’ realized positions during the period, conditioned on its teammates’ actions. O-DOG and O-OSG predict this reward by a constant-turn-rate extrapolation of each target. For computing prediction of marginal gains,  
+
+> O-DOG
+
+uses each neighbor’s most probable action under its previous-round weights (included in communication), whereas O-OSG uses its predecessors’ actual choices. The radius r applies to all algorithms. 
+
+Communication-limited decision periods. In OSG and 
+
+> O-OSG
+
+, robot i receives the actions of its i − 1 predecessors over N − 1 sequential hand-offs, i.e., N (N − 1) /2 messages per round. In O-DOG , each robot exchanges realized and most probable actions (given the robot’s action distribution at the time) with its k nearest teammates in a single simul-taneous exchange, i.e., N k messages per round. Following                  
+
+> 1The bounds 1/(1 + κf)and 1−κf/e become 1/2and 1−1/e when, in the worst case, κf= 1 .
+
+TABLE I: Round time, decision period P , and mean target-to-nearest-robot distance (m; mean over 20 initializations) for 20 and 50 robots at two link rates. O-DOG runs at P = 0 .3 s for both k.                                    
+
+> N= 20 N= 50
+> 0.25 Mbps 100 Mbps 0.25 Mbps 100 Mbps OSG/O-OSG ( P)1.11 s (1.2) 0.96 s (1.0) 3.32 s (3.4) 2.48 s (2.5) O-DOG ( P), ≤64 ms 51 ms ≤64 ms 51 ms OSG 63.5 60.0 59.9 60.7 O-OSG 30.9 29.9 43.4 38.3 O-DOG, k= 5 22.5 22.5 26.3 26.3 O-DOG, k= 10 16.6 16.6 19.1 19.1
+
+the decision-time accounting of [18], a round takes 
+
+τO-OSG = N t c + ( N − 1) τ + PN −1
+
+> m=1
+
+⌈m/c ⌉ S/B, τO-DOG = tc + τ + ⌈k/c ⌉ S/B, 
+
+where tc = 0.50 ms is a robot’s computation per round (measured in our simulator), τ = 50 ms is the per-hop latency (measured short-range Zigbee round trips stay below 100 ms [42]), S = 100 B is the size one agent’s single round communication, c = 5 messages can be exchanged simultaneously, and B is the link rate: 0.25 Mbps (Digi XBee 3 Zigbee) or 100 Mbps (Silvus SL5200), as in [18]. Each algorithm’s period P is the smallest multiple of 0.1 sthat is at least its round time τALG (Table I). O-DOG ’s round is at most 64 ms for every k ≤ 20 , so every period we test is feasible. We run each k at its best measured period among {0.2, 0.3, 0.5} s (0.3 s for all k ≥ 5). OSG and O-OSG run at their shortest feasible period as longer periods only degrade tracking at those time scales. We report the mean distance from each target to its nearest robot over 20 random initializations. 
+
+Results. O-DOG ’s learner and predictions help even under sequential coordination: O-OSG tracks 51% closer than  
+
+> OSG
+
+with 20 robots and 28% closer with 50 (Table I). However, sequential communication limits how often O-OSG 
+
+can decide. Each of its N − 1 hand-offs costs one link latency, so its round grows with the team: it re-plans only a quarter as often as O-DOG with 20 robots and less than a tenth as often with 50, whereas O-DOG ’s single simultaneous exchange does not depend on N . Since the targets keep moving between decisions, the slower loop costs accuracy: with about half of O-OSG ’s messages, O-DOG with k = 5 
+
+tracks 27% closer with 20 robots and 39% closer with 50 at 0.25 Mbps (Figure 1a,c). A faster link barely helps O-OSG because its round is dominated by latency rather than bandwidth. With k ≥ 10 , O-DOG is even better than O-OSG 
+
+without any communication limit (by up to 34%). This is because O-DOG allows every robot to condition on its nearest teammates, whereas in O-OSG the ordering is fixed and the robots earlier in the sequence decide without knowing the choices of those after them. Figure 1b,d show how much coordination O-DOG needs. Without neighbors ( k = 0 ), the robots ignore each other and track worse than OSG ; a single neighbor already beats OSG 
+
+with 20 robots and roughly matches it with 50, and from 
+
+k = 5 onward O-DOG beats O-OSG on every initialization at both link rates. Beyond k ≈ 10 the gains are marginal, which is consistent with the locality of eq. (17). Any robot’s reward depends only on teammates within the coverage radius r, so Fig. 1: (a, c) Mean tracking distance with 20 and 50 robots at 0.25 Mbps (3 s moving average; shaded: ±1 standard deviation over 20 seeds); OSG and O-OSG decide every 1.2 s (a) and 3.4 s (c), O-DOG every 0.3 s. (b, d) Episode mean versus O-DOG ’s neighborhood size k (N k messages per round), each k at its best period (error bars: 95% confidence intervals). Solid horizontal lines: OSG and 
+
+O-OSG at their 0.25 Mbps periods ( N (N − 1) /2 messages per round); dotted: O-OSG without communication limits ( P = 0 .5 s). 
+
+additional, more distant neighbors add little value. VI. C ONCLUSION 
+
+We presented the Optimistic Distributed Online Greedy (O-DOG ) algorithm for multi-agent submodular coordina-tion in unpredictable environments. Leveraging tools from optimistic online learning, O-DOG enables agents to make simultaneous online decisions over arbitrary, possibly time-varying, communication networks, while exploiting predic-tions of their upcoming rewards. We bounded O-DOG ’s tracking regret in terms of the agents’ prediction error rather than the time horizon: the bound never exceeds its prediction-free counterpart, and remains sublinear even when the optimal actions change at every time step, provided the environment changes predictably. In simulated multi-robot target tracking with a 20 agent network, O-DOG tracked the targets by up to 27% closer than the state-of-the-art sequential algorithm OSG equipped with optimism while transmitting approximately half the number of messages. On a 50 agent network that gap grew to 40%. Compared to OSG without any optimism, O-DOG tracks up to 70% closer, thereby achieving a scalable distributed submodular coordination architecture for tracking regret. 
+
+Future work. We will extend O-DOG ’s guarantees to actions whose rewards are revealed only over multiple time steps, such as multi-step trajectories executed in the style of receding horizon, by using delayed feedback techniques [43]. We will also extend O-DOG to bandit feedback, where each agent observes the reward of its selected action only. REFERENCES [1] P. Tokekar, V. Isler, and A. Franchi, “Multi-target visual tracking with aerial robots,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2014, pp. 3067–3072. [2] M. Corah and N. Michael, “Scalable distributed planning for multi-robot, multi-target tracking,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2021, pp. 437–444. [3] N. Atanasov, J. Le Ny, K. Daniilidis, and G. J. Pappas, “Decentralized active information acquisition: Theory and application to multi-robot SLAM,” in IEEE Inter. Conf. Rob. Auto. (ICRA) , 2015, pp. 4775–4782. [4] M. Corah and N. Michael, “Distributed matroid-constrained submod-ular maximization for multi-robot exploration: Theory and practice,” 
+
+Autonomous Robots (AURO) , vol. 43, no. 2, pp. 485–501, 2019. [5] A. Krause, A. Singh, and C. Guestrin, “Near-optimal sensor place-ments in gaussian processes: Theory, efficient algorithms and empir-ical studies,” Jour. Mach. Learn. Res. (JMLR) , vol. 9, pp. 235–284, 2008. [6] A. Singh, A. Krause, C. Guestrin, and W. J. Kaiser, “Efficient informa-tive sensing using multiple robots,” Journal of Artificial Intelligence Research (JAIR) , vol. 34, pp. 707–755, 2009. [7] U. Feige, “A threshold of ln (n) for approximating set cover,” Journal of the ACM (JACM) , vol. 45, no. 4, pp. 634–652, 1998. [8] M. L. Fisher, G. L. Nemhauser, and L. A. Wolsey, “An analysis of approximations for maximizing submodular set functions–II,” in 
+
+Polyhedral combinatorics , 1978, pp. 73–87. [9] B. Gharesifard and S. L. Smith, “Distributed submodular maximiza-tion with limited information,” IEEE Transactions on Control of Network Systems (TCNS) , vol. 5, no. 4, pp. 1635–1645, 2017. [10] D. Grimsman, M. S. Ali, J. P. Hespanha, and J. R. Marden, “The impact of information in distributed submodular maximization,” IEEE Trans. Ctrl. Netw. Sys. (TCNS) , vol. 6, no. 4, pp. 1334–1343, 2019. [11] M. Corah and N. Michael, “Distributed submodular maximization on partition matroids for planning on large sensor networks,” in IEEE Conference on Decision and Control (CDC) , 2018, pp. 6792–6799. [12] B. Schlotfeldt, V. Tzoumas, and G. J. Pappas, “Resilient active information acquisition with teams of robots,” IEEE Transactions on Robotics (TRO) , vol. 38, no. 1, pp. 244–261, 2021. [13] J. Liu, L. Zhou, P. Tokekar, and R. K. Williams, “Distributed re-silient submodular action selection in adversarial environments,” IEEE Robotics and Automation Letters (RAL) , vol. 6, no. 3, pp. 5832–5839, 2021. [14] A. Robey, A. Adibi, B. Schlotfeldt, H. Hassani, and G. J. Pappas, “Optimal algorithms for submodular maximization with distributed constraints,” in Learn. for Dyn. & Cont. (L4DC) , 2021, pp. 150–162. [15] N. Rezazadeh and S. S. Kia, “Distributed strategy selection: Asubmodular set function maximization approach,” Automatica , vol. 153, p. 111000, 2023. [16] R. Konda, D. Grimsman, and J. R. Marden, “Execution order matters in greedy algorithms with limited information,” in American Control Conference (ACC) , 2022, pp. 1305–1310. [17] A. Krause and D. Golovin, “Submodular function maximization,” 
+
+Tractability: Practical Approaches to Hard Problems , vol. 3, 2012. [18] Z. Xu, S. S. Garimella, and V. Tzoumas, “Communication- and computation-efficient distributed submodular optimization in robot mesh networks,” IEEE Transactions on Robotics (TRO) , 2025. [19] Z. Xu, H. Zhou, and V. Tzoumas, “Online submodular coordination with bounded tracking regret: Theory, algorithm, and applications to multi-robot coordination,” IEEE Robotics and Automation Letters (RAL) , vol. 8, no. 4, pp. 2261–2268, 2023. [20] Q. Zhang, Z. Wan, Y. Yang, L. Shen, and D. Tao, “Near-optimal online learning for multi-agent submodular coordination: Tight approxima-tion and communication efficiency,” in International Conference on Learning Representations (ICLR) , 2025. [21] T. H. Chung, G. A. Hollinger, and V. Isler, “Search and pursuit-evasion in mobile robotics: A survey,” Autonomous Robots , vol. 31, no. 4, pp. 299–316, 2011. [22] R. E. Kalman, “A new approach to linear filtering and prediction problems,” Journal of Fluids Engineering , vol. 82, no. 1, pp. 35–45, 1960. [23] A. Rudenko, L. Palmieri, M. Herman, K. M. Kitani, D. M. Gavrila, and K. O. Arras, “Human motion trajectory prediction: A survey,” 
+
+The International Journal of Robotics Research , vol. 39, no. 8, pp. 895–935, 2020. [24] A. Navsalkar, H. Zhou, and V. Tzoumas, “Self-adaptive learning and model predictive control for tracking unknown dynamics with no regret,” 2026. [Online]. Available: https://arxiv.org/abs/2607.26370 [25] Z. Xu, X. Lin, and V. Tzoumas, “Leveraging untrustworthy commands for multi-robot coordination in unpredictable environments: A bandit submodular maximization approach,” in American Control Conference (ACC) , 2024, pp. 192–199. [26] M. Herbster and M. K. Warmuth, “Tracking the best expert,” Machine learning , vol. 32, no. 2, pp. 151–178, 1998. [27] M. Streeter and D. Golovin, “An online algorithm for maximizing submodular functions,” Adv. Neu. Inf. Proc. Sys. , vol. 21, 2008. [28] L. Chen, H. Hassani, and A. Karbasi, “Online continuous submodular maximization,” in International Conference on Artificial Intelligence and Statistics (AISTATS) . PMLR, 2018, pp. 1896–1905. [29] Z. Xu and V. Tzoumas, “Distributed online submodular maximiza-tion under communication delays: A simultaneous decision-making approach,” in American Control Conference (ACC) , 2026, pp. 4105– 4110. [30] Z. Xu, X. Lin, and V. Tzoumas, “Bandit submodular maximization for multi-robot coordination in unpredictable and partially observable environments,” in Robotics: Science and Systems (RSS) , 2023. [31] C.-K. Chiang, T. Yang, C.-J. Lee, M. Mahdavi, C.-J. Lu, R. Jin, and S. Zhu, “Online optimization with gradual variations,” in Conference on Learning Theory (COLT) , 2012. [32] A. Rakhlin and K. Sridharan, “Online learning with predictable sequences,” in Conference on Learning Theory (COLT) , 2013. [33] P. Zhao, Y.-J. Zhang, L. Zhang, and Z.-H. Zhou, “Adaptivity and non-stationarity: Problem-dependent dynamic regret for online convex optimization,” Journal of Machine Learning Research , vol. 25, no. 98, pp. 1–52, 2024. [34] M. Zhang, P. Zhao, H. Luo, and Z.-H. Zhou, “No-regret learning in time-varying zero-sum games,” in Proceedings of the 39th Interna-tional Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 162. PMLR, 2022, pp. 26 772–26 808. [35] T. S. Salem, G. Özean, I. Nikolaou, E. Terzi, and S. Ioannidis, “Online submodular maximization via online convex optimization,” ser. AAAI’24/IAAI’24/EAAI’24. AAAI Press, 2024. [Online]. Available: https://doi.org/10.1609/aaai.v38i13.29425 [36] Y. Crama, P. L. Hammer, and R. Holzman, “A characterization of a cone of pseudo-boolean functions via supermodularity-type inequal-ities,” in Quantitative Methoden in den Wirtschaftswissenschaften .Springer, 1989, pp. 53–55. [37] S. Foldes and P. L. Hammer, “Submodularity, supermodularity, and higher-order monotonicities of pseudo-boolean functions,” Mathemat-ics of Operations Research , vol. 30, no. 2, pp. 453–461, 2005. [38] T. Matsuoka, S. Ito, and N. Ohsaka, “Tracking regret bounds for online submodular optimization,” in International Conference on Artificial Intelligence and Statistics (AISTATS) . PMLR, 2021, pp. 3421–3429. [39] N. Cesa-Bianchi and G. Lugosi, Prediction, Learning, and Games .Cambridge University Press, 2006. [40] M. Sviridenko, J. Vondrák, and J. Ward, “Optimal approximation for submodular and supermodular optimization with bounded curvature,” 
+
+Math. of Operations Research , vol. 42, no. 4, pp. 1197–1218, 2017. [41] M. Conforti and G. Cornuéjols, “Submodular set functions, matroids and the greedy algorithm: Tight worst-case bounds and some general-izations of the rado-edmonds theorem,” Discrete Applied Mathematics ,vol. 7, no. 3, pp. 251–274, 1984. [42] K. F. Haque, A. Abdelgawad, and K. Yelamarthi, “Comprehensive performance analysis of zigbee communication: An experimental approach with xbee s2c module,” Sensors , vol. 22, no. 9, 2022. [Online]. Available: https://www.mdpi.com/1424-8220/22/9/3245 [43] P. Sharma, Z. Xu, and V. Tzoumas, “Asynchronous distributed bandit submodular maximization under heterogeneous communication delays,” 2026. [Online]. Available: https://arxiv.org/abs/2604.06430 
+
+APPENDIX IPROOF OF THEOREM 1We prove the precise form 
+
+> T
+
+X
+
+> t=1
+
+ri⋆t ,t −
+
+> T
+
+X
+
+> t=1
+
+r⊤ 
+
+> t
+
+pt ≤ 3
+
+√2
+
+q
+
+αV (1 + 2 P (T )) ¯D(T )+ 10 
+
+q ¯D(T ) ln J, (18) with αV = 3+ln( |V| T ) and J = ⌈log 2(2 T )⌉+1 . Theorem 1 follows, since αV = O(log( |V| T )) , ln J = O(log log T ),and 1 + 2 P (T ) ≤ 2(1 + P (T )) .Write λj,t ≜ r⊤ 
+
+> t
+
+p(j) 
+
+> t
+
+and μj,t ≜ ˆr⊤ 
+
+> t
+
+p(j) 
+
+> t
+
+for the realized and predicted rewards of base expert j, and B(T ) ≜ PTt=1 ∥λt −
+
+μt∥2
+
+> ∞
+
+. The imported lemmas are stated for losses. We apply them to ℓt = −rt and mt = −ˆrt, which leaves every norm unchanged and reverses the sign of the regret. After normalization, lines 8 and 14–16 of Algorithm 1 are the base updates of [34, eq. (20)] with share coefficient ξ = β, and lines 9 and 17 are Optimistic Hedge [33]. 
+
+Lemma 1 ([34, Lemma 13]) . For any j and any comparators 
+
+ut ∈ ∆|V| with P u ≜ P
+
+> t≥2
+
+∥ut − ut−1∥1, PTt=1 ⟨ut −
+
+p(j) 
+
+> t
+
+, r t⟩ ≤ αV (1 + P u)/γ (j) + γ(j)D(T ).
+
+Lemma 2 ([33, Lemma 2]) . For Optimistic Hedge over J
+
+experts at a fixed rate ε > 0 and any expert j, P 
+
+> t
+
+λj,t −P
+
+> t
+
+⟨qt, λ t⟩ ≤ ε P
+
+> t
+
+∥λt − μt∥2
+
+> ∞
+
++ ln( J)/ε .
+
+Both are stated with an additional non-positive term, dropped here. The remaining lemmas are ours. 
+
+Lemma 3. ∥λt − μt∥∞≤ ∥ rt − ˆrt∥∞≤ 1, hence B(T ) ≤
+
+D(T ).Proof. |λj,t − μj,t |= |(rt − ˆrt)⊤p(j) 
+
+> t
+
+|≤ ∥ rt − ˆrt∥∞, since 
+
+∥p(j) 
+
+> t
+
+∥1= 1 and rt, ˆrt ∈ [0 , 1] |V| .
+
+Lemma 4. There exists j such that αV (1 + 2 P (T )) /γ (j) +
+
+γ(j) ¯D(T ) ≤ 3
+
+√2
+
+pαV (1 + 2 P (T )) ¯D(T ).Proof. Let A = αV (1 + 2 P (T )) and γ⋆ = pA/ ¯D(T ).Since A ∈ [αV , α V (1 + 2 T )] and ¯D(T ) ∈ [1 , T ], γ⋆/γ (1) ∈
+
+[1 , pT (1 + 2 T )] ⊆ [1 , 2T ]. As γ(j) = γ(1) 2j−1 for 
+
+j ≤ J = ⌈log 2(2 T )⌉ + 1 , some j has γ(j) = λγ ⋆
+
+with λ ∈ [2 −1/2, 21/2], giving A/γ (j) + γ(j) ¯D(T ) =(λ + λ−1)pA ¯D(T ) ≤ (2 1/2 + 2 −1/2)pA ¯D(T ) =3
+
+√2
+
+pA ¯D(T ).
+
+Lemma 5. For every j, P 
+
+> t
+
+λj,t − P
+
+> t
+
+⟨qt, λ t⟩ ≤
+
+10 p ¯D(T ) ln J.Proof. We use a variant of the doubling trick [39], restarting on the observed prediction-error budget rather than on fixed rounds, as suggested in [33]. Epoch ℓ restarts the meta at the fixed rate εℓ =pln( J)/4ℓ, so Lemma 2 applies to it separately. Its budget 
+
+bℓ satisfies bℓ ≤ 4ℓ + 1 : Bt ≤ 4ℓ before its last round, which adds at most 1 by Lemma 3. The epoch’s regret is thus at most εℓ(4 ℓ + 1) + ln( J)/ε ℓ = (2 · 2ℓ + 2 −ℓ)√ln J.If L is the last epoch, 4L−1 < ¯B(T ) for L ≥ 1, so 
+
+2L ≤ 2p ¯B(T ) in all cases. Summing, P
+
+> ℓ≤L
+
+(2 ·2ℓ +2 −ℓ) ≤
+
+4 · 2L + 2 ≤ 8p ¯B(T ) + 2 ≤ 10 p ¯B(T ), and ¯B(T ) ≤ ¯D(T )
+
+by Lemma 3. 
+
+Proof of Theorem 1. Since pt = P 
+
+> j
+
+qj,t p(j) 
+
+> t
+
+, we have 
+
+r⊤ 
+
+> t
+
+pt = ⟨qt, λ t⟩. Hence, for any j,
+
+X
+
+> t
+
+ri⋆t ,t − X
+
+> t
+
+r⊤ 
+
+> t
+
+pt =
+
+h X 
+
+> t
+
+λj,t − X
+
+> t
+
+⟨qt, λ t⟩
+
+i
+
++
+
+h X 
+
+> t
+
+ri⋆t ,t − X
+
+> t
+
+r⊤ 
+
+> t
+
+p(j)
+
+> t
+
+i
+
+.
+
+The first bracket is at most 10 p ¯D(T ) ln J by Lemma 5. For the second, take ut = ei⋆t in Lemma 1. Since ∥ei − ei′ ∥1= 2 
+
+for i̸ = i′, P u = 2 P (T ), and with D(T ) ≤ ¯D(T ) the bracket is at most A/γ (j) + γ(j) ¯D(T ). Choosing j as in Lemma 4 gives 3
+
+√2
+
+pαV (1 + 2 P (T )) ¯D(T ). Every step is an inequality between realized quantities, so the bound holds on every realization.

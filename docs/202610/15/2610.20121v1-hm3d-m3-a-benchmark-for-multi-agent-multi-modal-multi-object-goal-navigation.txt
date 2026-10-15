@@ -1,0 +1,242 @@
+Title: HM3D-M3: A Benchmark for Multi-Agent, Multi-Modal, Multi-Object Goal Navigation
+
+URL Source: https://arxiv.org/pdf/2610.20121v1
+
+Published Time: Thu, 15 Oct 2026 01:32:16 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# HM3D-M 3: A Benchmark for Multi-Agent, Multi-Modal, Multi-Object Goal Navigation 
+
+Hongyu Ding 1,4,∗, Kanyu Xu 2,∗, Mingjia Chen 3, Zixuan Chen 2,Jieqi Shi 2,†, Jing Huo 1,†, Yifan Zhang 4,†, Yang Gao 2
+
+Abstract — Rapid progress in AI agents and robotics makes it a matter of the near future that humans are served by a team of robots. Such a team will receive several goals at once, each specified in whatever form is convenient for the human, such as a category name, a photo, or a spoken description. Existing benchmarks study multi-agent, multi-modal, and multi-object goal navigation in isolation , and a benchmark that places all three in one episode is missing. To fill this gap, we introduce HM3D-M 3. A team of K agents starts at distributed locations in a photorealistic indoor scene and searches for an unordered set of M object goals, each given as an open-vocabulary category, an instance image, or an instance description. HM3D-M 3 provides 1,000 validation episodes over 3,926 goals from 379 open-vocabulary categories, 100K observation–assignment training samples, and two team-level metrics, goal-level SR and makespan-normalized SPL. We further contribute two baselines. HiGA is a trained hierarchical goal assigner on top of a frozen open-vocabulary navigation policy, and LaViRA-M 3 is a training-free team of VLM agents with shared mapping and progress analysis. Adapted multi-robot and zero-shot methods reach 16–27% SR, while our baselines reach 38–41% with complementary strengths and distinct failure modes. Furthermore, we deploy LaViRA-M 3
+
+on a heterogeneous three-robot team. Project page: https: //robo-lavira.github.io/hm3d-m3/ 
+
+I. I NTRODUCTION 
+
+Consider a home with several robots and a resident who asks them to find a nightstand, the couch in a photo, and “the plant by the sliding glass door”. Nothing in this request is exotic. Rapid progress in AI agents and robot hardware places such teams within the near future, and the request has the shape everyday instructions take: several goals at once, each given in whatever form is at hand. What is missing is a way to measure how well a team handles it, since the goals have to be divided, recognized under three different specifications, and tracked jointly. Standing in that future and looking back at the present, the landscape of navigation benchmarks is fragmented, as Table I summarizes. Single-agent object-goal navigation asks for one instance of one category, recently from an open  
+
+> ∗Equal Contribution ,†Corresponding Author
+> 1Hongyu Ding and Jing Huo are with the School of Computer Science, Nanjing University, China.
+> 2Kanyu Xu, Zixuan Chen, Jieqi Shi and Yang Gao are with the School of Intelligence Science and Technology, Nanjing University, China.
+> 3Mingjia Chen is with the School of Electrical and Automation Engi-neering, Nanjing Normal University, Nanjing, China.
+> 4Hongyu Ding and Yifan Zhang are with the Institute of Automation, Chinese Academy of Sciences, and the University of Chinese Academy of Sciences, Nanjing, China.
+
+Fig. 1: HM3D-M 3. Top: a team of agents searches a pho-torealistic scene for an unordered set of goals given as a category, an instance image, or an instance description. The benchmark provides 1,000 validation episodes, 3,926 goals, 379 categories, and 100K training samples. Bottom: goal-level SR of all methods including our two complementary baselines, and the real-world deployment on three heteroge-neous robots. vocabulary [1], [6]. Multi-object variants give one agent several category goals [3], [10]. Multi-modal variants mix category, image, and language goals, but present them se-quentially and score each sub-task on its own [7]. Multi-robot semantic navigation evaluates teams, but on a single goal of a single modality, and grants success as soon as 
+
+any robot arrives [11], [12]. Recent systems combine all three [13], [14], yet they are evaluated on episodes borrowed from single-agent benchmarks with per-sub-task scoring. No benchmark defines the joint task, generates episodes for it, or measures the team as a whole. The intersection is not a concatenation of its parts. Allo-cation happens under partial observability, since who should pursue which goal depends on heterogeneous evidence that arXiv:2610.20121v1 [cs.RO] 14 Oct 2026 TABLE I: Comparison with related goal-navigation benchmarks. Unord. means that goals are given as an unordered set, and Mix means that several modalities appear within one episode.                                                                                                     
+
+> Benchmark Venue Multi-agent Multi-goal Unord. Open vocab. ON TN IIN Mix
+> ObjectNav [1] arXiv’20 ✗✗–✗✓✗✗✗
+> RoboTHOR [2] CVPR’20 ✗✗–✗✓✗✗✗
+> MultiON [3] NeurIPS’20 ✗✓✗✗✓✗✗✗
+> CollaVN [4] NeurIPS’21 ✓✗–✗✗✗✗✗
+> InstanceImageNav [5] arXiv’22 ✗✗–✗✗✗✓✗
+> HM3D-OVON [6] IROS’24 ✗✗–✓✓✗✗✗
+> GOAT-Bench [7] CVPR’24 ✗✓✗✓✓✓✓✓
+> Habitat-MAS [8] ICLR’25 ✓✓✓✗✓✗✗✗
+> HM3D-MFMON [9] arXiv’26 ✗✓✗✗✓✗✗✗
+> HM3D-M 3(ours) –✓✓✓✓✓✓✓✓
+
+arrives as the map grows. Verification becomes instance-level, since an image or a description refers to one specific object. Completion is joint, since the natural cost is the team makespan, so an idle or redundant robot is not free. To fill this gap, we present HM3D-M 3, a benchmark for 
+
+Multi-agent, Multi-modal, Multi-object goal navigation in photorealistic scans of real buildings [15], [16], illustrated in Fig. 1. An episode places K agents at distributed, jointly reachable start positions and gives the team an unordered set of M goals from 379 open-vocabulary categories. Each goal is specified as a category (ON), an instance image (IIN), or an instance description (TN). A goal counts as found when an agent declares it while standing within 1 m of that instance, and every episode stores the oracle team makespan d∗ for budgeting and normalization. We further contribute two baselines, one trained and one training-free. HiGA, short for Hierarchical Goal Assigner, is a trained method in which a transformer reads the shared map, agent poses, and per-goal CLIP heat maps, assigns goals to agents, and hands each assignment to a frozen open-vocabulary navigation policy [6]. It is trained with behavior cloning and DAgger [17] from an oracle assigner. LaViRA-M3 is a training-free method that extends the vision-language model (VLM) navigation agent of LaViRA [18], [19] to a team coordinated only through a shared map, a shared goal board, and shared natural-language progress analysis. We also adapt four existing multi-robot and zero-shot meth-ods [11], [13], [20], [21] to the benchmark. The results expose a task that is far from solved, with adapted methods at 16–27% SR, HiGA at 37.9%, and LaViRA-M 3 at 41.0%, and two baselines with complemen-tary strengths. HiGA is the strongest on category goals but weak on image goals and inefficient, whereas LaViRA-M 3 is the strongest on image and text goals and the most efficient. Their failures differ, since LaViRA-M 3 mostly declares a goal from the wrong place, whereas HiGA mostly fails to detect or match it. Our contributions are:  
+
+> •
+
+HM3D-M 3, the first benchmark for multi-agent, multi-modal, multi-object goal navigation, with a standardized episode generator, a validation set of 1,000 episodes and 3,926 goals on 36 held-out scenes, a training set of 100K observation–assignment samples on disjoint scenes, and team-level metrics.  
+
+> •
+
+Two baselines, the trained HiGA and the training-free LaViRA-M 3, plus adaptations of four existing methods, evaluated with ablations, scaling studies over K and M ,and a per-goal failure attribution.  
+
+> •
+
+A real-world deployment of LaViRA-M 3 on a heteroge-neous team of three robots running local VLMs, which complete mixed-modality goal sets in an office through the same coordination channels as in simulation. II. R ELATED WORK 
+
+Goal navigation benchmarks. Single-agent benchmarks have progressively enriched how a goal is specified, from a closed set of categories [1], [2] to an open vocabulary [6], and to a particular instance shown in an image [5] or described in language [7]. Multi-object variants ask one agent for several goals, in a fixed order [3] or as an unordered set [10], recently across several floors [9], and lifelong multi-modal navigation chains 5–10 goals of mixed modality into one episode with per-sub-task scoring [7], [22]. The one multi-agent benchmark among them, Habitat-MAS [8], targets language-specified household tasks for heterogeneous teams, with multi-object navigation limited to a closed vo-cabulary and a single modality. HM3D-M 3 inherits the open vocabulary and the three goal modalities of this line, and adds a team of agents, an unordered goal set searched jointly, and a per-episode team optimum. 
+
+Multi-robot semantic navigation. After early work in syn-thetic scenes [4], recent systems on photorealistic scans let a VLM allocate frontiers to robots [11], [12], and LLM agents have been coordinated on unordered multi-object missions in a single modality on small custom episode sets [23]. Closest to our task are two very recent systems that run robot teams on multi-modal, multi-goal missions. DM 3-Nav [13] is decentralized, with agents that exchange local maps, task states, and intents within communication range and claim goals by broadcasting them, and it introduces a makespan-normalized SPL. AnyGoal [14] is a training-free team in which a VLM guides exploration toward category, image, and language goals presented sequentially, as in GOAT-Bench. Both are methods rather than benchmarks, evaluated on single-agent episodes with sub-task scoring, and neither defines a multi-agent episode distribution, a team budget, or team metrics, which HM3D-M 3 supplies. We evaluate the official implementation of DM 3-Nav on it and adopt its Fig. 2: HM3D-M 3 validation set with 1,000 episodes and 3,926 goals. (a) Episodes per (K, M ) cell. (b) Goals per modality for each M . (c) Goal spread, the mean pairwise geodesic distance between goals, against the shortest team tour 
+
+d∗, correlated with r=0 .71 . (d) Number of same-category instances on the same floor for each IIN and TN goal. MSPL. The code of AnyGoal had not been released at the time of writing. 
+
+Trained and training-free navigation policies. Trained object-goal policies range from end-to-end RL and imita-tion [24] to the DAgger-trained open-vocabulary policy [6] that we use frozen as the lower level of HiGA. Training-free methods pair explicit maps with foundation models [20], [25], unify category, image, and text goals by graph match-ing [26], or let an LLM or VLM act as the navigation agent itself [18], [27]. LaViRA [18] and Uni-LaViRA [19] decompose each decision into a language, a vision, and a robot action. LaViRA-M 3 extends them to a team. III. T HE HM3D-M 3 BENCHMARK 
+
+A. Task Definition 
+
+An episode of HM3D-M 3 is a tuple (S, {sk}Kk=1 , {gj }Mj=1 )
+
+with a scene S, start poses sk for K agents, and M goals. Each goal gj = ( oj , m j , x j ) refers to an object instance 
+
+oj of a distinct category and is presented to the team in one modality mj with content xj . An ON goal gives the category name, e.g. “nightstand”. An IIN goal gives an image of the specific instance taken from a camera that is not the agent’s, and a TN goal gives a description of the specific instance, e.g. “the plant by the sliding glass door”. IIN and TN goals point to a specific instance, while an ON goal accepts any instance of the named category. All M goals are given at the start in no particular order. Each agent observes posed RGB-D images and its own pose in a frame shared by the team, as in prior multi-robot work [11], [13], and executes discrete actions, MOVE FORWARD by 0.25 m and 
+
+TURN LEFT or TURN RIGHT by 30 ◦, in lockstep with its teammates. 
+
+Success protocol. At any step an agent may declare 
+
+FOUND (j) for a goal j that is still unresolved. The declara-tion succeeds if the agent stands within 1 m of a navigable viewpoint of an acceptable instance of gj , following the success criterion of GOAT-Bench [7], and is otherwise void, with the episode continuing without penalty. Declaring and scoring are separate: a declaration is the policy’s own belief, which the team may share, whereas the evaluator scores it against the ground truth offline and never reveals the verdict, so any verification before declaring must use the agent’s own perception. A goal counts for the team regardless of which agent found it. The episode ends when all M goals are found or when every agent has exhausted its budget of 500 actions or a path length of 3 d∗, where d∗ is the oracle team makespan defined below. 
+
+B. Episode Generation 
+
+Scenes and goals. We use the HM3DSem scenes [16] with the train/validation scene split of HM3D-OVON [6], and draw goal instances and their navigable viewpoints from its 379 open-vocabulary categories. For each episode we sample a floor that contains at least M distinct categories, then M instances of M distinct categories on that floor, each keeping up to eight navigable viewpoints as its success region. Modalities are balanced within the episode, with exactly one goal per modality for M =3 and as evenly as possible otherwise, as shown in Fig. 2b. Fig. 2d shows how many other instances of the same category share the floor with each IIN and TN goal. 
+
+Image and text goals. IIN images follow the InstanceIma-geNav protocol [5] adopted by GOAT-Bench, with a camera placed 0.5–2 m from the instance at a height of 0.8–1.5 m and a field of view of 60 –120 ◦, keeping only viewpoints from which the instance is sufficiently visible. For TN descriptions we follow the LanguageNav pipeline of GOAT-Bench, rendering the instance from its best viewpoint and prompting a VLM, Qwen3.5-27B [28], for one sentence that distinguishes it from others of its category by color, material, and neighboring objects, and we spot-check the results. 
+
+Starts and reachability. The K start poses are sampled on the same floor by rejection sampling. They must lie on navigable regions of sufficient size, be separated by a controlled geodesic distance so that the team starts dis-tributed rather than co-located, and jointly cover the goals, 
+
+i.e. every goal must be geodesically reachable from at least one start. Each goal enters the routing geometry through a single representative viewpoint, and the start–goal and goal– goal geodesic matrices over these points are stored with the episode. 
+
+Oracle makespan. From these matrices we compute the oracle team makespan 
+
+d∗ = min   
+
+> a:{1..M }→{ 1..K }
+
+max  
+
+> k
+
+ℓk
+
+ a−1(k), (1) where a assigns goals to agents and ℓk(·) is the length of agent k’s open nearest-neighbor tour from sk through its assigned goals. The minimization is exact by enumeration when KM ≤ 10 5 and uses a load-balanced greedy assign-ment otherwise. d∗ is thus the optimal division of labor under nearest-neighbor routing rather than a global optimum, and since the per-agent tour is not always the shortest one and ON goals use the sampled instance although any instance is acceptable, it is an upper bound on the true optimum. It scales the budget and normalizes efficiency for all methods alike. 
+
+Splits. The validation set contains 1,000 episodes on the 36 HM3D-OVON validation scenes, sampled uniformly over 
+
+K ∈ { 2, 3, 4} and M ∈ { 3, 4, 5} and stratified over scenes, as shown in Fig. 2a, with 3,926 goals of which 1,299 are ON, 1,313 are TN, and 1,314 are IIN. The training set is generated on the disjoint HM3D-OVON training scenes with the same procedure. From it we derive 100K observation–assignment samples for learning coordination, as described in Sec. IV-B. 
+
+C. Metrics 
+
+Let ci ≤ Mi be the number of goals found in episode 
+
+i and Ti = max k ℓk the team makespan, i.e. the path length of the agent that travelled farthest. Goal-level SR 
+
+is 1
+
+> N
+
+P 
+
+> i
+
+ci/M i, i.e. the fraction of goals the team finds, which equals the Progress of MultiON [3] and the sub-task success of GOAT-Bench. We report goal-level rather than episode-level success because an episode succeeds only if all 
+
+M goals are found, which current methods achieve rarely. An episode-level rate would sit near zero and hide partial progress and per-modality differences. Makespan-normalized 
+
+SPL is 1
+
+> N
+
+P 
+
+> ici
+> Mi
+
+· d∗  
+
+> i
+> max( d∗
+> i,T i)
+
+, the multi-agent SPL of [13]. Normalizing by the makespan rather than the summed path rewards division of labor. Because SPL is weighted by 
+
+ci/M i, a team that finds only its nearest goals and stops early also scores low. In-place rotations add no path length but consume the action budget. ON , TN , and IIN are the found rates of goals of each modality. IV. B ASELINES 
+
+All methods receive the same inputs, the goal set with category names, reference images, and descriptions, posed RGB-D from every agent, and a shared top-down occupancy map built from the team’s depth observations. Goals that any agent has declared found are removed from every agent’s list. The evaluator’s verdict on those declarations is never revealed to the team. 
+
+A. Adapted Methods 
+
+To compare coordination strategies rather than perception stacks, all adapted methods and HiGA share one goal-recognition module, taken from the strongest HM3D-OVON baseline [6]. An open-vocabulary detector, OWLv2 [29], pro-poses candidates for every unresolved goal in every frame. A candidate is accepted for an ON goal by detector confidence, for a TN goal by CLIP [30] similarity between the crop and the description, and for an IIN goal by SuperGlue [31] keypoint matching against the reference image, after which a point-goal policy approaches the object and declares FOUND .Exploration and coordination follow each method’s original design. VLFM [20] scores frontiers with a BLIP-2 [32] value map, and each agent greedily heads to the highest-value frontier for the unresolved goals on the shared map. 
+
+EGO-Swarm [21] is a purely geometric swarm in which each agent moves to the nearest frontier, with a repulsion term that keeps agents apart. Co-NavGPT2 [11] uses a centralized VLM planner that reads the shared semantic top-down map with agent positions and frontier candidates and assigns one frontier to every agent at each replanning step. We use Qwen3.5-27B in place of GPT-4o so that all VLM-based methods share the same model. DM 3-Nav [13] is decentralized, with agents exchanging local maps, task states, and navigation intents within communication range, claiming goals by broadcasting their intent, and selecting frontiers weighted by distance. We port the official implementation to our episodes. 
+
+B. HiGA, a Hierarchical Goal Assigner 
+
+HiGA splits the problem into two levels, shown in Fig. 3a. An upper level decides who pursues what , and a lower level decides how to get there .
+
+Lower level. Each agent executes its current assignment with the frozen DAgRL+OD policy of HM3D-OVON [6], whose RGB policy explores toward the assigned category until the recognition module of Sec. IV-A takes over. The detector watches all unresolved goals rather than only the assigned one, so an agent that passes an unassigned goal will still claim it. 
+
+Upper level. The assigner observes the occupancy map, the poses of the K agents, and one heat map per goal, all in the shared frame. The heat map is obtained by scoring every RGB frame of every agent against the goal text with CLIP [30] and back-projecting the score through depth onto the map, where image goals use their category name. Map, goal, and agent tokens from three encoders are processed jointly by a 3-layer transformer with d=256 , an MLP head scores every agent–goal pair, and the Hungarian algorithm decodes a one-to-one assignment, leaving surplus goals unassigned and surplus agents exploring. The assignment is recomputed whenever a goal is found, an agent becomes idle, or a new candidate is detected. 
+
+Training. The teacher is an oracle assigner that uses ground-truth goal positions to compute the makespan-optimal assign-ment of Eq. (1) at every event. We collect 100K observation– assignment samples from the teacher on the training scenes, train with cross-entropy to the teacher’s assignment as be-havior cloning, and then run three rounds of DAgger [17], relabeling the states visited by the student. 
+
+C. LaViRA-M 3, a Team of VLM Agents 
+
+Each agent is an instance of the LaViRA agent [18], [19], shown in Fig. 3b, which translates a decision through three levels. In the language action , a VLM, Qwen3.5-27B, reads the goal set including reference images and descriptions, a four-view panorama, and its navigation history. It outputs a 
+
+progress estimation together with a high-level action, which navigates in a direction, backtracks to a waypoint, or claims (a) HiGA, trained. A transformer over agent, goal, and map tokens assigns goals to agents, and each agent executes its assignment with a frozen open-vocabulary navigation policy. Flames mark trained modules and snowflakes frozen ones. 
+
+> (b) LaViRA-M 3, training-free. Every agent runs a language–vision–robot action agent, and the team shares a top-down map, a goal board, and natural-language progress analysis. No goal is ever explicitly assigned.
+
+Fig. 3: The two HM3D-M 3 baselines. 
+
+to have found a goal. In the vision action , a VLM grounds the chosen direction to a bounding box, and in the robot action , the agent plans to the grounded target with the fast marching method on the shared map. 
+
+Team coordination. Three channels connect the agents. The 
+
+shared top-down map , a geometric occupancy map, is used for planning and to avoid re-exploring regions a teammate has covered, and it is not shown to the VLM. The shared goal board , SG, lists every goal with its status, either unresolved or found by a given agent. Shared progress analysis , SP, prepends each agent’s latest progress estimation, a first-person summary of where it has been and what it has seen, to every teammate’s prompt. Division of labor is not enforced and emerges from the VLM reading the board and its teammates’ progress analysis. 
+
+Declaring a goal. When the language action proposes to claim goal j, the agent re-examines the object in a four-view panorama with the VLM, requires the object to be within 2 m in depth, and requires the VLM’s identity judgment against the goal specification to be confident. Only then is FOUND (j)
+
+declared and written to the board. The 2 m gate is a property of this baseline and is looser than the 1 m success radius. Sec. V-E quantifies its share of the failures. V. E XPERIMENTS 
+
+A. Setup 
+
+All experiments run in Habitat [33] on the 1,000 validation episodes of HM3D-M 3 with a single evaluation run per method on 8 NVIDIA A800 GPUs. Agents act in lockstep with the discrete action space of Sec. III-A, and each agent has a budget of 500 actions and a path length of 3 d∗. HiGA and the adapted methods observe through the Stretch camera of their base policy, with 360 ×640 RGB-D and a 42 ◦ field of view, and LaViRA-M 3 observes 640 ×480 RGB-D with a 79 ◦
+
+field of view. Since the field of view differs, we additionally evaluate LaViRA-M 3 with the same 42 ◦ Stretch camera as a sensor-matched control in Table III. Co-NavGPT2, LaViRA-M3, and the TN descriptions all use Qwen3.5-27B [28], and HiGA and the adapted methods use the detector-based recognition module of Sec. IV-A. All numbers are in percent. 
+
+B. Main Results 
+
+Table II compares the four adapted methods with our two baselines, and three observations stand out. TABLE II: Main results on the HM3D-M 3 validation split with 1,000 episodes. SR and SPL are the goal-level SR and the makespan-normalized SPL of Sec. III-C, and ON, TN, and IIN are found rates per modality. Best in bold .                                            
+
+> Method Coordination SR ↑SPL ↑ON ↑TN ↑IIN ↑
+> VLFM [20] independent agents on a shared map 16.1 11.8 24.5 17.7 5.9 EGO-Swarm [21] geometric dispersion 23.7 10.7 35.5 28.0 7.5 Co-NavGPT2 [11] centralized VLM frontier allocation 24.5 9.4 37.3 28.8 7.6 DM 3-Nav [13] decentralized intent broadcasting 26.6 9.9 35.9 30.4 14.2
+> HiGA (ours) learned goal assignment 37.9 7.1 53.0 40.2 18.8
+> LaViRA-M 3(ours) shared goal board and progress analysis 41.0 20.3 38.6 40.9 41.4
+
+The task is far from solved. Adapted methods find 16–27% of the goals, the best method, LaViRA-M 3, finds 41.0%, and the best SPL is 20.3%. Image goals are the hardest for every detector-based method, with 5.9–18.8%. 
+
+Frontier allocation is not goal allocation. Among the adapted methods, spreading the team out matters more than semantic frontier scoring. The purely geometric EGO-Swarm at 23.7% outperforms independent VLFM agents at 16.1%, and the VLM- and intent-based frontier allocators of Co-NavGPT2 and DM 3-Nav add only a few points, 24.5% and 26.6%. Once the map is shared, deciding which goal each agent pursues is what separates the methods. HiGA, which shares the camera and the recognition module of the adapted methods, gains 11 points over the best of them. LaViRA-M 3
+
+gains 14 points with its wider camera and 3 points with the sensor-matched 42 ◦ camera of Table III, and in both configurations its SPL is about twice that of any adapted method. The wider field of view thus accounts for a large part of the SR gap of LaViRA-M 3 but not for its efficiency. 
+
+The two paradigms are complementary. HiGA is the strongest on category goals with 53.0% ON but weak on image goals with 18.8% IIN and the least efficient method with 7.1% SPL, since its detector finds categories reliably but keypoint matching rarely confirms an instance, and its policy, trained for single-goal episodes, travels far. LaViRA-M3 is the strongest on instance goals with 41.4% IIN and 40.9% TN and the most efficient with 20.3% SPL, since the VLM reasons over the reference image or description and shared progress analysis avoids redundant travel, but its category search trails HiGA by 14 points. With the matched camera, LaViRA-M 3 still leads HiGA on image goals, 27.8 against 18.8, and on SPL, 23.0 against 7.1. Neither paradigm dominates. 
+
+C. Ablations 
+
+HiGA. With the navigation policy fixed, Table III compares four assignment strategies. Random assigns goals uniformly at random, rule-based matches agents to detected candidates by travel cost, and HiGA-BC and HiGA-DAgger are trained by behavior cloning of the oracle assigner without and with three DAgger rounds. Learning to assign is worth 16 points over the hand-designed rule, because the learned assigner acts on the heat maps before a goal is detected, whereas the rule can only react to detections. DAgger adds 3.8 points over behavior cloning, concentrated on ON and IIN. 
+
+LaViRA-M 3. Both coordination channels matter, and for TABLE III: Ablations on the HM3D-M 3 validation split. HiGA: assignment strategy with the navigation policy fixed. LaViRA-M 3: coordination channels. Best within each group in bold .                                                  
+
+> Variant SR ↑SPL ↑ON ↑TN ↑IIN ↑
+> HiGA , assignment strategy random 16.8 2.7 22.7 17.3 8.3 rule-based 21.6 4.3 29.5 19.7 11.3 HiGA-BC 34.1 6.0 44.7 41.7 14.3 HiGA-DAgger 37.9 7.1 53.0 40.2 18.8 LaViRA-M 3, coordination channels Full 41.0 20.3 38.6 40.9 41.4
+> w/o SG 33.2 21.6 38.6 26.8 33.8 w/o SP 37.3 17.2 35.6 36.2 39.8 w/o SG + SP 29.3 18.8 30.3 26.0 30.1 w/ HiGA camera 29.6 23.0 32.6 27.6 27.8
+
+different reasons. In the variant without SG, the shared goal board is replaced by an explicit assignment that gives each agent one goal. SR drops by 7.8 points, almost entirely on instance goals, with TN falling from 40.9 to 26.8 and IIN from 41.4 to 33.8, while SPL rises slightly from 20.3 to 21.6. A fixed assignment makes paths direct but prevents agents from claiming goals they encounter opportunistically, which is how most instance goals are found. In the variant without SP, teammates’ progress analysis is withheld, and SR drops by 3.7 points uniformly across modalities and SPL by 3.1 points, because agents that do not know where their teammates have been re-explore, and removing both channels costs 11.7 points. The last row, separated by a rule, is the sensor-matched control in which LaViRA-M 3 uses the 42 ◦
+
+Stretch camera of HiGA and the adapted methods instead of its 79 ◦ camera. SR falls by 11.4 points across all modalities while SPL rises to 23.0, since a narrower view finds fewer goals but reaches those it finds with less detouring. 
+
+D. Scaling with K and M
+
+Fig. 4 varies one axis while fixing the other, with 200 LaViRA-M 3 episodes per point on the validation scenes. Adding agents helps, as SR at M =3 rises monotonically from 21.7% with one agent to 60.0% with nine. SPL, however, stays at 12–18%, which is the cost side of the same curve: additional agents buy coverage rather than a propor-tionally shorter division of labor, and current coordination does not yet exploit the parallelism that d∗ assumes. Adding Fig. 4: Scaling with team size and goal count for LaViRA-M3, with 200 episodes per point on validation scenes. (a) SR grows monotonically with K at M =3 while SPL stays flat. (b) SR and SPL fall with M at K=3 .goals hurts, as SR at K=3 falls from 55.0% with one goal to 31.7% with nine and SPL falls from 30.7% to 12.7%, since each additional goal competes for the same team budget and lengthens the makespan. 
+
+E. Failure Analysis 
+
+Fig. 5 attributes every missed goal to one cause, for both baselines, and the first split is whether the method ever acted on the goal. LaViRA-M 3 misses 59.0% of all goals, and for 50.7% of all goals it acted and still missed. In 41.8% the agent declared FOUND but stood more than 1 m from a valid viewpoint, which we call a pose miss, and in 8.9% its own verification rejected the claim and it never returned. Only 8.3% of goals were never claimed, and only 2.9% were never approached within 3 m. The pose misses are not one failure but three. Only about a quarter were declared within 2 m of a viewpoint, the case in which the agent saw the object and stopped early, which the 2 m depth gate of Sec. IV-C permits. About 30% had passed within 1 m of the goal earlier but declared elsewhere, a failure of choosing where to stop, and about 40% were declared more than 5 m away, that is, the agent misidentified an object or a room. The looser gate therefore explains only part of the gap. Stop selection and identity verification at a distance are the larger parts, and all three are properties of the baseline rather than of the task. HiGA misses 62.1%, and for 37.6% it acted and still missed. In 25.7% the detector fired but the approach did not end within 1 m of the right instance, and in 11.9%, all of them image goals, the keypoint matcher never confirmed the instance. A further 16.4% of goals were within 3 m of an agent but never detected, and 8.1% were never approached. Perception rather than allocation limits the trained paradigm. The two profiles are complementary and suggest pairing a VLM that recognizes instances with a learned policy that approaches, selects the stop point, and confirms identity at close range. VI. R EAL -W ORLD DEPLOYMENT 
+
+To test whether the setting transfers beyond simulation, we deploy LaViRA-M 3 on a heterogeneous team of three robots in an office, an Agilex Cobot Magic wheeled platform, a Unitree Go1, and a Unitree Go2 quadruped, shown in Fig. 6. Each robot carries an RGB-D camera, a Livox Mid-360 LiDAR for localization and mapping, and an onboard computer, an RTX 4090 on the Cobot Magic and a Jetson Orin NX on each quadruped, on which it runs its own LaViRA agent with a locally deployed Qwen3.8-27B [34], the successor of the Qwen3.5 model used in simulation, in 4-bit GGUF quantization, without any cloud API. The robots exchange the shared map as voxel records over Wi-Fi, together with the goal board and their progress analysis, through the same channels as in simulation, and each exe-cutes the resulting waypoints with its own velocity controller, the only platform-specific component. In the run of Fig. 6, the robots spread out through the office, each claims the goal it encounters, and a goal found by one robot is removed from the others’ lists, as also shown in the supplementary video. VII. C ONCLUSION 
+
+We introduced HM3D-M 3, a benchmark in which a team of agents searches for an unordered set of open-vocabulary goals given as categories, instance images, and descriptions, with a trained and a training-free baseline. The results show a task with ample headroom at 41% SR, two baselines with complementary strengths and distinct failures, and a difficulty that grows with the number of goals and is only partly relieved by adding agents. 
+
+Limitations. We assume a shared coordinate frame and lock-step execution, without communication cost or localization drift. Text goals are written by a VLM and only spot-checked, results come from a single run, and the real-world deployment is qualitative. REFERENCES [1] D. Batra, A. Gokaslan, A. Kembhavi, et al. , “ObjectNav revisited: On evaluation of embodied agents navigating to objects,” arXiv preprint arXiv:2006.13171 , 2020. [2] M. Deitke, W. Han, A. Herrasti, et al. , “RoboTHOR: An open simulation-to-real embodied AI platform,” in CVPR , 2020. [3] S. Wani, S. Patel, U. Jain, A. X. Chang, and M. Savva, “MultiON: Benchmarking semantic map memory using multi-object navigation,” in NeurIPS , 2020. [4] H. Wang, W. Wang, X. Zhu, J. Dai, and L. Wang, “Collaborative visual navigation,” arXiv preprint arXiv:2107.01151 , 2021. [5] J. Krantz, S. Lee, J. Malik, D. Batra, and D. S. Chaplot, “Instance-specific image goal navigation: Training embodied agents to find object instances,” arXiv preprint arXiv:2211.15876 , 2022. [6] N. Yokoyama, R. Ramrakhya, A. Das, D. Batra, and S. Ha, “HM3D-OVON: A dataset and benchmark for open-vocabulary object goal navigation,” in IROS , 2024. [7] M. Khanna, R. Ramrakhya, G. Chhablani, et al. , “GOAT-Bench: A benchmark for multi-modal lifelong navigation,” in CVPR , 2024. [8] J. Chen, C. Yu, X. Zhou, et al. , “EMOS: Embodiment-aware hetero-geneous multi-robot operating system with LLM agents,” in ICLR ,2025. [9] Z. Li, Z. Sun, J. Xu, et al. , “LifelongCrossNav: Persistent 3D seman-tic memory for cross-floor multi-object navigation,” arXiv preprint arXiv:2608.07079 , 2026. [10] N. Gireesh, A. Agrawal, A. Datta, et al. , “Sequence-agnostic multi-object navigation,” in ICRA , 2023. [11] B. Yu, H. Kasaei, and M. Cao, “Co-NavGPT: Multi-robot cooperative visual semantic navigation using vision language models,” arXiv preprint arXiv:2310.07937 , 2023. [12] Z. Shen et al. , “Enhancing multi-robot semantic navigation through multimodal chain-of-thought score collaboration,” in AAAI , 2025. [13] A. Kashiri, A. Jamsandekar, and Y. Yazıcıo˘ glu, “DM 3-Nav: Decentral-ized multi-agent multimodal multi-object semantic navigation,” arXiv preprint arXiv:2604.22014 , 2026. Fig. 5: Qualitative example and failure attribution. Left, a K=4 , M =3 episode of LaViRA-M 3 with one goal per modality, with agents in different colors. Right, where missed goals go, as a fraction of all goals, for (a) LaViRA-M 3 and (b) HiGA. A missed goal is either claimed and rejected by the protocol, or never claimed. 
+
+Fig. 6: Real-world deployment. Left, the three platforms—an Agilex Cobot Magic, a Unitree Go1, and a Unitree Go2— exchanging the shared map as voxel records. Center, a run with three goals—an image of a yellow suitcase, the category “printer”, and the description “green chair besides the coffee bar”—with first-person views at t0 to t3 ending when each robot declares its goal found. Right, the shared map growing over time, colored by robot, with regions mapped by more than one robot in pink. 
+
+[14] M. James, M. J. Fernando, M. A. Cabrera, and D. Tsetserukou, “Any-Goal: Vision-language guided multi-agent exploration for training-free lifelong navigation,” arXiv preprint arXiv:2606.13878 , 2026. [15] S. K. Ramakrishnan, A. Gokaslan, E. Wijmans, et al. , “Habitat-matterport 3D dataset (HM3D): 1000 large-scale 3D environments for embodied AI,” in NeurIPS Datasets and Benchmarks Track , 2021. [16] K. Yadav, R. Ramrakhya, S. K. Ramakrishnan, et al. , “Habitat-matterport 3D semantics dataset,” in CVPR , 2023. [17] S. Ross, G. Gordon, and D. Bagnell, “A reduction of imitation learning and structured prediction to no-regret online learning,” in AISTATS ,2011. [18] H. Ding, Z. Xu, Y. T. S. Fang, et al. , “LaViRA: Language-vision-robot actions translation for zero-shot vision language navigation in continuous environments,” arXiv preprint arXiv:2510.19655 , 2025. [19] H. Ding, S. Zhang, Z. Xu, et al. , “Uni-LaViRA: Language-vision-robot actions translation for unified embodied navigation,” arXiv preprint arXiv:2605.27582 , 2026. [20] N. Yokoyama, S. Ha, D. Batra, J. Wang, and B. Bucher, “VLFM: Vision-language frontier maps for zero-shot semantic navigation,” in 
+
+ICRA , 2024. [21] X. Zhou, J. Zhu, H. Zhou, C. Xu, and F. Gao, “EGO-Swarm: A fully autonomous and decentralized quadrotor swarm system in cluttered environments,” in ICRA , 2021. [22] M. Chang, T. Gervet, M. Khanna, et al. , “GOAT: GO to any thing,” in RSS , 2024. [23] P. Wu, Y. Mu, K. Zhou, J. Ma, J. Chen, and C. Liu, “CAMON: Cooperative agents for multi-object navigation with LLM-based con-versations,” arXiv preprint arXiv:2407.00632 , 2024. [24] R. Ramrakhya, D. Batra, E. Wijmans, and A. Das, “PIRLNav: Pre-training with imitation and RL finetuning for ObjectNav,” in CVPR ,2023. [25] S. Y. Gadre, M. Wortsman, G. Ilharco, L. Schmidt, and S. Song, “CoWs on pasture: Baselines and benchmarks for language-driven zero-shot object navigation,” in CVPR , 2023. [26] H. Yin, X. Xu, L. Zhao, Z. Wang, J. Zhou, and J. Lu, “UniGoal: Towards universal zero-shot goal-oriented navigation,” in CVPR , 2025. [27] Y. Long, W. Cai, H. Wang, G. Zhan, and H. Dong, “InstructNav: Zero-shot system for generic instruction navigation in unexplored environment,” in CoRL , 2024. [28] Qwen Team, “Qwen3.5: Towards native multimodal agents,” https: //qwen.ai/blog?id=qwen3.5, 2026. [29] M. Minderer, A. Gritsenko, and N. Houlsby, “Scaling open-vocabulary object detection,” in NeurIPS , 2023. [30] A. Radford, J. W. Kim, C. Hallacy, et al. , “Learning transferable visual models from natural language supervision,” in ICML , 2021. [31] P.-E. Sarlin, D. DeTone, T. Malisiewicz, and A. Rabinovich, “Su-perGlue: Learning feature matching with graph neural networks,” in 
+
+CVPR , 2020. [32] J. Li, D. Li, S. Savarese, and S. Hoi, “BLIP-2: Bootstrapping language-image pre-training with frozen image encoders and large language models,” in ICML , 2023. [33] M. Savva, A. Kadian, O. Maksymets, et al. , “Habitat: A platform for embodied AI research,” in ICCV , 2019. [34] Qwen Team, “Qwen3.8-Max: A new bar for coding and cowork,” https://qwen.ai/blog?id=qwen3.8, 2026.
