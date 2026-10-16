@@ -1,0 +1,1378 @@
+Title: Auditable and Deployable Multi-Agent Motion Planning via Posetal Games from Legal Guidelines
+
+URL Source: https://arxiv.org/pdf/2610.22277v1
+
+Published Time: Fri, 16 Oct 2026 01:55:25 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+> 1
+
+# Auditable and Deployable Multi-Agent Motion Planning via Posetal Games from Legal Guidelines 
+
+Florian Lercher 1,2*, Karan Mahesh 3,4*, Yujun Huang 1, Meshal Alharbi 1, Runyu Zhang 1, Hanna Krasowski 5,Michael R. Benjamin 3, Matthias Althoff 2, Gioele Zardini 1
+
+Abstract —When robots are deployed in the real-world, they must interact with other agents and accomplish their own goals while adhering to legal constraints. These potentially conflicting objectives are often only partially prioritized, making scalarized objectives or fully specified hierarchies unsuitable. We present a framework for multi-agent motion planning under legal re-quirements based on games with partially ordered preferences (posetal games). Scenario-independent legal guidelines order abstract legal concerns, from which we automatically derive agent preferences and a legal game for any concrete scenario. Agents may refine their legal preferences with private objectives, and regulators may refine the guideline as laws evolve. We prove that such customizations can only remove equilibria and thus preserve legality. To coordinate agents without explicitly communicating private preferences, we introduce belief play, which provably recovers the true equilibria from conservative local games, and a distributed iterative best-response protocol requiring less information. We apply the framework to maritime navigation, systematically lifting pairwise traffic rules to multi-vessel encounters. On seven encounters with up to four vessels, every rule violation of the committed equilibria is certified as forced by the legal hierarchy or unsatisfiable, and defectors are identified from public information in all tested cases. These results indicate that guideline-based posetal games offer an auditable route from partially specified laws to multi-agent motion planning. 
+
+Index Terms —Motion and path planning, multi-robot systems, game theory, formal methods, marine robotics, legal compliance 
+
+I. I NTRODUCTION 
+
+Robots that share roads, waterways, or airspace with other agents must plan their motion subject to many potentially 
+
+> *
+
+Florian Lercher and Karan Mahesh contributed equally to this work and are listed in alphabetical order. This work was partially supported by the MIT Maritime Consortium, the German Research Foundation (DFG) under grant AL 1185/20-1, and the National Science Foundation Graduate Research Fellowship Program under Grant No. 2141064. Any opinions, findings, and conclusions or recommen-dations expressed in this material are those of the author(s) and do not necessarily reflect the views of the National Science Foundation. 
+
+> 1
+
+Laboratory for Information and Decision Systems, Massachusetts Institute of Technology, Cambridge, MA 02139, USA. {yujun233 , meshal ,
+
+runyuzha , gzardini }@mit.edu 
+
+> 2
+
+School of Computation, Information and Technology, Technical Uni-versity of Munich, 85748 Garching, Germany. {florian.lercher ,
+
+althoff }@tum.de 
+
+> 3
+
+Department of Mechanical Engineering, Massachusetts Institute of Technology, Cambridge, MA 02139, USA. {karanmah ,
+
+mikerb }@mit.edu 
+
+> 4
+
+Woods Hole Oceanographic Institution, Woods Hole, MA 02543, USA. 
+
+> 5
+
+Department of Electrical Engineering and Computer Sci-ences, University of California, Berkeley, Berkeley, CA, USA. 
+
+krasowski@berkeley.edu 
+
+This research was conducted during Florian Lercher’s research stay at Massachusetts Institute of Technology in Prof. Zardini’s group. 
+
+V0V1
+
+V2
+
+?
+
+Fig. 1. A vessel encounter with conflicting COLREGS rules for V0. The vessel is required to keep its current course and speed for the overtaking vessel V1 and, simultaneously, give way to the crossing vessel V2 by evading to starboard [5, Rules 13 and 15]. 
+
+conflicting objectives. These objectives often include legal requirements imposed by regulators, which take precedence over individual objectives. Since not all objectives can be sat-isfied simultaneously in general, minimum-violation planning prioritizes them and systematically violates lower-priority ob-jectives when necessary to satisfy higher-priority ones [1], [2]. Legally compliant multi-agent motion planning is nevertheless difficult for at least three reasons. First, some objectives are incomparable, in the sense that one cannot assert that either objective is more important than the other. This is particularly relevant for legal regulations, where authorities typically spec-ify only a partial priority order [3]. Second, many traffic laws are stated as rules between pairs of agents, so the obligations of an agent depend on which other agents are present, and obligations toward different agents might conflict (Fig. 1). Third, in multi-agent settings, agents respond strategically to the actions of other agents [4], whose private objectives are typically unknown. Taken together, these obstacles call for a framework that derives the preferences of the agents from the law for every scenario, preserves the partial priorities of the law, and coordinates the agents without requiring them to disclose their private objectives. A particularly important instance of this problem is motion planning for autonomous vessels in the maritime domain. The International Code of Safety for Maritime Autonomous Ships [6], adopted in 2026, requires autonomous vessels to comply with the maritime traffic rules laid out in the Conven-tion on the International Regulations for Preventing Collisions at Sea (COLREGS) [5]. However, the COLREGS are only defined for pairs of vessels which may lead to conflicting requirements in encounters involving more than two vessels, as shown in Fig. 1. While the COLREGS prioritize collision avoidance over strict compliance with the encounter rules [5, arXiv:2610.22277v1 [cs.MA] 15 Oct 2026 2
+
+Rule 2], they do not specify which rules should be violated when conflicts arise. Considering these challenges, we identify auditability , cus-tomizability , and deployability as key requirements for amulti-agent motion planning algorithm under legal constraints. 
+
+Auditability requires agents to exhibit predictable behavior and provide explanations for their actions, particularly when not all conflicting objectives can be satisfied. Customizability 
+
+enables regulators to revise legal priorities and manufacturers to refine priorities that laws leave unspecified. Moreover, any 
+
+deployable algorithm has to allow agents to coordinate despite their limited knowledge of the private objectives of other agents. To meet these requirements, we present, to the best of our knowledge, the first systematic method for automatically constructing legally compliant motion-planning games from scenario-independent legal guidelines. Our framework repre-sents objective hierarchies as partially ordered preferences, resulting in posetal games [4], for which we provide solution protocols that operate under limited information. The key idea is to separate what the law prescribes from what a scenario instantiates. Regulators specify a guideline , i.e., a partial order over abstract legal concerns such as collision avoidance, and every concrete scenario inherits the preferences of its agents by matching their legal metrics to these concerns. Since every customization of the resulting preferences is a refinement, and refining preferences can only remove equilibria, legality is preserved by construction. We demonstrate the practical appli-cability of the framework through a case study of COLREGS-compliant motion planning for multi-vessel encounters. 
+
+A. Related Work 
+
+Our work lies at the intersection of formal specifications for robotics, game-theoretic motion planning with ordered ob-jectives, and COLREGS-compliant maritime navigation. Since formal specifications provide an interpretable representation of complex objectives and serve as the building blocks of posetal games, we first review their use in robotics, followed by specification-based approaches to multi-agent motion planning and related game-theoretic formulations with ordered prefer-ences. Finally, we discuss existing approaches for COLREGS-compliant multi-vessel motion planning to provide context for our case study. 
+
+1) Specifications for Robotic Interactions: Formal speci-fications, initially used primarily for offline monitoring and runtime verification, have become core components of learn-ing, synthesis, and control methods [7]–[14]. They provide interpretable representations of objectives and constraints and, in multi-agent settings, requirements governing interactions among agents. For example, autonomous-driving systems must satisfy specifications ranging from lane-keeping requirements to appropriate responses to emergency vehicles [15], [16]. In unstructured environments, interaction requirements are commonly expressed through pairwise rules or fixed priority structures, which favor concise representations at the expense of completeness. For instance, the airborne collision-avoidance system ACAS-X determines priorities for pairwise aircraft encounters and relies on heuristics to combine the resulting evaluations [17], [18]. Even in this pairwise setting, the pre-computed lookup tables are sufficiently large to motivate ded-icated compression methods [19]. This scalability challenge is further amplified in domains such as warehouse navigation and maritime robotics, where agents and interactions are more diverse [20]–[23]. Rulebooks [3], [24] reduce the need for exhaustive specification by prioritizing objectives and permit-ting lower-priority objectives to be violated when necessary to satisfy higher-priority ones. Our framework builds on this principle and extends it to multiple strategic agents whose obligations depend on the scenario. 
+
+2) Motion Planning with Formal Objectives: Motion-planning methods based on formal objectives generally adopt one of two perspectives: single-agent planning, in which other agents are treated as uncooperative, or multi-agent planning, in which varying degrees of cooperation are assumed. In single-agent settings, the behavior of surrounding agents is typically modeled using worst-case assumptions, reflecting minimal or no cooperation [22], [25]. Moreover, formal safety specifications are assigned higher priority than performance objectives to guarantee specification compliance by the ego agent [22], [26], [27]. In multi-agent settings, game-theoretic motion planning naturally models strategic interactions between agents. Most existing approaches require the objectives of each agent to be expressed as a scalar cost function, e.g., [28]–[31]. How-ever, scalarization can obscure the relative priorities among objectives so that the resulting behavior becomes difficult to interpret and predict. 
+
+3) Games with Ordered Objectives: To increase inter-pretability when rich preference structures are present, game-theoretic formulations that allow for enforcing orders of pref-erences have been proposed. The simplest structure is a two-level hierarchy, common when constraints, such as safety re-quirements, have strict priority over the performance objective. For example, in urban driving games [32], a shared collision-avoidance objective takes strict priority over individual costs. These personal costs may only depend on the personal action of the agent, a limitation that is lifted in [33] by incorporating zero-sum components. Games of ordered preferences [34] further generalize the objective hierarchy by allowing an arbitrary number of levels, corresponding to a total order over objectives. An iterative best-response solver for these games is presented in [35]. However, requiring a total order over legal requirements places a significant burden on regulators. Posetal games [4] relax this assumption by enabling objectives to remain incomparable, i.e., they admit a partial order over the objectives. Thus, they support the most general preference structure among the methods considered here. Although the methods in [4], [32]–[35] compute Nash equilibria, their practical deployment remains challenging. In particular, they assume complete knowledge of the preferences of all involved agents. Moreover, they do not provide amechanism for translating general legal requirements into the preferences required to model a specific scenario. 
+
+4) COLREGS-Compliant Multi-Vessel Motion Planning: 
+
+The COLREGS have been translated into formal specifica-tions to provide a precise, machine-interpretable representa-3
+
+tion [36]–[38]. These formalizations support the monitoring, testing, and synthesis of behavior in pairwise vessel en-counters. However, because the COLREGS primarily specify pairwise obligations, they do not explicitly prescribe how to prioritize conflicting obligations arising from simultaneous encounters with multiple vessels, as illustrated in Fig. 1. Specification-based approaches to maritime navigation have predominantly adopted an ego-centric perspective in which the behavior of surrounding vessels is monitored or modeled rather than strategically coordinated. Examples include real-world monitoring of COLREGS encounter situations for collision avoidance [39] and reactive vessel simulations in which the first detected conflict determines the executed maneuver [40]. Such methods can enforce or evaluate the obligations of an individual vessel, but do not explicitly model the potentially heterogeneous preferences of multiple interacting vessels. Existing multi-agent approaches commonly employ central-ized game-theoretic methods or homogeneous reinforcement-learning controllers with scalarized objectives [41]–[45]. How-ever, scalarization obscures the priority structure among objec-tives, and centralized or homogeneous formulations generally cannot accommodate private, agent-specific preferences. To the best of our knowledge, our framework is the first to systematically lift the pairwise COLREGS rules to encounters involving an arbitrary number of vessels while preserving an interpretable hierarchy of legal objectives. It further supports agents with private preferences and solution protocols that operate without requiring those preferences to be disclosed. 
+
+B. Contributions 
+
+We present a framework for multi-agent motion planning under legal requirements with partially ordered objectives, which automates the translation of practical scenarios into the theory of posetal games [4]. Our contributions are fourfold.  
+
+> •
+
+Systematic construction of legal posetal games. We introduce guidelines to represent priorities among legal concerns independently of the concrete scenario. From the legal guideline, we automatically derive the partially ordered preferences of the agents and the cor-responding multi-agent game for any concrete scenario. This removes the need to specify preferences by hand for every scenario, which is a prerequisite for using posetal games in practice.  
+
+> •
+
+Customization with legality guarantees. We enable agents to incorporate private objectives and regulators to refine legal guidelines, and we prove that such refine-ments can only restrict the set of legal behaviors rather than introduce new ones. This sharply contrasts with scalarization methods (e.g., [28]–[31]), in which changing even a single weight can alter the resulting behavior in ways that are to predict and audit.  
+
+> •
+
+Deployable solution protocols under private prefer-ences. We develop two protocols that avoid the complete-information assumption of prior work [4], [32]–[35]. We prove that belief play , which relies on conservative local beliefs, recovers exactly the equilibria of the true game and remains legal when interrupted. The second 
+
+p1
+
+p2 p3
+
+p4                    
+
+> Fig. 2. The Hasse diagram of the poset P=⟨{ p1, p 2, p 3, p 4},⪯P⟩with
+> p4≺Pp2≺Pp1and p4≺Pp3≺Pp1;p2and p3are incomparable.
+
+protocol, distributed iterative best-response, requires even less information about other agents.  
+
+> •
+
+Auditable COLREGS-compliant multi-vessel motion planning. We instantiate our framework for autonomous vessels and lift the pairwise COLREGS rules to en-counters with any number of vessels. We evaluate our framework empirically on seven encounters involving two to four vessels. Contrary to previous approaches [41]– [45], we can audit every rule violation and certify it as either forced by conflicting legal requirements of higher or incomparable priority or unsatisfiable within the action space. Moreover, defectors can be identified from public information alone. This paper is organized as follows: In Sec. II, we provide preliminaries and our problem statement. We present our framework for deriving posetal games from legal requirements in Sec. III before explaining our solution protocols for the resulting games in Sec. IV. In Sec. V, we instantiate our frame-work for COLREGS-compliant multi-vessel motion planning and evaluate it in Sec. VI. Finally, Sec. VII draws a conclusion and discusses future work, and Sec. A contains the proofs of the preference refinement operations. II. P RELIMINARIES AND PROBLEM STATEMENT 
+
+In this section, we recall the necessary background on games with partially ordered preferences and then state the problem addressed in this paper. 
+
+A. Games with Partially Ordered Preferences 
+
+In classical games, every agent possesses a scalar utility function to evaluate the outcomes of the game. Games with partially ordered preferences, or posetal games , are more general in that they allow each agent to evaluate an outcome with respect to multiple metrics that are prioritized according to a partial order [4]. We first introduce partially ordered sets and preferences to formalize this evaluation and then define posetal games. 
+
+1) Partially Ordered Sets: Let P be a set. A pre-order ≾
+
+over P is a reflexive and transitive relation over P. If a pre-order is also antisymmetric, we call it a partial order and write ⪯. For convenience, we use p ⪯ p′ interchangeably with 
+
+⟨p, p ′⟩ ∈ ⪯ , and analogously for pre-orders. In both pre-orders and partial orders, we denote the strict relation with ≺, where 
+
+p ≺ p′ if and only if p ≾ p′ (p ⪯ p′) but p′̸ ≾ p (p′̸ ⪯ p). Observe that the strict relation is asymmetric and transitive. A 
+
+partially ordered set or poset is a pair P := ⟨P , ⪯P⟩ where 
+
+P is the ground set and ⪯P is a partial order over P. We can visualize a poset using its Hasse diagram as shown in Fig. 2. 4
+
+> abcd
+
+collision area clearance                       
+
+> Fig. 3. Two robots meet head-on in a narrow corridor. By regulation, robots have to avoid collisions, keep a sufficient clearance from other robots, and remain inside the operational area marked by the bold lines. Collision avoidance is the highest-priority objective, and the other two are incomparable. We take the perspective of the left robot and assume the trajectory of the right robot is fixed. Trajectories a,c, and dare preferred over b, since bcauses a collision; aand care indifferent , as they have the same insufficient clearance but stay in the operational area; dis incomparable to aand c, as it achieves sufficient clearance by leaving the operational area (adapted from [4, Fig. 2]).
+
+2) Preferences: Let Γ be a set representing an action space .A metric m : Γ → R maps every action γ ∈ Γ to a utility 
+
+m(γ) ∈ R.1 We allow metrics to be named so that the metrics 
+
+mn and mn′
+
+may be distinct even if they represent the same underlying function; that is, mn̸ = mn′
+
+even if mn(γ) = 
+
+mn′
+
+(γ) for every γ ∈ Γ. Then, a preference P := ⟨M , ⪯P⟩
+
+is a finite poset of metrics, where m ⪯P m′ indicates that 
+
+m′ is at least as important as m. As explained in [3], [4], a preference induces a pre-order ≾Γ 
+
+> P
+
+over the action space Γ:We have γ ≾Γ 
+
+> P
+
+γ′ if and only if [3, Def. 5] 
+
+∀m ∈ M : m(γ) > m (γ′) = ⇒∃m′ ∈ M : m′ ≻P m and m′(γ) < m ′(γ′). (1) In other words, γ′ is at least as preferable as γ if and only if each metric in which γ′ performs worse than γ is dominated by a more important metric in which γ′ performs better. Fig. 3 illustrates the induced order on actions using a simple example. Some preferences are more specific than others in the sense that they induce a finer ordering on the action space. Formally, we say that a preference P′ is a refinement of P if and only if 
+
+γ ≺Γ 
+
+> P
+
+γ′ =⇒ γ ≺Γ 
+
+> P′
+
+γ′
+
+for any pair of actions γ, γ ′ ∈ Γ [4, Def. 6]. In words, every strict preference between two actions under P persists under P′. For a fixed action space, refinement is a pre-order on preferences, which we denote ⊑: We write P ⊑ P′ to mean that P′ refines P, ordering preferences from coarsest to finest. We introduce three operations that we can use to refine preferences [4, Sec. II-C]. In Sec. A, we prove that these operations indeed produce valid refinements. First, we can add a priority relation, or equivalently “add an edge”, to the partial order over metrics. 
+
+Proposition 1 (Preference priority refinement [4, Def. 7]) . Let 
+
+P = ⟨M , ⪯P⟩ be a preference. Any preference P′ = ⟨M , ⪯P′ ⟩
+
+with ⪯P ⊆ ⪯ P′ is a refinement of P.Next, we can aggregate two incomparable metrics. 
+
+Proposition 2 (Preference aggregation [4, Def. 8]) . Let 
+
+P = ⟨M , ⪯P⟩ be a preference and m1, m 2 ∈ M be two   
+
+> 1While the utility value could come from any pre-ordered set, we restrict ourselves to Rto simplify the presentation.
+
+incomparable metrics. Further, suppose ˆm is a metric with 
+
+ˆm(γ) = f (m1(γ), m 2(γ)) , where f : R × R → R is strictly increasing in both arguments. Let N := M \ { m1, m 2} and 
+
+M′ := N ∪ { ˆm}. Define a binary relation R ⊆ M ′ × M ′ by 
+
+R := {⟨ m, m ′⟩ ∈ ⪯ P | m, m ′ ∈ N } (2a) 
+
+∪ {⟨ ˆm, m ⟩ | m ∈ N , ∃k ∈ { 1, 2} : mk ⪯P m} (2b) 
+
+∪ {⟨ m, ˆm⟩ | m ∈ N , ∃k ∈ { 1, 2} : m ⪯P mk}. (2c) Then, P′ = ⟨M ′, ⪯P′ ⟩ with ⪯P′ := R∗ is a refinement of P,where R∗ is the reflexive-transitive hull of R. Intuitively, this means we replace m1 and m2 by ˆm and relate ˆm to all metrics that m1 or m2 were related to. Finally, we can compose two disjoint preferences by ap-pending one below the other. This generalizes the operation from [4, Def. 10], which only allows adding a single metric. 
+
+Proposition 3 (Preference augmentation) . For k ∈ { 1, 2}, let 
+
+Pk = ⟨M k, ⪯Pk ⟩ be preferences so that M1 ∩ M 2 = ∅. The preference P = ⟨M , ⪯P⟩ with M := M1 ∪ M 2 and 
+
+⪯P := ⪯P1 ∪ ⪯ P2 ∪ {⟨ m2, m 1⟩ | m1 ∈ M 1, m 2 ∈ M 2}
+
+is a refinement of P1.In words, the metrics of P2 only break ties between actions that are equal in every metric of P1, so that no gain in P2 can compensate for a loss in P1.
+
+3) Posetal Games: A posetal game 
+
+G := ⟨A , {Γi}i∈A , {Pi}i∈A ⟩
+
+consists of a set of agents A and, for each agent i ∈ A , an 
+
+action space Γi and a preference Pi [4, Def. 12]. The joint action space of the game is the product Γ := Q 
+
+> i∈A
+
+Γi of the individual action spaces, and the preferences Pi are defined over this joint action space as in Sec. II-A2. We refer to the elements of Γ as action profiles to emphasize that they consist of an action for each agent. Given an action profile γ ∈ Γ,we write γi ∈ Γi for the action of agent i ∈ A and γ−i
+
+for the joint action of the other agents A−i := A \ { i}. For any i ∈ A , we use the pair ⟨γi, γ −i⟩ and the action profile γ
+
+interchangeably. Using the pre-orders ≾Γ 
+
+> Pi
+
+induced by the preferences to compare action profiles, we can transfer classical game theory concepts. Rational agents always strive to play their best response to the actions of the others. Given a posetal game G,a best response of agent i ∈ A to the joint action γ−i ∈ Γ−i
+
+of the other agents is any action from the set [4, Def. 13] 
+
+BR Pi (γ−i) := {γi ∈ Γi | ∀ γ′ 
+
+> i
+
+∈ Γi : ⟨γi, γ −i⟩̸ ≺ Γ 
+
+> Pi
+
+⟨γ′
+
+> i
+
+, γ −i⟩} .
+
+An action profile γ ∈ Γ is a Nash equilibrium (NE) of G if and only if every agent plays a best response, i.e., [4, Def. 14] 
+
+∀i ∈ A : γi ∈ BR Pi (γ−i).
+
+Thus, at NE, no agent can unilaterally deviate to strictly improve its outcome. We denote the set of NEs of G as NE (G).We can show that refining the preferences of the agents results in filtering the NEs of the game. 5 
+
+> m1
+> m2m3
+
+. . .    
+
+> m′
+> 1m′
+> 2
+> m′
+> 3m′
+> 4m′
+> 5
+
+. . . . . .  
+
+> m1
+> m2m3
+
+. . .    
+
+> m′
+> 1m′
+> 2
+> m′
+> 3m′
+> 4m′
+> 5
+
+. . . . . .                
+
+> Scenario Legal metrics Legal preferences ΦG
+> Fig. 4. Deriving legal preferences from a generic rule set Φand a scenario-independent guideline G. For any concrete scenario, Φyields the set of metrics that each agent is legally required to consider, denoted by mkand m′
+> k. The guideline Ginduces the legal preference for an agent over its legal metrics. The color of the clouds indicates the agent to which a set of metrics or a preference belongs.
+
+Proposition 4 (Equilibrium refinement [4, Theorem 28]) . Sup-pose G := ⟨A , {Γi}i∈A , {Pi}i∈A ⟩ is a posetal game. Consider a second game G′ that is equal to G except that every agent uses a refined preference, i.e., G′ = ⟨A , {Γi}i∈A , {P′
+
+> i
+
+}i∈A ⟩,where P′ 
+
+> i
+
+⊒ Pi for all i ∈ A . It holds NE (G) ⊇ NE (G′).Proposition 4 states that the set of NEs depends antitonically 
+
+on the preferences: refining the preferences of the agents can only remove joint behaviors, but never introduce new ones. 
+
+B. Problem Statement 
+
+Let S be a scenario describing the involved agents A
+
+with their action spaces {Γi}i∈A and the environment. To coordinate the agents in case multiple equilibria exist, we assume that the law provides a social metric s, which maps action profiles to a totally ordered set and which the selected equilibrium should optimize. We are now ready to state the problem. 
+
+Problem 1 (Legal motion planning under private preferences) .
+
+Given a scenario S and the applicable legal requirements, (i) automatically derive preferences {Pi}i∈A that encode the legal requirements and strictly prioritize them over the individual objectives of the agents, which defines a posetal game G, and (ii) determine the socially optimal Nash equilibrium 
+
+γ∗ = arg max 
+
+> γ∈NE (G)
+
+(s(γ)) , (3) using a distributed protocol that all agents follow and that does not require the agents to disclose their preferences. Ties in (3) are broken by a fixed public rule, so that γ∗
+
+is unique. Typically, the individual goals of each agent are private or hard to communicate so that the true preference of an agent is unknown to the others. This is why part (ii) requires a distributed protocol rather than a centralized solver. We address part (i) in Sec. III, where G becomes the true game Gtrue , and part (ii) in Sec. IV. III. F ROM LEGAL REQUIREMENTS TO POSETAL GAMES 
+
+In this section, we address part (i) of Problem 1 and present a process that transforms laws and a given scenario into a posetal game whose solutions meet legal requirements. In Sec. III-A, we introduce legal metrics to quantify the legal concerns and explain how to derive these metrics from generic rules. As shown in Fig. 4, the relevant legal metrics depend on the agents and interactions present in a particular scenario so that manually specifying a preference for every possible scenario is infeasible. Sec. III-B therefore introduces guide-lines to allow regulators to specify a scenario-independent partial order over legal concerns, such as collision avoidance. From a guideline, we can automatically derive a preference over the legal metrics instantiated in any concrete scenario, as shown in Fig. 4. We leverage these preferences in Sec. III-C to construct a posetal game modeling the motion planning problem that incorporates individual goals of the agents and different implementations of the legal requirements. Moreover, we prove that the solutions of this game result in legal behavior. Finally, Sec. III-D discusses how the framework handles regulatory change. 
+
+A. Legally Required Metrics 
+
+Legal requirements typically include pairwise rules that the ego agent must follow with respect to every other agent. This is particularly common in traffic applications, including road [46], sea [5], and air [47] traffic. Many existing for-malizations express each pairwise rule as a generic temporal logic specification φ parameterized by the two involved agents, e.g., [48]–[51] for road traffic and [22], [36]–[38] for sea traffic. Temporal logics are well suited, as they can constrain the temporal evolution of a trajectory, e.g., the temporal operator G demands that a property always holds. While the standard semantics of temporal logic are Boolean, indicating only whether a trajectory satisfies the specification, robustness measures [52] provide quantitative semantics. The sign of the real-valued robustness value indicates satisfaction or violation and its magnitude reflects the corresponding margin. The literature provides many robustness measures (see, e.g., [53, Sec. 2.2] for a survey); the most suitable choice depends on the particular rule being formalized [54]. Robustness measures enable us to turn a temporal logic rule set into the numerical metrics required by our framework. Let 
+
+Φ be a set of generic temporal logic specifications that apply pairwise and S be a scenario. For φ ∈ Φ, let φi,j denote the instantiation of φ with the agents i, j ∈ A . The legal metrics for i ∈ A in S are 
+
+Mlegal  
+
+> i
+
+:= {mφi,j | φ ∈ Φ, j ∈ A −i}, where 
+
+mφi,j (γ) := min( ρφi,j (γ), 0) (4) for γ ∈ Γ. Here, ρφi,j (γ) denotes the robustness of φi,j 
+
+for γ. We cap the robustness at 0 so that we penalize stronger violations more without distinguishing among satis-fying behaviors (see [24, Sec. IV-A]). This allows agents to optimize their individual objectives as long as they meet the legal requirements, instead of demanding maximally robust satisfaction of the rules. Rules that apply only to the ego agent (e.g., speed limits) are handled analogously, with one metric per rule instead of one metric per contact agent. 6
+
+We emphasize that leveraging temporal logic robustness is only one way to derive metrics from legal requirements. At its core, our framework only requires a function that maps a scenario S and an agent i ∈ A to the set of legal met-rics Mlegal  
+
+> i
+
+. It therefore remains compatible with alternative methods, including hand-crafted numerical compliance scores such as [55]. 
+
+B. Guidelines 
+
+To represent abstract legal concerns, we introduce a set of labels L, each capturing a single aspect of the law. For our example in Fig. 3, the labels could include collision 
+
+for collision avoidance and high -vul and low -vul for the vulnerability of a robot. A concern C ∈ 2L combines several labels to model a more specific aspect of the law. To associate concrete metrics with concerns, we label each metric m with a concern Cm, and say that it addresses every less specific concern C ⊆ C m. In our example, a collision metric may carry the label collision together with a label describing the vulnerability of the other robot, e.g., high -vul . This metric addresses both the general collision concern {collision } and the more specific concern {collision , high -vul } that only captures collisions with highly vulnerable robots. To model the partial order over abstract legal concerns, we introduce guidelines. 
+
+Definition 1 (Guideline) . A guideline is a poset G := ⟨CG, ⪯G
+
+⟩, where CG is a set of concerns and ⪯G specifies their relative priorities. Our representation of concerns as sets of labels provides a modular mechanism for expressing priorities at different levels of specificity. In our example, we could start with a coarse guideline that prioritizes general collision avoidance through the concern {collision }. If vulnerability later becomes relevant to the legal priority, we can specialize the concern into 
+
+{collision , high -vul } and {collision , low -vul }, which we can then order to prioritize avoiding collisions with highly vulnerable robots. A guideline induces a preference over any given set of metrics. 
+
+Definition 2 (Induced preference) . Given a set of metrics M,a guideline G = ⟨CG, ⪯G⟩ induces the preference P(M, G) = 
+
+⟨M G, ⪯P(M,G)⟩ with 
+
+MG := {mC | C ∈ CG, m ∈ M s.t. Cm ⊇ C} , (5) and mC1 
+
+> 1
+
+⪯P(M,G) mC2 
+
+> 2
+
+if and only if mC1 
+
+> 1
+
+= mC2 
+
+> 2
+
+or C1 ≺G C2.In (5), mC is a renaming of the metric m as explained in Sec. II-A2. Intuitively, the induced preference picks, for each concern in CG, all metrics from M addressing that concern; if a metric addresses multiple concerns, several copies of it appear in the preference. We group the metrics according to the concern they were selected for. The groups are prioritized according to 
+
+⪯G, while metrics in the same group are incomparable. Fig. 5 shows an example. To prove that P(M, G) is well-defined, we need to show that ⪯P(M,G) is indeed a partial order.                  
+
+> Cm1={coll ,lv }Cm2={coll ,hv }Cm3={clear ,hv }Cm4={effort }C1={coll }C2={hv }
+> mC1
+> 1mC1
+> 2
+> mC2
+> 2mC2
+> 3
+
+# 7→                  
+
+> MGP(M,G)
+> Fig. 5. Inducing a preference from a guideline. Arrows indicate which concerns a metric addresses; colors indicate the concern a metric was selected for. Since m1addresses both concerns from G, two copies of it appear in P(M,G);m4addresses no concern and is dropped. Metrics within a group are incomparable, and the groups are prioritized according to G. We abbreviate the labels collision ,high -vul , and low -vul as coll ,hv , and
+> lv , respectively.
+
+Lemma 1 (Well-definedness of induced preferences) . Given a guideline G = ⟨CG, ⪯G⟩ and a set of metrics M, the induced preference P(M, G) = ⟨M G, ⪯P(M,G)⟩ is well-defined, i.e., 
+
+⪯P(M,G) is a partial order. 
+
+Proof. Observe that ⪯P(M,G) is reflexive by construction, and transitivity follows from the transitivity of ≺G. For antisymmetry, let mC1 
+
+> 1
+
+⪯P(M,G) mC2 
+
+> 2
+
+with mC1
+
+> 1
+
+̸ = mC2 
+
+> 2
+
+.Thus, we must have C1 ≺G C2. For mC1 
+
+> 1
+
+⪰P(M,G) mC2 
+
+> 2
+
+, we would need C1 ≻G C2, contradicting the asymmetry of ≺G.Hence, ⪯P(M,G) is a partial order. The induced preference is inherently non-compensatory .Consider two metrics mC1 
+
+> 1
+
+and mC2 
+
+> 2
+
+for which the guideline 
+
+G does not specify a clear priority, i.e., neither C1 ≺G C2
+
+nor C1 ≻G C2. In the induced preference, mC1 
+
+> 1
+
+and mC2 
+
+> 2
+
+are incomparable so that a gain in one metric cannot compensate for a loss in the other; instead, we accept every optimal trade-off between them. In particular, action profiles γ, γ ′ ∈ Γ which differ only in that mC1 
+
+> 1
+
+(γ) > m C1 
+
+> 1
+
+(γ′) and mC2 
+
+> 2
+
+(γ) < m C2 
+
+> 2
+
+(γ′)
+
+remain incomparable according to (1). Therefore, guidelines are well-suited to model the non-compensatory priorities of the law, while compensatory rules, e.g., aggregation in the sense of Proposition 2, are reserved for subsequent private modeling choices of individual agents. 
+
+Remark 1 (Good guideline design) . Designing unambiguous 
+
+guidelines, i.e., ensuring that each metric addresses at most one concern from CG, improves the interpretability of guidelines and the induced preference. However, we do not impose unambiguity as a hard constraint since it would limit the expressiveness of the framework. Moreover, it is good practice to ensure that every legal metric addresses at least one concern so that all of them are included in the induced preference. 
+
+C. Deriving the Motion Planning Game 
+
+Let us fix a scenario S and suppose the guideline Glegal 
+
+captures the legal requirements. Recall from Sec. III-A that 
+
+Mlegal  
+
+> i
+
+denotes the legal metrics for the agent i ∈ A in S. For each agent, we can automatically derive its legal preference as 
+
+P(Mlegal  
+
+> i
+
+, Glegal ), i.e., the preference that Glegal induces over its legal metrics. Evaluating actions purely on legal grounds is unrealistic, since each agent typically also cares about performance metrics that measure how well it achieves its individual goals. Moreover, in cases where the law leaves the 7
+
+priorities between metrics unspecified, different agents may implement the legal requirements differently. Thus, we assume that each agent i ∈ A possesses a true preference Pi that refines P(Mlegal  
+
+> i
+
+, Glegal ). This assumption allows agents to add objectives and priorities wherever the law is vague, but never to override a priority that the law prescribes. It is the formal counterpart of the requirement that legal requirements take precedence over individual objectives. Agents that violate this assumption are defectors . As we show in Sec. VI-B2, a defector whose action is not a legal best response can be identified from public information alone. In our example from Fig. 3, the robot may use Proposition 3 to include a performance metric measuring control effort below the legal preference. Using the true preferences, we obtain the true 
+
+game 
+
+Gtrue := ⟨A , {Γi}i∈A , {Pi}i∈A ⟩,
+
+whose NEs are incentive-stable solutions to the motion plan-ning problem. To characterize legality, we call an action profile γ ∈ Γ
+
+legal if every agent chooses an action that minimally vio-lates the law given the joint action of the others. Note that the minimum-violation condition results in full compliance if the rules do not conflict. Formally, this corresponds to 
+
+γi ∈ BR P(Mlegal  
+
+> i,Glegal )
+
+(γ−i) for every agent i ∈ A . Therefore, the set of all legal action profiles precisely corresponds to the NEs of the legal game 
+
+Glegal := ⟨A , {Γi}i∈A , {P(Mlegal  
+
+> i
+
+, Glegal )}i∈A ⟩.
+
+Consequently, we can prove that all solutions of Gtrue result in legal behavior by applying Proposition 4. 
+
+Theorem 1 (Legality) . We have NE (Gtrue ) ⊆ NE (Glegal ).Specifically, the NEs of Gtrue are exactly those legal action profiles at which every agent plays a best response under its true preference, i.e., 
+
+NE (Gtrue ) = {γ ∈ NE (Glegal ) | ∀ i ∈ A : γi ∈ BR Pi (γ−i)}.
+
+Proof. The preference of each agent in Gtrue is a refinement of its preference in Glegal . Thus, Proposition 4 directly applies and yields NE (Gtrue ) ⊆ NE (Glegal ). The second statement then follows from the definition of a NE. In words, private objectives can only select among legal behaviors and never turn an illegal action profile into an equilibrium. Since Proposition 4 holds for any refinement, this guarantee does not depend on the particular private objectives of the agents, which can therefore remain undisclosed. 
+
+D. Handling Regulatory Change 
+
+Laws evolve over time, so our framework needs to accom-modate regulatory change. We focus on revisions that refine the specification of legal behavior so that previously illegal behavior remains forbidden. Such revisions are practically relevant. For example, a regulatory scoping exercise by the International Maritime Organization found that the current COLREGS should keep as much of their content as possible when adapted for autonomous vessels [56, pp. 86–87].                           
+
+> GP(M,G)Glegal NE (Glegal )
+> G′P(M,G′)G′
+> legal NE (G′
+> legal )
+> induce build NE
+> induce build NE
+> ⊑⊑⊑⊇
+> Fig. 6. Propagation of a guideline refinement G⊑G′through the pipeline. The horizontal maps take a guideline to its induced preference, the assembled legal game, and its equilibria. Induction and game construction preserve ⊑
+> (solid vertical arrows, monotone homomorphisms), whereas the equilibrium map is antitone (dashed arrow). Hence, a finer guideline can only shrink the set of joint behaviors, i.e., NE (G′
+> legal )⊆NE (Glegal ).
+
+Formally, this means that the legal preference under the revised law should be a refinement of that under the original law. Consequently, we can freely modify the set of legal metrics and their labels as long as the set of metrics (5) picked by the guideline Glegal remains the same. To enable changes of the guideline itself, we introduce the notion of guideline refinement. 
+
+Definition 3 (Guideline refinement) . The guideline G′ refines 
+
+G, denoted G′ ⊒ G, if its induced preference P(M, G′) is a refinement of P(M, G) for all sets of metrics M and label assignments. By construction, the induction map associating a guideline G
+
+with its induced preference P(M, G) is therefore monotone in 
+
+G, i.e., 
+
+G ⊑ G′ =⇒ P(M, G) ⊑ P(M, G′),
+
+for any set of metrics M. Composed with the antitone equilibrium map of Proposition 4, refining a guideline can only shrink the set of legal equilibria. The entire pipeline thus reduces to a single monotonicity statement, summarized in Fig. 6, in which every map preserves refinement except the equilibrium map, which reverses it. Subsequently, we introduce three guideline refinement oper-ations to support commonly required changes. To prove their correctness, we reduce guideline refinements to the preference-level operations of Sec. II-A so that we need not reason about action orders from scratch. Beyond handling regulatory changes, the refinement operations also enable us construct the final legal guideline by composing simple and understandable guidelines covering different aspects of the law. 
+
+1) Priority Refinement: Regulators may need to clarify pri-orities between concerns that they previously left unspecified. This corresponds to “adding an edge” to ⪯G. Analogous to Proposition 1 for preferences, this priority refinement consti-tutes a refinement operation on guidelines. 
+
+Proposition 5 (Guideline priority refinement) . Let G =
+
+⟨CG, ⪯G⟩ be a guideline. Every guideline G′ = ⟨CG, ⪯G′ ⟩ with 
+
+⪯G ⊆ ⪯ G′ refines G.
+
+Proof. The induced metric set (5) depends only on CG, which is unchanged, so MG′ = MG. Given mC1 
+
+> 1
+
+≺P(M,G) mC2 
+
+> 2
+
+, we find C1 ≺G C2. As ⪯G ⊆ ⪯ G′ , we also have C1 ≺G′ C2, so 
+
+mC1 
+
+> 1
+
+≺P(M,G′) mC2 
+
+> 2
+
+. Thus, Proposition 1 yields that P(M, G′)
+
+refines P(M, G) since ⪯P(M,G) ⊆ ⪯ P(M,G′).8
+
+C11
+
+C21 C31
+
+C12
+
+C22
+
+C11 ∪ C 12
+
+C11 ∪ C 22
+
+C21 C31
+
+# ⋉C11 =      
+
+> Fig. 7. Visualization of guideline injection using Hasse diagrams. The colors indicate which parts of the refined guideline originate from which inputs. Continuing the example from Fig. 3, C11could be the {collision }
+> concern, which is split according to a guideline prioritizing {high -vul }over
+> {low -vul }.
+
+A regulator typically wishes to amend an existing guideline with a set of additional priorities and expects a canonical, least-restrictive way to enforce them. Formally, this corresponds to finding a ⊑-minimal priority refinement of the guideline. 
+
+Corollary 1 (Minimal priority refinement) . Let G = ⟨CG, ⪯G⟩
+
+be a guideline and D ⊆ CG × CG a set of required priorities. Further, let (⪯G ∪ D)∗ be the reflexive-transitive hull of ⪯G ∪
+
+D. If the hull is antisymmetric, G⋆ := ⟨CG, (⪯G ∪ D)∗⟩ is the unique ⊑-minimal priority refinement of G enforcing D.Otherwise, ⪯G ∪ D contains a cycle showing that D cannot be enforced consistently with existing regulations. 
+
+Proof. Let R := ( ⪯G ∪ D)∗. If R is antisymmetric, it is the smallest partial order with ⪯G ⊆ R that enforces D. Since 
+
+⪯G ⊆ R, we have G⋆ ⊒ G by Proposition 5. The order of any priority refinement G′ of G that enforces D must contain 
+
+R, so G⋆ ⊑ G′ by Proposition 5. Uniqueness follows as R is the smallest partial order with the required properties. A non-antisymmetric R contains a cycle that any extending partial order would inherit. In words, G⋆ adds the priorities in D together with those implied by transitivity, and every other priority refinement that enforces D is at least as restrictive. If D is inconsistent with the existing guideline, the cycle identifies the conflicting priorities, which the regulator must resolve. 
+
+2) Injection: While Proposition 5 allows refining priorities between concerns, it does not enable regulators to specify priorities within an existing concern. Therefore, we introduce a mechanism for “splitting” a concern into several more specific ones that can be prioritized individually. To this end, we define the injection operator ⋉ ˆC . Given guidelines 
+
+Gk = ⟨CGk , ⪯Gk ⟩ for k ∈ { 1, 2} and a concern ˆC ∈ CG1 ,
+
+G1 ⋉ ˆC G2 injects G2 into the concern ˆC in G1; Fig. 7 shows an abstract example. Intuitively, the resulting guideline first orders metrics according to G1 and then refines the priority of metrics addressing ˆC according to G2. Formally, G1 ⋉ ˆC G2 is the guideline G = ⟨CG, ⪯G⟩, where 
+
+CG := ( CG1 \ { ˆC} ) ∪ { ˆC ∪ C 2 | C 2 ∈ CG2 } and (6a) 
+
+⪯G := {⟨C 1, C′
+
+> 1
+
+⟩ ∈ ⪯ G1 | C 1, C′ 
+
+> 1
+
+∈ CG1 \ { ˆC}} (6b) 
+
+∪ {⟨ ˆC ∪ C 2, C1⟩ | ⟨ ˆC, C1⟩ ∈ ≺ G1 , C2 ∈ CG2 } (6c) 
+
+∪ {⟨C 1, ˆC ∪ C 2⟩ | ⟨C 1, ˆC⟩ ∈ ≺ G1 , C2 ∈ CG2 } (6d) 
+
+∪ {⟨ ˆC ∪ C 2, ˆC ∪ C ′
+
+> 2
+
+⟩ | ⟨C 2, C′
+
+> 2
+
+⟩ ∈ ⪯ G2 }. (6e) For (6) to define a guideline, we require that the injected concerns are new, i.e., ˆC ∪ C 2 /∈ CG1 \ { ˆC} for all C2 ∈ CG2 .Otherwise, an injected concern could inherit conflicting prior-ities from ˆC and from an existing concern of G1, and ⪯G
+
+would not be antisymmetric. Under this condition, (6c) to (6e) copy the priorities of ˆC to every injected concern and order the injected concerns among themselves according to G2.Injection also preserves unambiguity, i.e., if G1 and G2 are unambiguous, so is G1 ⋉ ˆC G2. Indeed, a metric addressing an injected concern ˆC ∪ C 2 addresses ˆC and thus no other concern of G1, and it cannot address two injected concerns since it would then address two concerns of G2. Furthermore, injection results in a refinement if every metric addressing ˆC
+
+also addresses a concern from CG2 .
+
+Proposition 6 (Guideline injection) . Let Gk = ⟨CGk , ⪯Gk ⟩ be guidelines for k ∈ { 1, 2} and let ˆC ∈ CG1 . For all metrics m
+
+so that Cm ⊇ ˆC, suppose that there is C2 ∈ CG2 with Cm ⊇ C 2.Then, the guideline G1 ⋉ ˆC G2 is a refinement of G1.
+
+Proof. We have MG1⋉ ˆC G2 = MG1 modulo metric renaming and duplication, since every metric addressing ˆC also addresses some C2 ∈ CG2 by assumption. With (6b) to (6d) we reproduce every relation of ⪯P(M,G1) and (6e) only adds relations among metrics addressing ˆC, which are incomparable under 
+
+⪯P(M,G1). Thus, ⪯P(M,G1) ⊆ ⪯ P(M,G1⋉ ˆC G2) modulo metric renaming and duplication, so that Proposition 1 concludes. 
+
+3) Augmentation: Finally, regulators need a way to com-bine two guidelines while prioritizing one over the other, e.g., to place generally applicable rules below jurisdiction-specific rules. Augmenting a guideline by appending a disjoint guideline at the bottom of the poset is a refinement operation, analogous to Proposition 3 for preferences. 
+
+Proposition 7 (Guideline augmentation) . For k ∈ { 1, 2}, let 
+
+Gk = ⟨CGk , ⪯Gk ⟩ be guidelines so that CG1 ∩ CG2 = ∅. The guideline G = ⟨CG, ⪯G⟩ with CG := CG1 ∪ CG2 and 
+
+⪯G := ⪯G1 ∪ ⪯ G2 ∪ {⟨C 2, C1⟩ | C 1 ∈ CG1 , C2 ∈ CG2 } (7) is a refinement of G1.
+
+Proof. By (5), we have MG = MG1 ∪ M G2 . Further, since 
+
+CG1 ∩CG2 = ∅, it is also MG1 ∩M G2 = ∅. The added relations 
+
+⟨C 2, C1⟩ from (7) rank every concern of G2 below every concern of G1, so every metric of MG2 sits strictly below every metric of MG1 in P(M, G). With this, Proposition 3 yields that G refines G1.IV. S OLUTION PROTOCOLS 
+
+In this section, we address part (ii) of Problem 1, which requires computing the socially optimal NE γ∗ (3) of the true game Gtrue derived in Sec. III. To this end, we propose the solution protocols summarized in Tab. I. The design of a solution protocol depends strongly on which information each agent has about the others. If the agents have complete information about the others, every agent can independently compute γ∗ without communication as they can directly construct Gtrue . However, assuming complete information is rarely realistic: in many application domains, the agents do not 9  
+
+> TABLE I SOLUTION PROTOCOLS ,THE INFORMATION THAT EACH AGENT REQUIRES ABOUT THE OTHER AGENTS ,AND WHETHER THE PROTOCOL IS GUARANTEED TO COMMIT TO THE SOCIALLY OPTIMAL EQUILIBRIUM
+
+Protocol Known about others Optimal? 
+
+Complete information action space, true preference 
+
+✓
+
+Belief play action space, belief on preference 
+
+✓
+
+Distributed IBR none after full search 
+
+know the true preferences of the others. Thus, the complete information protocol is not deployable and can only serve as a baseline for evaluation. Incomplete information about the preferences of the agents could be modeled by adapting Bayesian games [57] or robust games [58], which provide equilibrium concepts that account for such uncertainty, to the posetal setting. However, since each agent knows its own true preference, we aim to recover the true equilibria through communication between the agents, rather than reasoning about equilibria under uncertainty. We assume that communication is limited to action profiles, as allowing the agents to share their true preferences would reduce the problem to the complete information case. This makes our setting similar to uncoupled dynamics [59], except that we use explicit communication instead of repeated play. Subsequently, we propose two protocols: belief play recovers the true NEs from conservative local approximations, whereas distributed iterative best-response (IBR) requires no information about the action spaces or preferences of other agents. 
+
+A. Belief Play 
+
+For our first solution protocol, we assume that every agent 
+
+i ∈ A knows the action space of all other agents. While the true preference of each agent remains private, we suppose that the agent i has a belief Pij about the true preference of agent 
+
+j ∈ A , where Pii = Pi, since every agent knows its own true preference. We assume that the beliefs are conservative, i.e., the true preference Pj is a refinement of the belief Pij for all 
+
+i, j ∈ A . In words, a belief may omit objectives and priorities of another agent, but it never attributes to that agent a priority it does not have. Based on its beliefs, the agent i constructs its local game 
+
+Gi := ⟨A , {Γj }j∈A , {Pij }j∈A ⟩.
+
+We emphasize that the agents do not strictly require side information to form conservative beliefs. The legal guideline 
+
+Glegal and the set of legal metrics Mlegal  
+
+> j
+
+are publicly known, so agent i ∈ A can construct the legal preference 
+
+P(Mlegal  
+
+> j
+
+, Glegal ) of agent j ∈ A −i. As all agents follow the legal requirements, the legal preference is the most conserva-tive belief about Pj , so that P(Mlegal  
+
+> j
+
+, Glegal ) ⊑ Pij ⊑ Pj .Leveraging the conservative beliefs, we can solve Gtrue by intersecting the NEs of the local games. This fundamental property forms the basis of our belief play protocol. 
+
+Algorithm 1 Belief Play for Agent i ∈ A 
+
+Input: Local game Gi, social metric s
+
+Output: Socially optimal NE of the true game Gtrue  
+
+> 1:
+
+▷ Compute and propose NEs of the local game  
+
+> 2:
+
+solver ← NES OLVER (Gi) 
+
+> 3:
+
+Ni ← ∅  
+
+> 4:
+
+while ¬solver .DONE () do  
+
+> 5:
+
+γ ← solver .NEXT NE ()  
+
+> 6:
+
+Ni ← N i ∪ { γ} 
+
+> 7:
+
+BROADCAST (γ) 
+
+> 8:
+
+end while  
+
+> 9:
+
+▷ Receive candidates proposed by others in the meantime  
+
+> 10:
+
+for j ∈ A −i do  
+
+> 11:
+
+Nj ← RECV FROM (j) 
+
+> 12:
+
+end for  
+
+> 13:
+
+N ← T 
+
+> j∈A
+
+Nj ▷ Equilibria proposed by everyone  
+
+> 14:
+
+return arg max γ∈N (s(γ)) 
+
+Theorem 2 (Belief play) . Suppose that Pj is a refinement of 
+
+Pij for all distinct i, j ∈ A . The NEs of Gtrue are exactly those action profiles that are NEs in all local games Gi, i.e., 
+
+NE (Gtrue ) = \
+
+> i∈A
+
+NE (Gi).
+
+Proof. We first show NE (Gtrue ) ⊆ T 
+
+> i∈A
+
+NE (Gi). Due to our assumption, Proposition 4 applies to every local game. Thus, we have NE (Gtrue ) ⊆ NE (Gi) for all i ∈ A , and therefore 
+
+NE (Gtrue ) ⊆ T 
+
+> i∈A
+
+NE (Gi). To prove the reverse inclusion, let γ ∈ T 
+
+> i∈A
+
+NE (Gi) be arbitrary. Since γ is a NE of Gi
+
+for all i ∈ A , we have γj ∈ BR Pij (γ−j ) for all i, j ∈ A .By instantiating this statement with j = i, we obtain γi ∈
+
+BR Pii (γ−i) for all i ∈ A . Hence, we have γi ∈ BR Pi (γ−i) for all i ∈ A as Pii = Pi. This confirms that γ ∈ NE (Gtrue ).In words, an action profile is a true equilibrium if and only if every agent certifies it as an equilibrium of its own local game. Each agent can certify its own best response exactly because it knows its true preferences, whereas the conservative beliefs guarantee that no true equilibrium is discared by any agent. 
+
+1) Algorithm: Alg. 1 outlines the belief play protocol from the perspective of the agent i ∈ A . The agent first computes the NEs of its local game, collects them in Ni, and broadcasts them to all other agents. Here, we assume that NES OLVER 
+
+incrementally produces the NEs of the provided game. Next, the agent receives the candidate equilibria proposed by the others. According to Theorem 2, each action profile that is proposed by every agent is a NE of the true game. Thus, we compute the intersection of the candidates in line 13 and select the one that maximizes the social metric s. Since all agents follow the protocol and receive the same proposals, they compute the same intersection and, with the fixed tie-breaking rule of Problem 1, they commit to the same NE. 
+
+2) Anytime Legality: We can safely interrupt the main loop of Alg. 1 in lines 4–8 before all NEs have been 10 
+
+found. Let Ni ⊆ NE (Gi) denote the set of NEs proposed by agent i ∈ A before interruption, and let N be their intersection as computed in line 13. Theorem 2 guarantees that N ⊆ NE (Gtrue ). Thus, if N is not empty, the agents commit to the socially best NE among the currently known true equilibria. Since N can only grow as the enumeration proceeds, the social value of the committed equilibrium is nondecreasing and attains the optimum once all local equilibria have been enumerated. Moreover, if every belief refines the corresponding legal preference, as is the case for the default belief described above, we have S 
+
+> i∈A
+
+Ni ⊆ NE (Glegal ) due to Proposition 4. Thus, even if no true NE has been found yet, i.e., N = ∅, the agents can fall back to any proposed equilibrium to at least ensure legal behavior. However, such a fallback is not incentive-stable with respect to the true preferences since it is not a true NE. 
+
+3) Complexity and Communication: Belief play is agnostic of the solver used for the local game. A straightforward option is brute-force enumeration of the NEs of the local game Gi,which requires O(|Γ|n) best-response queries for n := |A| 
+
+agents, where the size |Γ| = Π i∈A |Γi| of the joint action space grows exponentially in n. The computation of NE (Gi)
+
+can become tractable when the game has special structure. For example, a posetal game can be shown to be a potential game under certain conditions on the metrics and preferences [4, Theorem 26]. Every NE found for the local games needs to be communicated. Thus, if the beliefs refine the legal preferences, the number of required messages is bounded by 
+
+n|NE (Glegal )| as NE (Gi) ⊆ NE (Glegal ) by Proposition 4. Observe that finer preference beliefs lead to fewer equilibrium candidates according to Proposition 4 and thus can only reduce the communication effort. 
+
+B. Distributed Iterative Best-Response 
+
+For our second protocol, we drop the assumption that every agent knows the action space of the others. Thus, the agent 
+
+i ∈ A only knows its own action space Γi and true preference 
+
+Pi. The protocol performs distributed best-response iteration, which yields a NE of the true game once it reaches a fixed point. The agents first assemble an initial action profile, to which each agent contributes its own action, and then forward the current profile from agent to agent. Upon receipt, an agent replaces its own action with a best response under its true preference and forwards the updated profile. Once no agent changes its action, every agent plays a best response, and the profile is a NE of Gtrue . Existing algorithms for distributed IBR, e.g., [60], which are defined for classical games, can be applied to posetal games as the notion of a best response transfers (see Sec. II-A3). If time permits, we can restart the iteration from different action profiles to obtain multiple NEs and select the one that maximizes the social metric s. Note that the protocol can only guarantee optimality of the solution after exhaustive exploration of the action space. 
+
+Remark 2 (Convergence) . If Gtrue is a potential game, best-response iteration, and thus our distributed protocol, converges according to [4, Theorem 26]. Otherwise, convergence is not guaranteed. If the protocol converges, it is typically compu-   
+
+> GSGive-way vessel Stand-on vessel
+> GS(a) GG(b) GS(c) Fig. 8. COLREGS encounter situations (adapted from [22, Fig. 2]). (a) In an overtaking situation, the overtaking vessel evades to either direction, while the overtaken vessel stands on. (b) In a head-on situation, both vessels evade to starboard. (c) In a crossing situation, the vessel coming from the left evades to starboard, while the vessel coming from the right stands on.
+
+tationally cheaper than belief play, as the agents only need to answer best-response queries rather than compute the NEs of a local game. The improved efficiency comes at a cost: Unlike belief play, distributed IBR is not guaranteed to find the optimal equilibrium (see Tab. I) and does not provide a legal equilibrium as a fallback in case of non-convergence or interruption. Nevertheless, our empirical results in Sec. VI-D suggest that, for the COLREGS case study, the protocol converges within about three best-response rounds, and that restarts recover the social value of the optimal solution in all tested scenarios, although up to 20 initializations are needed. V. C ASE STUDY : COLREGS-C OMPLIANT PLANNING 
+
+In this section, we apply the modeling framework developed in Sec. III to COLREGS-compliant multi-vessel motion plan-ning to demonstrate its practical value. The COLREGS [5] govern the collision avoidance of vessels in the open sea. Our case study focuses on the steering and sailing rules that apply under good visibility conditions. These rules assign one of two roles to each vessel in an encounter involving risk of collision: Give-way vessels are expected to observably alter their course to eliminate collision risk, whereas stand-on 
+
+vessels have to keep their original course and speed until the situation is resolved. Fig. 8 shows the assignment of roles for the situations defined in Rules 13 to 15. The ultimate concern of the COLREGS is avoiding collisions, which takes precedence over strict compliance with the encounter rules according to Rule 2(b): 
+
+In construing and complying with these Rules due regard shall be had to all dangers [. . .] and to any special circumstances [. . .], which may make a departure from these Rules necessary to avoid immediate danger. [5, Rule 2(b)] This is reinforced in Rule 17(b), which requires the stand-on vessel to maneuver if the give-way vessel does not take sufficient action to avoid a collision. We emphasize that the COLREGS only provide pairwise rules and do not explicitly address encounters involving more than two vessels. Our framework is the first that systematically lifts the pairwise COLREGS rules to encounters involving an arbitrary number of vessels. 11 
+
+In our case study, a scenario S comprises a set of vessels 
+
+A with the set of feasible trajectories as their action spaces 
+
+{Γi}i∈A . We begin by defining the legal metrics in Sec. V-A and the COLREGS guideline in Sec. V-B. In Sec. V-C, we discuss the legal and true games derived from an example scenario. Finally, Sec. V-D illustrates how our framework can accommodate potential future changes to the COLREGS. 
+
+A. Metrics Required by COLREGS 
+
+To define the set of legal metrics, we leverage the temporal logic formalization of the encounter rules from [22], [36], focusing on the rules R3 to R6. For ease of presentation, we assume that the give-way rules R3 to R5 are combined into a single specification. Thus, we have two generic specifications: 
+
+φgw for give-way obligations and φso for stand-on obligations. Moreover, we can specify collision avoidance as 
+
+φcoll := G ¬collides( i, j ),
+
+where i, j are placeholders for the ego and contact vessel. We apply the procedure from Sec. III-A for the vessel i ∈A in the scenario S. For φgw and φso , using the robustness definitions from [61, Sec. 5.2 and 5.3] yields the metrics mgw 
+
+> i,j
+
+and mso  
+
+> i,j
+
+for each contact vessel j ∈ A −i. For φcoll , we define the robustness of the collides predicate at time t for γ ∈ Γ as 
+
+ρcollides( i,j )(γ, t ) := 
+
+(
+
+ri,j − dt(γ) if dt(γ) > r i,j 
+
+|vti (γ) − vtj (γ)| otherwise ,
+
+with dt the inter-vessel distance and vt the vessel velocities at time t, and the collision radius ri,j . Applying spatial robustness [53, Sec. 2.2] and (4) yields the metric mcoll 
+
+> i,j
+
+for each j ∈ A−i, which quantifies collision severity as the maximum relative collision speed. For completeness, the closed form of the metric is 
+
+mcoll  
+
+> i,j
+
+(γ) = − max   
+
+> ts.t. dt(γ)≤ri,j
+
+(|vti (γ) − vtj (γ)|)
+
+with value 0 if dt(γ) > r i,j for all t. Overall, the set of metrics required by the COLREGS for the vessel i ∈ A is 
+
+MCOLREGS  
+
+> i
+
+:= [
+
+> j∈A −i
+
+{mcoll  
+
+> i,j
+
+, m gw  
+
+> i,j
+
+, m so  
+
+> i,j
+
+}.
+
+B. COLREGS Guideline 
+
+Before defining the COLREGS guideline, we need to or-ganize the metrics using labels. For every i, j ∈ A , mcoll  
+
+> i,j
+
+is labeled with collision , mgw  
+
+> i,j
+
+with give -way , and mso  
+
+> i,j
+
+with 
+
+stand -on . Moreover, we include labels describing properties of the contact vessel j, e.g., its classification according to [5, Rule 3]. The possible classes include nuc for vessels not under command, hampered for vessels restricted in their ability to maneuver, fishing for vessels engaged in fishing, 
+
+sailing for vessels under sail, and power -driven for power-driven vessels not falling into any of the other classes. Thus, the concern {give -way } relates to give-way obligations with respect to any other vessel, while the more specific concern 
+
+{give -way , nuc } only cares about give-way obligations with respect to vessels not under command. The metric mgw 
+
+> i,j
+
+addresses both concerns provided that j is not under command. 
+
+{collision }{give -way } {stand -on }   
+
+> Fig. 9. The guideline GCOLREGS representing the priorities over concerns specified by the COLREGS.
+
+V0
+
+V1V2                
+
+> mcoll
+> 0,1mcoll
+> 0,2
+> mso
+> 0,1mgw
+> 0,1mgw
+> 0,2mso
+> 0,2
+> mcoll
+> 1,0mcoll
+> 1,2
+> mgw
+> 1,0+mso
+> 1,0+mgw
+> 1,2+mso
+> 1,2
+> mperf
+> 1
+> mcoll
+> 2,0mcoll
+> 2,1
+> mgw
+> 2,0mgw
+> 2,1
+> mso
+> 2,0mso
+> 2,1
+> mperf
+> 2
+> Fig. 10. Modeling motion planning under COLREGS in an encounter of three vessels as a posetal game. We visualize the continuous action space of each vessel using a finite number of trajectories. In the legal game, every vessel would use its legal preference as shown for V0. In the true game, the vessels use refined preferences including their individual objectives and customized implementations of the COLREGS as shown for V1and V2.
+
+To define the COLREGS guideline GCOLREGS , recall from the beginning of the section that the COLREGS prioritize collision avoidance over strict compliance with the encounter rules, but leave the priority between different rules unspecified. Thus, GCOLREGS , which is shown in Fig. 9, puts the concern 
+
+{collision } over {give -way } and {stand -on }, but leaves the last two incomparable. Note that the guideline is unam-biguous with respect to the legal metrics MCOLREGS  
+
+> i
+
+for a vessel 
+
+i ∈ A .Let us now consider the preference induced by GCOLREGS 
+
+over the set of legal metrics MCOLREGS  
+
+> i
+
+for a vessel i ∈ A 
+
+in an arbitrary scenario S. The preference does not specify a priority between collision metrics mcoll  
+
+> i,j
+
+with respect to different contact vessels j ∈ A−i. Thus, collisions with different contact vessels are incomparable, as the law does not favor a particular vessel. This applies analogously to give-way and stand-on metrics. 
+
+C. Legal and True Game 
+
+To examine the automatically derived posetal games, we consider a scenario S representing an encounter of three vessels as shown in Fig. 10. In the legal game Glegal , every vessel uses its legal preference, which only involves metrics and priorities prescribed by the law, as shown for V0. In the true game Gtrue , the vessels may use any refinement of the legal preference. We demonstrate that Proposition 1 to 3 handle many commonly desired refinements. To incorporate the individual objectives of each vessel, we can use Propo-sition 3 to augment the legal preference with the individual 12 
+
+{nuc } {hampered }{fishing }{sailing }{power -driven }
+
+> (a)
+
+{collision }{gw , h} {so , nuc }{gw , nuc } {so , h}{gw , f} {so , f}{gw , s} {so , s}{gw , p} {so , p}       
+
+> (b) Fig. 11. Modifying GCOLREGS to prioritize the encounter rule metrics according to the vessel class hierarchy. (a) The guideline GR18 encoding the hierarchy. (b) The refined guideline after injection and priority refinement. The edges added via priority refinement are highlighted. We abbreviate some labels to keep the figure compact, e.g., gw is short for give -way .
+
+preference over suitable performance metrics. In Fig. 10, both 
+
+V1 and V2 include a performance metric mperf  
+
+> i
+
+using this technique. Proposition 1 allows us to define priorities between metrics that are incomparable according to the law. Doing so, 
+
+V2 prioritizes give-way obligations over stand-on obligations. Finally, we may aggregate any incomparable metrics into a single objective using Proposition 2, e.g., to improve compu-tational tractability. This is shown for V1, which aggregates all encounter rule metrics. 
+
+D. Regulatory Change 
+
+We outline how the guideline refinement operations from Sec. III-D could be used to accommodate potential future changes to the COLREGS. Although these modifications are hypothetical, they reflect changes that may reasonably be considered by regulators. Many existing implementations of the COLREGS implicitly or explicitly prioritize give-way obligations over stand-on obligations, e.g., [62]–[64]. To make this prioritization a legal requirement, we use Proposition 5 and Corollary 1 to add the edge {stand -on } ⪯ GCOLREGS {give -way } to GCOLREGS . Under the refined guideline, every vessel must prioritize give-way metrics mgw  
+
+> i,j
+
+over stand-on metrics mso  
+
+> i,j
+
+in its preference. For the scenario from Fig. 10, this makes the preference shown for V2 the new legal preference. Let us now consider the responsibilities between vessels from [5, Rule 18]. The rule establishes a hierarchy of vessel classes and requires vessels to give-way to any vessel higher up in the hierarchy, which in turn stands on. For multi-vessel encounters, a natural extension is to require that encounter obligations are fulfilled with respect to the highest-priority vessel first. To incorporate this requirement, we first define the guideline GR18 as shown in Fig. 11a to capture the hierarchy. Using Proposition 6, we split both the {give -way } and 
+
+{stand -on } concerns of GCOLREGS according to GR18 , i.e., we compute (GCOLREGS ⋉{give -way } GR18 ) ⋉{stand -on } GR18 . Adding the cross-priorities via Proposition 5 yields the guideline shown in Fig. 11b, which enforces the desired prioritization. Finally, [5, Rule 1(b)] lets local authorities issue special rules that take precedence over the general regulations. An example are the U.S. Inland Navigation Rules, which con-tain special provisions for the Great Lakes [65]. Modeling the priorities of such a regime over its own concerns as a guideline Glocal , we use Proposition 7 to augment Glocal with 
+
+GCOLREGS . In the resulting guideline, the local rules always take precedence over the general COLREGS rules. VI. E VALUATION 
+
+We evaluate the framework in one-shot COLREGS motion-planning games, in which each agent commits to a complete dynamically feasible trajectory before the encounter begins. Our goals are threefold. First, we verify that every rule vio-lation at the committed equilibria can be audited and that de-fectors can be identified from public information. Second, we confirm that private and regulatory customizations shrink the set of equilibria as predicted by Theorem 2 and Proposition 4, and we quantify the efficiency cost of private preferences. Finally, we compare the communication cost and solution quality of the two distributed protocols. We first describe the common experimental setup, and then address the three goals. 
+
+A. Experimental Setup 
+
+We implement our evaluation in CommonOcean 2 [66] to ensure reproducibility of the results. Our evaluation uses five geometric scenarios, which are shown in Fig. 12: a two-agent crossing, a three-agent triangle, the crossing–overtaking conflict of Fig. 1, a four-agent priority encounter, and a four-agent gauntlet. If not specified otherwise, the vessels are general power-driven vessels according to [5, Rule 3]. For the crossing and triangle scenarios, we also consider mixed-class variants, where the vessel Alfa is engaged in fishing. In the four-agent priority encounter, Bravo is a vessel engaged in fishing, and Delta is a sailing vessel. In the scenarios with vessels of different classes, i.e., crossing + fishing, triangle + fishing, and the four-agent priority encounter, the legal guideline is GCOLREGS refined with the vessel-class hierarchy of [5, Rule 18] as described in Sec. V-D (Fig. 11b); we use it for the legal and true games, the social metric, the audits, and the price of preference alike. In all other scenarios, the legal guideline is GCOLREGS , which induces the same preferences as the refined guideline when all vessels belong to the same class. The initial speed is 5 m/s for every vessel except Charlie, which travels at 11 m/s in the crossing–overtaking scenario and at 7.5 m/s in the four-agent priority encounter and the gauntlet.                     
+
+> 2https://commonocean.cps.cit.tum.de 13 Alfa Bravo Charlie Delta Initial state Goal −101
+> −101
+> x [ km ]y [ km ]
+> (a) Crossing
+> −101
+> x [ km ]
+> (b) Triangle
+> 012
+> x [ km ]
+> (c) Crossing–overtaking −1012
+> −101
+> x [ km ]y [ km ]
+> (d) Four-agent priority
+> 012
+> x [ km ]
+> (e) Gauntlet
+> Fig. 12. Action spaces for all five geometric scenario configurations. Each colored curve represents a candidate trajectory for one agent, shaded from a pale tint at t= 0 to the saturated hue at the horizon.
+
+1) Vessel Models: To model the vessel dynamics, we use the yaw-constrained kinematic model from [66, Sec. V-B] with acceleration and yaw-rate as bounded inputs. Hull dimensions and acceleration limits are taken from two CommonOcean vessel types: type 1 is 175 m by 25 .4 m with 0.24 m/s2, and type 2 is 304 .8 m by 32 m with 0.0127 m/s2. The maximum yaw rate is set per vessel between 0.03 rad /s and 0.06 rad /s.
+
+2) Action Spaces: For every scenario, each agent receives a finite set of dynamically feasible trajectories, computed using the above vessel model. Each agent receives paths that alter course to either side, hold a parallel offset, and return to the original track; the offsets range from 50 m to 850 m . For each path, we consider multiple speed profiles, e.g., constant speed and brake-and-resume. As a result, the triangle has 41 actions per agent, the crossing–overtaking game has 36 /4/90 actions for Alfa/Bravo/Charlie, the gauntlet has 104 ,975 joint profiles, and the largest game, the four-agent priority encounter, has 
+
+164 ,934 joint profiles. Unless stated otherwise, we enumerate the joint action space exhaustively to determine equilibria. 
+
+3) True Preferences: In every scenario, each vessel has a circular goal region with radius 150 m . Each vessel i ∈ A 
+
+measures its performance using a goal-reaching metric and a path-length metric 
+
+mgoal  
+
+> i
+
+(γ) := −dgoal  
+
+> i
+
+(γ), (8a) 
+
+mlen  
+
+> i
+
+(γ) := − X
+
+> t
+
+∥pt+∆ ti (γ) − pti(γ)∥ − v0 
+
+> i
+
+Ti(γ), (8b) where dgoal  
+
+> i
+
+(γ) is the distance from the final position of the vessel to its goal region (zero inside it), pti(γ) its position at time t, v0 
+
+> i
+
+its initial speed, and Ti(γ) its travel time until it stops at its goal. We arrange these into a preference Pperf 
+
+> i
+
+by prioritizing mgoal  
+
+> i
+
+over mlen  
+
+> i
+
+so that reaching the goal dominates not reaching it and, among trajectories that reach, the shorter and faster one is preferred. Hence, a give-way detour costs path length even if the vessel still reaches its goal, so compliance is never free. To obtain the true preference of the vessel, we use Proposition 3 to place Pperf  
+
+> i
+
+below its legal preference according to Sec. V, analogous to the performance metrics of V1 and V2 in Fig. 10. Hence, performance can never compensate for a worse legal outcome. 
+
+4) Social Metric: To select the committed solution γ∗ from 
+
+NE (Gtrue ) according to (3), we use a lexicographic social metric that follows the two levels of the default COLREGS guideline. For an action profile γ ∈ Γ, let 
+
+scoll (γ) := P
+
+> i∈A
+
+P 
+
+> j∈A −i
+
+mcoll  
+
+> i,j
+
+(γ),senc (γ) := P
+
+> i∈A
+
+P
+
+> j∈A −i
+
+ mgw  
+
+> i,j
+
+(γ)/s gw + mso  
+
+> i,j
+
+(γ)/s so 
+
+be the total collision and encounter compliance, where sgw 
+
+and sso are the median magnitudes of the violated give-way and stand-on metrics over all pairs of actions in the game for normalization, and 
+
+s(γ) :=  scoll (γ), s enc (γ), (9) with remaining ties broken by a fixed public rule. Since all legal metrics are capped at zero, both components are non-positive and become 0 exactly when all vessels comply with the corresponding rules. Across levels, s respects the priority of the guideline: no improvement in encounter compliance can compensate for a worse collision outcome. Within a level, the guideline does not prioritize among the metrics of different vessels, so s weighs them equally. Formally, s corresponds to a refinement of the preference P(GCOLREGS , S 
+
+> i∈A
+
+MCOLREGS  
+
+> i
+
+)
+
+that the guideline induces over the union of all legal metrics, obtained by aggregating the incomparable metrics of each level with Proposition 2. Other refinements could also serve as the social metric. Observe that s is based only on public information, so every agent can evaluate it independently. 
+
+B. Auditability 
+
+Fig. 13 shows the committed equilibrium γ∗ for our seven scenarios. Since not all rules can be satisfied simultaneously in general, the committed equilibrium γ∗ may violate individual rules. The posetal structure enables us to audit these violations and justify them in terms of conflicting higher-priority require-ments. Furthermore, it enables us to identify defectors, i.e., vessels that violate legal requirements even though compliance would have been possible. 
+
+1) Auditing Violations: For each committed solution, we audit every violated rule against the legal hierarchy, consider-ing the unilateral deviations of the violating vessel. A violation is unsatisfiable within the action space if no such deviation satisfies the rule. Otherwise, it is forced if no deviation can improve the rule without worsening a metric of higher or 14 Alfa Bravo Charlie Delta Initial state Goal −1 0 1                
+
+> −101
+> x [ km ]y [ km ]
+> (a) Crossing
+> −101
+> x [ km ]
+> (b) Crossing + fishing
+> −101
+> x [ km ]
+> (c) Triangle
+> −101
+> x [ km ]
+> (d) Triangle + fishing 012
+> −101
+> x [ km ]y [ km ]
+> (e) Crossing–overtaking −1012
+> −101
+> x [ km ]y [ km ]
+> (f) Four-agent priority
+> 012
+> x [ km ]
+> (g) Gauntlet
+> Fig. 13. Socially optimal equilibrium γ∗(3) of the true game. The shading of the trajectories encodes time like in Fig. 12.
+
+incomparable priority in the legal preference. In Fig. 13, we can see that none of the vessels collide, choosing trajectories that maintain the highest priority objective of collision avoid-ance. All lower-priority violations at the selected equilibria are forced; none is unsatisfiable within the action space. Hence, every violation is explained by the legal hierarchy. We audit all seven scenarios. The committed equilibria of the crossing and the crossing + fishing scenario satisfy every rule, so they have no violations. In the triangle, every vessel is the give-way vessel toward one vessel and the stand-on vessel toward another; all three alter course to starboard and thereby violate their stand-on duties, since each of the 2 deviations that satisfy the stand-on duty of a vessel worsens its give-way metric. The triangle + fishing scenario has a single forced violation, the stand-on duty of Charlie toward Bravo. Crossing–overtaking has two forced violations, the stand-on duty of Alfa toward Charlie and the stand-on duty of Charlie toward Alfa: every deviation that satisfies one of them worsens either a collision metric or a give-way metric. Under the guideline GCOLREGS ,give-way and stand-on are incomparable, so the collision concern forces at least one encounter violation, and the social metric selects a trade-off in which the stand-on duties of Alfa and Charlie are violated while every give-way duty is satisfied. The four-agent priority encounter has five forced violations: the stand-on duty of Alfa toward Charlie, the give-way duties of Charlie toward Alfa and toward the fishing vessel Bravo, and the stand-on duties of Delta toward Alfa and toward Charlie. The gauntlet has two forced violations, the stand-on duty of Alfa toward Charlie and the give-way duty of Charlie toward Alfa. 
+
+2) Identifying Defectors: We now consider four scenarios that include a defector: triangle with Alfa as the defector and crossing–overtaking with each of Alfa, Bravo, and Charlie as the defector in turn. The defector always moves straight to its goal at full speed while the other agents respond legally; the resulting trajectories are shown in Fig. 14. Given the committed action profile γ, we can identify the agent i ∈ A 
+
+as the defector if its action is not a legal best-response, i.e., 
+
+γi /∈ BR P(Mlegal  
+
+> i,Glegal )
+
+(γ−i). Observe that this test only uses the publicly available information from the legal game and does not require the auditor to know the true preference of any agent. The test successfully identifies the defector in three of the four cases. The exception is Bravo, which is the stand-on vessel toward both other vessels and satisfies its stand-on duties: moving straight to its goal at full speed is its action in the committed equilibrium γ∗, and the other agents respond with their actions in γ∗. If the action of the defector is itself a legal best response, as in this case, the resulting behavior is legal, and the defector has merely steered the agents toward an equilibrium it favors. 
+
+C. Customizability 
+
+We demonstrate customizability on the triangle scenario, holding the legal guideline fixed to GCOLREGS throughout this experiment. Private preferences are refined on the homoge-neous triangle with three power-driven vessels, and the legal guideline is refined on its mixed-class variant, due to the vessel-class hierarchy of [5, Rule 18]. 15 Alfa Bravo Charlie Defector Initial state Goal −1 0 1       
+
+> −101
+> x [ km ]y [ km ]
+> (a) Alfa defects (triangle)
+> 012
+> x [ km ]
+> (b) Alfa defects (crossing–overtaking)
+> 012
+> x [ km ]
+> (c) Bravo defects
+> 012
+> x [ km ]
+> (d) Charlie defects
+> Fig. 14. Defector trajectories for (a) the triangle scenario and (b)–(d) the crossing–overtaking scenario. The highlighted agent ignores legal requirements and always moves straight to its goal. The shading of the trajectories encodes time like in Fig. 12.
+
+1) Private Preference Refinements: Out of the 102 NEs of the legal game, only 17 are NEs of the true game, in which Proposition 3 places the performance metrics (8) below the legal preference of every vessel. Every true equilibrium is legal, as shown in Fig. 15a and predicted by Theorem 1. We now further refine the private preferences of the vessels. Using Proposition 1 to let Bravo prioritize its give-way metrics over its stand-on metrics reduces the number of true equilibria to 11 . After Charlie applies the opposite priority refinement, prioritizing stand-on over give-way, only 6 equilibria are left. Every refinement only shrinks the set of equilibria rather than adding new ones, confirming Proposition 4: the four sets are nested, as Fig. 15 shows. 
+
+2) Guideline Refinements: To reflect a change in the law, we refine the legal guideline by adding the vessel-class hi-erarchy of [5, Rule 18] as described in Sec. V-D. On the mixed-class triangle, this shrinks the legal set from 92 to 50 
+
+equilibria. The number of legal equilibria differs from that of the homogeneous one, because the encounter metrics toward a fishing vessel follow the class-specific rules. The 42 removed equilibria are those in which a power-driven vessel violates its give-way duty toward the fishing vessel. The legal equilibria under the refined guideline are a subset of those under the original one, as expected (see Fig. 6). 
+
+D. Solution Protocols 
+
+We compare the two protocols of Sec. IV, belief play and distributed IBR, on the triangle, crossing–overtaking, four-agent priority, and gauntlet scenarios. Fig. 16 reports the communication cost of the protocols and Tab. II the gap to the socially optimal equilibrium γ∗ (3). The communication cost counts how many messages were sent via the communication channel, independent of the number of recipients. Thus, a belief play broadcast and an IBR point-to-point forward each count as one send. The reported count is proportional to the total volume of data exchanged, because each message consists of one action profile and thus has a fixed size. As the local solver in belief play, we employ exhaustive enumeration. A run of IBR depends on a random seed, which determines the initial action profile and breaks ties among multiple best Original Refined −1 0 1     
+
+> −101
+> x [ km ]y [ km ]
+> (a)
+> −101
+> x [ km ]
+> (b) −101
+> −101
+> x [ km ]y [ km ]
+> (c)
+> Fig. 15. Customization of the private preferences via refinement of the legal preferences by adding (a) performance, (b) prioritization of give-way metrics over stand-on metrics for Bravo, and (c) stand-on metrics over give-way metrics for Charlie. Each plot shows one refinement step by drawing the trajectories occurring in at least one NE of the original game below those of the refined game.
+
+responses. Fig. 16 characterizes the communication cost of a single run: it reports the mean, standard deviation, and range of the number of sends over 15 independently seeded runs. Tab. II characterizes the solution quality that is attainable by restarting the protocol: for k ∈ {1, 5, 10 , 20 }, IBR is run from k
+
+differently seeded initializations, the distinct equilibria reached are pooled, and the socially best among them according to (9) is committed. Each entry of the table is therefore the 16 Triangle Crossing– overtaking Four-agent priority Gauntlet                                                                           
+
+> 050 100 150 200 250 300
+> Action profiles sent [#]  Belief play Distributed IBR
+> Fig. 16. Communication cost of a single run of each solution protocol. The error bars indicate the standard deviation over 15 independently seeded distributed IBR runs. TABLE II SOLUTION QUALITY OF IBR WITH RESTARTS :OPTIMALITY GAP OF THE SOCIALLY BEST EQUILIBRIUM AMONG THOSE REACHED FROM k
+> INITIALIZATIONS /NUMBER OF DISTINCT EQUILIBRIA REACHED . E ACH ENTRY STEMS FROM ONE POOL OF kSEEDED RUNS .
+> Scenario Distributed IBR Belief play
+> 1 init. 5 inits. 10 inits. 20 inits. triangle 0.84 /10.0/30.0/50.0/10 0.0/17
+> crossing–overtaking 8.82 /18.82 /20.0/40.0/40.0/5
+> four-agent priority 9.92 /14.05 /40.0/90.0/13 0.0/29
+> gauntlet 15 .59 /10.24 /30.08 /70.08 /80.0/43
+
+outcome of one pool of k runs and not an average, and its communication cost is the sum over these k runs. The pools are nested, so the gap cannot increase with k.Distributed IBR converges to a true equilibrium in all four considered scenarios while communicating far fewer action profiles than belief play. As the local solver of belief play is deterministic, so is the communication cost of the protocol. It sends every distinct local-equilibrium proposal: 159 profiles on triangle, 22 on crossing–overtaking, 124 on four-agent priority, and 271 on gauntlet. Distributed IBR first uses |A| 
+
+sends to construct the initial profile and then forwards one profile per agent in each best-response round; its means are 
+
+11 .4, 11 .4, 17 .6, and 16 .8 profiles per run, respectively, which corresponds to about three best-response rounds. The trade-off is the quality of the committed equilibrium: IBR commits to 
+
+a true NE but not necessarily to the socially optimal one. In contrast, belief play always commits γ∗, as it recovers all true NEs by construction. Tab. II quantifies this by reporting the optimality gap at the encounter level, i.e., senc (γ∗) − senc (γ),where γ is the committed action profile. Five initializations suffice for IBR to reach γ∗ on the triangle, and ten on crossing–overtaking and four-agent priority. On the gauntlet, its encounter compliance remains 0.08 below that of γ∗ with 
+
+10 and with 20 initializations. VII. C ONCLUSION AND FUTURE WORK 
+
+We presented a framework for multi-agent motion planning under legal requirements with partially ordered objectives, building on posetal games [4]. Guidelines capture priorities among legal concerns independently of the concrete scenario, from which we systematically derive partially ordered agent preferences and the corresponding legal game. To customize the framework while guaranteeing legality, agents augment these preferences with private objectives and regulators re-fine the guideline. Since every such customization is a re-finement and the set of equilibria depends antitonically on the preferences, customizations can only remove equilibria, so that legality is preserved by construction. Even under private preferences, we can deploy our framework using a distributed IBR protocol or belief play, which coordinates agents through conservative local beliefs and provably recovers the equilibria of the true game. We instantiated the framework for COLREGS-compliant motion planning, where it naturally lifts the pairwise rules to multi-vessel encounters. Using the case study, we demonstrated customizability and auditability, including the ability to explain required rule violations and to identify defectors. Our evaluation showed that distributed IBR exchanges solution quality for communication efficiency and weaker information assumptions compared to belief play. Several directions remain open. First, we would like to ex-tend our framework into a receding-horizon scheme, in which agents repeatedly re-solve the game as the encounter evolves and refine their beliefs about the preferences of the others based on observed behavior. The main difficulty is to update the beliefs from observations while keeping them conservative, since the technical result only holds for conservative beliefs. Second, deploying such a scheme on real vessels requires real-time capable solvers. While exhaustive enumeration of the joint action space provides exact references, its cost grows ex-ponentially with the number of agents. Specialized planners for COLREGS encounters that exploit the structure of the game, such as the pairwise symmetric collision metrics, could sub-stantially reduce this cost. Establishing conditions under which the COLREGS game is a potential game would, in addition, guarantee the convergence of distributed IBR, which we have so far observed empirically. Third, the auditability results are relative to the finite action lattice, so that a violation classified as unsatisfiable may become satisfiable under a richer action space. Characterizing how the audit outcome depens on the discretization would strengthen the legal interpretation of such certificates. Fourth, a defector whose action is still a legal best response can steer the equilibrium selection without violating the law, which calls for a mechanism-design perspective on the social metric. Finally, applying our framework to other domains in which regulators specify only partial priorities, like autonomous driving or airborne collision avoidance, would further test its generality. In both domains, interaction rules are also stated pairwise, so the lifting of pairwise rules to many agents would apply directly. APPENDIX 
+
+A. Proofs of the Preference Refinement Operations 
+
+To prove Proposition 1 to 3, we first observe that two actions are indifferent if and only if they are equal in every metric: 
+
+Lemma 2 (Indifference) . Given a preference P := ⟨M , ⪯P⟩,we have γ ≾Γ 
+
+> P
+
+γ′ and γ ≿Γ 
+
+> P
+
+γ′ if and only if 
+
+∀m ∈ M : m(γ) = m(γ′).17 
+
+Proof. The backward direction follows immediately since the universal quantifier is vacuously satisfied in both instances of (1). For the forward direction, we assume both 
+
+∀m ∈ M : m(γ) > m (γ′) = ⇒∃m′ ∈ M : m′ ≻P m and m′(γ) < m ′(γ′) (10a) 
+
+∀m ∈ M : m(γ′) > m (γ) = ⇒∃m′ ∈ M : m′ ≻P m and m′(γ′) < m ′(γ). (10b) We assume that there exists a metric m so that m(γ)̸ = m(γ′)
+
+and derive a contradiction. Since M is finite, we may choose 
+
+m that is maximal with respect to ⪯P among all metrics that differ at γ and γ′, i.e., m′(γ) = m′(γ′) for all m′ ≻P m. But, if m(γ) > m (γ′), there must be m′ ≻P m so that m′(γ) <m′(γ′) according to (10a), which is a contradiction. If m(γ) <m(γ′) we use (10b) to derive the contradiction. As a direct consequence of Lemma 2, we have γ ≺Γ 
+
+> P
+
+γ′
+
+if and only if, in addition to (1), there exists a separating metric m ∈ M with m(γ) < m (γ′). With this, we can prove Proposition 1 to 3 by showing that every strict relation of the original preference is preserved. 
+
+Proof of Proposition 1. Let γ ≺Γ 
+
+> P
+
+γ′. By Lemma 2, (1) holds for P and some m ∈ M has m(γ) < m (γ′). Since ⪯P ⊆ ⪯ P′ ,every dominating metric required by (1) for P still dominates under P′, so (1) holds for P′ as well, while the separating metric m persists. Hence, γ ≺Γ 
+
+> P′
+
+γ′.
+
+Proof of Proposition 2. Let γ ≺Γ 
+
+> P
+
+γ′. We verify (1) for P′.Consider any metric m of M′ with m(γ) > m (γ′). If m̸ = ˆ m,the dominating metric supplied by (1) for P is preserved by (2a) unless it is mk for some k ∈ { 1, 2}. In the latter case, (2c) provides ˆm ⪰P′ m. If ˆm improves, it is the required dominating metric. Otherwise, since mk improves and f is strictly increasing in each argument, the other metric ml, with 
+
+l ∈ { 1, 2} \ { l}, worsens. Since ml worsens and γ ≺Γ 
+
+> P
+
+γ′,(1) supplies an improving metric above ml that survives the aggregation. By (2b), this metric sits above ˆm, and hence above m by transitivity. If m = ˆ m, strict monotonicity implies 
+
+mk(γ) > m k(γ′) for some k ∈ { 1, 2}, and the dominating metric for mk under P, which by (2b) sits above ˆm in P′,improves on γ′. A separating metric of P likewise yields one for P′, so γ ≺Γ 
+
+> P′
+
+γ′ by Lemma 2. 
+
+Proof of Proposition 3. Let γ ≺Γ 
+
+> P1
+
+γ′. Every metric of M2
+
+is ranked, in P, strictly below every metric of M1, so it can neither serve as nor invalidate a dominating metric for a comparison decided within M1. Since γ ≺Γ 
+
+> P1
+
+γ′ is strict, there exists at least one separating metric m ∈ M 1 with 
+
+m(γ) < m (γ′). m persists and dominates every metric in 
+
+M2, yielding γ ≺Γ 
+
+> P
+
+γ′ by Lemma 2. REFERENCES [1] J. Tumova, G. C. Hall, S. Karaman, E. Frazzoli, and D. Rus, “Least-violating control strategy synthesis with safety rules,” in Proc. of the Int. Conf. on Hybrid Systems: Computation and Control (HSCC) , 2013, pp. 1–10. [2] T. Wongpiromsarn, K. Slutsky, E. Frazzoli, and U. Topcu, “Minimum-violation planning for autonomous systems: Theoretical and practical considerations,” in Proc. of the American Control Conf. (ACC) , 2021, pp. 4866–4872. [3] A. Censi, K. Slutsky, T. Wongpiromsarn, D. Yershov, S. Pendleton, J. Fu, and E. Frazzoli, “Liability, ethics, and culture-aware behavior specification using rulebooks,” in Proc. of the IEEE Int. Conf. on Robotics and Automation (ICRA) , 2019, pp. 8536–8542. [4] A. Zanardi, G. Zardini, S. Srinivasan, S. Bolognani, A. Censi, F. D¨ orfler, and E. Frazzoli, “Posetal games: Efficiency, existence, and refinement of equilibria in games with prioritized metrics,” IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 1292–1299, 2022. [5] International Maritime Organization (IMO), “COLREGs: Convention on the international regulations for preventing collisions at sea,” 1972. [6] ——, “International code of safety for maritime autonomous surface ships (MASS code),” 2026. [7] C. I. Vasile, X. Li, and C. Belta, “Reactive sampling-based path planning with temporal logic specifications,” The International Journal of Robotics Research , vol. 39, no. 8, pp. 1002–1028, 2020. [8] Y. Meng and C. Fan, “Signal temporal logic neural predictive control,” 
+
+IEEE Robotics and Automation Letters , vol. 8, no. 11, pp. 7719–7726, 2023. [9] M. Srinivasan and S. Coogan, “Control of mobile robots using barrier functions under temporal logic specifications,” IEEE Transactions on Robotics , vol. 37, no. 2, pp. 363–374, 2021. [10] C. Pek, G. F. Schuppe, F. Esposito, J. Tumova, and D. Kragic, “SpaTiaL: monitoring and planning of robotic tasks using spatio-temporal logic specifications,” Autonomous Robots , vol. 47, no. 8, pp. 1439–1462, 2023. [11] J. V. Deshmukh, A. Donz´ e, S. Ghosh, X. Jin, G. Juniwal, and S. A. Seshia, “Robust online monitoring of signal temporal logic,” Formal Methods in System Design , vol. 51, no. 1, pp. 5–30, 2017. [12] X. Li, C.-I. Vasile, and C. Belta, “Reinforcement learning with temporal logic rewards,” in Proc. of the IEEE/RSJ Int. Conf. on Intelligent Robots and Systems (IROS) , 2017, pp. 3834–3839. [13] Y. Jiang, S. Bharadwaj, B. Wu, R. Shah, U. Topcu, and P. Stone, “Temporal-logic-based reward shaping for continuing reinforcement learning tasks,” in Proc. of the AAAI Conf. on Artificial Intelligence (AAAI) , 2021, pp. 7995–8003. [14] M. Hasanbeig, Y. Kantaros, A. Abate, D. Kroening, G. J. Pappas, and I. Lee, “Reinforcement learning for temporal logic control synthesis with probabilistic satisfaction guarantees,” in Proc. of the IEEE Conf. on Decision and Control (CDC) , 2019, pp. 5338–5343. [15] M. Althoff, S. Maierhofer, G. W¨ ursching, Y. Lin, F. Lercher, and R. Stolz, “No more traffic tickets: A tutorial to ensure traffic-rule compliance of automated vehicles,” Proceedings of the IEEE , vol. 114, no. 4, pp. 628–657, 2026. [16] N. Mehdipour, M. Althoff, R. D. Tebbens, and C. Belta, “Formal methods to comply with rules of the road in autonomous driving: State of the art and grand challenges,” Automatica , vol. 152, 2023. [17] M. J. Kochenderfer, J. E. Holland, and J. P. Chryssanthacopoulos, “Next-generation airborne collision avoidance system,” Lincoln Laboratory Journal , vol. 19, no. 1, pp. 17–33, 2012. [18] J.-B. Jeannin, K. Ghorbal, Y. Kouskoulas, R. Gardner, A. Schmidt, E. Zawadzki, and A. Platzer, “Formal verification of ACAS X, an industrial airborne collision avoidance system,” in Proc. of the Int. Conf. on Embedded Software (EMSOFT) , 2015, pp. 127–136. [19] K. D. Julian, M. J. Kochenderfer, and M. P. Owen, “Deep neural network compression for aircraft collision avoidance systems,” Journal of Guidance, Control, and Dynamics , vol. 42, no. 3, pp. 598–608, 2019. [20] H. Ma, D. Harabor, P. J. Stuckey, J. Li, and S. Koenig, “Searching with consistent prioritization for multi-agent path finding,” in Proc. of the AAAI Conf. on Artificial Intelligence (AAAI) , 2019, pp. 7643–7650. [21] J. Li, A. Tinka, S. Kiesel, J. W. Durham, T. K. S. Kumar, and S. Koenig, “Lifelong multi-agent path finding in large-scale warehouses,” in Proc. of the AAAI Conf. on Artificial Intelligence (AAAI) , 2021, pp. 11 272– 11 281. [22] H. Krasowski and M. Althoff, “Provable traffic rule compliance in safe reinforcement learning on the open sea,” IEEE Transactions on Intelligent Vehicles , vol. 9, no. 12, pp. 7617–7634, 2024. [23] M. E. Heistand and C. M. Payne, “An approach to establishing evaluation criteria for unmanned surface vessel manoeuvres during COLREGs encounters,” The Journal of Navigation , vol. 77, no. 5-6, pp. 645–657, 2024. [24] T. Wongpiromsarn, K. Slutsky, and E. Frazzoli, “Formal specification and control synthesis of autonomous robots using rulebooks,” IEEE Transactions on Robotics , vol. 42, pp. 1330–1350, 2026. [25] M. Koschi and M. Althoff, “Set-based prediction of traffic participants considering occlusions and traffic rules,” IEEE Transactions on Intelli-gent Vehicles , vol. 6, no. 2, pp. 249–265, 2021. 18 
+
+[26] S. Manzinger, C. Pek, and M. Althoff, “Using reachable sets for trajec-tory planning of automated vehicles,” IEEE Transactions on Intelligent Vehicles , vol. 6, no. 2, pp. 232–248, 2021. [27] P. Halder, L. Kiltz, H. Homburger, J. Reuter, and M. Althoff, “Lex-icographic minimum-violation motion planning using signal temporal logic,” IEEE Open Journal of Intelligent Transportation Systems , vol. 7, pp. 2307–2326, 2026. [28] A. Dreves and M. Gerdts, “A generalized nash equilibrium approach for optimal control problems of autonomous cars,” Optimal Control Applications and Methods , vol. 39, no. 1, pp. 326–342, 2018. [29] D. Fridovich-Keil, V. Rubies-Royo, and C. J. Tomlin, “An iterative quadratic method for general-sum differential games with feedback linearizable dynamics,” in Proc. of the IEEE Int. Conf. on Robotics and Automation (ICRA) , 2020, pp. 2216–2222. [30] M. Wang, Z. Wang, J. Talbot, J. C. Gerdes, and M. Schwager, “Game-theoretic planning for self-driving cars in multivehicle competitive scenarios,” IEEE Transactions on Robotics , vol. 37, no. 4, pp. 1313– 1325, 2021. [31] M. Bhatt, Y. Jia, and N. Mehr, “Strategic decision-making in multiagent domains: A weighted constrained potential dynamic game approach,” 
+
+IEEE Transactions on Robotics , vol. 41, pp. 2749–2764, 2025. [32] A. Zanardi, E. Mion, M. Bruschetta, S. Bolognani, A. Censi, and E. Fraz-zoli, “Urban driving games with lexicographic preferences and socially efficient nash equilibria,” IEEE Robotics and Automation Letters , vol. 6, no. 3, pp. 4978–4985, 2021. [33] K. Miller and S. Mitra, “Multi-agent motion planning using differential games with lexicographic preferences,” in Proc. of the IEEE Conf. on Decision and Control (CDC) , 2022, pp. 5751–5756. [34] D. H. Lee, L. Peters, and D. Fridovich-Keil, “You can’t always get what you want: Games of ordered preference,” IEEE Robotics and Automation Letters , vol. 10, no. 7, pp. 7182–7189, 2025. [35] P. de las Heras Molins, E. Roy-Almonacid, D. H. Lee, L. Peters, D. Fridovich-Keil, and G. Bakirtzis, “Approximate solutions to games of ordered preference,” in Proc. of the IEEE Int. Intelligent Transportation Systems Conf. (ITSC) , 2025, pp. 3378–3385. [36] H. Krasowski and M. Althoff, “Temporal logic formalization of marine traffic rules,” in Proc. of the IEEE Intelligent Vehicles Symp. (IV) , 2021, pp. 186–192. [37] T. R. Torben, J. A. Glomsrud, T. A. Pedersen, I. B. Utne, and A. J. Sørensen, “Automatic simulation-based testing of autonomous ships using Gaussian processes and temporal logic,” Proceedings of the Insti-tution of Mechanical Engineers, Part O: Journal of Risk and Reliability ,vol. 237, no. 2, pp. 293–313, 2023. [38] T. A. Pedersen, C. Vasanthan, M. Hemrich, K. B. Karolius, and S. Kemna, “Formalizing testing of collision avoidance systems using signal temporal logic,” in Proc. of the European Safety and Reliability Conf. and the Society for Risk Analysis Europe Conf. (ESREL SRA-E) ,2025, pp. 2469–2476. [39] E. Dietrich, H. Krasowski, E. Cem Gezer, R. Skjetne, A. J. Sørensen, and M. Arcak, “Staying on spec: Real-time monitoring under uncertainty with a maritime case study,” 2026. [Online]. Available: https://arxiv.org/abs/2608.02811 [40] H. Krasowski, S. Sch¨ ardinger, M. Arcak, and M. Althoff, “Intelligent sailing model for open sea navigation,” Ocean Engineering , vol. 367, 2026. [41] X. Lin, P. Szenher, Y. Huang, and B. Englot, “Distributional rein-forcement learning based integrated decision making and control for autonomous surface vehicles,” IEEE Robotics and Automation Letters ,vol. 10, no. 2, pp. 1194–1201, 2025. [42] Z. Cui, W. Guan, X. Zhang, and H. Han, “Autonomous collision avoid-ance decision-making method for multiple marine surface ships based on deep reinforcement learning,” IEEE Journal of Oceanic Engineering ,vol. 51, no. 2, pp. 1198–1216, 2026. [43] Y. Cho, J. Han, and J. Kim, “Efficient COLREG-Compliant Collision Avoidance in Multi-Ship Encounter Situations,” IEEE Transactions on Intelligent Transportation Systems , vol. 23, no. 3, pp. 1899–1911, 2022. [44] G. Wei and W. Kuo, “COLREGs-compliant multi-ship collision avoid-ance based on multi-agent reinforcement learning technique,” Journal of Marine Science and Engineering , vol. 10, no. 10, 2022. [45] L. Grgiˇ cevi´ c, E. M. Coates, T. I. Fossen, R. T. Bye, and O. L. Osen, “Centralised decision support in maritime vessel traffic services: A polymatrix game solution,” IEEE Access , vol. 13, pp. 74 375–74 395, 2025. [46] United Nations (UN), “Convention on road traffic,” 1968. [47] International Civil Aviation Organization (ICAO), Annex 2 — Rules of the Air , 10th ed. ICAO, 2005. [48] K. Esterle, L. Gressenbuch, and A. Knoll, “Formalizing traffic rules for machine interpretability,” in Proc. of the IEEE Connected and Automated Vehicles Symp. (CAVS) , 2020, pp. 1–7. [49] S. Maierhofer, A.-K. Rettinger, E. C. Mayer, and M. Althoff, “Formal-ization of interstate traffic rules in temporal logic,” in Proc. of the IEEE Intelligent Vehicles Symp. (IV) , 2020, pp. 752–759. [50] S. Maierhofer, P. Moosbrugger, and M. Althoff, “Formalization of inter-section traffic rules in temporal logic,” in Proc. of the IEEE Intelligent Vehicles Symp. (IV) , 2022, pp. 1135–1144. [51] Y. Sun, C. M. Poskitt, J. Sun, Y. Chen, and Z. Yang, “LawBreaker: An approach for specifying traffic laws and fuzzing autonomous vehicles,” in Proc. of the IEEE/ACM Int. Conf. on Automated Software Engineering (ASE) , 2023, pp. 1–12. [52] G. E. Fainekos and G. J. Pappas, “Robustness of temporal logic spec-ifications for continuous-time signals,” Theoretical Computer Science ,vol. 410, no. 42, pp. 4262–4291, 2009. [53] E. Bartocci, J. Deshmukh, A. Donz´ e, G. Fainekos, O. Maler, D. Niˇ ckovi´ c, and S. Sankaranarayanan, “Specification-based monitoring of cyber-physical systems: A survey on theory, tools and applications,” in Lectures on Runtime Verification: Introductory and Advanced Topics ,E. Bartocci and Y. Falcone, Eds. Springer International Publishing, 2018, pp. 135–175. [54] F. Finkeldei, M. Wolf, J.-N. Weghorn, A. Pretschner, and M. Althoff, “Enhanced traffic rule monitoring using model-predictive and duration-aware robustness,” in Proc. of the IEEE Int. Intelligent Transportation Systems Conf. (ITSC) , 2025, pp. 1322–1329. [55] K. Woerner, M. R. Benjamin, M. Novitzky, and J. J. Leonard, “Quan-tifying protocol evaluation for autonomous collision avoidance,” Au-tonomous Robots , vol. 43, no. 4, pp. 967–991, 2019. [56] International Maritime Organization (IMO), “Outcome of the regulatory scoping exercise for the use of maritime autonomous surface ships (MASS),” 2021. [57] J. C. Harsanyi, “Games with incomplete information played by “Bayesian” players, I–III part I. the basic model,” Management Science ,vol. 14, no. 3, pp. 159–182, 1967. [58] M. Aghassi and D. Bertsimas, “Robust game theory,” Mathematical Programming , vol. 107, no. 1, pp. 231–273, 2006. [59] S. Hart and A. Mas-Colell, “Uncoupled dynamics do not lead to nash equilibrium,” American Economic Review , vol. 93, no. 5, pp. 1830–1836, 2003. [60] S. Durand, F. Garin, and B. Gaujal, “Distributed best response dynamics with high playing rates in potential games,” Performance Evaluation ,vol. 129, pp. 40–59, 2019. [61] M. M¨ uller, F. Finkeldei, H. Krasowski, M. Arcak, and M. Althoff, “Falsification-driven reinforcement learning for maritime motion plan-ning,” Ocean Engineering , vol. 361, 2026. [62] B. Wingqvist, B. Olofsson, J.-O. Lindh, A. Robertsson, and R. Johans-son, “Collision avoidance for ASVs in archipelagos—A COLREGs-aware optimization-based method,” in Proc. of the European Control Conf. (ECC) , 2024, pp. 1139–1146. [63] E. Meyer, A. Heiberg, A. Rasheed, and O. San, “COLREG-compliant collision avoidance for unmanned surface vehicle using deep reinforce-ment learning,” IEEE Access , vol. 8, pp. 165 344–165 364, 2020. [64] T. A. Johansen, T. Perez, and A. Cristofaro, “Ship collision avoidance and COLREGS compliance using simulation-based control behavior selection with predictive hazard assessment,” IEEE Transactions on Intelligent Transportation Systems , vol. 17, no. 12, pp. 3407–3422, 2016. [65] United States Coast Guard, “Navigation rules and regulations hand-book,” 2024. [66] H. Krasowski and M. Althoff, “CommonOcean: Composable bench-marks for motion planning on oceans,” in Proc. of the IEEE Int. Intelligent Transportation Systems Conf. (ITSC) , 2022, pp. 1676–1682.

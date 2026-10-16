@@ -1,0 +1,872 @@
+Title: From Solo to Ensemble: A Hierarchical Framework for Composable Multi-Agent Human-Object Interaction
+
+URL Source: https://arxiv.org/pdf/2610.11722v1
+
+Published Time: Fri, 09 Oct 2026 01:44:30 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# From Solo to Ensemble: A Hierarchical Framework for Composable Multi-Agent Human-Object Interaction 
+
+Zekai Deng 1 Kangyi Chen 1 Ye Shi 1,2 Jingya Wang 1, ∗
+
+{dengzk2023, chenky2025, shiye, wangjingya}@shanghaitech.edu.cn 
+
+> 1
+
+ShanghaiTech University 2InstAdapt 
+
+Abstract: Physics-based human-object interaction has achieved robust single-agent manipulation skills, yet extending them to multi-agent cooperative tasks remains challenging. Existing approaches typically adapt interaction policies through task-specific fine-tuning, which entangles low-level contact-rich execu-tion with high-level coordination and limits reuse across object geometries, inter-action types, and team sizes. We propose a hierarchical framework that converts a single-agent HOI policy into a reusable Object-oriented Motion Skill . Specifi-cally, we reinterpret teacher rollouts as object-oriented action supervision by ex-tracting short-horizon object-proxy motions from executed trajectories, and distill task-specific teachers into a low-level skill operating in an Object-oriented Action Space . For downstream tasks, the distilled skill is frozen as a reusable executor, while a high-level policy coordinates multiple agents by generating region-wise object-oriented actions conditioned on the shared object, task goal, agent states, and local manipulation regions. This formulation shifts multi-agent HOI learning from direct contact-rich full-body control to compact object-level proxy-motion coordination. Experiments on diverse HOI tasks show that the distilled Object-oriented Motion Skill supports robust proxy-motion execution and enables com-posable policy learning across different interaction types, object geometries, and team sizes. 
+
+Keywords: Multi-Agent Human-Object Interaction, Skill Distillation 
+
+## 1 Introduction 
+
+Physics-based character control has made substantial progress in learning robust full-body skills from motion imitation, adversarial motion priors, latent skill learning, and unified humanoid con-trollers [1–5]. Recent human-object interaction (HOI) methods further extend these advances to contact-rich object manipulation and human-scene interaction [6–10]. However, multi-human HOI introduces a distinct coordination challenge: multiple humanoids must coordinate contact locations, motion directions, and force application around the same manipulated object. Existing methods have explored transferring interaction skills to multi-human tasks. For example, CooHOI [11] adapts learned interaction policies to cooperative manipulation through object-level coupling. Such transfer is typically realized through policy initialization or task-specific fine-tuning. Although the adapted policy can solve a specific cooperative task, it still entangles low-level motor skill and high-level coordination within a single task policy. As a result, the learned behavior is difficult to reuse, compose, or transfer to new object geometries and cooperative configurations. Our key insight is that a single-human HOI policy should not be directly fine-tuned into a task-specific multi-human policy. Instead, it should be preserved and converted into a reusable Object-
+
+> ∗
+
+Corresponding author: wangjingya@shanghaitech.edu.cn arXiv:2610.11722v1 [cs.RO] 8 Oct 2026 Different Object 
+
+> Geometries
+
+Different Team Sizes Different 
+
+Interaction Types Figure 1: Our method composes object-oriented motion skills and cooperative planning to support shared object manipulation across team sizes, object geometries, and interaction types. 
+
+oriented Motion Skill that can realize local proxy motions across downstream HOI tasks. With this skill, downstream learning only needs to reason in the Object-oriented Action Space . This leads to a hierarchical and decoupled control framework, where the low-level Object-oriented Motion Skill handles contact-rich execution and the high-level policy performs compositional object-level coordination through proxy-motion planning. To make the skill reusable, the control interface should neither be tied to a specific task goal nor over-constrain the humanoid motion. We therefore define the Object-oriented Action Space as short-horizon motions of an object proxy, allowing the low-level policy to learn how to realize desired proxy motion through contact selection, balance control, and full-body coordination. Specifically, we reinterpret rollouts from single-human HOI teacher policies as object-oriented ac-tion supervision by extracting future object-proxy motions from their executed trajectories. This converts task-specific teachers into an Object-oriented Motion Skill that can be frozen and reused as a low-level executor. In downstream tasks, a high-level policy observes the shared object, task goal, agent states, and local manipulation regions, and generates region-wise object-oriented actions. In this way, downstream RL no longer optimizes contact-rich full-body control directly, but instead learns cooperative decision making within the compact Object-oriented Action Space. Our contributions are threefold: • We establish a transferable formulation for physics-based multi-human HOI, shifting the focus from task-specific cooperative policy learning to transferable object-oriented motion coordination. • We develop a distillation-based hierarchical learning framework that converts single-human HOI knowledge into a reusable Object-oriented Motion Skill, enabling high-level policies to coordinate multiple humans through short-horizon object-proxy motions. • We validate the framework on cooperative HOI tasks, showing that an Object-oriented Motion Skill distilled from a single-human skill supports robust proxy-motion execution and enables high-level policy learning across different interaction types, object geometries, and team sizes. 
+
+## 2 Related Work 
+
+Human-Object Interaction Motion Synthesis and Physics-Based Control. Character anima-tion and motion synthesis have extensively studied human motion in 3D scenes and human-object interaction, including kinematic human-scene and dynamic-object interaction methods [12–24]. Re-cent diffusion-based approaches further improve motion diversity and controllability by condition-2ing on scene constraints, text, action labels, or object trajectories [25–36]. However, such kinematic generation methods often lack physical validity, especially for long-horizon contact-rich interactions that require sustained contacts, force exchange, and object dynamics. Physics-based character control addresses this issue by learning closed-loop policies for physically plausible full-body behaviors from motion imitation, adversarial motion priors, latent skills, and large-scale motion datasets [1–5, 37, 38]. These techniques have been extended to physics-based HOI and human-scene interaction, enabling contact-rich behaviors such as object catching and ma-nipulation, scene-level interactions, dynamic HOI imitation, reusable sports skills, task-tokenized scene interaction, and whole-body HOI control across diverse objects [6, 7, 9, 10, 39–46]. While these methods substantially improve physical realism and task coverage, their control abstractions are usually tied to reference motions, task labels, or single-human interaction settings. 
+
+Multi-Character Interaction and Cooperative Object Manipulation. Compared with single-human HOI, cooperative interaction introduces a stronger coordination challenge: a shared object-level task must be decomposed into per-human contacts, motions, and force application. Existing multi-person datasets and kinematic animation methods have enabled visually plausible human-human interactions and choreographic motions [47–66]. However, these methods mainly target motion synthesis and do not guarantee physically valid contacts, forces, or shared object dynamics. Recent physics-based multi-character methods improve physical plausibility by combining gener-ated motions with controllers or converting multi-human motions into executable policies [8, 67–73], but they mostly focus on human-human interaction, sports, reaction, or collision avoidance rather than contact-rich cooperative object manipulation [74–76]. Cooperative object manipulation has also been explored in legged robotics, including multi-robot payload transport, pushing, and collaborative carrying [77–82]. These systems demonstrate object-level coordination, but they typically rely on quadrupedal morphology, engineered manipulation interfaces, or task-specific control designs, and do not address full-body humanoid HOI with motion priors. Most closely related to our setting, CooHOI [11] learns cooperative human-object interaction through shared object dynamics, but its adaptation still couples low-level motor execution with task-specific multi-human coordination. In contrast, our method preserves single-human HOI skills as a reusable low-level skill operating over object-oriented proxy motions, enabling high-level policies to compose local object motions across object geometries, interaction types, and team sizes. 
+
+## 3 Method 
+
+Our method builds a composable HOI control hierarchy around object-oriented proxy motions. Sec. 3.1 first introduces the Object-oriented Motion Skill , a reusable low-level policy that realizes short-horizon motions of object proxies through physically feasible humanoid control. Its Object-oriented Action Space provides a compact interface between high-level task reasoning and contact-rich execution. Sec. 3.2 then trains task-specific high-level policies on top of the frozen skill, allow-ing single- and multi-human HOI tasks to be solved by generating region-wise proxy motions rather than full-body motions or torque-level actions. Fig. 2 provides an overview of the full pipeline. 
+
+3.1 Low-Level Policy: Generalizable Object-oriented Motion Skill Definition of Object-oriented Action Space. We decouple high-level HOI reasoning from low-level physical execution by introducing an Object-oriented Motion Skill , a reusable low-level policy controlled through an Object-oriented Action Space . Instead of directly tracking full-body reference motions or optimizing toward a task-specific goal, the skill realizes short-horizon motions of a ma-nipulated object proxy. For clarity, we formulate the action space for a single humanoid and omit the agent index. Let st denote the humanoid state and ot denote the object proxy observed by the low-level skill. We represent either a complete object or a task-relevant local region as a compact cuboid proxy with 31) Collect Teacher Rollouts  
+
+> Reference rollouts Task-specific Teacher Construct proxy-motion condition
+> 2) Distilling a Unified Skill from Single-Human HOI
+> Reference object trajectory Teacher Goal State Humanoid State Unified Student Object Proxy
+> BC PPO
+> Low-Level Policy: Generalizable Object-oriented Motion Skill
+> Object-oriented High-Level Policy
+> Random object trajectory Humanoid State Object Proxy
+> 3) RL Post-Training for Robust HOI
+> Low-level policy
+
+Input Global proxy    
+
+> Agent states Task goal local proxy local proxy
+> High-Level Policy: Composable Cooperative Planning for Shared Object Manipulation
+> Task-specific Teacher
+> &
+> Low-level policy
+
+Figure 2: Overview of our hierarchical framework. We distill and post-train a reusable Object-oriented Motion Skill from task-specific single-human HOI rollouts re-labeled as proxy-motion supervision. The frozen skill then executes local proxy motions planned by high-level policies, enabling composable single- and multi-human HOI. unified kinematic and bounding-box features. This abstraction provides a shared input format across manipulation regions, object geometries, and interaction types. We define an object anchor pt ∈ R3 as the reference point of the proxy ot, such as its root or center. The Object-oriented Action Space is defined as a short-horizon sequence of anchor displacements: 
+
+mt = [∆ pt, 0, ∆pt, 1, . . . , ∆pt,K −1] , ∆pt,k = pt+k+1 − pt+k, (1) where K is the prediction horizon. Eq. (1) is written in a common coordinate frame for notation. In practice, mt is transformed into the local frame of the receiving humanoid before being fed to the skill. Thus, mt specifies the desired near-future motion of the object proxy, while ot provides the geometric and dynamic context required for physical execution. Given the humanoid state, the object proxy, and the object-oriented action, the low-level skill outputs humanoid control actions: 
+
+at = πlow (st, ot, mt) . (2) Here, mt is the high-level object-oriented action, whereas at is the low-level humanoid control action. Compared with a final object goal, mt provides dense temporal guidance. Compared with full-body motion tracking, it preserves freedom in contact selection, balance, and locomotion. This interface allows downstream high-level policies to compose diverse single- and multi-human HOI tasks by generating proxy-level object motions while reusing the same low-level skill. 
+
+Trajectory Rollouts from Task-specific Teacher Policy. Existing single-human HOI policies are typically trained with task-specific goals, hand-designed rewards, and AMP-based motion priors [2, 42]. We treat such a trained policy as a teacher, denoted by atea  
+
+> t
+
+∼ πtea (· | st, ot, gtea  
+
+> t
+
+), where st,
+
+ot, and gtea  
+
+> t
+
+are the humanoid state, object proxy state, and task-specific teacher goal, respectively. Although gtea  
+
+> t
+
+is effective for the source task, it is tied to a particular goal and reward formulation and therefore cannot directly serve as a reusable low-level control interface. We collect successful teacher rollouts and convert them into supervision for the Object-oriented Motion Skill. A reference rollout is written as τref = {(sref  
+
+> t
+
+, oref  
+
+> t
+
+, pref  
+
+> t
+
+, gtea  
+
+> t
+
+)}H−1 
+
+> t=0
+
+, where pref 
+
+> t
+
+4denotes the anchor position of the object proxy. These rollouts provide physically plausible in-teraction states, while their object proxy trajectories define training conditions in the Object-oriented Action Space. For each reference state, we construct the future proxy-motion condition 
+
+mref  
+
+> t
+
+= [∆ pref  
+
+> t, 0
+
+, . . . , ∆pref 
+
+> t,K −1
+
+], with ∆pref  
+
+> t,k
+
+= pref  
+
+> t+k+1
+
+− pref 
+
+> t+k
+
+, following Eq. (1). The orig-inal teacher goal is retained only for querying πtea , whereas the student is conditioned on the constructed future object motion: the teacher uses πtea (at | st, ot, gtea  
+
+> t
+
+), while the student uses 
+
+πlow (at | st, ot, mref  
+
+> t
+
+). In this way, a task-specific single-human HOI policy is reinterpreted as object-oriented action supervision for a reusable low-level skill. Teacher actions are not stored in the rollout buffer; instead, they are queried online when behavior-cloning supervision is applied. 
+
+Distilling a Unified Skill from Single-Human HOI. In the first stage, we use the converted teacher rollouts to bootstrap the Object-oriented Motion Skill from physically feasible contact-rich interactions. Each environment is initialized from a sampled reference frame, and the executed ac-tion is replaced by the online teacher action with probability p, which is gradually annealed to zero. This defines a mixed rollout policy π(p)mix that exposes the student to feasible interaction states during early training. The student is trained with PPO conditioned on the future proxy-motion condition, together with an auxiliary online behavior cloning loss: 
+
+L = −Eτ ∼π(p)mix 
+
+"H−1X
+
+> t=0
+
+γtrt
+
+#
+
++ λBC Et
+
+h
+
+μlow (st, ot, mref  
+
+> t
+
+) − μtea (st, ot, gtea  
+
+> t
+
+) 22
+
+i
+
+, (3) where μlow and μtea denote the mean actions of the student and teacher policies. Here, rt combines an object-proxy trajectory tracking reward robj  
+
+> t
+
+and an auxiliary human pose tracking reward rhuman  
+
+> t
+
+.The object reward trains the skill to follow the future proxy-motion condition, while the human reward stabilizes early contact-rich imitation by matching the reference motion. We provide the details of the human pose tracking reward in the appendix. Both p and λBC are decayed during training, so that the student gradually shifts from teacher-guided imitation to reinforcement learning under the Object-oriented Action Space. The core reward is object-proxy trajectory tracking. For a target proxy-motion condition m⋆t =[∆ p⋆t, 0, . . . , ∆p⋆t,K −1], we define 
+
+robj  
+
+> t
+
+= exp − 1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+d∆pt,k − ∆p⋆t,k 
+
+> 22
+
+!
+
+, (4) where d∆pt,k denotes the executed anchor displacement. In this stage, m⋆t = mref  
+
+> t
+
+. The reference human motion is used only for reward computation and is never provided to the student input. This prevents the student from becoming a full-body motion tracker and forces it to realize the demonstrated interaction through object-oriented proxy-motion conditions. 
+
+RL Post-Training for Robust HOI. The distillation stage trains the policy mainly within the tra-jectory distribution induced by successful teacher rollouts. However, in downstream HOI tasks, high-level policies may generate proxy motions that deviate from the teacher demonstrations, caus-ing the low-level policy to encounter out-of-distribution states. To improve the robustness and out-of-distribution generalization of the Object-oriented Motion Skill, we further post-train πlow with randomly generated feasible object-proxy motions. In this stage, we remove teacher action replace-ment and the behavior cloning loss, i.e., p = 0 and λBC = 0 , and optimize the policy only with the object-proxy tracking reward in Eq. (4). The target motion is replaced by a sampled random proxy-motion condition, m⋆t = mrand  
+
+> t
+
+. This exposes the policy to a broader range of object mo-tions and forces it to realize them through physical humanoid-object interaction rather than relying on teacher-guided trajectories. After post-training, πlow is frozen and reused as the shared Object-oriented Motion Skill for downstream single- and multi-human HOI policy learning. 
+
+3.2 High-Level Policy: Composable Cooperative Planning for Shared Object Manipulation 
+
+The learned Object-oriented Motion Skill enables downstream HOI tasks to be formulated as proxy-motion planning over task-relevant manipulation regions. Instead of generating full-body humanoid 5motions or low-level control actions, the high-level policy predicts object-oriented actions that spec-ify how local object proxies should move in the near future. The frozen Object-oriented Motion Skill then realizes these proxy-level motions through physical humanoid control. This forms a com-posable hierarchy: downstream tasks only train task-specific high-level policies, while sharing the same low-level Object-oriented Motion Skill. For a task with N humanoids, we assign each humanoid a manipulation region ρi according to the object geometry and interaction role. This region specifies where the humanoid interacts with the object, but does not prescribe its full-body motion, contact pattern, or the complete object transport strategy. Given the global object proxy og 
+
+> t
+
+, we instantiate a compatible local proxy by 
+
+oit = ψ  og 
+
+> t
+
+, ρi , i = 1 , . . . , N. (5) Here, ψ is a geometric adapter that represents the selected region using the same cuboid proxy format as in Object-oriented Motion Skill learning. A local proxy may correspond to an endpoint, side, or corner of a larger object. Since oit remains compatible with the skill observation space, the same Object-oriented Motion Skill can be applied to different object regions, geometries, interaction types, and team sizes without architectural changes. The high-level policy adopts an object-centric view and outputs one object-oriented action for each local proxy: 
+
+mit 
+
+> Ni=1
+
+= πhigh 
+
+
+
+og 
+
+> t
+
+, ¯sit, oit 
+
+> Ni=1
+
+, gt
+
+
+
+, ait = πlow 
+
+ sit, oit, mit
+
+ , (6) where ¯sit denotes the state of humanoid i represented in the object-centric frame, and gt is the task goal state. Each mit follows the Object-oriented Action Space defined in Eq. (1), but specifies the desired near-future motion of the corresponding local proxy. Humanoids are coordinated by the high-level policy, the shared object dynamics, and object-level task rewards, while the frozen Object-oriented Motion Skill handles contact-rich full-body execution. During downstream training, πlow is fixed and only πhigh is optimized. Following prior physics-based interaction-control methods [11, 42], we optimize πhigh with PPO using task-specific re-wards; details are provided in the appendix. Thus, downstream HOI learning is reduced to region-conditioned proxy-motion planning, enabling the same Object-oriented Motion Skill to support single-human and multi-human HOI across different object geometries and interaction types. 
+
+## 4 Experiments 
+
+4.1 Evaluation on Compositional HOI Tasks Evaluation Protocol. We evaluate whether the Object-oriented Motion Skill learned from single-human interaction can serve as a reusable low-level interface for downstream object manipulation. In all tasks, πlow is frozen, and only a task-specific πhigh is trained to predict object-oriented actions for local proxies, which are then executed by the frozen skill. We test multi-human carrying and pushing, including two-human sofa carrying, four-human H-box/cross-box carrying, and two-/four-human sofa pushing. We also include single-human armchair/table carrying and large-box pushing to evaluate transfer across object geometries and interaction modes. Each object or manipulation region is represented by the same cuboid proxy format as in skill learning, allowing all settings to share the Object-oriented Action Space without modifying πlow .All experiments are conducted in Isaac Gym [83] with 4096 parallel environments. We use the same humanoid model as prior physics-based HOI controllers [11, 42], with 15 rigid bodies and 28 PD-controlled joints. Objects are initialized with random yaw in [0 , 2π] and root-to-target distance of 4–10 m . We report success rate(%) and precision(cm) over 4096 environments, with success defined as the object root reaching within 0.2 m of the target. 
+
+Baselines. We compare with CooHOI [11], a representative physics-based cooperative HOI base-line. CooHOI adapts a full interaction policy to each downstream carrying task, but still couples 6Table 1: Quantitative evaluation of downstream compositional HOI tasks. The Object-oriented Mo-tion Skill is frozen across all tasks, and only task-specific high-level policies are trained to generate object-oriented actions for local proxies.                                                    
+
+> Task Object #Agents CooHOI Ours Succ. ↑Precision ↓Succ. ↑Precision ↓
+> Carrying
+> Armchair 197.26 5.05 97.81 4.99
+> Table 197.07 5.23 97.19 5.11
+> Sofa 284.17 10.12 88.21 8.70
+> H-box 480.96 17.50 85.63 14.24
+> Cross-box 482.38 15.13 86.14 13.81
+> Pushing
+> Large box 1——96.24 9.31 Sofa 2——94.98 15.22 Sofa 4——88.14 17.97
+
+motor execution and coordination in one policy, limiting direct reuse across geometries, interaction modes, and team sizes. Our method instead freezes the Object-oriented Motion Skill and trains only a task-specific high-level policy in the Object-oriented Action Space. We evaluate CooHOI on its supported carrying tasks; for pushing, which is outside its released carrying-focused setting, we report only our method to test generalization beyond source carrying. 
+
+Compositional Transfer. Table 1 shows that our hierarchy transfers across object geometries, in-teraction modes, and team sizes. For multi-human carrying, the method remains effective from two-human sofa carrying to four-human compositional-object manipulation, since the high-level policy coordinates local proxy motions while the frozen Object-oriented Motion Skill handles contact-rich execution. This avoids binding the policy to a specific cooperative layout as in monolithic full-body adaptation. The pushing results further verify interaction-mode transfer: although the skill is dis-tilled from single-human carrying, it supports two- and four-human sofa pushing by changing only the high-level policy. Single-human armchair/table carrying and large-box pushing additionally con-firm geometric transfer, showing that the cuboid-proxy abstraction provides a unified and reusable low-level interface across object shapes and tasks. 
+
+4.2 Evaluation on Object-oriented Motion Skill Evaluation Protocol. We evaluate whether the proposed pipeline can convert a task-specific single-human HOI policy into a reusable Object-oriented Motion Skill. The student is conditioned on the humanoid state, object-proxy observation, and short-horizon object-oriented action. We test two target distributions: teacher-rollout targets , relabeled from successful teacher trajectories, and 
+
+random proxy-motion targets , procedurally generated to evaluate generalization beyond the teacher-induced motion manifold. All experiments use the simulator and humanoid model of Sec. 4.1. The teacher policy is trained independently on the source single-human carrying task in Sec. 3.1. Dur-ing skill learning, the box size is randomized within [0 .5, 1.5] times its nominal scale to improve geometric coverage. We report tracking errors on the object-proxy anchor, i.e., the box center in our implementation. Epos , Evel , and Eacc denote mean position(mm), velocity(mm/frame), and acceleration errors(mm/frame 2). Trajectory Targets Reached (TTR) is the fraction of target posi-tions reached within 15 cm . Succ traj measures complete trajectory-following success, where failure occurs if the object deviates more than 30 cm from the reference at any timestep. 
+
+Baselines. We compare with adapted variants of two representative physics-based HOI skill-learning paradigms. InterPhys [42] represents goal-driven interaction control, where policies are trained with task goals, task rewards, and adversarial motion priors constructed from OMOMO [31] and AMASS [84] motion clips. SkillMimic [7] represents imitation-based skill learning, where poli-cies track human-object demonstrations conditioned on skill labels. For a controlled comparison, we adapt both methods to receive the same short-horizon object-oriented action and optimize them with 7Table 2: Quantitative evaluation of Object-oriented Motion Skill learning. We report proxy-motion tracking under teacher-rollout targets and procedurally generated random proxy-motion targets. Method Teacher-Rollout Targets Random-Motion Targets                                                                      
+
+> Epos ↓Evel ↓Eacc ↓TTR ↑Succ traj ↑Epos ↓Evel ↓Eacc ↓TTR ↑Succ traj ↑
+> InterPhys [42] 106.5 47.8 50.9 82.6 68.2 112.2 63.9 54.1 76.4 60.8 SkillMimic [7] 91.0 40.3 44.2 90.8 81.2 99.3 54.6 49.7 84.9 68.3
+> Ours 79.8 38.2 31.3 100.0 98.9 95.8 45.2 39.2 96.3 91.8
+> Ours w/o Online Distill. 117.9 52.3 50.8 86.7 84.8 148.2 63.1 55.9 58.4 23.8 Ours w/o Random-Motion RL 88.1 41.3 32.8 97.2 98.1 156.1 65.5 57.2 63.1 38.7
+
+the same object-proxy tracking objective. Thus, all methods share the same target motion interface, while differing in how the underlying contact-rich interaction skill is acquired. 
+
+Proxy-motion Tracking. Table 2 shows that our method achieves the best tracking performance on teacher-rollout targets. This indicates that relabeling successful teacher rollouts into future proxy motions preserves physically feasible interaction behavior without exposing the student to full-body reference motion. The advantage becomes more pronounced on random proxy-motion targets. Al-though the adapted baselines receive the same object-oriented action, their performance drops when the target motions move away from the teacher-rollout distribution. In contrast, our Object-oriented Motion Skill maintains higher target-reaching and trajectory success rates, showing that teacher-guided relabeling and random-motion RL post-training expand the executable region of the Object-oriented Action Space. These results support object-oriented motion as a compact low-level in-terface: it provides sufficient temporal guidance for object transport while preserving flexibility in contact selection, balance, and locomotion. 
+
+Ablation. Table 2 further validates the contribution of the two training stages. Removing on-line distillation causes a clear performance drop, especially on random proxy-motion targets. This suggests that object-proxy tracking rewards alone are insufficient to bootstrap contact-rich carry-ing, since stable grasping, balance, and locomotion must first emerge before trajectory rewards be-come informative. Teacher-guided rollout and online behavior cloning therefore provide a feasible-interaction prior that stabilizes early skill acquisition. Removing random-motion RL post-training preserves strong performance on teacher-rollout targets but substantially weakens generalization to random proxy-motion targets. This indicates that rela-beled teacher rollouts provide high-quality supervision near the source task manifold, but cover only a limited range of executable object motions. Random-motion post-training expands this range and turns the distilled policy from a teacher-rollout follower into a reusable Object-oriented Motion Skill for downstream high-level policy learning. 
+
+## 5 Limitations 
+
+Our framework studies compositional HOI within a reusable Object-oriented Motion Skill, where high-level policies coordinate local proxy motions through a shared low-level executor. However, it does not explicitly address composition across heterogeneous skill types or long-horizon temporal task structures, such as multi-stage task decomposition and dynamic role reassignment. Incorporat-ing skill-level composition with higher-level planning is a promising direction for future work. 
+
+## 6 Conclusion 
+
+We presented a hierarchical framework for composable physics-based HOI that converts task-specific single-human interaction policies into a reusable Object-oriented Motion Skill . By rela-beling teacher rollouts with short-horizon object-proxy motions, our method learns a low-level skill under the Object-oriented Action Space , instead of directly fine-tuning single-human policies into task-specific cooperative controllers. The frozen skill realizes region-wise object-oriented actions 8through contact-rich full-body control, allowing downstream policies to transfer across different object geometries, interaction types, and team sizes. 
+
+Acknowledgments 
+
+This work was supported by the National Natural Science Foundation of China (62406195, 62303319), HPC Platform of ShanghaiTech University, Core Facility Platform of Computer Sci-ence and Communication of ShanghaiTech University, Key Laboratory of Intelligent Perception and Human-Machine Collaboration (ShanghaiTech University), Ministry of Education, and Shanghai Engineering Research Center of Intelligent Vision and Imaging. 
+
+## References 
+
+[1] X. B. Peng, P. Abbeel, S. Levine, and M. Van de Panne. Deepmimic: Example-guided deep re-inforcement learning of physics-based character skills. ACM Transactions On Graphics (TOG) ,37(4):1–14, 2018. [2] X. B. Peng, Z. Ma, P. Abbeel, S. Levine, and A. Kanazawa. Amp: Adversarial motion priors for stylized physics-based character control. ACM Transactions on Graphics (ToG) , 40(4): 1–20, 2021. [3] X. B. Peng, Y. Guo, L. Halper, S. Levine, and S. Fidler. Ase: Large-scale reusable adversarial skill embeddings for physically simulated characters. ACM Transactions on Graphics (TOG) ,41(4):1–17, 2022. [4] C. Tessler, Y. Kasten, Y. Guo, S. Mannor, G. Chechik, and X. B. Peng. Calm: Conditional ad-versarial latent models for directable virtual characters. In ACM SIGGRAPH 2023 Conference Proceedings , pages 1–9, 2023. [5] C. Tessler, Y. Guo, O. Nabati, G. Chechik, and X. B. Peng. Maskedmimic: Unified physics-based character control through masked motion inpainting. ACM Transactions on Graphics (TOG) , 2024. [6] Y. Wang, J. Lin, A. Zeng, Z. Luo, J. Zhang, and L. Zhang. Physhoi: Physics-based imitation of dynamic human-object interaction. arXiv preprint arXiv:2312.04393 , 2023. [7] Y. Wang, Q. Zhao, R. Yu, A. Zeng, J. Lin, Z. Luo, H. W. Tsui, J. Yu, X. Li, Q. Chen, J. Zhang, L. Zhang, and T. Ping. Skillmimic: Learning reusable basketball skills from demonstrations. 
+
+arXiv preprint arXiv:2408.15270 , 2024. [8] G. Tevet, S. Raab, S. Cohan, D. Reda, Z. Luo, X. B. Peng, A. H. Bermano, and M. van de Panne. Closd: Closing the loop between simulation and diffusion for multi-task character control. arXiv preprint arXiv:2410.03441 , 2024. [9] L. Pan, Z. Yang, Z. Dou, W. Wang, B. Huang, B. Dai, T. Komura, and J. Wang. Tokenhsi: Unified synthesis of physical human-scene interactions through task tokenization. In CVPR ,2025. [10] S. Xu, H. Y. Ling, Y.-X. Wang, and L. Gui. Intermimic: Towards universal whole-body control for physics-based human-object interactions. In CVPR , 2025. [11] J. Gao, Z. Wang, Z. Xiao, J. Wang, T. Wang, J. Cao, X. Hu, S. Liu, J. Dai, and J. Pang. Coohoi: Learning cooperative human-object interaction with manipulated object dynamics. 
+
+arXiv preprint arXiv:2406.14558 , 2024. [12] X. Li, S. Liu, K. Kim, X. Wang, M.-H. Yang, and J. Kautz. Putting humans in a scene: Learning affordance in 3d indoor environments. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 12368–12376, 2019. 9[13] S. Zhang, Y. Zhang, Q. Ma, M. J. Black, and S. Tang. Generating person-scene interactions in 3d scenes. In International Conference on 3D Vision (3DV) , volume 2, 2020. [14] H. Xuan, X. Li, J. Zhang, H. Zhang, Y. Liu, and K. Li. Narrator: Towards natural con-trol of human-scene interaction generation via relationship reasoning. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pages 22268–22278, Octo-ber 2023. [15] K. Zhao, S. Wang, Y. Zhang, T. Beeler, and S. Tang. Compositional human-scene interaction synthesis with semantic control. In European conference on computer vision (ECCV) , 2022. [16] J. Lee and H. Joo. Locomotion-action-manipulation: Synthesizing human-scene interactions in complex 3d environments. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , 2023. [17] Z. Wang, Y. Chen, T. Liu, Y. Zhu, W. Liang, and S. Huang. Humanise: Language-conditioned human motion generation in 3d scenes. Advances in Neural Information Processing Systems ,35:14959–14971, 2022. [18] Z. Wang, Y. Chen, B. Jia, P. Li, J. Zhang, J. Zhang, T. Liu, Y. Zhu, W. Liang, and S. Huang. Move as you say, interact as you can: Language-guided human motion generation with scene affordance. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024. [19] S. Starke, H. Zhang, T. Komura, and J. Saito. Neural state machine for character-scene inter-actions. ACM Transactions on Graphics , 38(6):178, 2019. [20] K. Zhao, Y. Zhang, S. Wang, T. Beeler, and S. Tang. DIMOS: Synthesizing diverse human motions in 3d indoor scenes. In International conference on computer vision (ICCV) , 2023. [21] S. Starke, Y. Zhao, T. Komura, and K. Zaman. Local motion phases for learning multi-contact character movements. ACM Transactions on Graphics (TOG) , 39(4):54–1, 2020. [22] N. Jiang, T. Liu, Z. Cao, J. Cui, Y. Chen, H. Wang, Y. Zhu, and S. Huang. Chairs: Towards full-body articulated human-object interaction. arXiv preprint arXiv:2212.10621 , 3, 2022. [23] X. Zhang, B. L. Bhatnagar, S. Starke, V. Guzov, and G. Pons-Moll. Couch: Towards control-lable human-chair interactions. In European Conference on Computer Vision , pages 518–535. Springer, 2022. [24] C. Zhang, Y. Liu, R. Xing, B. Tang, and L. Yi. Core4d: A 4d human-object-human interaction dataset for collaborative object rearrangement. arXiv preprint arXiv:2406.19353 , 2024. [25] J. Ho, A. Jain, and P. Abbeel. Denoising diffusion probabilistic models. Advances in neural information processing systems , 33:6840–6851, 2020. [26] S. Huang, Z. Wang, P. Li, B. Jia, T. Liu, Y. Zhu, W. Liang, and S.-C. Zhu. Diffusion-based gen-eration, optimization, and planning in 3d scenes. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 16750–16761, 2023. [27] J. Tang, J. Wang, K. Ji, L. Xu, J. Yu, and Y. Shi. A unified diffusion framework for scene-aware human motion estimation from sparse signals. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21251–21262, 2024. [28] H. Yi, J. Thies, M. J. Black, X. B. Peng, and D. Rempe. Generating human interaction motions in scenes with text control. In European Conference on Computer Vision , pages 246–263. Springer, 2025. [29] K. Zhao, G. Li, and S. Tang. Dart: A diffusion-based autoregressive motion model for real-time text-driven motion control. arXiv preprint arXiv:2410.05260 , 2024. 10 [30] J. Li, J. Wu, and C. K. Liu. Object motion guided human motion synthesis. ACM Transactions on Graphics (TOG) , 42(6):1–11, 2023. [31] J. Li, A. Clegg, R. Mottaghi, J. Wu, X. Puig, and C. K. Liu. Controllable human-object interaction synthesis. arXiv preprint arXiv:2312.03913 , 2023. [32] H. Pi, S. Peng, M. Yang, X. Zhou, and H. Bao. Hierarchical generation of human-object interactions with diffusion probabilistic models. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 15061–15073, 2023. [33] X. Peng, Y. Xie, Z. Wu, V. Jampani, D. Sun, and H. Jiang. Hoi-diff: Text-driven synthesis of 3d human-object interactions using diffusion models. arXiv preprint arXiv:2312.06553 , 2023. [34] Z. Zhang, Y. Shi, L. Yang, S. Ni, Q. Ye, and J. Wang. Openhoi: Open-world hand-object interaction synthesis with multimodal large language model. In The Thirty-ninth Annual Con-ference on Neural Information Processing Systems , 2025. [35] N. Jiang, Z. Zhang, H. Li, X. Ma, Z. Wang, Y. Chen, T. Liu, Y. Zhu, and S. Huang. Scaling up dynamic human-scene interaction modeling. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 1737–1747, 2024. [36] N. Jiang, Z. He, Z. Wang, H. Li, Y. Chen, S. Huang, and Y. Zhu. Autonomous character-scene interaction synthesis from text instruction. In SIGGRAPH Asia 2024 Conference Papers , pages 1–11, 2024. [37] Z. Luo, J. Cao, J. Merel, A. Winkler, J. Huang, K. M. Kitani, and W. Xu. Universal humanoid motion representations for physics-based control. In International Conference on Learning Representations , 2024. [38] J. Juravsky, Y. Guo, S. Fidler, and X. B. Peng. Superpadl: Scaling language-directed physics-based control with progressive supervised distillation. In ACM SIGGRAPH 2024 Conference Proceedings , pages 1–11, 2024. [39] J. Merel, S. Tunyasuvunakool, A. Ahuja, Y. Tassa, L. Hasenclever, V. Pham, T. Erez, G. Wayne, and N. Heess. Catch & carry: reusable neural controllers for vision-guided whole-body tasks. 
+
+ACM Transactions on Graphics (TOG) , 39(4):39–1, 2020. [40] Y.-W. Chao, J. Yang, W. Chen, and J. Deng. Learning to sit: Synthesizing human-chair interac-tions via hierarchical control. In Proceedings of the AAAI Conference on Artificial Intelligence ,volume 35, pages 5887–5895, 2021. [41] Z. Xie, J. Tseng, S. Starke, M. van de Panne, and C. K. Liu. Hierarchical planning and control for box loco-manipulation. Proceedings of the ACM on Computer Graphics and Interactive Techniques , 6(3):1–18, 2023. [42] M. Hassan, Y. Guo, T. Wang, M. Black, S. Fidler, and X. B. Peng. Synthesizing physical character-scene interactions. In ACM SIGGRAPH 2023 Conference Proceedings , pages 1–9, 2023. [43] H. Zhang, Y. Yuan, V. Makoviychuk, Y. Guo, S. Fidler, X. B. Peng, and K. Fatahalian. Learn-ing physically simulated tennis skills from broadcast videos. ACM Transactions on Graphics (TOG) , 42(4):1–14, 2023. [44] L. Liu and J. Hodgins. Learning to schedule control fragments for physics-based characters using deep q-learning. ACM Transactions on Graphics (TOG) , 36(3):1–14, 2017. [45] S. Liu, G. Lever, Z. Wang, J. Merel, S. A. Eslami, D. Hennes, W. M. Czarnecki, Y. Tassa, S. Omidshafiei, A. Abdolmaleki, et al. From motor control to team play in simulated humanoid football. Science Robotics , 7(69):eabo0235, 2022. 11 [46] Z. Xie, S. Starke, H. Y. Ling, and M. van de Panne. Learning soccer juggling skills with layer-wise mixture-of-experts. In ACM SIGGRAPH 2022 Conference Proceedings , pages 1–9, 2022. [47] J. N. Kundu, H. Buckchash, P. Mandikal, A. Jamkhandi, V. B. Radhakrishnan, et al. Cross-conditioned recurrent networks for long-term synthesis of inter-person human motion interac-tions. In IEEE/CVF Winter Conference on Applications of Computer Vision (WACV) , 2020. [48] Y. Shen, L. Yang, E. S. Ho, and H. P. Shum. Interaction-based human activity comparison. 
+
+IEEE Transactions on Visualization and Computer Graphics (TVCG) , 2019. [49] M. Fieraru, M. Zanfir, E. Oneata, A.-I. Popa, V. Olaru, and C. Sminchisescu. Three-dimensional reconstruction of human interactions. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2020. [50] L. Xu, X. Lv, Y. Yan, X. Jin, S. Wu, C. Xu, Y. Liu, Y. Zhou, F. Rao, X. Sheng, et al. Inter-x: Towards versatile human-human interaction analysis. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024. [51] Y. Liu, C. Zhang, R. Xing, B. Tang, B. Yang, and L. Yi. Core4d: A 4d human-object-human interaction dataset for collaborative object rearrangement. In IEEE/CVF Conference on Com-puter Vision and Pattern Recognition (CVPR) , 2025. [52] J. Zhang, J. Zhang, Z. Song, Z. Shi, C. Zhao, Y. Shi, J. Yu, L. Xu, and J. Wang. Hoi-mˆ 3: Capture multiple humans and objects interaction within contextual environment. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024. [53] K. Kogashi, A. Cherian, and M.-Y. J. Kuo. Mmhoi: Modeling complex 3d multi-human multi-object interactions. In IEEE/CVF Winter Conference on Applications of Computer Vision (WACV) , 2026. [54] N. Le, T. Pham, T. Do, E. Tjiputra, Q. D. Tran, and A. Nguyen. Music-driven group choreog-raphy. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2023. [55] L. Siyao, T. Gu, Z. Yang, Z. Lin, Z. Liu, H. Ding, L. Yang, and C. C. Loy. Duolando: Fol-lower gpt with off-policy reinforcement learning for dance accompaniment. In International Conference on Learning Representations (ICLR) , 2024. [56] J. Won, K. Lee, C. O’Sullivan, J. K. Hodgins, and J. Lee. Generating and ranking diverse multi-character interactions. ACM Transactions on Graphics (TOG) , 2014. [57] H. Liang, W. Zhang, W. Li, J. Yu, and L. Xu. Intergen: Diffusion-based multi-human mo-tion generation under complex interactions. International Journal of Computer Vision (IJCV) ,2024. [58] M. Tanaka and K. Fujiwara. Role-aware interaction generation from textual description. In 
+
+IEEE/CVF International Conference on Computer Vision (ICCV) , 2023. [59] Y. Shafir, G. Tevet, R. Kapon, and A. H. Bermano. Human motion diffusion as a generative prior. In International Conference on Learning Representations (ICLR) , 2024. [60] A. Ghosh, R. Dabral, V. Golyanik, C. Theobalt, and P. Slusallek. Remos: 3d motion-conditioned reaction synthesis for two-person interactions. In European Conference on Com-puter Vision (ECCV) , 2024. [61] W. Tan, B. Li, C. Jin, W. Huang, X. Wang, and R. Song. Think-then-react: Towards un-constrained human action-to-reaction generation. In International Conference on Learning Representations (ICLR) , 2025. 12 [62] Z. Zhang, S. Zhang, Y. Wang, and S. Li. Reactffusion: Physical contact-guided diffusion model for reaction generation. In ACM International Conference on Multimedia , 2025. [63] Y. Zhao, Y. Wang, L. Wen, H. Zhang, and X. Qi. Freedance: Towards harmonic free-number group dance generation via a unified framework. In IEEE/CVF International Conference on Computer Vision (ICCV) , 2025. [64] K. Fan, J. Tang, W. Cao, R. Yi, M. Li, J. Gong, J. Zhang, Y. Wang, C. Wang, and L. Ma. Freemotion: A unified framework for number-free text-to-motion synthesis. In European Con-ference on Computer Vision (ECCV) , 2024. [65] A. Ghosh, B. Zhou, R. Dabral, J. Wang, V. Golyanik, C. Theobalt, P. Slusallek, and C. Guo. Duetgen: Music driven two-person dance generation via hierarchical masked modeling. In 
+
+ACM SIGGRAPH , 2025. [66] M. G. Javed, C. Guo, L. Cheng, and X. Li. Intermask: 3d human interaction generation via collaborative masked modeling. In International Conference on Learning Representations (ICLR) , 2025. [67] X. Huang, T. Truong, Y. Zhang, F. Yu, J. P. Sleiman, J. Hodgins, K. Sreenath, and F. Farshid-ian. Diffuse-cloc: Guided diffusion for physics-based character look-ahead control. ACM Transactions on Graphics (TOG) , 2025. [68] K. Karunratanakul, K. Preechakul, S. Suwajanakorn, and S. Tang. Guided motion diffusion for controllable human motion synthesis. In IEEE/CVF International Conference on Computer Vision (ICCV) , 2023. [69] Z. Zhang, R. Liu, R. Hanocka, and K. Aberman. Tedi: Temporally-entangled diffusion for long-term motion synthesis. In ACM SIGGRAPH , 2024. [70] Z. Luo, J. Cao, K. Kitani, W. Xu, et al. Perpetual humanoid control for real-time simulated avatars. In IEEE/CVF International Conference on Computer Vision (ICCV) , 2023. [71] Y. Liu, C. Chen, C. Ding, and L. Yi. Physreaction: Physically plausible real-time humanoid reaction synthesis via forward dynamics guided 4d imitation. In ACM International Conference on Multimedia , 2024. [72] K. Ji, Y. Shi, Z. Jin, K. Chen, L. Xu, Y. Ma, J. Yu, and J. Wang. Towards immersive human-x interaction: A real-time framework for physically plausible motion synthesis. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 10173–10183, 2025. [73] B. Li, R. Zhang, H. Liang, J. Zhang, J. Zhang, X. Chen, L. Xu, J. Yu, and J. Wang. Intera-gent: Physics-based multi-agent command execution via diffusion on interaction graphs. arXiv preprint arXiv:2512.07410 , 2025. [74] B. Haworth, G. Berseth, S. Moon, P. Faloutsos, and M. Kapadia. Deep integration of physical humanoid control and crowd navigation. In ACM SIGGRAPH , 2020. [75] D. Rempe, Z. Luo, X. Bin Peng, Y. Yuan, K. Kitani, K. Kreis, S. Fidler, and O. Litany. Trace and pace: Controllable pedestrian animation via guided trajectory diffusion. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 13756–13766, 2023. [76] Z. Luo, J. Wang, K. Liu, H. Zhang, C. Tessler, J. Wang, Y. Yuan, J. Cao, Z. Lin, F. Wang, et al. Smplolympics: Sports environments for physically simulated humanoids. arXiv preprint arXiv:2407.00187 , 2024. 13 [77] O. Nachum, M. Ahn, H. Ponte, S. S. Gu, and V. Kumar. Multi-Agent Manipulation via Lo-comotion using Hierarchical Sim2Real. In L. P. Kaelbling, D. Kragic, and K. Sugiura, edi-tors, Proceedings of the Conference on Robot Learning , volume 100 of Proceedings of Ma-chine Learning Research , pages 110–121. PMLR, 2020. URL https://proceedings.mlr. press/v100/nachum20a.html .[78] F. D. Vincenti and S. Coros. Centralized Model Predictive Control for Collaborative Loco-Manipulation. In Proceedings of Robotics: Science and Systems , Daegu, Republic of Korea, July 2023. doi:10.15607/RSS.2023.XIX.050. [79] M. Sombolestan and Q. Nguyen. Hierarchical adaptive control for collaborative manipulation of a rigid object by quadrupedal robots. In 2023 IEEE/RSJ International Conference on In-telligent Robots and Systems (IROS) , pages 2752–2759, 2023. doi:10.1109/IROS55552.2023. 10341700. [80] G. Turrisi, L. Schulze, V. S. Medeiros, C. Semini, and V. Barasuol. Pacc: A passive-arm approach for high-payload collaborative carrying with quadruped robots using model predic-tive control. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 11139–11146. IEEE, Oct. 2024. doi:10.1109/iros58592.2024.10801456. URL 
+
+http://dx.doi.org/10.1109/IROS58592.2024.10801456 .[81] Y. Feng, C. Hong, Y. Niu, S. Liu, Y. Yang, W. Yu, T. Zhang, J. Tan, and D. Zhao. Learning multi-agent loco-manipulation for long-horizon quadrupedal pushing. In IEEE International Conference on Robotics and Automation (ICRA) , pages 14441–14448, 2025. doi:10.1109/ ICRA55743.2025.11128478. [82] B. Pandit, A. K. Shrestha, and A. Fern. Multi-quadruped cooperative object transport: Learning decentralized pinch-lift-move, 2025. URL https://arxiv.org/abs/2509.14342 .[83] V. Makoviychuk, L. Wawrzyniak, Y. Guo, M. Lu, K. Storey, M. Macklin, D. Hoeller, N. Rudin, A. Allshire, A. Handa, et al. Isaac gym: High performance gpu-based physics simulation for robot learning. arXiv preprint arXiv:2108.10470 , 2021. [84] N. Mahmood, N. Ghorbani, N. F. Troje, G. Pons-Moll, and M. J. Black. AMASS: Archive of motion capture as surface shapes. In International Conference on Computer Vision , pages 5442–5451, Oct. 2019. 14 A Appendix 
+
+A.1 Training and Implementation Details Character Model and Policy Inputs. We use a customized simulated humanoid adapted from the AMP character model [2]. The humanoid consists of 15 rigid bodies, 12 actuated joints, and 28 
+
+degrees of freedom (DoFs). The 28 DoFs correspond to the actuated joint space controlled by low-level PD servos, where the policy predicts target joint configurations rather than directly applying torques. At each time step t, the proprioceptive state st describes the physical state of the character. Following AMP [2], it includes the positions, rotations, linear velocities, and angular velocities of all rigid bodies. All quantities are expressed in the character-centric local frame, except for the root orientation and root height, which are kept in the world frame to preserve global elevation information. We represent body rotations using the 6D rotation representation and exclude the global root position from the proprioceptive input. This yields a 223 D state vector st ∈ R223 . At each time step, the policy outputs an action at that specifies target joint rotations for PD control. For 3D spherical joints, the target rotations are parameterized as exponential maps. No external perturbation forces are applied to the humanoid during simulation. For low-level skill learning, we formulate proxy tracking as a short-horizon object-motion execution task. The controlled humanoid interacts with a cuboid object proxy, whose anchor pt ∈ R3 is defined as the proxy center. The object proxy observation ot ∈ R54 encodes the geometric and kinematic state of the oriented cuboid proxy, including its vertices Vbox  
+
+> t
+
+∈ R8×3, orientation θt ∈
+
+R3, vertex linear velocities vbox  
+
+> t
+
+∈ R8×3, and angular velocity ωt ∈ R3. Following the Object-oriented Action Space in Eq. (1), the task goal is a future proxy-motion condition 
+
+m⋆t = [∆ p⋆t, 0, . . . , ∆p⋆t,K −1], (A.1) where we use K = 10 , resulting in m⋆t ∈ R30 .Proxy-motion targets may be constructed in different reference frames, such as the teacher roll-out frame, the object-centric frame, or the global simulation frame. Before being provided to the low-level policy, they are transformed into the receiving humanoid’s local frame, following the object-motion interface in Sec. 3.1. For simplicity, m⋆t denotes this frame-consistent proxy-motion condition. For notation simplicity, we use m⋆t to denote the frame-consistent proxy-motion condi-tion provided to πlow . Together with the humanoid proprioceptive state and proxy observation, the low-level policy acts as 
+
+at = πlow (st, ot, m⋆t ) . (A.2) 
+
+Low-Level Skill Training. The Object-oriented Motion Skill is trained in two consecutive stages, as summarized in Algorithm 1. The first stage distills a task-specific single-human teacher into a proxy-motion-conditioned student. Given successful teacher rollouts, we relabel each reference state with a future object-oriented action mref  
+
+> t
+
+constructed from the reference proxy anchor trajec-tory. During training, environments are initialized from reference frames, and the executed action is sampled from a mixed policy that uses the online teacher action with probability p and the stu-dent action otherwise. The student is optimized with PPO using the object-proxy tracking reward and an auxiliary human tracking reward, while an online behavior cloning loss matches the mean action of the teacher. Both the teacher action replacement probability p and the behavior cloning weight λBC are gradually annealed to zero, so that the policy shifts from teacher-guided imitation to autonomous proxy-motion execution. In the second stage, we remove teacher guidance entirely and post-train the same policy with randomly sampled feasible proxy-motion targets mrand  
+
+> t
+
+. Only the object-proxy tracking reward is retained in this stage. This exposes the skill to motions beyond the teacher rollout distribution and improves its robustness before it is frozen for downstream high-level policy learning. During distillation, the student is optimized with the object-proxy tracking reward in Eq. (4), to-gether with an auxiliary human motion tracking reward: 
+
+rdistill  
+
+> t
+
+= robj  
+
+> t
+
++ λhuman rhuman  
+
+> t
+
+. (A.3) 15 Algorithm 1 Training the Object-oriented Motion Skill 
+
+Require: Teacher policy πtea , reference rollout set Dref , horizon K
+
+Require: Initial low-level policy πlow , distillation epochs Edistill , post-training epochs Epost 
+
+Ensure: Frozen Object-oriented Motion Skill πlow 
+
+1: Relabel teacher rollouts as object-oriented supervision 
+
+2: for each rollout τref ∈ D ref do 
+
+3: for each timestep t do 
+
+4: Construct mref  
+
+> t
+
+= [∆ pref  
+
+> t, 0
+
+, . . . , ∆pref 
+
+> t,K −1
+
+] from the reference proxy anchor trajectory 
+
+5: where ∆pref  
+
+> t,k
+
+= pref  
+
+> t+k+1
+
+− pref 
+
+> t+k
+
+6: end for 
+
+7: end for 
+
+8: Stage 1: Teacher-guided distillation 
+
+9: for e = 1 to Edistill do 
+
+10: Anneal teacher action probability p and BC weight λBC 
+
+11: Initialize environments from sampled reference frames in Dref 
+
+12: for each rollout step t do 
+
+13: Query student action alow  
+
+> t
+
+∼ πlow (· | st, ot, mref  
+
+> t
+
+)
+
+14: Query online teacher action atea  
+
+> t
+
+∼ πtea (· | st, ot, gtea  
+
+> t
+
+)
+
+15: Execute at = atea  
+
+> t
+
+with probability p, otherwise execute at = alow 
+
+> t
+
+16: Compute rt = robj  
+
+> t
+
+(mref  
+
+> t
+
+) + λhuman rhuman 
+
+> t
+
+17: end for 
+
+18: Update πlow with PPO and online BC: 
+
+LBC = Et
+
+h
+
+μlow (st, ot, mref  
+
+> t
+
+) − μtea (st, ot, gtea  
+
+> t
+
+) 22
+
+i
+
+.
+
+19: end for 
+
+20: Stage 2: Random proxy-motion post-training 
+
+21: Set p = 0 and λBC = 0 
+
+22: for e = 1 to Epost do 
+
+23: Sample feasible random proxy-motion targets mrand 
+
+> t
+
+24: for each rollout step t do 
+
+25: Execute at ∼ πlow (· | st, ot, mrand  
+
+> t
+
+)
+
+26: Compute rt = robj  
+
+> t
+
+(mrand  
+
+> t
+
+)
+
+27: end for 
+
+28: Update πlow with PPO 
+
+29: end for 
+
+30: Freeze πlow for downstream high-level policy learning The object reward enforces execution of the reference object-oriented action mref  
+
+> t
+
+, while the auxil-iary human reward stabilizes early contact-rich learning by encouraging the student to remain close to feasible teacher motions. During random post-training, reference human motions and teacher actions are no longer available. We therefore remove the human tracking term and optimize the low-level skill only with the object-proxy tracking reward under randomly generated proxy-motion conditions: 
+
+rpost  
+
+> t
+
+= robj  
+
+> t
+
+, m⋆t = mrand  
+
+> t
+
+. (A.4) This prevents the low-level policy from becoming a full-body motion tracker and instead encourages it to realize diverse proxy motions through physically plausible humanoid-object interaction. Let ˆ· denote the reference teacher state. For the auxiliary human reward, we track a compact set of humanoid quantities, including key-point positions xK 
+
+> t
+
+, body pose qt, joint velocity ˙qt, and a velocity smoothness term. The key-point set K contains the root and arm-related bodies, which are most relevant to stable object interaction. The pose vector qt includes the root orientation and joint poses in the same rotation representation as the policy state. The human motion tracking reward is 16 defined as 
+
+rhuman  
+
+> t
+
+= exp 
+
+
+
+− wkp xK 
+
+> t
+
+− ˆxK 
+
+> t
+> 2
+
+− wpose ∥qt − ˆqt∥2
+
+− wvel ˙qt − ˙ˆqt
+
+> 2
+
+− wsmooth ∥ ˙qt − ˙qt−1∥2 
+
+.
+
+(A.5) This reward is used only as an auxiliary training signal during distillation. The reference human state is never exposed as part of the low-level policy input. 
+
+Procedural Random Proxy-Motion Generation. In the post-training stage, the teacher is re-moved and the goal motion is replaced with a procedurally generated random proxy motion, 
+
+m⋆t = mrand  
+
+> t
+
+. The generator maintains a rolling displacement buffer and extends the tail of the current short-horizon trajectory with smooth bounded planar and vertical motions. Algorithm 2 summarizes this procedure. The generated proxy trajectory is then transformed into the humanoid-centric input frame before being provided to πlow .
+
+Downstream High-Level Policy and Rewards. For high-level furniture manipulation, we for-mulate downstream tasks as object-centric proxy-motion planning over task-relevant manipulation regions. The initial poses of the humanoids and object, as well as the target object placement, are randomly sampled within predefined task ranges. The task goal gt ∈ R3 encodes the desired object-level outcome, i.e., the target position of the furniture root in the object-centric frame. The global object state og 
+
+> t
+
+follows the same 54 D cuboid format as the low-level proxy observation, but is rep-resented in the object-centric coordinate frame. For a task with N humanoids, each humanoid is assigned a manipulation region ρi according to the object geometry and its interaction role. For compact objects, the local proxy can be the whole object; for long or large furniture, different hu-manoids are assigned to endpoints, sides, or corners; for pushing tasks, the regions are placed on the side from which agents should apply force. Given og 
+
+> t
+
+and ρi, we instantiate a local cuboid proxy 
+
+oit = ψ(og 
+
+> t
+
+, ρi), (A.6) which keeps the same observation format as in low-level skill learning. The high-level policy observes the global object state, the task goal, and the per-agent object-centric inputs {¯sit, oit}Ni=1 , where each per-agent input has 277 dimensions. It outputs one proxy-motion condition mit ∈ R30 for each humanoid: 
+
+{mit}Ni=1 = πhigh 
+
+ og 
+
+> t
+
+, {¯sit, oit}Ni=1 , gt
+
+ . (A.7) Each high-level output is transformed from the object-centric frame to the corresponding humanoid-centric frame before being executed by the frozen Object-oriented Motion Skill: 
+
+ait = πlow 
+
+ sit, oit, mit
+
+ . (A.8) During downstream training, the learned Object-oriented Motion Skill is frozen and only the high-level policy πhigh is optimized. Following prior physics-based interaction-control methods [11, 42], we train πhigh with PPO using task-specific rewards. The single-human teacher policy used for low-level distillation is trained independently with the same PPO-based interaction-control protocol. Its reward follows the same object-transport objective described below, specialized to N = 1 with the whole box treated as the assigned proxy region. This makes the teacher rollouts physically feasible single-agent carrying demonstrations that are aligned with the downstream proxy-motion execution objective. For downstream shared-object manipulation, the high-level task reward consists of a holding term and an object-transport term: 
+
+rhigh  
+
+> t
+
+= 0 .4 rheld  
+
+> t
+
++ 0 .6 rtrans  
+
+> t
+
+. (A.9) The holding term encourages each humanoid to stay attached to its assigned local proxy region. Let 
+
+hit denote the midpoint of the two hands of agent i, and let cit denote the geometric center of its assigned local proxy oit. We define the multi-agent holding reward as 
+
+rheld  
+
+> t
+
+=
+
+> N
+
+Y
+
+> i=1
+
+exp 
+
+
+
+−wheld hit − cit
+
+> 2
+
+
+
+. (A.10) 17 Algorithm 2 Procedural Random Proxy-Motion Generation 
+
+Require: Current proxy anchor pt, rolling displacement buffer ∆t−1 ∈ RK×3, generator state 
+
+ξt−1, warm-up length Tw
+
+Ensure: Random proxy-motion condition mrand  
+
+> t
+
+and updated buffer ∆t
+
+1: if t ≤ Tw then 
+
+2: mrand  
+
+> t
+
+← 0, ∆t ← 0
+
+3: Reset generator state ξt
+
+4: return mrand  
+
+> t
+
+, ∆t
+
+5: end if 
+
+6: Reconstruct the absolute future anchors: 
+
+P1: K = pt + cumsum(∆ t−1).
+
+7: Let q ← PK be the current trajectory tail. 
+
+8: if t = Tw + 1 then 
+
+9: Initialize ξt = ( ϕt, v t, ζ t) by sampling yaw, speed, and height-control variables 
+
+10: else 
+
+11: ξt ← ξt−1
+
+12: end if 
+
+13: Sample bounded planar increments δϕ and δv 
+
+14: Update heading and speed: 
+
+ϕt ← ϕt + δϕ, vt ← clip( vt + δv ).
+
+15: Generate the next planar tail: 
+
+Pxy K+1 = qxy + ∆ t v t
+
+cos ϕt
+
+sin ϕt
+
+
+
+.
+
+16: Generate the next height: 
+
+P zK+1 =
+
+qz + ∆ zraise , initial lifting stage ,qz + ∆ zsmooth , otherwise ,
+
+where ∆zsmooth is produced by a low-frequency smooth height process. 
+
+17: Clamp P zK+1 to the feasible height range and form 
+
+PK+1 = [ Pxy K+1 , P zK+1 ].
+
+18: Set the current random proxy-motion condition: 
+
+mrand  
+
+> t
+
+← [P1 − pt, P2 − P1, . . . , PK − PK−1] .
+
+19: Update the rolling displacement buffer: 
+
+∆t ← [P2 − P1, . . . , PK+1 − PK ] .
+
+20: return mrand  
+
+> t
+
+, ∆t
+
+The product form requires all agents to maintain their assigned contacts: if any agent loses its proxy region, the overall holding reward decreases sharply. The object-transport term measures whether the shared object moves toward the target with a proper direction, velocity, distance, and final placement. Let pot and vot denote the object root position and velocity, and let ptar denote the target position. We compute transport-related terms in the horizontal plane. Let Πxy (·) denote the projection onto the ground plane, and define 
+
+dt = Πxy (ptar ) − Πxy (pot )
+
+∥Πxy (ptar ) − Πxy (pot )∥ + ϵ , (A.11) where dt is the horizontal direction from the object to the target. The transport reward is 
+
+rtrans  
+
+> t
+
+= 0 .2 rdir  
+
+> t
+
++ 0 .2 rvel  
+
+> t
+
++ 0 .5 rdist  
+
+> t
+
++ 0 .1 rput  
+
+> t
+
+. (A.12) 18 Table A.1: Implementation details and main hyperparameters. 
+
+Item Value 
+
+Simulator Isaac Gym Number of environments 4096 
+
+Humanoid model AMP humanoid Control mode PD target control Control frequency 30 Hz Physics substeps 2
+
+Episode length 2500 steps State initialization Hybrid initialization Policy architecture MLP actor-critic Hidden units [1024 , 1024 , 512] 
+
+Activation ReLU Input normalization Enabled Value normalization Disabled Action distribution Fixed diagonal Gaussian Optimizer PPO Learning rate 2 × 10 −5
+
+Discount factor γ 0.99 
+
+GAE parameter λ 0.95 
+
+PPO clipping threshold 0.2
+
+Rollout horizon 32 
+
+Minibatch size 16384 
+
+PPO epochs per update 6
+
+Critic loss coefficient 5.0
+
+Entropy coefficient 0.0
+
+Gradient norm 1.0
+
+Low-level distillation epochs 15000 
+
+Low-level random post-training epochs 5000 
+
+High-level epochs, N = 1 10000 
+
+High-level epochs, N = 2 20000 
+
+High-level epochs, N = 4 40000 
+
+Maximum proxy speed 2.5 m /s
+
+Proxy-motion increment clip ±0.083 m per control step 
+
+The four components are defined as 
+
+rdir  
+
+> t
+
+= ¯f ot · dt, (A.13) 
+
+rvel  
+
+> t
+
+= exp 
+
+
+
+−wobj ,vel (Π xy (vot ) · dt − v⋆)2
+
+, (A.14) 
+
+rdist  
+
+> t
+
+= exp 
+
+
+
+−wdist Πxy (pot ) − Πxy (ptar ) 2
+
+, (A.15) 
+
+rput  
+
+> t
+
+= I  Πxy (pot ) − Πxy (ptar ) < 0.5 exp 
+
+
+
+−wput 
+
+ zot − zplace 2
+
+. (A.16) Here, ¯f ot is the normalized horizontal forward direction of the object root, v⋆ = 1 .0 m /s is the desired transport speed, zot is the object root height, and zplace is the expected object root height after final placement. The direction term is a signed cosine alignment term without an exponential transformation, while the velocity and distance terms provide dense guidance for moving the object toward the target. The put-down term is activated only when the object is sufficiently close to the target, encouraging correct final placement rather than merely transporting the object near the goal. 
+
+Optimization and Hyperparameters. All policies are trained in Isaac Gym with 4096 paral-lel environments. We use the same simulated humanoid model and PD-control interface for both low-level and high-level policies. The control frequency is 30 Hz, with two physics substeps per control step. Both πlow and πhigh are parameterized by MLP actor-critic networks with hidden sizes [1024 , 1024 , 512] and ReLU activations. The policies output diagonal Gaussian actions with 19 Figure A.1: A deadlock failure of CooHOI [11]. After failed grasping attempts, the agents may stay near the object but stop making progress. Our method is less likely to get stuck because it follows explicit short-horizon trajectory plans. fixed standard deviation, and we optimize them using PPO with generalized advantage estimation. Table A.1 summarizes the main implementation details and hyperparameters. The low-level Object-oriented Motion Skill is trained in two stages. In the distillation stage, the student is trained for 15000 epochs using teacher rollouts and the auxiliary human tracking reward. It is then post-trained for another 5000 epochs using randomly generated proxy-motion targets, where only the object-proxy tracking objective is used. For downstream tasks, πlow is frozen and only the high-level policy πhigh is optimized. We train the high-level policy for 10000 , 20000 , and 
+
+40000 epochs for single-agent, two-agent, and four-agent tasks, respectively. To stabilize high-level training, we clip the proxy-motion increments predicted by πhigh . Since the control frequency is 30 Hz, a maximum proxy speed of 2.5 m /s corresponds to a per-step displace-ment limit 
+
+∆pmax = 2.530 ≈ 0.083 m . (A.17) We therefore clip each consecutive-frame translational proxy-motion increment to this range. This prevents the high-level policy from producing physically infeasible proxy trajectories that cannot be executed by the frozen low-level skill. 
+
+Failure mode compared with CooHOI. Fig. A.1 shows a typical failure case of CooHOI [11]. After one or two failed attempts to lift the object, the policy can get stuck: the agents stay around the object but stop making further effective adjustments. In other words, once the interaction falls into a bad local state, CooHOI may fail to recover and the whole cooperative behavior enters a deadlock. A likely reason is that CooHOI relies on implicit coordination through object-conditioned observations, which can be sensitive to the local object state, especially object velocity. When the agents are already close to the object while the object remains static, the policy may no longer receive a strong enough signal to continue corrective behavior. Our method is less prone to this issue. The high-level policy explicitly predicts short-horizon local future trajectories, and the low-level skill is further post-trained with RL to respond robustly to diverse trajectory commands. As a result, even from imperfect contact states or near-static configurations, our policy can still keep producing meaningful corrective actions instead of becoming inactive. 20

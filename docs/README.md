@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-15</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-16</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 9 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>7</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-15 22:31:06 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-16 22:12:14 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,10 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日共生成 9 篇推荐（精读 3 篇，速读 6 篇）</p>
-<p>精读：《Optimistic Distributed Submodular Coordination with Applications to Multi-Target Tracking with Multiple Robots》（8.0/10）, 《FPTAS for Polygonal Multi-Robot Motion Planning》（8.0/10）</p>
-<p>速读：《Who to Trust in Multi-Robot Systems: Joint Robot and Object Hypothesis Trust Inference via Neural-Symbolic Cross-Validation》（7.0/10）, 《Distributed area coverage path planning subject to the inclusion of a headland path》（7.0/10）, 《HM3D-M3: A Benchmark for Multi-Agent, Multi-Modal, Multi-Object Goal Navigation》（7.0/10）</p>
-<p>这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。</p>
+<p>今天从9篇中精读2篇、速读7篇，聚焦多智能体追捕、去中心化集群自组织与机器人协同操作。最值得看的是两篇8.0精读：基于可达性控制屏障函数的抢占式通信多智能体追捕，以及去中心化智能体集群的自我编排学习。普通读者可</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -74,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Optimistic Distributed Submodular Coordination with Applications to Multi-Target Tracking with Multiple Robots">Optimistic Distributed Submodular Coordination with Applications to Multi-Target Tracking with Multiple Robots</span></li><li><span class="dpr-home-dashboard-paper-title" title="FPTAS for Polygonal Multi-Robot Motion Planning">FPTAS for Polygonal Multi-Robot Motion Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="DD-GBP: Anytime Multi-Arm Planning and Continuous Execution via Distributed Dynamic Gaussian Belief Propagation">DD-GBP: Anytime Multi-Arm Planning and Continuous Execution via Distributed Dynamic Gaussian Belief Propagation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Robust Multi-Agent Pursuit with Preemptive Communication via Reachability-Based Control Barrier Functions">Robust Multi-Agent Pursuit with Preemptive Communication via Reachability-Based Control Barrier Functions</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Self-Orchestration in Decentralized Agent Swarms">Learning Self-Orchestration in Decentralized Agent Swarms</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -87,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">7 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Who to Trust in Multi-Robot Systems: Joint Robot and Object Hypothesis Trust Inference via Neural-Symbolic Cross-Validation">Who to Trust in Multi-Robot Systems: Joint Robot and Object Hypothesis Trust Inference via Neural-Symbolic Cross-Validation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed area coverage path planning subject to the inclusion of a headland path">Distributed area coverage path planning subject to the inclusion of a headland path</span></li><li><span class="dpr-home-dashboard-paper-title" title="HM3D-M3: A Benchmark for Multi-Agent, Multi-Modal, Multi-Object Goal Navigation">HM3D-M3: A Benchmark for Multi-Agent, Multi-Modal, Multi-Object Goal Navigation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="From Solo to Ensemble: A Hierarchical Framework for Composable Multi-Agent Human-Object Interaction">From Solo to Ensemble: A Hierarchical Framework for Composable Multi-Agent Human-Object Interaction</span></li><li><span class="dpr-home-dashboard-paper-title" title="Non-Prehensile Multi-Object Placement with Mobile Robots via Diffusion-Based Trajectory Planning">Non-Prehensile Multi-Object Placement with Mobile Robots via Diffusion-Based Trajectory Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Scalable Multi-Human Cooperative Manipulation via Commander-Executor Coordination">Scalable Multi-Human Cooperative Manipulation via Commander-Executor Coordination</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>7</strong></span></div>
 </section>
 </div>
 
