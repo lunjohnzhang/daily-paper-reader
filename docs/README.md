@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-16</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-17</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 9 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>7</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-16 22:12:14 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-17 21:15:32 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今天从9篇中精读2篇、速读7篇，聚焦多智能体追捕、去中心化集群自组织与机器人协同操作。最值得看的是两篇8.0精读：基于可达性控制屏障函数的抢占式通信多智能体追捕，以及去中心化智能体集群的自我编排学习。普通读者可</p>
+<p>今日速读三篇均分 6.0 的论文，聚焦分布式约束求解与机器人学习。最值得关注的是机器人操作的两项方向：用预测动力学适应实现统一操作，以及在测试时优化环境潜变量以改进世界模型。普通读者可先关注这两篇机器人学习论文，重点看方法在真实任务中的泛化表现。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Robust Multi-Agent Pursuit with Preemptive Communication via Reachability-Based Control Barrier Functions">Robust Multi-Agent Pursuit with Preemptive Communication via Reachability-Based Control Barrier Functions</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Self-Orchestration in Decentralized Agent Swarms">Learning Self-Orchestration in Decentralized Agent Swarms</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
+
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">7 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="From Solo to Ensemble: A Hierarchical Framework for Composable Multi-Agent Human-Object Interaction">From Solo to Ensemble: A Hierarchical Framework for Composable Multi-Agent Human-Object Interaction</span></li><li><span class="dpr-home-dashboard-paper-title" title="Non-Prehensile Multi-Object Placement with Mobile Robots via Diffusion-Based Trajectory Planning">Non-Prehensile Multi-Object Placement with Mobile Robots via Diffusion-Based Trajectory Planning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Scalable Multi-Human Cooperative Manipulation via Commander-Executor Coordination">Scalable Multi-Human Cooperative Manipulation via Commander-Executor Coordination</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Dynamic Conflict Clustering with Lightweight Learning and Strategic Repair for Distributed Constraint Satisfaction">Dynamic Conflict Clustering with Lightweight Learning and Strategic Repair for Distributed Constraint Satisfaction</span></li><li><span class="dpr-home-dashboard-paper-title" title="Collective Learning for Unified Robotic Manipulation via Predictive Dynamics Adaptation">Collective Learning for Unified Robotic Manipulation via Predictive Dynamics Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="T2-z: Test-Time Optimization of Environment Latents for Robotic World Models">T2-z: Test-Time Optimization of Environment Latents for Robotic World Models</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>7</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 </div>
 
