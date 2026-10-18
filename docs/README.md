@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-17</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-18</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 3 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-17 21:15:32 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-18 21:40:43 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读三篇均分 6.0 的论文，聚焦分布式约束求解与机器人学习。最值得关注的是机器人操作的两项方向：用预测动力学适应实现统一操作，以及在测试时优化环境潜变量以改进世界模型。普通读者可先关注这两篇机器人学习论文，重点看方法在真实任务中的泛化表现。</p>
+<p>今日精读挂零、速读4篇，全部聚焦多智能体与多机器人协作，最高分6.0，整体偏探索性。</p>
+<p>最值得看的是多操作员多机器人远程协作界面在复杂环境下的设计与评估，以及“观察、共享还是预测”对具身协作中伙伴信息的拆解。</p>
+<p>普通读者可先挑这两篇扫读摘要与实验设置，判断是否与自己的场景（远程操控或协作策略）相关，再决定是否深挖。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Dynamic Conflict Clustering with Lightweight Learning and Strategic Repair for Distributed Constraint Satisfaction">Dynamic Conflict Clustering with Lightweight Learning and Strategic Repair for Distributed Constraint Satisfaction</span></li><li><span class="dpr-home-dashboard-paper-title" title="Collective Learning for Unified Robotic Manipulation via Predictive Dynamics Adaptation">Collective Learning for Unified Robotic Manipulation via Predictive Dynamics Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="T2-z: Test-Time Optimization of Environment Latents for Robotic World Models">T2-z: Test-Time Optimization of Environment Latents for Robotic World Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Design and Evaluation of a Collaborative Teleoperation Interface for Multi-Operator Multi-Robot Systems in Challenging Environments">Design and Evaluation of a Collaborative Teleoperation Interface for Multi-Operator Multi-Robot Systems in Challenging Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="HarnessNet: Feedback-driven Hierarchical Joint Harness Evolution for Multi-agent Systems">HarnessNet: Feedback-driven Hierarchical Joint Harness Evolution for Multi-agent Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Observe, Share, or Predict? Disentangling Partner Information in Embodied Multi-Agent Collaboration">Observe, Share, or Predict? Disentangling Partner Information in Embodied Multi-Agent Collaboration</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
 </section>
 </div>
 
