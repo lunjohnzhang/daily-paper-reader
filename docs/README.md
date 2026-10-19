@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-18</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-19</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 4 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-18 21:40:43 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-19 22:52:03 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精读挂零、速读4篇，全部聚焦多智能体与多机器人协作，最高分6.0，整体偏探索性。</p>
-<p>最值得看的是多操作员多机器人远程协作界面在复杂环境下的设计与评估，以及“观察、共享还是预测”对具身协作中伙伴信息的拆解。</p>
-<p>普通读者可先挑这两篇扫读摘要与实验设置，判断是否与自己的场景（远程操控或协作策略）相关，再决定是否深挖。</p>
+<p>今日精读2篇、速读2篇，重点聚焦机器人智能体自我进化与异构协作。最值得看的是《InstAgent》提出的递归自我改进智能体操作系统（9.0分），以及《CoEvolve》让人形机器人从技能进化到策略的代码策略自演化（8.0分）。普通读者可先看这两篇的精读摘要，再浏览《VLA-Fabric》中多臂VLA智能体的交互学习思路。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="InstAgent: A Recursively Self-Improving Agent Operating System for Heterogeneous Robot Collaboration">InstAgent: A Recursively Self-Improving Agent Operating System for Heterogeneous Robot Collaboration</span></li><li><span class="dpr-home-dashboard-paper-title" title="CoEvolve: Self-Evolving Code Policies from Skills to Strategies for Humanoid Robots">CoEvolve: Self-Evolving Code Policies from Skills to Strategies for Humanoid Robots</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Design and Evaluation of a Collaborative Teleoperation Interface for Multi-Operator Multi-Robot Systems in Challenging Environments">Design and Evaluation of a Collaborative Teleoperation Interface for Multi-Operator Multi-Robot Systems in Challenging Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="HarnessNet: Feedback-driven Hierarchical Joint Harness Evolution for Multi-agent Systems">HarnessNet: Feedback-driven Hierarchical Joint Harness Evolution for Multi-agent Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Observe, Share, or Predict? Disentangling Partner Information in Embodied Multi-Agent Collaboration">Observe, Share, or Predict? Disentangling Partner Information in Embodied Multi-Agent Collaboration</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="VLA-Fabric: Learning Interaction for Composable Multi-Arm VLA Agents">VLA-Fabric: Learning Interaction for Composable Multi-Arm VLA Agents</span></li><li><span class="dpr-home-dashboard-paper-title" title="From Agents to Edges: Paired Optimization for Multi-Agent Collaboration">From Agents to Edges: Paired Optimization for Multi-Agent Collaboration</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 </div>
 
