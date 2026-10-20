@@ -1,0 +1,1444 @@
+Title: PACT: Plan-Augmented Coordination via Trace-Graphs for Dynamic Multi-Agent Combinatorial Optimization
+
+URL Source: https://arxiv.org/pdf/2610.26671v1
+
+Published Time: Tue, 20 Oct 2026 03:11:17 GMT
+
+Number of Pages: 29
+
+Markdown Content:
+# PACT: P LAN -A UGMENTED COORDINATION VIA 
+
+# TRACE -G RAPHS FOR DYNAMIC MULTI -A GENT 
+
+# COMBINATORIAL OPTIMIZATION 
+
+Xiao Zhou, Alex Schutz, Victor-Alexandru Darvariu & Nick Hawes 
+
+Oxford Robotics Institute University of Oxford OX1 3PJ, Oxford, United Kingdom. 
+
+{xiaozhou,alexschutz,victord,nickh }@robots.ox.ac.uk 
+
+## ABSTRACT 
+
+Multi-agent approaches have been investigated recently as a means of improving the scalability of reinforcement learning for neural combinatorial optimization. Existing methods assume that all problem instance information is known upfront. However, real-world problems are often dynamic : relevant information is pro-gressively revealed as the agents take actions (e.g., arriving at an edge in a routing problem only to discover it is untraversable). In such cases, existing methods fail to coordinate agents to explore and exploit the progressively revealed informa-tion. To address the arising coordination challenge, we introduce PACT ( Plan-
+
+Augmented Coordination via Trace-graphs). PACT augments the environment graph with auxiliary nodes representing the plans of agents, which are connected to the resource nodes to indicate future dependencies. The proposed message-passing scheme over the augmented graph grounds inter-agent coordination in the environment and enables proactive, rather than reactive, conflict resolution. We show that PACT improves solution quality in dynamic problems relative to base-lines and exhibits the best transfer to larger instances on which, remarkably, it outperforms centralized oracles with privileged access to instance uncertainty. 
+
+## 1 INTRODUCTION 
+
+Many routing, scheduling, and allocation problems require several agents to construct a joint com-binatorial solution under a shared objective such as total travel cost or makespan, a setting known as multi-agent combinatorial optimization (MACO) (Berto et al., 2025). Existing formulations typi-cally assume that the instance to be solved is fully specified before construction begins. In many real systems, however, relevant information becomes available only through execution: a route may be discovered to be untraversable only when an agent reaches it, or a machine may become known to be unavailable only when an operation is attempted (Pillac et al., 2013; Ouelhadj & Petrovic, 2009). We call this setting dynamic multi-agent combinatorial optimization (DMACO). Classic combinatorial optimization typically assumes fully disclosed instances upfront. Although reactive re-optimization can adapt to newly revealed information, solving must recur continuously (Vieira et al., 2003; Bertsimas et al., 2019), and such reactive paradigms generally do not account for how current decisions affect information and coordination requirements that arise later (Ulmer, 2019). Neural combinatorial optimization (NCO) amortizes the cost of re-solving by learning poli-cies over instance distributions (Kool et al., 2019; Kwon et al., 2020; Kool et al., 2022) and has recently been extended to multi-agent settings (Berto et al., 2025; Luttmann & Xie, 2026). Nonethe-less, these NCO approaches still assume fixed and fully observable instances prior to execution. Since information in DMACO is revealed through agents’ actions, we formulate it as a sequential decision-making problem, naturally suited to multi-agent reinforcement learning (MARL) (Bern-stein et al., 2002; Oliehoek & Amato, 2016; Yu et al., 2022). Existing MARL approaches typically manage coordination via agent-centric representations (Sunehag et al., 2018; Guestrin et al., 2002; Sukhbaatar et al., 2016). Alongside neural MACO solvers that resolve step-level conflicts during 1arXiv:2610.26671v1 [cs.LG] 19 Oct 2026 parallel decoding (Berto et al., 2025), these methods broadly share a common limitation: they lo-calize coordination at the agent or step level, without explicitly modeling the shared environmental structure that drives their interdependencies. MARL with step-level coordination             
+
+> A1 G1
+> A2 G2
+> Step t: Start
+> A1 G1
+> A2 G2
+> ✗
+> Step t+1: Uncertainty revealed
+> G1
+> A1
+> A2
+> ✗
+> ✗
+> ✓
+> Step T: Both claim G 2
+> PACT with plan-level coordination
+> A1
+> G1
+> A2 G2
+> Step t: Start
+> A1
+> G1
+> A2 G2
+> ✗
+> Coordinate
+> Step t+1: Uncertainty revealed
+> A2
+> A1
+> ✗✓
+> Step T: All goals visited
+> Agents Unvisited
+> Goal
+> Visited
+> Goal
+> Uncertain
+> Element
+> Ground
+> Truth
+> Planned
+> Route
+> Uncertainty blocked blocked
+> Uncertainty blocked blocked
+> ✓
+> Conflict
+> Found
+> No
+> Conflict
+
+Figure 1: PACT with plan-level coordination prevents goal conflicts exhibited by MARL methods with step-level coordination. In DMACO, coordination requirements are funda-mentally induced by the environment. For instance, multiple agents might contend for a capacity-limited resource, or one agent’s action might re-solve local uncertainty crucial to another’s future trajectory. Because these dependencies are grounded in the environment, relying solely on agent-level rela-tions creates a structural mismatch : the underlying graph elements driving the coordination are excluded from the representational mechanism. Furthermore, restricting coordination to the current step introduces a temporal mismatch . An agent might commit to a trajectory that appears locally conflict-free, only to conflict with another agent’s plan several steps later, as illustrated in Figure 1. To address these structural and temporal mismatches, we introduce PACT ( Plan-Augmented 
+
+Coordination via Trace-graphs), a novel coordination framework for DMACO. First, each agent proposes multiple candidate plans. Every candidate plan is then attached to the environment graph via its projected trace , a record of the graph elements on which it places demand. By perform-ing coordination on this plan-augmented trace-graph, PACT enables the underlying environmental structure to explicitly mediate dependencies across agents’ future candidate plans. We refer to this mechanism as environment-mediated coordination . Our key contributions are as follows: • We propose PACT, a novel coordination framework for DMACO problems that represents coor-dination requirements directly through the environmental structure that induces them, rather than through ungrounded relations defined between agents. • We introduce the plan-augmented trace-graph, which attaches candidate plans to the elements they demand. The proposed message-passing scheme resolves contention over remaining capacities, thereby coordinating agents over future decision steps rather than only the current one. • On three DMACO problems spanning routing and scheduling, we show that PACT outperforms neural MACO solvers and MARL methods in solution quality and zero-shot generalization on instances up to 64 × larger than the training set, at a fraction of the runtime of online replanning. 
+
+## 2 RELATED WORK 
+
+Neural Multi-Agent Combinatorial Optimization. NCO amortizes the cost of solving recurring optimization problems by learning solution policies over instance distributions (Bengio et al., 2021; Cappart et al., 2023). Constructive approaches generate solutions autoregressively (Kool et al., 2019; Kwon et al., 2020), with multi-agent extensions coordinating agents’ decisions to construct a joint solution. Sequential methods decode agents’ actions in turn (Son et al., 2024; Zheng et al., 2024), whereas parallel methods simultaneously decode agents’ actions with inter-agent communication (Zong et al., 2022; Hua et al., 2025). These approaches focus on specific MACO problems, while PARCO (Berto et al., 2025) provides a general framework for parallel decoding across MACO prob-lems, resolving conflicting selections through a learned priority-based handler. MACSIM (Luttmann & Xie, 2026) learns through self-improvement to predict joint agent-action assignments that are 2conflict-free by construction. These methods assume that problem instances are fully specified be-fore solution construction begins and coordinate agents at the current step. They therefore do not explicitly reason about information revealed during execution or dependencies between agents’ de-cisions across future steps. 
+
+Coordination in Multi-Agent Reinforcement Learning. Cooperative MARL typically employs centralized training with decentralized execution (Bernstein et al., 2002; Oliehoek & Amato, 2016), under which representative algorithms such as multi-agent PPO (MAPPO) (Yu et al., 2022) train a shared centralized critic, whereas independent PPO (IPPO) (De Witt et al., 2020) uses decentralized critics. Coordination is commonly achieved via value factorization, such as additive decomposi-tion in VDN (Sunehag et al., 2018) and monotonic mixing in QMIX (Rashid et al., 2020), explicit representations like deep coordination graphs (DCG) (B¨ ohmer et al., 2020), or inter-agent commu-nication (Sukhbaatar et al., 2016; Foerster et al., 2016; Das et al., 2019; Hu et al., 2024). In all these families, the coordination medium is agent-centric (e.g., agent utilities, pairwise payoffs, or directed messages). This introduces two limitations when these approaches are applied to DMACO. First, pairwise decompositions struggle to capture simultaneous multi-agent dependencies without incurring the exponential inference costs of higher-order factors (Guestrin et al., 2002; Kok & Vlas-sis, 2006). Second, these mechanisms coordinate the agents’ actions at the current state, whereas conflicts in the future are reflected only implicitly through learned value estimates. In DMACO settings, PACT addresses both limitations through environment-mediated coordination. By connecting each candidate plan to the graph elements its trace occupies, PACT captures interac-tions between candidate plans, such as contention for shared capacity or dependence on unrevealed information, at the element that induces them. This element-centric aggregation accommodates multi-agent dependencies without explicit agent-pair factors, while candidate traces expose coordi-nation requirements spanning future decision steps. 
+
+## 3 PRELIMINARIES 
+
+We represent a DMACO problem as a graph, where each node is an element that a solution selects, assigns, or sequences, and edges encode the relations among elements. We assume that any obser-vation made by one agent is immediately available to the whole team, so that all agents act on the same information. The problem is therefore modeled as a fully cooperative multi-agent partially observable Markov decision process (MPOMDP) (Oliehoek & Amato, 2016), defined by the tuple 
+
+⟨M , S, {A i}i∈M , T , O, C, γ ⟩, where M is the team of agents, S the states, {A i}i∈M the action space for each agent, T the transition function, O the observation function, C the cost function, and γ ∈ (0 , 1] the discount factor. We factorize the state space S into observable graph states Gt
+
+and an unobserved latent realization ξ, with O(Gt, ξ ) = Gt. At the start of each episode we sample 
+
+ξ ∼ p(ξ), and it is held fixed for the episode. The observed graph Gt = ( Vt, Et, X t) consists of the elements Vt, the relations Et among them, and the attributes Xt of each element and each agent. The attributes Xt also determine the set Mt ⊆ M of agents active at decision step t. Each active agent 
+
+i ∈ M t selects an action ai,t ∈ A i(Gt) from its own policy πi conditioned on the graph observation 
+
+Gt, where Ai(Gt) ⊆ V t ∪{ ∅}, so that agent i commits either to a single element or to none. We write 
+
+π = {πi}i∈M for the team policy. The state then advances according to Gt+1 ∼ T (· | G t, at, ξ ),where the joint action at = {ai,t }i∈M t . Each decision step incurs a cost C(Gt, at, ξ ) ∈ R≥0, and the agents minimize the expected discounted cost J(π) = Eξ,π 
+
+h P 
+
+> t
+
+γt C(Gt, at, ξ )
+
+i
+
+.Capacities and demands serve as the general interface for defining resource constraints in combi-natorial optimization (Blazewicz et al., 1983) and constraint programming (Aggoun & Beldiceanu, 1993). We assign a capacity κt(v) ≥ 0 to each element v ∈ V t, recorded in the attributes Xt. The action ai from agent i places a demand d(v, a i,t ) ≥ 0 on the element v. A unit capacity κ(v) = 1 
+
+makes an element exclusive, which covers a goal location claimed by a single traveler (Toth & Vigo, 2014) and a job processed by a single machine (Pinedo, 1995), while larger capacities describe re-sources that several agents may hold simultaneously. At decision step t, the demand on element v
+
+from all active agents is dt(v) = P 
+
+> i∈M t
+
+d(v, a i,t ). The joint actions permitted by the remaining capacities form the set 
+
+A(Gt) = 
+
+(
+
+a = {ai}i∈M t ∈ Y
+
+> i∈M t
+
+Ai(Gt) : dt(v) ≤ κt(v) for every v ∈ V t
+
+)
+
+. (1) 3Observation         
+
+> A1 G1
+> A2 G2
+> Uncertainty
+> Environment
+> GNN
+> Encoder
+> Encoder
+> Agent
+> Embedding
+> σ1
+> σ2
+> Graph
+> Embedding hG
+> A1
+> A2
+> Candidate Plan Generation
+> K candidates × H Psteps
+> Plan-Augmented
+> Trace-Graph
+> A1A2
+> Coordination
+> capacity
+> load
+> Load aggregation
+> Edge-aware MPNN
+> Plan Selection
+> for A1
+> A1 G1
+> A2 G2
+> A1A2
+> ↓
+> ↓ ↓
+> ↓
+> Plan Score
+> Plan Selection
+> for A2 Action a 2
+> Action a 1
+> Next round of
+> Coordination
+> Update
+> Plan Score
+> Trace
+> Trace
+> Update
+> Environment
+> State
+
+Figure 2: Overview of PACT. After encoding graph observations, agents independently generate candidate plans to form a plan-augmented trace-graph for multi-step coordination. The joint action 
+
+at comprises the initial step of each selected plan. Eq. (1) is the only feasibility constraint that couples the agents, and it is a conjunction of conditions taken element by element. 
+
+## 4 METHODOLOGY 
+
+We now present PACT, whose overall architecture is illustrated in Figure 2. Each agent first gen-erates a set of candidate plans instead of committing to a single next action (Section 4.1). The candidate plans are incorporated into the graph through the elements they occupy, forming a plan-augmented trace-graph over which inter-agent coordination is performed (Section 4.2). Each agent subsequently selects one of its coordinated candidate plans and executes its first action (Section 4.3). Finally, all modules are trained end to end (Section 4.4). The complete forward pass of PACT is summarized in Algorithm 1. 4.1 CANDIDATE PLAN GENERATION 
+
+As was illustrated in Figure 1, coordination over individual actions is inherently myopic: agents whose current actions are compatible may still contend for the same resources several steps ahead. PACT therefore coordinates over short-horizon candidate plans. However, planning in the joint ac-tion space scales exponentially with both the number of agents and the planning horizon (Bernstein et al., 2002; Kearns et al., 2002). We instead decouple plan proposal from multi-agent coordination: each agent independently generates a compact set of candidate plans, while interactions among these plans are handled by the coordination mechanism in Section 4.2. Given the current graph observation Gt, a GNN-based encoder Enc θ , whose parameters θ are shared with every other learned module of PACT, extracts graph-related representations hG together with an agent-related representation σi for each active agent, 
+
+ hG, {σi}i∈M t
+
+ = Enc θ (Gt). (2) The graph representation hG describes the decision-relevant structure and elements of the current problem instance, while σi provides the agent-specific context needed to specialize the graph repre-sentation to agent i.For each agent i, PACT generates K candidate plans, each consisting of a sequence of Hp actions, 
+
+ˆpki =  ˆaki,t , ˆaki,t +1 , . . . , ˆaki,t +Hp−1
+
+, k = 1 , . . . , K. (3) Each candidate plan is constructed through a rollout governed by a learned candidate plan gener-ation policy πplan  
+
+> θ
+
+. To ensure diversity among the K candidate plans, their first actions are drawn jointly without replacement from the policy at the initial rollout state πplan  
+
+> θ
+
+(Gt). Following this ini-tialization, each of the K plans unrolls independently. At each rollout step j, πplan  
+
+> θ
+
+conditions on the 4encoded graph hG, the agent representation σi, and the rollout state at step j, ˆGkt+j,i to extend the partial plan, ensuring that subsequent decisions dynamically reflect the accumulated consequences of preceding actions. 4.2 PLAN -A UGMENTED TRACE -G RAPH AND COORDINATION 
+
+Recall the routing scenario shown in Figure 1. In this scenario, two agents move apart at the current step but then both claim the same goal several steps later. Their current actions place demand on different elements, so Eq. (1) holds at every step until they arrive, and the demand that must be reconciled is located at the goal, where the final two actions together exceed its remaining capac-ity κt(v). PACT therefore records, for each candidate plan, which elements it would occupy, the induced demand, and the step of the plan. We refer to this record as the candidate plan’s trace ,
+
+Tr(ˆ pki ) =    v, d (v, ˆaki,t +j ), j  : d(v, ˆaki,t +j ) > 0, j = 0 , . . . , H p − 1 , (4) where j indexes the step of the plan at which the demand is placed. Once K candidate plans are generated in parallel, their traces form the plan-augmented trace-graph 
+
+χt =  Vt ∪ ˆVt, Et ∪ ˆEt
+
+, where candidate plan nodes ˆVt = {ˆpki : i ∈ M t, k ≤ K} and trace arcs ˆEt = {(ˆ p, v ) : ( v, ·, ·) ∈ Tr(ˆ p)}. Each arc carries the demand and the plan step that produced it. Arcs join candidate plans to elements but not to one another. This forces information exchange between agents to occur through the graph structure. Thus, the same graph structure captures both the original combinatorial problem and the prospective interactions introduced by the plans. PACT coordinates the candidate plans by iteratively alternating between two operations in order to compute a set of preferences . First, the resource contention induced by the agents’ current plan preferences is estimated. Second, preferences are updated through message passing on the plan-augmented trace-graph χt. Concretely, let s(r) 
+
+> i
+
+(k) denote the score of plan k of agent i after coordi-nation round r = 0 , . . . , R . The corresponding preference is: 
+
+q(r) 
+
+> i
+
+(k) = exp( s(r) 
+
+> i
+
+(k)) 
+
+PKk′=1 exp( s(r) 
+
+> i
+
+(k′)) . (5) Every node of χt carries a representation h(r) at round r, whose initial value h(0) is given by hG for element nodes and by an encoding of the node’s trace for candidate plan nodes. A scoring head fscore 
+
+turns a candidate plan’s representation into its score, so that s(0)  
+
+> i
+
+(k) = η tanh  fscore (h(0) (ˆ pki )) 
+
+before information is exchanged between agents, where η > 0 is a fixed step size bound. Given the current preferences q(r) 
+
+> i
+
+, each element aggregates the demand induced by all candidate plans that reach it. We define d(v, ˆpki ) = P 
+
+> j
+
+d(v, ˆaki,t +j ) as the total demand that ˆpki places on v
+
+across its steps. The load on element v at round r is the preference-weighted demand of all plans, 
+
+L(r)(v) = X
+
+> i∈M t
+> K
+
+X
+
+> k=1
+
+q(r) 
+
+> i
+
+(k) × d(v, ˆpki ). (6) Hence, L(r)(v) measures the expected demand induced by the agents’ current preferences q(r) 
+
+> i
+
+over their candidate plans. The load is compared with the remaining capacity κt(v) − dt(v) of each element and injected into its representation through a learned projection Wload , normalized by the capacity κt(v),
+
+˜h(r)(v) = h(r)(v) + Wload 
+
+"
+
+L(r)(v)
+
+κt(v) , ReLU  L(r)(v) − (κt(v) − dt(v)) 
+
+κt(v)
+
+#
+
+, (7) where L(r)(v) 
+
+> κt(v)
+
+describes resource utilization, while  L(r)(v) − (κt(v) − dt(v))  explicitly identifies demand beyond the remaining capacity. Normalizing by capacity provides a common scale for resources with different capacities. An edge-aware message-passing layer, shared across rounds, then propagates this information over the plan-augmented trace-graph, 5Algorithm 1 PACT forward pass at decision step t 
+
+> 1:
+
+Input: graph observation Gt 
+
+> 2:
+
+Encode Gt once into hG and {σi} (Eq. (2))  
+
+> 3:
+
+for each agent i ∈ M t (in parallel) do  
+
+> 4:
+
+Generate K candidate plans ˆp1 
+
+> i
+
+, . . . , ˆpKi through rollout, with first actions drawn jointly with-out replacement (Section 4.1)  
+
+> 5:
+
+end for  
+
+> 6:
+
+Construct the plan-augmented trace-graph χt from the candidate plan traces (Eq. (4))  
+
+> 7:
+
+Initialize candidate plan scores s(0)  
+
+> i
+
+and preferences q(0)  
+
+> i
+
+= softmax( s(0)  
+
+> i
+
+) (Eq. (5))  
+
+> 8:
+
+for coordination round r = 0 , . . . , R − 1 do  
+
+> 9:
+
+Compute the load L(r)(v) induced by the current plan preferences (Eq. (6))  
+
+> 10:
+
+Inject capacity-aware load features and perform message passing over χt (Eqs. (7) and (8))  
+
+> 11:
+
+Update candidate plan scores s(r+1)  
+
+> i
+
+and preferences q(r+1)  
+
+> i
+
+(Section 4.2) (Eq. (9))  
+
+> 12:
+
+end for  
+
+> 13:
+
+for each agent i ∈ M t (in parallel) do  
+
+> 14:
+
+Sample zi ∼ softmax( s(R) 
+
+> i
+
+/τ ) and set ai,t = ˆ pzi 
+
+> i
+
+[0] (Section 4.3)  
+
+> 15:
+
+end for  
+
+> 16:
+
+Output: Joint action at = {ai,t }i∈M t
+
+h(r+1) = MPNN  ˜h(r), χ t
+
+, (8) 
+
+s(r+1)  
+
+> i
+
+(k) = s(r) 
+
+> i
+
+(k) + η tanh  fscore (h(r+1) (ˆ pki )) . (9) The updated scores are renormalized over the K candidate plans of each agent to obtain q(r+1)  
+
+> i
+
+,which in turn induces a new load profile through Eq. (6). The candidate plan scores are there-fore updated iteratively through coordination, allowing an agent’s preference over its own plans to respond to the evolving preferences of the rest of the team. 4.3 PLAN SELECTION AND EXECUTION 
+
+After R coordination rounds, each agent selects a candidate plan based on its final coordinated scores, zi ∼ softmax( s(R) 
+
+> i
+
+/τ ), where τ is a learned temperature controlling the sharpness of selec-tion over candidate plans. Each agent then executes the first action of its chosen plan, ai,t = ˆ pzi 
+
+> i
+
+[0] .The resulting joint action at = {ai,t }i∈M t is applied to the environment via T , which incurs the cost C(Gt, at, ξ ), reveals the components of ξ associated with at, and yields the subsequent graph observation Gt+1 . Following the receding-horizon principle, PACT regenerates and coordinates new candidate plans from Gt+1 at each step. Consequently, while future actions within a candidate plan serve as look-ahead information for multi-agent coordination, execution remains closed-loop and adapts to newly revealed information. 4.4 POLICY TRAINING 
+
+PACT learns its plan generation and plan-selection policies from the return. Unlike a conventional policy in which the sampled policy output is the environment action, PACT produces each agent’s action through a structured sequence of stochastic decisions: candidate plans are first generated and subsequently selected after coordination. The policy objective therefore needs to account for the internal decisions that give rise to the executed action. We decompose the policy update into three components: candidate plan proposal (prop ), plan rollout (roll ), and plan selection (sel ). For each component g ∈ { prop , roll , sel }, we optimize the clipped surrogate objective: 
+
+Lg (θ) = Et
+
+" X
+
+> i∈M t
+
+min 
+
+
+
+ρgi,t (θ) ˆAt, clip  ρgi,t (θ), 1 − ϵg , 1 + ϵg
+
+ ˆAt
+
+#
+
+, (10) 6where ρgi,t is the importance ratio between the probabilities that the current and the behavior policies assign to agent i’s decisions in component g. For prop , these decisions are the K first actions, and the ratio compares their joint probability as an ordered set drawn without replacement. For roll , they are the actions at steps j ≥ 1 of the selected plan ˆpzi 
+
+> i
+
+. For sel , the decision is the selected index 
+
+zi. The advantage ˆAt is estimated with generalized advantage estimation (Schulman et al., 2015) from a critic conditioned on the graph observation Gt, and ϵg is the clipping width. The overall objective sums the component objectives as LPACT (θ) = Lprop (θ) + Lroll (θ) + Lsel (θ). Clipping each component separately preserves PACT’s structured hierarchy while allowing a single return signal to jointly train proposal, rollout, and selection. 
+
+## 5 EXPERIMENTS 
+
+5.1 EXPERIMENTAL SETTING 
+
+Problems. We evaluate PACT on three representative DMACO problems, spanning both routing and scheduling domains. In the Multi-Agent Canadian Traveller Problem (MACTP) (Papadim-itriou & Yannakakis, 1991; Shiri & Salman, 2017), a team traverses a graph to collectively visit goal nodes at minimum total travel cost, with edge traversability revealed upon reaching an endpoint or attempting a crossing. Travelers are agents and goal nodes have unit capacity. In the Dynamic Flexible Job-Shop Problem (DFJSP) (Ouelhadj & Petrovic, 2009), jobs comprise precedence-constrained operations assigned to eligible machines; whether an uncertain machine is operational or broken is revealed when an operation is dispatched to it. In the Non-Clairvoyant Flexible Flow Shop Problem (NCFFSP) (Motwani et al., 1994), jobs pass through ordered stages of interchange-able machines whose latent processing-time factors are revealed upon dispatch. Both scheduling problems minimize makespan, with machines acting as agents and jobs as unit-capacity elements. Appendix A provides the formal models and revelation rules. 
+
+Baselines. We compare PACT with two multi-agent NCO methods, PARCO and MACSIM, which are evaluated as centralized joint-construction solvers through task wrappers, retaining their origi-nal training objectives and model configurations. For PACT, PARCO, and MACSIM two decoding strategies named greedy (g.) and sampling (s.) are used. We also compare four cooperative MARL baselines (MAPPO, IPPO, VDN, and DCG), using matched graph encoders over the common obser-vation interface and shared parameters across agents. MAPPO, IPPO, and VDN produce per-agent actions, whereas DCG coordinates joint actions through max-plus message passing on an agent coor-dination graph. PACT uses a critic conditioned on the graph observation and performs decentralized execution with communication through the plan-augmented trace-graph, in which each agent selects its own candidate plan. Gurobi (Gurobi Optimization, LLC, 2026) and OR-Tools (Perron & Furnon) provide online replanning baselines and oracle references. Appendix B.1 details the baseline imple-mentations and adaptations. 
+
+Training. For each problem, all learning-based methods are trained on the same instance set with a mixture of small sizes. The mixture spans n ∈ { 10 , 13 , 16 } nodes for MACTP, N ∈ { 12 , 16 , 20 }
+
+jobs for DFJSP, and N ∈ { 12 , 16 , 20 } jobs with 3 stages and 3 or 4 machines per stage for NCFFSP. Dataset generation seeds are fixed, and each method is trained with 10 independent seeds. The training configurations are given in Appendix B. 
+
+Evaluation. All methods use the same 100 test instances per configuration, and learning-based results are averaged across the 10 training seeds. Instance sizes are denoted by nodes × agents ×
+
+goals ( n × A × G) for MACTP, jobs × machines × operations ( N × M × O) for DFJSP, and jobs 
+
+× machines per stage × stages ( N × Mℓ × S) for NCFFSP. The first configuration in each problem block is in-distribution (ID), matching the training mixture’s largest size; the remaining four evaluate zero-shot transfer (ZST) to larger instances. The final two NCFFSP configurations also increase the stage count from 3 to 4. Appendix C.2 details the evaluation protocols. 5.2 MAIN RESULTS 
+
+Table 1 shows that PACT, using the same framework across all three problems with decentralized execution and coordination through the plan-augmented trace-graph, attains the lowest cost among learning-based methods in almost every configuration under greedy decoding and in every configu-7Table 1: Results on three DMACO problems under ID and ZST evaluation. Cost ↓, Time (s) ↓, and Success (%) ↑. N/A marks unsupported configurations, T/O marks runs without a feasible solution within the time limit, and OOM marks runs that exceed GPU memory. 
+
+MACTP 
+
+n × A × G 16 ×4×6 (ID) 32 ×6×10 (ZST) 128 ×12 ×24 (ZST) 512 ×24 ×48 (ZST) 1024 ×32 ×64 (ZST) Metric Cost Succ. Time Cost Succ. Time Cost Succ. Time Cost Succ. Time Cost Succ. Time Oracle Gurobi (10m) 2.84 100.0 0.18 4.28 100.0 0.25 9.52 100.0 386.5 21.9 100.0 627.2 3132.5 93.0 652.3 OR-Tools (10m) 2.84 100.0 0.66 4.28 100.0 37.5 13.0 100.0 624.7 917.7 97.0 633.8 T/O T/O T/O 
+
+Replan Gurobi 5.02 90.0 0.42 10.1 79.0 1.06 95.0 37.0 13.9 T/O T/O T/O T/O T/O T/O OR-Tools 4.08 93.0 0.92 23.5 34.0 6.37 231.9 39.0 121.3 T/O T/O T/O T/O T/O T/O Greedy MAPPO ( g. ) 3.83 96.8 0.027 6.78 98.1 0.020 32.8 95.7 0.79 OOM OOM OOM OOM OOM OOM IPPO ( g. ) 3.92 97.1 0.015 6.84 98.8 0.033 28.6 97.2 0.63 OOM OOM OOM OOM OOM OOM VDN ( g. ) 3.52 98.9 0.012 5.84 99.6 0.019 20.7 99.9 0.38 OOM OOM OOM OOM OOM OOM DCG ( g. ) 3.68 99.3 0.011 8.44 98.1 0.048 70.0 93.3 0.99 OOM OOM OOM OOM OOM OOM PARCO ( g. ) 4.56 98.9 0.004 10.8 95.0 0.017 195.1 41.2 0.11 1722.0 4.2 0.35 3999.2 4.5 0.73 MACSIM ( g. ) 7.36 89.9 0.038 12.7 95.2 0.035 34.8 99.6 0.047 90.2 100.0 0.18 131.3 100.0 2.20 PACT ( g. ) 3.66 99.1 0.056 5.79 99.6 0.064 18.6 99.7 0.34 72.3 99.0 2.61 86.1 99.6 11.0 Sampling PARCO ( s. ) 3.35 100.0 0.094 5.50 100.0 0.15 17.8 99.7 2.67 372.6 86.3 9.83 1341.6 71.3 27.5 MACSIM ( s. ) 3.27 100.0 0.48 6.32 100.0 0.68 24.0 100.0 1.91 84.2 100.0 42.0 125.8 100.0 381.7 PACT ( s. ) 2.89 100.0 5.27 4.66 100.0 5.45 15.5 100.0 10.5 50.3 100.0 51.9 84.0 100.0 136.9 
+
+DFJSP 
+
+N × M × O 20 ×8×6 (ID) 30 ×14 ×6 (ZST) 50 ×16 ×8 (ZST) 80 ×20 ×8 (ZST) 120 ×24 ×10 (ZST) Metric Cost Succ. Time Cost Succ. Time Cost Succ. Time Cost Succ. Time Cost Succ. Time Oracle Gurobi (10m) 154.9 100.0 624.6 133.7 100.0 626.3 291.7 100.0 614.2 T/O T/O T/O T/O T/O T/O OR-Tools (10m) 148.3 100.0 624.2 126.1 100.0 624.2 221.6 100.0 600.6 T/O T/O T/O T/O T/O T/O 
+
+Replan Gurobi 156.8 100.0 28.8 T/O T/O T/O T/O T/O T/O T/O T/O T/O T/O T/O T/O OR-Tools 172.7 87.0 61.6 149.4 100.0 76.3 T/O T/O T/O T/O T/O T/O T/O T/O T/O Greedy MAPPO ( g. ) 170.2 100.0 0.022 148.4 100.0 0.021 245.1 100.0 0.070 299.0 100.0 0.24 429.2 100.0 0.84 IPPO ( g. ) 207.7 96.1 0.051 156.1 99.7 0.054 295.6 98.7 0.24 380.1 98.6 0.87 584.4 98.5 3.45 VDN ( g. ) 632.1 54.4 0.056 688.7 66.5 0.076 1641.3 57.7 0.33 2498.4 59.6 1.27 4311.0 59.9 5.54 DCG ( g. ) 986.6 15.1 0.088 1476.8 13.4 0.13 3089.9 7.4 0.61 5017.7 5.4 2.72 9296.8 0.5 13.1 PARCO ( g. ) 170.5 100.0 0.004 146.0 100.0 0.004 258.4 99.7 0.015 336.2 97.4 0.054 2578.1 7.6 0.35 MACSIM ( g. ) 608.3 54.7 0.18 596.9 70.1 0.21 1241.3 60.2 0.48 1305.2 58.0 0.84 1866.3 61.2 1.64 PACT ( g. ) 162.5 100.0 0.093 141.5 100.0 0.10 233.2 100.0 0.25 283.9 100.0 0.77 398.4 100.0 2.41 Sampling PARCO ( s. ) 165.0 100.0 0.087 142.8 100.0 0.096 249.7 100.0 0.18 314.5 100.0 0.28 490.3 100.0 2.30 MACSIM ( s. ) 156.2 100.0 0.20 136.4 100.0 0.25 242.3 100.0 0.93 307.2 100.0 1.83 458.3 100.0 5.24 PACT ( s. ) 155.9 100.0 10.5 134.1 100.0 10.5 232.4 100.0 23.6 279.6 100.0 54.4 396.5 100.0 112.1 
+
+NCFFSP 
+
+N × Mℓ × S 20 ×4×3 (ID) 30 ×6×3 (ZST) 50 ×7×3 (ZST) 80 ×6×4 (ZST) 120 ×8×4 (ZST) Metric Cost Succ. Time Cost Succ. Time Cost Succ. Time Cost Succ. Time Cost Succ. Time Oracle Gurobi (10m) 34.3 100.0 624.5 30.7 100.0 600.2 41.2 100.0 601.6 91.2 100.0 602.2 183.5 100.0 607.3 OR-Tools (10m) 32.0 100.0 124.0 26.9 100.0 603.6 36.0 100.0 600.2 67.5 100.0 600.3 70.8 100.0 600.2 
+
+Replan Gurobi 37.5 100.0 15.7 34.1 100.0 19.3 225.1 55.0 31.4 T/O T/O T/O T/O T/O T/O OR-Tools 37.1 100.0 6.62 36.5 100.0 13.6 53.6 100.0 32.2 351.3 96.0 112.5 T/O T/O T/O Greedy MAPPO ( g. ) 46.5 97.4 0.019 38.0 99.2 0.020 49.4 99.3 0.065 94.5 98.2 0.33 93.8 98.4 1.13 IPPO ( g. ) 47.3 98.5 0.017 39.3 99.3 0.020 52.6 98.9 0.070 99.8 97.8 0.30 97.1 98.6 1.05 VDN ( g. ) 50.0 97.8 0.017 44.2 96.8 0.027 63.9 93.2 0.12 151.0 84.4 1.04 186.1 81.6 4.62 DCG ( g. ) 84.1 71.7 0.036 102.4 58.9 0.069 152.4 59.0 0.26 376.7 50.3 1.64 513.9 48.4 6.98 PARCO ( g. ) 42.9 99.3 0.005 49.8 98.8 0.009 66.8 98.8 0.010 N/A N/A N/A N/A N/A N/A MACSIM ( g. ) 64.7 82.9 0.067 55.4 91.7 0.057 98.4 86.6 0.11 212.6 82.7 0.29 213.9 89.1 0.35 PACT ( g. ) 41.5 100.0 0.049 35.9 100.0 0.063 48.8 99.9 0.17 83.4 99.7 0.51 86.7 99.4 1.84 Sampling PARCO ( s. ) 37.3 100.0 0.085 39.6 100.0 0.099 57.4 100.0 0.13 N/A N/A N/A N/A N/A N/A MACSIM ( s. ) 39.0 100.0 0.21 36.1 100.0 0.32 50.7 100.0 0.71 97.3 100.0 2.09 109.6 100.0 3.87 PACT ( s. ) 36.2 100.0 5.35 35.4 100.0 6.17 44.8 100.0 11.7 82.5 100.0 32.5 85.6 100.0 97.0 ration under sampling. Each baseline instead degrades in some regime: the MARL baselines exceed GPU memory on large MACTP instances, PARCO’s success collapses on the largest MACTP and DFJSP instances, and VDN, DCG, and MACSIM leave a large fraction of DFJSP episodes incom-plete under greedy decoding. The advantage of PACT grows under zero-shot transfer and is most pronounced on the largest MACTP configuration, where it reduces greedy cost by 34% relative to MACSIM while maintaining 99.6% success. Compared with online replanning, PACT reaches comparable or lower cost with sampling and runs at least seven times faster under greedy decod-ing wherever replanning completes, whereas replanning loses success or exceeds its time limit as instances grow. We note that, while Oracle methods are not directly comparable due to having priv-ileged access to the uncertainty ξ, they nevertheless may not yield optimal solutions on the largest instances, since they are limited by the time budget. We provide a breakdown of PACT’s end-to-end 8PACT MAPPO IPPO VDN DCG 0 1 2 3 4 5
+
+> Environment steps ( ×10 5)
+> −75 −50 −25 0
+> Evaluation return
+
+(a) MACTP 0 1 2 3 4 5 
+
+> Environment steps ( ×10 5)
+> −900 −600 −300
+> Evaluation return
+
+(b) DFJSP 0 1 2 3 4 5 
+
+> Environment steps ( ×10 5)
+> −240 −180 −120 −60
+> Evaluation return
+
+(c) NCFFSP 
+
+Figure 3: Validation return during training. Curves show the mean across ten seeds; shaded regions indicate one standard deviation. Higher is better. wall clock runtime into environment stepping, encoding, candidate plan generation, coordination, plan selection, and other costs in Appendix C.3. Validation returns obtained during training are reported in Figure 3. On MACTP, PACT and the MARL baselines reach similar final returns. On DFJSP, PACT reaches high-return performance earlier than MAPPO and maintains it thereafter, with lower variability across seeds than VDN and DCG, whose returns deteriorate after initial gains. On NCFFSP, PACT also learns faster than MAPPO and attains a higher final mean return. We present PARCO and MACSIM’s training curves separately in Appendix C.1 because they require substantially more training steps. Despite larger budgets, PARCO attains lower best mean returns than PACT on all three problems, while MACSIM converges to a comparable return on MACTP and DFJSP but remains lower on NCFFSP. 5.3 ABLATION STUDY 
+
+We ablate PACT on the largest zero-shot transfer configuration of each problem under greedy eval-uation and report cost and runtime relative to the reference model with K = 4 candidate plans and R = 2 coordination rounds (Figure 4). Appendix C.4 details the protocol and the analysis of each component. Coordination is the main source of PACT’s gains. Removing message passing on the plan-augmented trace-graph degrades performance to below that of MAPPO on DFJSP and NCFFSP, so candidate generation alone does not explain the improvement. Coordination also de-pends on having alternatives to choose from. With a single candidate plan per agent, performance degrades on every problem, whereas four candidates provide most of the benefit and larger sets yield no consistent gain. A second coordination round matters on MACTP, where plans span Hp = 4 
+
+steps and capture multi-step interactions, while one round suffices on the scheduling problems with 
+
+Hp = 1 . Further rounds bring no consistent improvement at nearly unchanged runtime. MACTP DFJSP NCFFSP 0.25 0.50 0.75 1.00 1.25 1.50 1.75   
+
+> Performance ratio
+> OOM
+> 550 100 PACT PACT w/o Coord. MAPPO
+
+(a) Effect of Coordination 1 4 8 16  
+
+> Candidate count
+> 01234
+> Performance ratio
+> 0.0 0.5 1.0 1.5 2.0 2.5
+> Time ratio
+> Ratio: Time: MACTP MACTP DFJSP DFJSP NCFFSP NCFFSP
+
+(b) Number of Candidate Plans 1 2 3 4 
+
+> Coordination rounds
+> 0.85 0.90 0.95 1.00 1.05 1.10 1.15
+> Performance ratio
+> 0.0 0.5 1.0 1.5 2.0
+> Time ratio
+> Ratio: Time: MACTP MACTP DFJSP DFJSP NCFFSP NCFFSP
+
+(c) Coordination Rounds 
+
+Figure 4: Analysis of PACT components. 
+
+## 6 CONCLUSION 
+
+In this paper, we introduced PACT, a framework for DMACO that enables agents to coordinate over candidate plans through the environmental structure that induces their dependencies. By augmenting the environment graph with candidate plan traces and performing capacity-aware message passing over the resulting trace-graph, PACT extends coordination beyond the current decision step while retaining closed-loop execution as new information is revealed. Our experiments on routing and 9scheduling problems demonstrate that PACT consistently achieves strong solution quality and com-pletion success across both in-distribution and zero-shot transfer settings, with particularly strong generalization to larger instances. In terms of limitations, the global communication assumption be-hind MPOMDPs may be relaxed in future work by imposing communication radiuses inside which information is shared. Additionally, PACT samples independently from agents’ policies πi to con-struct the joint action at inference time. Stronger joint actions may be obtained by reasoning over the policies of other agents, for example by maintaining and updating beliefs. 10 AI USE STATEMENT 
+
+In this work, we used generative AI tools to design or provide feedback on research methodology or experiments, and to implement methods. We have not used generative AI tools to generate syn-thetic data sets, help develop theoretical models or conceptual frameworks, formulate mathematical claims, provide critical ingredients for proving mathematical claims, assist in the writing of proofs, propose or refine hypotheses, or interpret results. Cleaning and reformatting datasets and support-ing qualitative and thematic data analysis are not applicable to this work. Additionally, we used generative AI tools to draft parts of the research paper, discover research topics or identify gaps, brainstorm, source/search for information, edit the research paper to improve readability, identify relevant literature, and assist with translation. We have reviewed all AI-assisted work. We checked all sources and LLM-generated research ideas for potential plagiarism through a manual literature review. All LLM-generated code was validated and tested for correctness. All LLM-generated writ-ing has been manually reviewed for accuracy. We take full responsibility for the final content of this work, including text, claims, and artifacts produced with the aid of generative AI. REPRODUCIBILITY STATEMENT 
+
+Source code used to implement the PACT method will be released upon publication of the paper. Appendix A gives the formal model and revelation rules of each problem, and Appendix B.3 speci-fies the instance generators. Appendix B describes the baseline implementations, and Appendix B.4 and Appendix B.5 report the training configurations and the compute environment. Appendix D details the algorithms of PACT. 
+
+## REFERENCES 
+
+Abderrahmane Aggoun and Nicolas Beldiceanu. Extending CHIP in order to solve complex schedul-ing and placement problems. Mathematical and computer modelling , 17(7):57–73, 1993. Yoshua Bengio, Andrea Lodi, and Antoine Prouvost. Machine learning for combinatorial opti-mization: A methodological tour d’horizon. European Journal of Operational Research , 290(2): 405–421, 2021. Daniel S Bernstein, Robert Givan, Neil Immerman, and Shlomo Zilberstein. The complexity of decentralized control of markov decision processes. Mathematics of operations research , 27(4): 819–840, 2002. Federico Berto, Chuanbo Hua, Laurin Luttmann, Jiwoo Son, Junyoung Park, Kyuree Ahn, Changhyun Kwon, Lin Xie, and Jinkyoo Park. PARCO: Parallel autoregressive models for multi-agent combinatorial optimization. In The Thirty-ninth Annual Conference on Neural Information Processing Systems , 2025. URL https://openreview.net/forum?id=9F2Cmgo17M .Dimitris Bertsimas, Patrick Jaillet, and S´ ebastien Martin. Online vehicle routing: The edge of optimization in large-scale applications. Operations Research , 67(1):143–162, 2019. Matteo Bettini, Amanda Prorok, and Vincent Moens. BenchMARL: Benchmarking multi-agent reinforcement learning. Journal of Machine Learning Research , 25(217):1–10, 2024. J. Blazewicz, J.K. Lenstra, and A.H.G.Rinnooy Kan. Scheduling subject to resource con-straints: classification and complexity. Discrete Applied Mathematics , 5(1):11–24, 1983. ISSN 0166-218X. doi: https://doi.org/10.1016/0166-218X(83)90012-4. URL https://www. sciencedirect.com/science/article/pii/0166218X83900124 .Wendelin B¨ ohmer, Vitaly Kurin, and Shimon Whiteson. Deep coordination graphs. In International Conference on Machine Learning , pp. 980–991. PMLR, 2020. Quentin Cappart, Didier Ch´ etelat, Elias B Khalil, Andrea Lodi, Christopher Morris, and Petar Veliˇ ckovi´ c. Combinatorial optimization and reasoning with graph neural networks. Journal of Machine Learning Research , 24(130):1–61, 2023. 11 Abhishek Das, Th´ eophile Gervet, Joshua Romoff, Dhruv Batra, Devi Parikh, Mike Rabbat, and Joelle Pineau. TarMAC: Targeted multi-agent communication. In International Conference on machine learning , pp. 1538–1546. PMLR, 2019. Christian Schroeder De Witt, Tarun Gupta, Denys Makoviichuk, Viktor Makoviychuk, Philip HS Torr, Mingfei Sun, and Shimon Whiteson. Is independent learning all you need in the StarCraft multi-agent challenge? arXiv preprint arXiv:2011.09533 , 2020. Jakob Foerster, Ioannis Alexandros Assael, Nando De Freitas, and Shimon Whiteson. Learning to communicate with deep multi-agent reinforcement learning. In Advances in neural information processing systems , volume 29, 2016. Carlos Guestrin, Michail G. Lagoudakis, and Ronald Parr. Coordinated reinforcement learning. In 
+
+International Conference on Machine Learning , pp. 227–234, 2002. Gurobi Optimization, LLC. Gurobi optimizer reference manual. https://www.gurobi.com ,2026. Shengchao Hu, Li Shen, Ya Zhang, and Dacheng Tao. Learning multi-agent communication from graph modeling perspective. In International Conference on Learning Representations , volume 2024, pp. 12963–12978, 2024. Chuanbo Hua, Federico Berto, Jiwoo Son, Seunghyun Kang, Changhyun Kwon, and Jinkyoo Park. CAMP: Collaborative Attention Model with Profiles for Vehicle Routing Problems. In Proceed-ings of the 2025 International Conference on Autonomous Agents and Multiagent Systems (AA-MAS) , 2025. https://github.com/ai4co/camp .Michael Kearns, Yishay Mansour, and Andrew Y Ng. A sparse sampling algorithm for near-optimal planning in large markov decision processes. Machine learning , 49(2):193–208, 2002. Jelle R. Kok and Nikos Vlassis. Collaborative multiagent reinforcement learning by payoff propa-gation. Journal of Machine Learning Research , 7(65):1789–1828, 2006. URL http://jmlr. org/papers/v7/kok06a.html .Wouter Kool, Herke van Hoof, and Max Welling. Attention, learn to solve routing problems! In 
+
+International Conference on Learning Representations , 2019. URL https://openreview. net/forum?id=ByxBFsRqYm .Wouter Kool, Herke van Hoof, Joaquim Gromicho, and Max Welling. Deep policy dynamic pro-gramming for vehicle routing problems. In International conference on integration of constraint programming, artificial intelligence, and operations research , pp. 190–213. Springer, 2022. Yeong-Dae Kwon, Jinho Choo, Byoungjip Kim, Iljoo Yoon, Youngjune Gwon, and Seungjai Min. POMO: Policy optimization with multiple optima for reinforcement learning. In Advances in neural information processing systems , volume 33, pp. 21188–21198, 2020. Yeong-Dae Kwon, Jinho Choo, Iljoo Yoon, Minah Park, Duwon Park, and Youngjune Gwon. Matrix encoding networks for neural combinatorial optimization. In Advances in Neural Information Processing Systems , volume 34, pp. 5138–5149, 2021. Laurin Luttmann and Lin Xie. Multi-action self-improvement for neural combinatorial optimization. In The Fourteenth International Conference on Learning Representations , 2026. URL https: //openreview.net/forum?id=6KrETIaOYD .Julian Minder, Florian Gr¨ otschla, Jo¨ el Mathys, and Roger Wattenhofer. SALSA-CLRS: A sparse and scalable benchmark for algorithmic reasoning. In The Second Learning on Graphs Conference ,2023. URL https://openreview.net/forum?id=PRapGjDGFQ .Rajeev Motwani, Steven Phillips, and Eric Torng. Nonclairvoyant scheduling. Theoreti-cal Computer Science , 130(1):17–47, 1994. ISSN 0304-3975. doi: https://doi.org/10. 1016/0304-3975(94)90151-1. URL https://www.sciencedirect.com/science/ article/pii/0304397594901511 .12 Frans A. Oliehoek and Christopher Amato. A Concise Introduction to Decentralized POMDPs .Springer, 2016. Djamila Ouelhadj and Sanja Petrovic. A survey of dynamic scheduling in manufacturing systems. 
+
+Journal of scheduling , 12(4):417–431, 2009. Cemal ¨ Ozg¨ uven, Lale ¨ Ozbakır, and Yasemin Yavuz. Mathematical models for job-shop scheduling problems with routing and process plan flexibility. Applied mathematical modelling , 34(6):1539– 1548, 2010. Christos H Papadimitriou and Mihalis Yannakakis. Shortest paths without a map. Theoretical Computer Science , 84(1):127–150, 1991. Laurent Perron and Vincent Furnon. OR-Tools. URL https://developers.google.com/ optimization/ .Victor Pillac, Michel Gendreau, Christelle Gu´ eret, and Andr´ es L Medaglia. A review of dynamic vehicle routing problems. European Journal of Operational Research , 225(1):1–11, 2013. Michael. Pinedo. Scheduling : theory, algorithms, and systems . Prentice-Hall international se-ries in industrial and systems engineering. Prentice Hall, Englewood Cliffs, N.J, 1995. ISBN 0137067577. Tabish Rashid, Mikayel Samvelyan, Christian Schroeder de Witt, Gregory Farquhar, Jakob Foerster, and Shimon Whiteson. Monotonic value function factorisation for deep multi-agent reinforcement learning. Journal of Machine Learning Research , 21(178):1–51, 2020. URL http://jmlr. org/papers/v21/20-081.html .John Schulman, Philipp Moritz, Sergey Levine, Michael Jordan, and Pieter Abbeel. High-dimensional continuous control using generalized advantage estimation. arXiv preprint arXiv:1506.02438 , 2015. Davood Shiri and F. Sibel Salman. On the online multi-agent O-D k-Canadian traveler problem. 
+
+Journal of Combinatorial Optimization , 34(2):453–461, 2017. Jiwoo Son, Minsu Kim, Sanghyeok Choi, Hyeonah Kim, and Jinkyoo Park. Equity-transformer: Solving NP-hard min-max routing problems as sequential generation with equity context. In 
+
+Proceedings of the AAAI Conference on Artificial Intelligence , volume 38, pp. 20265–20273, 2024. Wen Song, Xinyang Chen, Qiqiang Li, and Zhiguang Cao. Flexible job-shop scheduling via graph neural network and deep reinforcement learning. IEEE Transactions on Industrial Informatics ,19(2):1600–1610, 2022. Sainbayar Sukhbaatar, Rob Fergus, et al. Learning multiagent communication with backpropaga-tion. In Advances in neural information processing systems , volume 29, 2016. Peter Sunehag, Guy Lever, Audrunas Gruslys, Wojciech Marian Czarnecki, Vinicius Zambaldi, Max Jaderberg, Marc Lanctot, Nicolas Sonnerat, Joel Z. Leibo, Karl Tuyls, and Thore Graepel. Value-decomposition networks for cooperative multi-agent learning based on team reward. In Proceed-ings of the 17th International Conference on Autonomous Agents and MultiAgent Systems , AA-MAS ’18, pp. 2085–2087, Richland, SC, 2018. International Foundation for Autonomous Agents and Multiagent Systems. Paolo Toth and Daniele Vigo. Vehicle routing: problems, methods, and applications . SIAM, 2014. Marlin W Ulmer. Anticipation versus reactive reoptimization for dynamic vehicle routing with stochastic requests. Networks , 73(3):277–291, 2019. Guilherme E Vieira, Jeffrey W Herrmann, and Edward Lin. Rescheduling manufacturing systems: a framework of strategies, policies, and methods. Journal of scheduling , 6(1):39–62, 2003. Chao Yu, Akash Velu, Eugene Vinitsky, Jiaxuan Gao, Yu Wang, Alexandre Bayen, and Yi Wu. The surprising effectiveness of PPO in cooperative multi-agent games. In Advances in neural information processing systems , volume 35, pp. 24611–24624, 2022. 13 Zhi Zheng, Shunyu Yao, Zhenkun Wang, Tong Xialiang, Mingxuan Yuan, and Ke Tang. DPN: Decoupling partition and navigation for neural solvers of min-max vehicle routing prob-lems. In Forty-first International Conference on Machine Learning , 2024. URL https: //openreview.net/forum?id=ar174skI9u .Zefang Zong, Meng Zheng, Yong Li, and Depeng Jin. MAPDP: Cooperative multi-agent reinforce-ment learning to solve pickup and delivery problems. In Proceedings of the AAAI conference on artificial intelligence , volume 36, pp. 9980–9988, 2022. 14 A PROBLEM DEFINITIONS 
+
+This appendix defines the optimization problems and residual deterministic models (i.e., models of the remaining problem at each decision step) used by the baselines. A.1 MACTP 
+
+Problem Definition. MACTP generalizes the Canadian Traveler Problem (Papadimitriou & Yan-nakakis, 1991) to a cooperative team that starts from distinct nodes and covers shared goals on a connected undirected graph with positive traversal costs. Agents try to reach each goal by traversing a graph, but a subset of edges may be blocked, with a given probability, and the true state of the edge is only revealed when an agent reaches one of its endpoints. The blockage probability of each edge is determined at instance generation time. In order to fulfill a goal, an agent must take the action to claim it, which retires that agent. Agents may pass through a goal without claiming it, and may pass through an already claimed goal. The episode succeeds once all goals have been claimed. A representative MACTP example was shown in Figure 1 in the main text. We formulate the optimization problem as finding a minimum-cost collection of walks that jointly cover the remaining goals. 
+
+Indices and Sets 
+
+• N = {1, . . . , n } denotes the nodes, and E ⊆ N × N contains the directed arcs induced by the usable undirected edges, with cost wvv ′ > 0.• D ⊆ N : the set of goal nodes. • i ∈ M : agents represented in the current planning problem, with agent i starting its residual walk at si.• Dcov ⊆ D : goals still requiring coverage, with Gt = |D cov |.
+
+Decision Variables 
+
+• xi, (v,v ′) ∈ Z≥0: number of traversals of arc (v, v ′) by agent i.• fi, (v,v ′) ≥ 0: auxiliary connectivity flow carried only on arcs used by agent i.• yi,v ∈ { 0, 1} indicates whether agent i is credited with covering v and is fixed to zero for 
+
+v / ∈ D cov .• ei,v ∈ { 0, 1}: whether agent i ends its residual walk at v ∈ N .
+
+Objective Function 
+
+min X
+
+> i∈M
+
+X
+
+> (v,v ′)∈E
+
+wvv ′ xi, (v,v ′) (11) 
+
+Subject to 
+
+X
+
+> v∈N
+
+ei,v = 1 , ∀i ∈ M (12) 
+
+X
+
+> (v,v ′)∈E
+
+xi, (v,v ′) − X
+
+> (v′,v )∈E
+
+xi, (v′,v ) = 1[v = si] − ei,v , ∀i ∈ M , v ∈ N 
+
+(13) 
+
+X
+
+> (v,v ′)∈E
+
+fi, (v,v ′) − X
+
+> (v′,v )∈E
+
+fi, (v′,v ) =
+
+ X
+
+> g∈D cov
+
+yi,g 
+
+
+
+1[v = si] − yi,v 1[v ∈ D cov ], ∀i ∈ M , v ∈ N 
+
+(14) 
+
+fi, (v,v ′) ≤ Gtxi, (v,v ′), ∀i ∈ M , (v, v ′) ∈ E 
+
+(15) 
+
+X
+
+> i∈M
+
+yi,v = 1 , ∀v ∈ D cov (16) 
+
+Constraints and Online Replanning. The degree constraints define one walk per agent, while the auxiliary flow certifies that every credited goal lies on that walk. During online replanning, revealed 15 blocked edges are removed, whereas unrevealed edges remain available under their optimistic status. If the revealed graph makes complete coverage infeasible, we replace Eq. (16) with P 
+
+> i
+
+yi,v +uv = 1 
+
+and lexicographically minimize the number of uncovered goals before travel cost. 
+
+MPOMDP Formulation. In the notation of Section 3, the latent variable ξ defines the blockage probability of the edges, while the graph state Gt is the known graph state. Node features contain goal coverage and claim status. Edge features contain traversal cost, blocking probability, and the currently known status, while each agent carries its present location as an agent feature. The active set Mt contains the whole team, although retired agents can only remain at their current nodes and live agents move only through deterministic or revealed-open edges. An agent may retire by claiming an unclaimed goal, where unit capacity and unit claim demand enforce exclusivity, while non-goal nodes impose no shared constraint. The step cost C(Gt, at, ξ ) is the team’s total traversal cost, with retired agents incurring zero cost. Episodes end after all goals are covered or all agents retire, and truncated episodes additionally receive an estimate of the remaining completion cost. A.2 DFJSP 
+
+Problem Definition. In DFJSP, every job follows an ordered chain of operations, and each op-eration is eligible for a specified subset of machines. Some machines are unavailable from the beginning of an episode, but their condition remains hidden until the first attempted dispatch. A failed dispatch leaves the operation unscheduled and delays its job by a fixed amount, after which the broken machine is removed from future decisions. Failures are correlated through latent groups whose memberships and priors are observed, while the group condition and each machine-specific outcome remain hidden. Machines act as agents and may schedule operations before becoming idle, with processing beginning once both the selected machine and job are available. The objec-tive function is the makespan of the resulting schedule. Figure 5 visualizes an illustrative DFJSP instance. Job-operation chains  Eligible operations for different machine                  
+
+> Job 1 O11 O12 O13
+> O21 O22 O23
+> O31 O32 O33
+> M1 M2
+> (with Uncertainty)
+> M3 M4
+> (with Uncertainty)
+> M1
+> M2
+> M3
+> M4
+> 012345678
+> J1: O11
+> J1: O12
+> J1: O13
+> J1: O11
+> J2: O22
+> J2: O23
+> J3: O31
+> J3: O32
+> J3: O33
+> Job 2
+> Job 3
+> O11
+> O22
+> O13
+> O11
+> O21
+> O32
+> O31
+> O12
+> O33
+> O21
+> O23
+> O33
+> Attempt to dispatch, reveal
+> broken machine
+> J2: O21
+
+Figure 5: Illustration of the DFJSP task. The upper panel pairs ordered job chains with machine-specific eligibility sets, where the lightning bolts mark machines that may have latent breakdowns. The lower panel gives a machine-wise schedule, where the dashed block records a failed dispatch to a broken machine and the solid block shows successful operation dispatch. 16 We formulate the optimization problem as a standard disjunctive FJSP over the remaining operations and the machines currently considered usable ( ¨ Ozg¨ uven et al., 2010). 
+
+Indices and Sets 
+
+• j ∈ J indexes jobs, chain( j) is the ordered operation chain of job j, and Ot contains the operations not yet scheduled at replanning step t.• Elig t(o) ⊆ I : machines currently considered usable for operation o, with processing time 
+
+po,i > 0 for i ∈ Elig t(o).• ro,t is the earliest time permitted by the current job state, and qi,t is the next time at which machine i becomes available. 
+
+Decision Variables 
+
+• xo,i ∈ { 0, 1}: whether operation o is assigned to machine i ∈ Elig t(o).• so ≥ 0 is the start time of operation o, and do = P 
+
+> i∈Elig t(o)
+
+po,i xo,i is its assigned dura-tion. • zo,o ′ ∈ { 0, 1}: relative order of two distinct operations that may share a machine, defined once for each unordered pair o < o ′.• Cmax ≥ 0 is the makespan, and B is any valid upper bound on the completion time of the residual schedule. 
+
+Objective Function 
+
+min Cmax (17) 
+
+Subject to 
+
+X
+
+> i∈Elig t(o)
+
+xo,i = 1 , ∀o ∈ O t (18) 
+
+Cmax ≥ so + do, ∀o ∈ O t (19) 
+
+so′ ≥ so + do, ∀(o, o ′) consecutive in a residual job chain (20) 
+
+so ≥ ro,t , ∀o ∈ O t (21) 
+
+so ≥ qi,t − B(1 − xo,i ), ∀o ∈ O t, i ∈ Elig t(o) (22) 
+
+so′ ≥ so + do − B(1 − zo,o ′ ) − B(2 − xo,i − xo′,i ), ∀o < o ′, i ∈ Elig t(o) ∩ Elig t(o′) (23) 
+
+so ≥ so′ + do′ − Bz o,o ′ − B(2 − xo,i − xo′,i ), ∀o < o ′, i ∈ Elig t(o) ∩ Elig t(o′) (24) 
+
+Constraints and Online Replanning. Each remaining operation is assigned once and must follow its job predecessor, while the release constraints preserve the current job and machine timelines. The pairwise disjunctions prevent operations on the same machine from overlapping. At each replan-ning step, completed operations and revealed-broken machines are removed, whereas unrevealed machines remain provisionally available with their known processing times. 
+
+MPOMDP Formulation. The latent variable ξ records the condition of every uncertain machine, with correlations induced by group-level variables. Each element of Gt represents a job and records its next unscheduled operation and earliest feasible start time. Machine features contain availability, group membership, and the current condition estimate, while an eligibility edge carries the process-ing time for the job’s next operation. The active set Mt contains every machine not known to be broken, including busy machines, which may either dispatch an eligible job or wait. A scheduled operation starts no earlier than the release times of both participants, while unit job capacity permits at most one dispatch to each job per round. The step cost C(Gt, at, ξ ) is the increase in makespan, so its undiscounted sum equals Cmax for a completed schedule. A truncated episode additionally receives a penalty of processing all remaining operations serially on their slowest available machines, providing a pessimistic completion cost that prevents stalling from being beneficial. 17 A.3 NCFFSP 
+
+Problem Definition. In NCFFSP, jobs pass through a common sequence of stages, and each stage is served by parallel machines whose processing times depend on both the job and the selected machine (Kwon et al., 2021). Some machines also have hidden condition factors that scale their processing times and are correlated through latent batches. Batch membership and its prior are observed, but a machine’s realized factor appears only after its first dispatch. Unlike DFJSP, every dispatch succeeds because uncertainty changes processing duration rather than machine eligibility, and busy machines may schedule jobs that begin once both participants are available. The objective is the final makespan, and non-clairvoyance here refers to the initially unknown machine-dependent duration factors (Motwani et al., 1994). Figure 6 illustrates an NCFFSP workflow. Job 1  Job 1       
+
+> Job 2 Job 2
+> ... ...
+> Job NJob N
+> Waiting Jobs Completed Jobs
+> Stage 1
+
+# ... 
+
+> M1
+> M2
+> M3
+> Stage 2
+> M1
+> M2
+> Stage S
+> M1
+> M2
+> M3
+
+Figure 6: Illustration of the NCFFSP task. Jobs operate from left to right through consecutive parallel machine stages, where the lightning bolts mark machines that may have unrevealed duration factors. We formulate the optimization problem over the remaining job stages as a flexible flow-shop model using the current processing times. Assignment, stage-precedence, release-time, and machine non-overlap constraints are used. 
+
+Indices and Sets 
+
+• ℓ ∈ { 1, . . . , S } indexes stages, and Iℓ contains the machines serving stage ℓ.• j, j ′ ∈ J t: jobs with at least one stage still to be scheduled in the residual problem. • ¯pℓji > 0: nominal processing time of job j on machine i ∈ I ℓ.• ξℓi : hidden condition factor of machine i. Before revelation, pℓji,t = ¯ pℓji , while afterwards it is the positive rounded value of ¯pℓji ξℓi .• rℓj,t is the current release-time floor for job j at stage ℓ, and qi,t is the next time at which machine i becomes available. 
+
+Decision Variables 
+
+• xℓji ∈ { 0, 1}: whether job j is assigned to machine i ∈ I ℓ at stage ℓ.• sℓj ≥ 0 is the start time, and dℓj = P 
+
+> i∈I ℓ
+
+pℓji,t xℓji is the assigned duration. • zℓjj ′ ∈ { 0, 1}: relative order of distinct jobs j < j ′ that may share a machine at stage ℓ.• Cmax ≥ 0 is the makespan, and B is any valid upper bound on the completion time of the residual schedule. 
+
+Objective Function 
+
+min Cmax (25) 
+
+18 Subject to                                                                              
+
+> X
+> i∈I ℓ
+> xℓji = 1 ,∀j, ℓ remaining for j(26)
+> Cmax ≥sℓj +dℓj ,∀j, ℓ remaining for j(27)
+> sℓ+1 ,j ≥sℓj +dℓj ,∀j, ℓ < S remaining for j(28)
+> sℓj ≥rℓj,t ,∀j, ℓ remaining for j(29)
+> sℓj ≥qi,t −B(1 −xℓji ),∀j, ℓ remaining for j, i ∈ I ℓ(30)
+> sℓj ′≥sℓj +dℓj −B(1 −zℓjj ′)−B(2 −xℓji −xℓj ′i),∀ℓremaining for j, j ′, j < j ′, i ∈ I ℓ(31)
+> sℓj ≥sℓj ′+dℓj ′−Bz ℓjj ′−B(2 −xℓji −xℓj ′i),∀ℓremaining for j, j ′, j < j ′, i ∈ I ℓ(32)
+
+Constraints and Online Replanning The assignment and non-overlap constraints play the same roles as in DFJSP, while Eq. (28) enforces the shared stage order. The release bounds preserve the current job and machine timelines, while online replanning uses nominal durations until a machine is revealed and realized durations thereafter. Every machine remains eligible for future assignments. 
+
+MPOMDP Formulation. NCFFSP uses the job-machine graph interface of DFJSP, but its latent variable ξ contains machine-dependent duration factors rather than binary failure states, and each job element records its next stage and earliest start time. Machine features store the served stage, current availability, batch membership, and either the prior or the revealed factor, while each eligibility edge carries the effective processing time known at that step. Every machine remains in Mt, including those that are currently busy, and may either dispatch a job at its stage or wait. Each job has unit capacity within a round, and a dispatch directed to that job contributes unit demand, while the scheduled start time respects both participants’ release times and prevents assignments on the same machine from overlapping. The step cost C(Gt, at, ξ ) is the increase in makespan, whose undiscounted sum equals the final makespan for a completed schedule. A truncated episode additionally receives a penalty of the makespan required to complete the schedule from the truncated state under a uniformly random legal policy. This penalty is separate from the NCFFSP objective and ensures that giving up is no better than acting randomly. 
+
+## B EXPERIMENTAL DETAILS 
+
+This appendix lists the baselines evaluated in Section 5 and the licenses of their corresponding code implementations. We also describe how instances are generated for each of the three problems, the training hyperparameters for every learning-based method, and the hardware and software used to run all experiments. B.1 BASELINES 
+
+Classic Solvers. The Gurobi and OR-Tools classic solvers are ran in two modes. The baselines marked Oracle in the results solve complete realizations using privileged access to the uncertainty with a time limit of 10 minutes. The Replan baselines repeatedly solve the remaining problem under the information available at each decision step, with a time limit of 2 seconds for each re-solve. 
+
+Gurobi. Gurobi (Gurobi Optimization, LLC, 2026) solves the mixed-integer linear programs in Appendix A using branch-and-cut. We retain the best feasible solution found for each instance under the time budget and report the mean objective value across the evaluation set. 
+
+OR-Tools. OR-Tools (Perron & Furnon) provides a complementary CP-SAT implementation un-der the same information settings and evaluation configurations. 
+
+Graph-based MARL Baselines. MAPPO, IPPO, VDN, and DCG use matched graph encoders over the common observation interface, and their per-agent networks share parameters within the team while the flow of information among agents follows the centralized or decentralized structure of each algorithm. 19 Table 2: Summary of licenses for baselines. Resource Type License Gurobi (Gurobi Optimization, LLC, 2026) Solver (commercial) Commercial, academic license OR-Tools (Perron & Furnon) Solver (open-source library) Apache License 2.0 BenchMARL (Bettini et al., 2024) Library (MAPPO, IPPO, and VDN) MIT License DCG (B¨ ohmer et al., 2020) Code Apache License 2.0 PARCO (Berto et al., 2025) Code MIT License MACSIM (Luttmann & Xie, 2026) Code Apache License 2.0 
+
+MAPPO. Multi-Agent PPO (Yu et al., 2022) uses a shared-parameter decentralized actor and a centralized critic, so each actor conditions on the common graph information and its own agent features while the critic aggregates information across the team. Both networks are trained with the clipped PPO objective and generalized advantage estimation. 
+
+IPPO. Independent PPO (De Witt et al., 2020) uses the same shared-parameter decentralized ac-tor as MAPPO, but replaces the centralized critic with a decentralized value function. The critic produces one estimate per agent from that agent’s observation, and training uses the same clipped PPO objective and advantage estimator. 
+
+VDN. Value Decomposition Networks (Sunehag et al., 2018) learn shared per-agent action-value functions and select each agent’s action independently, after which the selected utilities are summed into a team value, Qtot = P 
+
+> i
+
+Qi, trained from a common temporal-difference target. 
+
+DCG. Deep Coordination Graphs (B¨ ohmer et al., 2020) combine per-agent utility terms with pair-wise payoff terms defined on a fixed, fully connected coordination graph, and at each step max-plus message passing approximately maximizes the resulting joint action-value function to select the agents’ actions. 
+
+PARCO. PARCO (Berto et al., 2025) is a parallel autoregressive neural solver in which a shared transformer encodes the instance and communication layers exchange context among agent queries. A multiple-pointer decoder proposes simultaneous actions before a learned priority rule resolves conflicts and assigns fallback actions to displaced agents. 
+
+MACSIM. MACSIM (Luttmann & Xie, 2026) also constructs multi-agent solutions autoregres-sively from a shared instance representation. To produce a conflict-free set of simultaneous actions, it samples agent-task pairs without replacement from a joint categorical distribution at each con-struction step. 
+
+Neural Solver Adaptation. We implement task wrappers for PARCO and MACSIM through their respective environment interfaces while preserving the instances, transition rules, action constraints, and objectives used to evaluate the other methods. 
+
+Solution Decoding Strategies. We evaluate PARCO, MACSIM, and PACT under two solution decoding strategies: greedy and sampling . Greedy decoding uses one deterministic rollout, while sampling decoding generates 128 independent stochastic rollouts per method and instance and re-tains that method’s best realized solution (Berto et al., 2025; Luttmann & Xie, 2026). For greedy decoding, PARCO and MACSIM select the argmax of their action distributions, while in PACT the internal candidate plan generation, virtual rollout, and plan selection are all made deterministic. B.2 CODE AND LICENSES 
+
+Table 2 lists the external solvers and codebases used to implement the baselines above, together with their licenses. 20 B.3 DATA GENERATION 
+
+MACTP. Following SALSA-CLRS (Minder et al., 2023), each instance uses a sparse, connected Erd˝ os–R´ enyi graph over n nodes, with agent starts and goals sampled uniformly at random and positive traversal costs assigned to its edges. In the reference configuration, 25% of the edges are stochastic, and their traversability is sampled at generation time but remains hidden until encoun-tered, as described in Appendix A.1. 
+
+DFJSP. We follow the synthetic FJSP generation procedure of Song et al. (2022): each job con-tains four to six ordered operations, each operation is assigned a random subset of eligible machines, and its machine-dependent processing times vary within 20% of an operation-level mean. Each ma-chine is initially designated stochastic with probability 0.6, after which a feasibility repair ensures that every operation retains at least one always-available eligible machine. Stochastic machines have fixed hidden availability and correlated breakdown probabilities within small machine groups, so observing one machine can inform the condition of others. Availability is revealed only when a job is first dispatched to the machine, and the resulting transition follows Appendix A.2. 
+
+NCFFSP. Each instance contains N jobs that pass through S processing stages, with several inter-changeable machines available at each stage. Following Kwon et al. (2021), nominal job–machine processing times are sampled independently and uniformly from the integers {2, . . . , 9}. Each real machine is independently designated stochastic with probability 0.6 and receives a fixed hidden con-dition factor generated from a group-correlated latent variable u ∈ [0 , 1] through ξ = 0 .8 + 7 .2u4.The factor is revealed on the machine’s first dispatch and scales its processing times thereafter, as described in Appendix A.3. B.4 TRAINING CONFIGURATION 
+
+PACT and the four MARL baselines use a common number of training steps, data-collection scale, optimizer, and graph-encoder configuration across all three tasks. Table 3 reports these shared set-tings together with the update parameters specific to the on-policy and value-based families. We evaluate checkpoints on the same 64 evaluation episodes every 20,000 steps, and each configuration is trained with 10 random seeds. 
+
+PACT-specific Settings. PACT uses two coordination rounds in every task and is evaluated with 
+
+K = 4 candidate plans per agent. During training, K is sampled from {2, 4, 8}, while the planning horizon is Hp = 4 on MACTP and Hp = 1 on DFJSP and NCFFSP. All three decision groups use a clipping range of 0.2. The proposal and rollout groups use an entropy coefficient of 0.001 , while the selection group uses 0.01 .
+
+Neural Combinatorial Optimization Baselines. PARCO and MACSIM retain their original training objectives and model configurations, with PARCO using its rollout-based objective and MACSIM using self-improvement. Both methods use Adam with learning rate 1 × 10 −4 and are trained for 50 epochs on each task. 21 Table 3: Training configuration for PACT and the MARL baselines. Hyperparameter Value 
+
+Shared settings 
+
+Training steps 500,000 Validation interval 20,000 steps Validation episodes 64 Random seeds 10 Optimizer Adam Learning rate 5 × 10 −5
+
+Steps per batch 2,000 Parallel environments 4Maximum gradient norm 5Encoder layers 2Hidden dimension 64 Aggregation Weighted mean Discount factor 0.99 (MACTP); 1.0 (DFJSP and NCFFSP) 
+
+PPO settings (PACT, MAPPO, and IPPO) 
+
+Update epochs 4Minibatch size 128 Clipping coefficient 0.2
+
+GAE parameter λ 0.95 
+
+Entropy coefficient (MAPPO and IPPO) 0.01 
+
+Value-loss coefficient 1.0
+
+Value-based settings (VDN and DCG) 
+
+Updates per batch 200 Minibatch size 256 Replay-buffer capacity 30,000 Target-update coefficient 0.005 
+
+Initial exploration rate ϵ 0.8
+
+DCG-specific settings 
+
+Payoff rank 8Max-plus iterations 4
+
+PACT-specific settings 
+
+Score step bound η 1.0 (fixed) Selection temperature τ Learned, initialized to 1.0, τ ≥ 0.25 
+
+Coordination MPNN layers 1
+
+Coordination hidden dimension 64 
+
+B.5 COMPUTE AND SOFTWARE 
+
+All learning-based methods were trained and evaluated on NVIDIA L40S GPUs, while the Gurobi and OR-Tools baselines were run on an Intel Core Ultra 7 265HX CPU. Experiments used Python 3.11, PyTorch 2.9.1, TorchRL 0.10.1, TensorDict 0.10.0, PyTorch Geometric 2.6.1, NumPy 2.1.3, and NetworkX 3.6.1. The optimization baselines used Gurobi 13.0.3 and OR-Tools 9.12.4544. 
+
+## C ADDITIONAL EXPERIMENTAL RESULTS 
+
+C.1 TRAINING CURVES FOR PARCO AND MACSIM Figures 7 and 8 show the validation returns of PARCO and MACSIM during training on the three DMACO problems. Curves show the mean across ten seeds, with shaded regions indicating one standard deviation. The horizontal red dashed line marks PACT’s highest mean validation return during training, and the red shaded band shows one standard deviation across seeds at the corre-sponding checkpoint. PACT achieves a higher best mean validation return than PARCO across all 22 three problems and outperforms MACSIM on NCFFSP. While it converges to returns comparable to PACT on MACTP and DFJSP, MACSIM consistently requires substantially more training steps across all tasks. Overall, PACT demonstrates a significantly improved trade-off between sample efficiency and validation performance. Furthermore, despite occasional matching validation perfor-mance in-distribution, we nevertheless highlight the significantly higher performance on larger ZST instances reported in the main text. PARCO PACT 0 10 20 30 40 
+
+> Environment steps ( ×10 6)
+> −5 −4 −3
+> Evaluation return  −3.0
+> starts at −82
+
+(a) MACTP 0 10 20 30 40  
+
+> Environment steps ( ×10 6)
+> −190 −180 −170 −160
+> Evaluation return  −161.9
+> starts at −738
+
+(b) DFJSP 0 20 40 60  
+
+> Environment steps ( ×10 6)
+> −100 −80 −60 −40
+> Evaluation return  −43.8
+> starts at −234
+
+(c) NCFFSP 
+
+Figure 7: Validation return during training for PARCO on the three DMACO problems. MACSIM PACT 0 1 2 3
+
+> Environment steps ( ×10 6)
+> −75 −50 −25 0
+> Evaluation return  −3.0
+
+(a) MACTP 0 20 40  
+
+> Environment steps ( ×10 6)
+> −600 −400 −200
+> Evaluation return  −161.9
+
+(b) DFJSP 0 10 20  
+
+> Environment steps ( ×10 6)
+> −200 −150 −100 −50
+> Evaluation return  −43.8
+
+(c) NCFFSP 
+
+Figure 8: Validation return during training for MACSIM on the three DMACO problems. C.2 COMPLETE RESULTS FOR LEARNING -B ASED METHODS 
+
+We evaluate each method on 100 instances for each of 10 independently trained seeds and report the mean across seeds. Success is the percentage of successfully completed instances, cost is the mean negated episodic return over all episodes, including penalties from failed or truncated episodes, whereas objective is the mean negated episodic return over successfully completed episodes. Per-formance ratio is cost divided by the mean cost of PACT on the same problem and test configuration within the same evaluation group: greedy methods use greedy PACT as the reference, and sampling methods use sampling PACT. PACT has a ratio of one within each group, and lower values are better. All ratios are computed from the cost values as reported in the table. Time reports the end-to-end runtime per instance in seconds. Each entry reports the mean and one standard deviation across the ten training seeds; performance ratio is computed from the mean cost and reported without a standard deviation. N/A indicates that the method does not support the configuration. Tables 4, 5, and 6 report these metrics under greedy and best-of-128 sampling evaluation. 23 Table 4: Complete results for learning-based methods on MACTP. The first configuration is in-distribution (ID), and the remaining configurations are evaluated zero-shot (ZST). 
+
+Method Evaluation Success (%) 
+
+↑ Cost ↓ Objective ↓ Perf. ratio 
+
+↓ Time (s) ↓
+
+16 × 4 × 6 (ID) MAPPO Greedy 96.8 ±2.1 3.83 ±0.25 3.53 ±0.06 1.046 0.027 ±0.030 
+
+IPPO Greedy 97.1 ±2.0 3.92 ±0.36 3.57 ±0.11 1.071 0.015 ±0.007 
+
+VDN Greedy 98.9 ±0.9 3.52 ±0.20 3.33 ±0.04 0.962 0.012 ±0.004 
+
+DCG Greedy 99.3 ±0.7 3.68 ±0.47 3.55 ±0.26 1.005 0.011 ±0.003 
+
+PARCO Greedy 98.9 ±1.2 4.56 ±0.23 4.34 ±0.13 1.246 0.004 ±0.002 
+
+MACSIM Greedy 89.9 ±3.7 7.36 ±0.68 5.55 ±0.35 2.011 0.038 ±0.021 
+
+PACT Greedy 99.1 ±1.4 3.66 ±0.18 3.43 ±0.07 1.000 0.056 ±0.015 
+
+PARCO Sampling 100.0 ±0.0 3.35 ±0.04 3.35 ±0.04 1.159 0.094 ±0.016 
+
+MACSIM Sampling 100.0 ±0.0 3.27 ±0.09 3.27 ±0.09 1.131 0.48 ±0.07 
+
+PACT Sampling 100.0 ±0.0 2.89 ±0.02 2.89 ±0.02 1.000 5.27 ±0.49 
+
+32 × 6 × 10 (ZST) MAPPO Greedy 98.1 ±1.8 6.78 ±0.68 6.19 ±0.19 1.171 0.020 ±0.007 
+
+IPPO Greedy 98.8 ±1.4 6.84 ±0.76 6.27 ±0.22 1.181 0.033 ±0.052 
+
+VDN Greedy 99.6 ±1.0 5.84 ±0.40 5.69 ±0.23 1.009 0.019 ±0.019 
+
+DCG Greedy 98.1 ±1.4 8.44 ±4.49 7.84 ±4.36 1.458 0.048 ±0.029 
+
+PARCO Greedy 95.0 ±2.4 10.8 ±1.8 7.67 ±0.25 1.865 0.017 ±0.005 
+
+MACSIM Greedy 95.2 ±5.1 12.7 ±1.3 11.0 ±0.7 2.193 0.035 ±0.010 
+
+PACT Greedy 99.6 ±0.8 5.79 ±0.38 5.68 ±0.13 1.000 0.064 ±0.053 
+
+PARCO Sampling 100.0 ±0.0 5.50 ±0.06 5.50 ±0.06 1.180 0.15 ±0.06 
+
+MACSIM Sampling 100.0 ±0.0 6.32 ±0.42 6.32 ±0.42 1.356 0.68 ±0.28 
+
+PACT Sampling 100.0 ±0.0 4.66 ±0.05 4.66 ±0.05 1.000 5.45 ±0.67 
+
+128 × 12 × 24 (ZST) MAPPO Greedy 95.7 ±5.5 32.8 ±16.4 20.6 ±3.8 1.763 0.79 ±0.66 
+
+IPPO Greedy 97.2 ±2.4 28.6 ±10.3 21.3 ±6.1 1.538 0.63 ±0.48 
+
+VDN Greedy 99.9 ±0.3 20.7 ±4.5 20.3 ±4.1 1.113 0.38 ±0.15 
+
+DCG Greedy 93.3 ±17.8 70.0 ±101.0 52.9 ±69.2 3.763 0.99 ±1.40 
+
+PARCO Greedy 41.2 ±24.2 195.1 ±89.4 48.9 ±36.0 10.489 0.11 ±0.04 
+
+MACSIM Greedy 99.6 ±0.7 34.8 ±3.4 33.4 ±3.0 1.871 0.047 ±0.032 
+
+PACT Greedy 99.7 ±0.7 18.6 ±3.1 17.8 ±0.9 1.000 0.34 ±0.18 
+
+PARCO Sampling 99.7 ±0.7 17.8 ±5.2 17.6 ±4.6 1.148 2.67 ±1.95 
+
+MACSIM Sampling 100.0 ±0.0 24.0 ±2.9 24.0 ±2.9 1.548 1.91 ±1.63 
+
+PACT Sampling 100.0 ±0.0 15.5 ±0.9 15.5 ±0.9 1.000 10.5 ±1.6 
+
+512 × 24 × 48 (ZST) MAPPO Greedy OOM OOM OOM OOM OOM IPPO Greedy OOM OOM OOM OOM OOM VDN Greedy OOM OOM OOM OOM OOM DCG Greedy OOM OOM OOM OOM OOM PARCO Greedy 4.2 ±8.4 1722.0 ±555.4 225.5 ±200.4 23.817 0.35 ±0.06 
+
+MACSIM Greedy 100.0 ±0.0 90.2 ±3.1 90.2 ±3.1 1.248 0.18 ±0.01 
+
+PACT Greedy 99.0 ±2.5 72.3 ±42.8 46.2 ±4.0 1.000 2.61 ±2.71 
+
+PARCO Sampling 86.3 ±10.3 372.6 ±267.9 112.4 ±116.5 7.408 9.83 ±12.04 
+
+MACSIM Sampling 100.0 ±0.0 84.2 ±13.3 84.2 ±13.3 1.674 42.0 ±8.9 
+
+PACT Sampling 100.0 ±0.0 50.3 ±5.8 50.3 ±5.8 1.000 51.9 ±14.6 
+
+1024 × 32 × 64 (ZST) MAPPO Greedy OOM OOM OOM OOM OOM IPPO Greedy OOM OOM OOM OOM OOM VDN Greedy OOM OOM OOM OOM OOM DCG Greedy OOM OOM OOM OOM OOM PARCO Greedy 4.5 ±10.0 3999.2 ±1871.4 472.0 ±558.1 46.448 0.73 ±0.15 
+
+MACSIM Greedy 100.0 ±0.0 131.3 ±2.2 131.3 ±2.2 1.525 2.20 ±0.15 
+
+PACT Greedy 99.6 ±1.3 86.1 ±29.2 70.5 ±11.1 1.000 11.0 ±14.7 
+
+PARCO Sampling 71.3 ±16.2 1341.6 ±349.6 187.1 ±214.0 15.971 27.5 ±27.9 
+
+MACSIM Sampling 100.0 ±0.0 125.8 ±15.0 125.8 ±15.0 1.498 381.7 ±31.0 
+
+PACT Sampling 100.0 ±0.0 84.0 ±10.8 84.0 ±10.8 1.000 136.9 ±27.9 
+
+24 Table 5: Complete results for learning-based methods on DFJSP. The first configuration is in-distribution (ID), and the remaining configurations are evaluated zero-shot (ZST). 
+
+Method Evaluation Success (%) 
+
+↑ Cost ↓ Objective ↓ Perf. ratio 
+
+↓ Time (s) ↓
+
+20 × 8 × 6 (ID) MAPPO Greedy 100.0 ±0.0 170.2 ±3.2 170.2 ±3.2 1.047 0.022 ±0.008 
+
+IPPO Greedy 96.1 ±9.4 207.7 ±83.7 176.2 ±7.1 1.278 0.051 ±0.017 
+
+VDN Greedy 54.4 ±48.2 632.1 ±486.7 181.7 ±6.4 3.890 0.056 ±0.028 
+
+DCG Greedy 15.1 ±32.1 986.6 ±411.5 187.8 ±14.6 6.071 0.088 ±0.004 
+
+PARCO Greedy 100.0 ±0.0 170.5 ±0.4 170.5 ±0.4 1.049 0.004 ±0.001 
+
+MACSIM Greedy 54.7 ±20.3 608.3 ±212.0 166.1 ±4.3 3.743 0.18 ±0.03 
+
+PACT Greedy 100.0 ±0.0 162.5 ±2.9 162.5 ±2.9 1.000 0.093 ±0.042 
+
+PARCO Sampling 100.0 ±0.0 165.0 ±0.3 165.0 ±0.3 1.058 0.087 ±0.001 
+
+MACSIM Sampling 100.0 ±0.0 156.2 ±1.1 156.2 ±1.1 1.002 0.20 ±0.09 
+
+PACT Sampling 100.0 ±0.0 155.9 ±1.4 155.9 ±1.4 1.000 10.5 ±3.7 
+
+30 × 14 × 6 (ZST) MAPPO Greedy 100.0 ±0.0 148.4 ±3.2 148.4 ±3.2 1.049 0.021 ±0.009 
+
+IPPO Greedy 99.7 ±0.7 156.1 ±12.5 152.4 ±4.8 1.103 0.054 ±0.017 
+
+VDN Greedy 66.5 ±46.3 688.7 ±748.7 158.3 ±5.6 4.867 0.076 ±0.049 
+
+DCG Greedy 13.4 ±28.1 1476.8 ±604.8 217.6 ±76.6 10.437 0.13 ±<0.01 
+
+PARCO Greedy 100.0 ±0.0 146.0 ±0.5 146.0 ±0.5 1.032 0.004 ±0.001 
+
+MACSIM Greedy 70.1 ±21.7 596.9 ±311.7 141.5 ±4.3 4.218 0.21 ±0.05 
+
+PACT Greedy 100.0 ±0.0 141.5 ±3.6 141.5 ±3.6 1.000 0.10 ±0.05 
+
+PARCO Sampling 100.0 ±0.0 142.8 ±0.5 142.8 ±0.5 1.065 0.096 ±0.001 
+
+MACSIM Sampling 100.0 ±0.0 136.4 ±1.2 136.4 ±1.2 1.017 0.25 ±0.09 
+
+PACT Sampling 100.0 ±0.0 134.1 ±1.9 134.1 ±1.9 1.000 10.5 ±4.3 
+
+50 × 16 × 8 (ZST) MAPPO Greedy 100.0 ±0.0 245.1 ±5.9 245.1 ±5.9 1.051 0.070 ±0.033 
+
+IPPO Greedy 98.7 ±3.0 295.6 ±86.2 261.6 ±11.0 1.268 0.24 ±0.11 
+
+VDN Greedy 57.7 ±50.0 1641.3 ±1647.5 256.2 ±18.6 7.038 0.33 ±0.27 
+
+DCG Greedy 7.4 ±15.9 3089.9 ±1041.2 335.3 ±71.8 13.250 0.61 ±0.01 
+
+PARCO Greedy 99.7 ±0.9 258.4 ±2.7 253.7 ±2.0 1.108 0.015 ±0.024 
+
+MACSIM Greedy 60.2 ±29.8 1241.3 ±195.5 247.3 ±9.2 5.323 0.48 ±0.13 
+
+PACT Greedy 100.0 ±0.0 233.2 ±3.6 233.2 ±3.6 1.000 0.25 ±0.15 
+
+PARCO Sampling 100.0 ±0.0 249.7 ±1.7 249.7 ±1.7 1.074 0.18 ±0.01 
+
+MACSIM Sampling 100.0 ±0.0 242.3 ±1.8 242.3 ±1.8 1.043 0.93 ±0.93 
+
+PACT Sampling 100.0 ±0.0 232.4 ±2.6 232.4 ±2.6 1.000 23.6 ±11.0 
+
+80 × 20 × 8 (ZST) MAPPO Greedy 100.0 ±0.0 299.0 ±9.8 299.0 ±9.8 1.053 0.24 ±0.12 
+
+IPPO Greedy 98.6 ±3.5 380.1 ±162.5 319.9 ±16.3 1.339 0.87 ±0.49 
+
+VDN Greedy 59.6 ±51.3 2498.4 ±2780.2 318.3 ±18.6 8.800 1.27 ±1.12 
+
+DCG Greedy 5.4 ±11.4 5017.7 ±1604.1 452.9 ±148.6 17.674 2.72 ±0.02 
+
+PARCO Greedy 97.4 ±5.9 336.2 ±32.6 314.6 ±4.6 1.184 0.054 ±0.084 
+
+MACSIM Greedy 58.0 ±32.2 1305.2 ±1130.6 312.5 ±11.6 4.597 0.84 ±0.24 
+
+PACT Greedy 100.0 ±0.0 283.9 ±4.7 283.9 ±4.7 1.000 0.77 ±0.50 
+
+PARCO Sampling 100.0 ±0.0 314.5 ±3.9 314.5 ±3.9 1.125 0.28 ±0.03 
+
+MACSIM Sampling 100.0 ±0.0 307.2 ±2.3 307.2 ±2.3 1.099 1.83 ±1.75 
+
+PACT Sampling 100.0 ±0.0 279.6 ±3.5 279.6 ±3.5 1.000 54.4 ±28.7 
+
+120 × 24 × 10 (ZST) MAPPO Greedy 100.0 ±0.0 429.2 ±20.5 429.2 ±20.5 1.077 0.84 ±0.45 
+
+IPPO Greedy 98.5 ±4.4 584.4 ±354.4 469.7 ±30.9 1.467 3.45 ±2.43 
+
+VDN Greedy 59.9 ±51.6 4311.0 ±4961.6 467.5 ±27.1 10.821 5.54 ±5.48 
+
+DCG Greedy 0.5 ±1.6 9296.8 ±2400.1 1030.2 ±1062.3 23.335 13.1 ±0.1 
+
+PARCO Greedy 7.6 ±13.7 2578.1 ±608.2 439.1 ±23.1 6.471 0.35 ±0.08 
+
+MACSIM Greedy 61.2 ±32.3 1866.3 ±641.7 462.0 ±19.7 4.684 1.64 ±0.52 
+
+PACT Greedy 100.0 ±0.0 398.4 ±6.8 398.4 ±6.8 1.000 2.41 ±1.56 
+
+PARCO Sampling 100.0 ±0.0 490.3 ±13.6 490.3 ±13.6 1.237 2.30 ±2.86 
+
+MACSIM Sampling 100.0 ±0.0 458.3 ±2.9 458.3 ±2.9 1.156 5.24 ±9.66 
+
+PACT Sampling 100.0 ±0.0 396.5 ±4.9 396.5 ±4.9 1.000 112.1 ±27.3 
+
+25 Table 6: Complete results for learning-based methods on NCFFSP. The first configuration is in-distribution (ID), and the remaining configurations are evaluated zero-shot (ZST). 
+
+Method Evaluation Success (%) 
+
+↑ Cost ↓ Objective ↓ Perf. ratio 
+
+↓ Time (s) ↓
+
+20 × 4 × 3 (ID) MAPPO Greedy 97.4 ±3.5 46.5 ±2.3 44.2 ±1.0 1.120 0.019 ±0.006 
+
+IPPO Greedy 98.5 ±1.9 47.3 ±1.7 45.4 ±1.5 1.140 0.017 ±0.004 
+
+VDN Greedy 97.8 ±2.2 50.0 ±2.1 48.6 ±1.5 1.205 0.017 ±0.005 
+
+DCG Greedy 71.7 ±31.6 84.1 ±50.6 56.1 ±17.0 2.027 0.036 ±0.011 
+
+PARCO Greedy 99.3 ±0.7 42.9 ±0.5 42.5 ±0.4 1.034 0.005 ±0.002 
+
+MACSIM Greedy 82.9 ±32.5 64.7 ±43.0 45.9 ±5.9 1.559 0.067 ±0.022 
+
+PACT Greedy 100.0 ±0.0 41.5 ±0.7 41.5 ±0.7 1.000 0.049 ±0.019 
+
+PARCO Sampling 100.0 ±0.0 37.3 ±0.2 37.3 ±0.2 1.030 0.085 ±0.002 
+
+MACSIM Sampling 100.0 ±0.0 39.0 ±1.5 39.0 ±1.5 1.077 0.21 ±0.03 
+
+PACT Sampling 100.0 ±0.0 36.2 ±0.6 36.2 ±0.6 1.000 5.35 ±0.26 
+
+30 × 6 × 3 (ZST) MAPPO Greedy 99.2 ±1.3 38.0 ±1.9 37.3 ±0.8 1.058 0.020 ±0.007 
+
+IPPO Greedy 99.3 ±1.3 39.3 ±1.0 38.5 ±1.2 1.095 0.020 ±0.007 
+
+VDN Greedy 96.8 ±2.8 44.2 ±3.1 41.3 ±1.4 1.231 0.027 ±0.010 
+
+DCG Greedy 58.9 ±25.5 102.4 ±53.7 52.3 ±13.4 2.852 0.069 ±0.005 
+
+PARCO Greedy 98.8 ±0.9 49.8 ±1.2 48.7 ±1.4 1.387 0.009 ±0.005 
+
+MACSIM Greedy 91.7 ±23.3 55.4 ±46.4 41.2 ±5.7 1.543 0.057 ±0.032 
+
+PACT Greedy 100.0 ±0.0 35.9 ±1.9 35.9 ±1.9 1.000 0.063 ±0.041 
+
+PARCO Sampling 100.0 ±0.0 39.6 ±0.4 39.6 ±0.4 1.119 0.099 ±0.002 
+
+MACSIM Sampling 100.0 ±0.0 36.1 ±2.3 36.1 ±2.3 1.020 0.32 ±0.04 
+
+PACT Sampling 100.0 ±0.0 35.4 ±0.9 35.4 ±0.9 1.000 6.17 ±0.29 
+
+50 × 7 × 3 (ZST) MAPPO Greedy 99.3 ±1.3 49.4 ±2.8 48.0 ±0.7 1.012 0.065 ±0.027 
+
+IPPO Greedy 98.9 ±1.9 52.6 ±2.5 49.7 ±2.6 1.078 0.070 ±0.032 
+
+VDN Greedy 93.2 ±8.3 63.9 ±12.5 53.5 ±2.4 1.309 0.12 ±0.07 
+
+DCG Greedy 59.0 ±30.0 152.4 ±79.0 75.4 ±30.9 3.123 0.26 ±0.03 
+
+PARCO Greedy 98.8 ±2.2 66.8 ±3.5 65.3 ±1.3 1.369 0.010 ±0.006 
+
+MACSIM Greedy 86.6 ±30.5 98.4 ±104.2 61.3 ±19.1 2.016 0.11 ±0.07 
+
+PACT Greedy 99.9 ±0.3 48.8 ±2.4 48.4 ±1.1 1.000 0.17 ±0.14 
+
+PARCO Sampling 100.0 ±0.0 57.4 ±2.3 57.4 ±2.3 1.281 0.13 ±0.09 
+
+MACSIM Sampling 100.0 ±0.0 50.7 ±4.0 50.7 ±4.0 1.132 0.71 ±0.09 
+
+PACT Sampling 100.0 ±0.0 44.8 ±1.5 44.8 ±1.5 1.000 11.7 ±0.6 
+
+80 × 6 × 4 (ZST) MAPPO Greedy 98.2 ±3.3 94.5 ±11.8 88.5 ±1.3 1.133 0.33 ±0.24 
+
+IPPO Greedy 97.8 ±4.5 99.8 ±14.1 91.6 ±5.0 1.197 0.30 ±0.24 
+
+VDN Greedy 84.4 ±11.7 151.0 ±42.7 98.8 ±2.9 1.811 1.04 ±0.42 
+
+DCG Greedy 50.3 ±18.1 376.7 ±137.6 141.8 ±53.5 4.517 1.64 ±0.03 
+
+PARCO Greedy N/A N/A N/A N/A N/A MACSIM Greedy 82.7 ±28.5 212.6 ±191.5 114.4 ±27.9 2.549 0.29 ±0.16 
+
+PACT Greedy 99.7 ±0.7 83.4 ±8.9 81.1 ±2.3 1.000 0.51 ±0.57 
+
+PARCO Sampling N/A N/A N/A N/A N/A MACSIM Sampling 100.0 ±0.0 97.3 ±7.1 97.3 ±7.1 1.179 2.09 ±0.66 
+
+PACT Sampling 100.0 ±0.0 82.5 ±2.9 82.5 ±2.9 1.000 32.5 ±1.6 
+
+120 × 8 × 4 (ZST) MAPPO Greedy 98.4 ±3.5 93.8 ±16.1 86.2 ±2.5 1.082 1.13 ±1.22 
+
+IPPO Greedy 98.6 ±3.5 97.1 ±16.2 90.2 ±4.4 1.120 1.05 ±1.15 
+
+VDN Greedy 81.6 ±13.2 186.1 ±65.9 96.8 ±2.8 2.146 4.62 ±1.60 
+
+DCG Greedy 48.4 ±27.9 513.9 ±241.2 186.0 ±99.1 5.927 6.98 ±0.35 
+
+PARCO Greedy N/A N/A N/A N/A N/A MACSIM Greedy 89.1 ±23.1 213.9 ±222.1 123.6 ±29.2 2.467 0.35 ±0.29 
+
+PACT Greedy 99.4 ±1.1 86.7 ±22.6 80.4 ±2.4 1.000 1.84 ±2.40 
+
+PARCO Sampling N/A N/A N/A N/A N/A MACSIM Sampling 100.0 ±0.0 109.6 ±8.9 109.6 ±8.9 1.280 3.87 ±0.62 
+
+PACT Sampling 100.0 ±0.0 85.6 ±4.4 85.6 ±4.4 1.000 97.0 ±10.0 
+
+26 C.3 RUNTIME ANALYSIS 
+
+Table 7 decomposes PACT’s end-to-end runtime into environment stepping, policy inference, and other costs. Policy inference is further divided into encoding, candidate plan generation, trace-graph coordination, plan selection, and remaining policy operations. We report the ID and largest ZST configuration for each task to show how the distribution changes with problem scale. The runtime profiles reflect both problem scale and the planning horizon Hp. On MACTP, where 
+
+Hp = 4 , plan generation accounts for 38.02% on the ID configuration and remains at 42.15% on the largest ZST configuration because each of the K candidates requires a multi-step autoregressive virtual rollout. By contrast, DFJSP and NCFFSP use Hp = 1 , so plan generation ends after the initial candidate actions and its share falls from 23.82% and 27.49% to 3.74% and 5.27% as the instances grow. Their larger graph states instead make encoding dominant, accounting for 86.37% and 87.76% of runtime. Encoding also increases from 11.91% to 43.77% on MACTP, but its longer rollouts keep plan generation comparably expensive. The relative runtime of coordination decreases from 9.95-13.25% on the ID configurations to 2.81-4.42% on the largest configurations, while selection remains below 1.3% across the evaluated configurations. Table 7: Breakdown of PACT’s end-to-end runtime. Component columns report percentages of the end-to-end runtime, and the final column reports time per instance. Task Configuration Env. step Policy Other Time (s) Encoder Plan Coord. Selection Other MACTP 16 × 4 × 6 (ID) 15.77% 11.91% 38.02% 9.95% 0.5% 15.45% 8.39% 0.056                                                                    
+
+> 1024 ×32 ×64 (ZST) 5.32% 43.77% 42.15% 2.81% 0.14% 4.5% 1.31% 11.0 DFJSP 20 ×8×6(ID) 19.04% 15.35% 23.82% 12.92% 1.28% 23.5% 4.08% 0.093
+> 120 ×24 ×10 (ZST) 2.38% 86.37% 3.74% 4.42% 0.07% 2.51% 0.53% 2.41 NCFFSP 20 ×4×3(ID) 19.71% 15.84% 27.49% 13.25% 0.69% 18.59% 4.43% 0.049
+> 120 ×8×4(ZST) 2.17% 87.76% 5.27% 3.01% 0.02% 1.26% 0.52% 1.84
+
+C.4 ABLATION STUDY DETAILS 
+
+In this section, we provide further details regarding the evaluation protocol and results of the ablation study reported in Section 5.3 in the main text. All ablation experiments are conducted with greedy evaluation on the largest zero-shot transfer configuration of each problem. We use the PACT model with K = 4 candidate plans and R = 2 
+
+coordination rounds as the reference model. We define the performance ratio as cost divided by the reference model’s mean cost on the same problem, and compute the time ratio in the same way using end-to-end runtime. Both ratios equal one for the reference model, and lower values are better. We present the ablation results in Figure 4. For each method or configuration, bars show mean performance ratios across seeds, with error bars indicating one standard deviation, while lines show mean time ratios. 
+
+Effect of Coordination. We compare PACT, PACT without coordination, and MAPPO in Fig-ure 4(a). PACT without coordination omits message passing on the plan-augmented trace-graph, so each agent selects its candidate plan independently. PACT achieves the lowest mean performance ratio on all three problems. Removing coordination substantially degrades performance, particu-larly on MACTP and NCFFSP, and makes it worse than MAPPO on DFJSP and NCFFSP. This indicates that the gains arise from using shared elements to mediate candidate selection rather than from candidate generation alone. 
+
+Number of Candidate Plans. We vary the number of candidate plans K ∈ { 1, 4, 8, 16 } in Fig-ure 4(b). With K = 1 , each agent exposes only one plan to the trace-graph, so coordination cannot redirect it to an alternative. This setting degrades performance on every problem and produces high variability on NCFFSP, whereas four candidates provide most of the observed improvement. Larger sets yield no consistent gain beyond the variation across seeds. The time ratio reflects both per-step computation and episode length, so longer episodes can offset the savings from fewer candidates. The sharp escalation in the time ratio on MACTP at large K is consistent with Hp = 4 , compared with Hp = 1 on DFJSP and NCFFSP. 27 Number of Coordination Rounds. We vary the number of coordination rounds R ∈ { 1, 2, 3, 4} in Figure 4(c). The first round updates candidate plans from the loads induced by the initial preferences. Subsequent rounds recompute these loads after the preferences change, allowing plans to respond to how other agents have adjusted their selections. One round performs comparably on the scheduling problems but yields a higher mean performance ratio on MACTP, while the second closes this gap. This difference is consistent with MACTP’s longer plan traces capturing multi-step interactions, whereas the scheduling tasks use Hp = 1 . Further rounds provide no consistent improvement, and runtime remains nearly unchanged. 
+
+## D DETAILED ALGORITHMS 
+
+Algorithm 1 summarizes how PACT maps the graph observation at one decision step to a joint action. The three algorithms below develop this procedure in sequence: candidate plan generation (Algorithm 2), coordination on the plan-augmented trace-graph (Algorithm 3), and plan selection followed by execution (Algorithm 4). Together, they complement the corresponding descriptions in Section 4.1-Section 4.3 with a more explicit account of the forward pass. 
+
+Algorithm 2 Candidate plan generation for agent i (detail of Section 4.1)  
+
+> 1:
+
+Input: graph observation Gt; encodings hG and σi from Eq. (2); agent i; candidate plan count 
+
+K; plan horizon Hp 
+
+> 2:
+
+Output: candidate plans ˆp1 
+
+> i
+
+, . . . , ˆpKi and their traces Tr(ˆ pki ) 
+
+> 3:
+
+ˆxki, 0 ← current state of agent i from Gt for every k 
+
+> 4:
+
+draw ˆa1
+
+> i,t
+
+, . . . , ˆaKi,t jointly, without replacement, from πplan  
+
+> θ
+
+(· | hG, σ i, ˆxki, 0) 
+
+> 5:
+
+for k = 1 , . . . , K do  
+
+> 6:
+
+ˆxki, 1 ← rollout state of agent i after ˆaki,t  
+
+> 7:
+
+for j = 1 , . . . , H p − 1 do  
+
+> 8:
+
+sample ˆaki,t +j ∼ πplan  
+
+> θ
+
+(· | hG, σ i, ˆxki,j ) 
+
+> 9:
+
+ˆxki,j +1 ← rollout state after ˆaki,t +j 
+
+> 10:
+
+end for  
+
+> 11:
+
+ˆpki ← (ˆ aki,t , . . . , ˆaki,t +Hp−1) 
+
+> 12:
+
+Tr(ˆ pki ) ← { (v, d (v, ˆaki,t +j ), j ) : d(v, ˆaki,t +j ) > 0} 
+
+> 13:
+
+end for  
+
+> 14:
+
+return {ˆpki , Tr(ˆ pki )}Kk=1 
+
+28 Algorithm 3 Coordination on the plan-augmented trace-graph (detail of Section 4.2) 
+
+1: Input: candidate plans {ˆpki , Tr(ˆ pki )} for all i ∈ M t, k = 1 , . . . , K ; coordination rounds R
+
+2: Output: candidate plan scores s(R) 
+
+> i
+
+for all i ∈ M t
+
+3: χt ← G t with one candidate plan node per ˆpki and a trace arc (ˆ pki , v ) for every (v, d, j ) ∈ Tr(ˆ pki )
+
+4: h(0) ← hG for element nodes and an encoding of the node’s trace for candidate plan nodes 
+
+5: s(0)  
+
+> i
+
+(k) ← η tanh  fscore (h(0) (ˆ pki )) , q(0)  
+
+> i
+
+← softmax( s(0)  
+
+> i
+
+) (Eq. (5)) 
+
+6: for r = 0 , . . . , R − 1 do 
+
+7: for each element v on which some trace places demand do 
+
+8: L(r)(v) ← P
+
+> i
+
+P 
+
+> k
+
+q(r) 
+
+> i
+
+(k) d(v, ˆpki ) (Eq. (6)) 
+
+9: ˜h(r)(v) = h(r)(v) + Wload 
+
+ L(r)(v) 
+
+> κt(v)
+
+, ReLU (L(r)(v)−(κt(v)−dt(v)) )
+
+> κt(v)
+
+
+
+, (Eq. (7): normalized by the capacity κt(v))
+
+10: end for 
+
+11: h(r+1) ← MPNN( ˜h(r), χ t) (Eq. (8)) 
+
+12: s(r+1)  
+
+> i
+
+(k) ← s(r) 
+
+> i
+
+(k) + η tanh  fscore (h(r+1) (ˆ pki ))  (Eq. (9)) 
+
+13: q(r+1)  
+
+> i
+
+← softmax( s(r+1)  
+
+> i
+
+)
+
+14: end for 
+
+15: return {s(R) 
+
+> i
+
+}i∈M t
+
+Algorithm 4 Plan selection and execution (detail of Section 4.3) 
+
+1: Input: candidate plans {ˆpki } and candidate plan scores {s(R) 
+
+> i
+
+} for all i ∈ M t; selection tem-perature τ
+
+2: Output: executed joint action at
+
+3: for each agent i ∈ M t (in parallel) do 
+
+4: zi ∼ softmax( s(R) 
+
+> i
+
+/τ )
+
+5: ai,t ← ˆpzi 
+
+> i
+
+[0] 
+
+6: end for 
+
+7: at ← { ai,t }i∈M t
+
+8: submit at to the environment, update the state, observation, and cost (Section 4.3) 
+
+9: return at
+
+29
