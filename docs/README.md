@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-20</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-21</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 5 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>4</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-20 22:28:01 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-21 22:30:47 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-10-20 日报聚焦多智能体仓储调度与路径规划：精读 4 篇、速读 1 篇，其中 CARVS 以 10.0 分居首。最值得关注的是 CARVS 提出的面向人机协作仓库的拥塞感知在线取送算法，以及 Policy Search in Code Space 在代码空间做策略搜索以求解多智能体路径规划。普通读者可优先看 CARVS 的仓库场景建模与 PACT 的轨迹图协调思路，再按兴趣补读代码空间策略搜索。</p>
+<p>今日精选 5 篇机器人多智能体研究，其中 1 篇关于通信与任务图不匹配条件下基于观测器的多智能体控制，获 8.0 分，最值得精读。重点看两点：通信拓扑切换下的多智能体控制，以及机器人集群时空记忆的规模化；普通读者可先读 8.0 分那篇，了解系统失配时如何保持控制稳定。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">4 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CARVS: A Congestion-Aware Algorithm for Online Multi-Agent Pickup-and-Delivery in Human-Collaborative Warehouses">CARVS: A Congestion-Aware Algorithm for Online Multi-Agent Pickup-and-Delivery in Human-Collaborative Warehouses</span></li><li><span class="dpr-home-dashboard-paper-title" title="Policy Search in Code Space for Multi-Agent Pathfinding">Policy Search in Code Space for Multi-Agent Pathfinding</span></li><li><span class="dpr-home-dashboard-paper-title" title="Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding">Map-Distribution Mixture-of-Experts for Multi-Agent Pathfinding</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Observer-Based Control for Multi-Agent Systems under Communication-Task Graph Mismatch and Directed Switching Topologies">Observer-Based Control for Multi-Agent Systems under Communication-Task Graph Mismatch and Directed Switching Topologies</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PACT: Plan-Augmented Coordination via Trace-Graphs for Dynamic Multi-Agent Combinatorial Optimization">PACT: Plan-Augmented Coordination via Trace-Graphs for Dynamic Multi-Agent Combinatorial Optimization</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Industrial ReMEmbR: Scaling Spatiotemporal Memory to Robot Fleets">Industrial ReMEmbR: Scaling Spatiotemporal Memory to Robot Fleets</span></li><li><span class="dpr-home-dashboard-paper-title" title="Discovery-Probability Graph Planning for Embodied Agents in Tasks with Hidden Cooperation Requirements">Discovery-Probability Graph Planning for Embodied Agents in Tasks with Hidden Cooperation Requirements</span></li><li><span class="dpr-home-dashboard-paper-title" title="Robot-Task Suitability in Heterogeneous Multi-Robot Task Allocation">Robot-Task Suitability in Heterogeneous Multi-Robot Task Allocation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
 </section>
 </div>
 
