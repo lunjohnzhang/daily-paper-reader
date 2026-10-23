@@ -1,0 +1,601 @@
+Title: Consistent Distributed Invariant EKF SLAM with Point and Object Features
+
+URL Source: https://arxiv.org/pdf/2610.31221v1
+
+Published Time: Fri, 23 Oct 2026 01:15:00 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Consistent Distributed Invariant EKF SLAM with Point and Object Features 
+
+Mengya Xu, Xianjia Yu, Ha Sier, Shoudong Huang, Tomi Westerlund 
+
+Abstract — Multi-robot SLAM allows robots to improve their estimates by exchanging map information, but repeated ex-changes create unknown correlations between local estimators. Covariance intersection (CI) can fuse estimates without track-ing these correlations. In right-invariant extended Kalman filter (RI-EKF) SLAM, however, point features obtain their invariant errors through the robot rotation, so a neighbor’s map estimate is expressed in its own error coordinates and is correlated with its pose, and cannot be fused by CI directly. This paper presents Joint-CI, a unified fusion method for distributed RI-EKF SLAM with point, object, and mixed point–object maps. Using a neighboring robot’s local posterior and an inter-robot observation, a joint estimate of the receiving robot’s pose and the common features is constructed in the receiving robot’s error coordinates, retaining the robot–feature and feature– feature correlations. Partial-state CI then fuses this estimate with the receiving robot’s local posterior. We show that the unified formulation and the fusion preserve the six unobserv-able directions associated with global rotation and translation, and that communication and fusion preserve first-order co-variance consistency given consistent local posteriors. Monte Carlo simulations and a real-world dataset-derived experiment show that Joint-CI improves estimation accuracy while main-taining consistent, mildly conservative uncertainty. The code is available at https://anonymous.4open.science/r/ Joint-CI-for-Distributed-RI-EKF-SLAM-E14B/ .
+
+I. I NTRODUCTION 
+
+Multi-robot SLAM improves coverage and estimation ac-curacy by allowing robots to exchange locally acquired map information. Representative systems such as DDF-SAM [1], Kimera-Multi [2], and Swarm-SLAM [3] employ distributed or decentralized nonlinear optimization over factor-graph or pose-graph representations. These approaches provide powerful batch or incremental optimization capabilities, but repeatedly solving a growing optimization problem can im-pose computational and latency costs on lightweight robotic platforms. Filtering-based methods provide a complementary solution by recursively updating the current posterior as new measurements and communicated estimates arrive. Point features are generic and efficient to detect and match, and have therefore been widely used in both single-robot and multi-robot SLAM. Advances in machine learning have also increased interest in high-level features such as objects, which provide persistent semantic identities and strong geometric constraints [4], [5], [6], [7]. Practical sys-tems have further demonstrated the value of mixed map representations, in which low-level point features and high-level object features are maintained together [8], [9], [10]. For filtering-based SLAM, estimation consistency is essential because underestimated uncertainty can degrade both state estimation and uncertainty-aware downstream decisions [11]. Conventional EKF SLAM can become inconsistent because linearization at the estimated states may introduce spurious information along unobservable directions [12], [13], [14]. Right-invariant EKF (RI-EKF) formulations address this is-sue by defining the estimation error through the symmetry of the state space, which preserves the appropriate unobservable directions. They have been developed for both point-feature SLAM [15], [16] and object-feature SLAM [17]. Distributed filtering introduces an additional difficulty because previous information exchange creates generally unknown cross-correlations between local estimators. Co-variance intersection (CI) [18] provides a conservative fusion rule without explicitly tracking these correlations and has been applied to SLAM [19] and decentralized cooperative localization [20], [21]. Partial-state CI extends this idea to estimates containing different or overlapping subsets of a common state [22], [23], [24]. Distributed invariant filters have also applied CI to pose estimation on Lie groups [25], [26], without estimating a shared map. For object-level multi-robot SLAM, Li et al. [27] use per-object invariant errors, representing each object as an independent SE (3) 
+
+component, so that neighboring robot poses and common object estimates can be combined separately. Despite these advances, fusing map information between RI-EKF SLAM estimators remains nontrivial. Exchanging only pose estimates discards the information contained in the shared map, and the per-object invariant errors in [27] rely on object orientations and therefore do not directly cover point features. In RI-EKF SLAM, point features, which carry no orientation of their own, obtain their invariant errors through the robot rotation [15], [16], and the object formulation in [17] adopts the same coupling, allowing point, object, and mixed maps to share one error representation. In this coupled formulation, exchanging map features raises two issues. First, each robot’s feature errors are defined relative to its own rotation error, so a neighbor’s feature covariance cannot be combined directly with the receiving robot’s posterior. Second, a neighbor’s pose and feature errors are correlated through its own SLAM estimation, and in the coupled formulation they additionally share the same rotation error. A communicated covariance that ignores these correlations is not guaranteed to be consistent. This paper presents Joint-CI, a single construction that ad-dresses both issues for distributed RI-EKF SLAM with point, object, and mixed point–object maps. Joint-CI re-expresses the communicated robot pose and common features in the receiving filter’s error coordinates as one correlated partial state, derives its complete first-order covariance from the neighboring posterior and the inter-robot observation, and then applies standard partial-state CI. The main contributions arXiv:2610.31221v1 [cs.RO] 22 Oct 2026 are: 1) We derive a unified construction of the communicated robot–feature partial state and its complete first-order co-variance in error coordinates compatible with the receiving filter, for point, object, and mixed maps. 2) We show that the unified local RI-EKF formulation and the subsequent fusion preserve the global gauge directions. Given consistent local posteriors, we further establish first-order covariance consistency of the communicated estimate and subsequent CI fusion. 3) We evaluate estimation accuracy, statistical consistency, communication and computational costs, and operation in multi-neighbor networks through Monte Carlo simulations and a real-world dataset-derived experiment. II. P ROBLEM FORMULATION 
+
+We consider K robots, Np point features, and No object features, indexed by k, a, and b, respectively. Robot k has orientation Rk ∈ SO (3) and position xk ∈ R3. Point feature 
+
+a has position qa ∈ R3, while object feature b has orientation 
+
+Rfb ∈ SO (3) and position f b ∈ R3. All robot and feature states are expressed in a common global frame. 
+
+1) State Space: Robot k maintains a local map with point-feature index set Ipk and object-feature index set Iok . Its state can be written as 
+
+Xk = ( Rk, {Rfb 
+
+> k
+
+}b∈I ok , xk, {qak}a∈I pk , {f bk }b∈I ok ). (1) For compactness, feature index ranges are omitted in subsequent equations. Let mp = |I pk | and mo = |I ok | denote the numbers of point and object features in robot k’s local map. We define the coupled state group Gmp,m o , which is isomorphic to SE 1+ mp+mo (3) × SO (3) mo , where SE m(3) 
+
+contains one rotation and m three-dimensional vectors [16], [15]. The local state satisfies Xk ∈ Gmp,m o . When the numbers of point and object features are clear from context, 
+
+G denotes the corresponding group Gmp,m o .
+
+2) Process model: Let n denote the discrete time index. Following the first-order integration scheme commonly used in RI-EKF SLAM [16], [17], the process model is 
+
+Rk,n +1 = Rk,n Exp( wRk,n )Ruk,n ,
+
+xk,n +1 = xk,n + Rk,n (vk,n + wvk,n ), (2) where (Ruk,n , vk,n ) is the odometry, wk,n =[( wRk,n )T , (wvk,n )T ]T ∼ N (0, Φk,n ) is the corresponding process noise, and Exp : R3 → SO (3) denotes the exponential map, with local inverse Log . Features are static. 
+
+3) Observation models: Robot k may obtain three types of observations, including point feature observations, object feature pose observations, and inter-robot pose observations. Here, the time index is omitted from the observation models for readability. The observation of point feature a by robot k is 
+
+zqka = RTk (qa − xk) + νqka , (3) where νqka ∼ N (0, Ψqka ) is the point observation noise. The observation of object feature b by robot k is 
+
+Rzkb = Exp( νRkb )RTk Rfb ,
+
+zfkb = RTk (f b − xk) + νfkb , (4) where νokb = [( νRkb )T , (νfkb )T ]T ∼ N (0, Ψokb ) is the object pose observation noise. Let l̸ = k denote another robot. When robot k observes robot l, the inter-robot observation is 
+
+Rzkl = Exp( νRkl )RTk Rl,
+
+zxkl = RTk (xl − xk) + νxkl , (5) where νkl = [( νRkl )T , (νxkl )T ]T ∼ N (0, Ψkl ) is the inter-robot pose observation noise. 
+
+4) Problem of Interest: Each robot maintains a local RI-EKF posterior over its own pose and locally observed features. Robots communicate over a time-varying graph, and 
+
+Vk denotes the set of robots that can communicate with and observe robot k at the current time. For each l ∈ V k, the inter-robot observation allows robot l to estimate robot k’s pose, while its local posterior provides estimates of their common features. The objective is to construct from each neighbor a joint estimate of robot k’s pose and the common features, with a covariance expressed in invariant error coordinates compatible with robot k’s local posterior, and to fuse all such estimates with robot k’s local posterior without tracking the unknown cross-correlations among the local estimators. We assume that all robots are initialized in a common but arbitrary global frame with consistent initial covariances, and that correspondences between features observed by different robots are available. All process and observation noises are assumed mutually independent across robots, features, and time. Each current noise realization is also assumed independent of the prior state-estimation errors. III. D ISTRIBUTED RI-EKF SLAM 
+
+A. Unified local RI-EKF formulation 
+
+The local estimator follows the standard RI-EKF propa-gation, measurement update, and feature initialization pro-cedures established for point-feature SLAM [15], [16] and object-feature SLAM [17]. Both formulations use the robot rotation perturbation in the error definition of every position component, while object features additionally contain an orientation error. This shared structure yields the unified error defined below. For any X1, X2 ∈ G mp,m o , the operator ⊕ is defined by 
+
+X1 ⊕ X2 =  R1R2, {Rfb 
+
+> 1
+
+Rfb 
+
+> 2
+
+},
+
+R1x2 + x1, {R1qa 
+
+> 2
+
++ qa 
+
+> 1
+
+}, {R1f b 
+
+> 2
+
++ f b 
+
+> 1
+
+}. (6) The associated minus operation is defined as X1 ⊖ X2 =
+
+X1 ⊕ X−12 , where X−12 is the group inverse. Identifying the Lie algebra with its vector coordinates, the error e ∈ R6+3 mp+6 mo is 
+
+eT = (eR)T , {(eRfb
+
+)T }, (ex)T , {(eqa
+
+)T }, {(ef b
+
+)T }, (7) where eR, ex, eqa
+
+, eRfb , ef b
+
+∈ R3 for all applicable a and b.The exponential map on this Lie group is defined by 
+
+Exp G (e) = ( Exp( eR), {Exp( eRfb
+
+)},J(eR)ex, {J(eR)eqa
+
+}, {J(eR)ef b
+
+}), (8) where J(·) denotes the left Jacobian of SO (3) under the convention of [17]. The true state X, its estimate ˆX, and the associated right-invariant error e satisfy 
+
+X = Exp G (e) ⊕ ˆX. (9) Each robot k maintains the estimate ˆXk and the covariance 
+
+Pk of its error ek. Time indices are added when needed. According to the process model (2), the propagated invari-ant error of robot k, ek,n +1 |n, satisfies 
+
+ek,n +1 |n ≃ Fk,n ek,n + Gk,n wk,n . (10) The corresponding first-order Jacobians are 
+
+Fk,n = I6+3 mp+6 mo ,
+
+Gk,n =
+
+
+
+ˆRk,n 00 0
+
+[ˆ xk,n +1 |n]× ˆRk,n ˆRk,n 
+
+col a∈I pk
+
+
+
+[ˆ qak,n ]× ˆRk,n 
+
+
+
+0
+
+col b∈I ok
+
+
+
+[ˆf bk,n ]× ˆRk,n 
+
+
+
+0
+
+
+
+(11) where [·]× denotes the skew-symmetric matrix of a vector and col i∈I (Mi) stacks the matrices Mi vertically according to the state ordering. At a measurement update, the time indices are omitted for readability. For point feature a and object feature b, define the residuals 
+
+rqka = zqka − ˆRTk (ˆ qak − ˆxk),
+
+rokb =
+
+"
+
+Log 
+
+
+
+Rzkb ( ˆRTk ˆRfb 
+
+> k
+
+)T
+
+
+
+zfkb − ˆRTk (ˆf bk − ˆxk)
+
+#
+
+. (12) Their first-order models are 
+
+rqka ≃ Hqka ek + νqka , rokb ≃ Hokb ek + νokb . (13) Let Spa ∈ R3×3mp and Sob ∈ R3×3mo select point a and object b according to the state ordering. The corresponding Jacobians are 
+
+Hqka = 0 0 − ˆRTk ˆRTk Spa 0 ,
+
+Hokb =
+
+− ˆRTk ˆRTk Sob 0 0 00 0 − ˆRTk 0 ˆRTk Sob
+
+
+
+. (14) The residuals and Jacobians of all currently observed features are stacked for the measurement update. When a feature is first observed, its estimate is initialized using the inverse observation model: 
+
+ˆqak = ˆ xk + ˆRkzqka ,
+
+( ˆRfb 
+
+> k
+
+, ˆf bk ) = ( ˆRkRzkb , ˆxk + ˆRkzfkb ). (15) Under the error convention in (9), the corresponding first-order errors satisfy 
+
+eqa
+
+≃ ex − ˆRkνqka ,
+
+"
+
+eRfb
+
+ef b
+
+#
+
+≃
+
+eR
+
+ex
+
+
+
+− blkdiag( ˆRk, ˆRk)νokb , (16) where blkdiag( ·) forms a block-diagonal matrix from its arguments. For s ∈ { q, o }, let es
+
+> new
+
+, νsk, and Ψsk denote the corre-sponding new-feature error, observation noise, and noise co-variance, respectively, with the feature index a or b omitted. The relations in (16) can be written as 
+
+es 
+
+> new
+
+≃ Lskek + Bskνsk, (17) where Lsk and Bsk are the corresponding state-error and observation-noise Jacobians. Let Πsk be the permutation matrix that maps the appended ordering [eTk , (es
+
+> new
+
+)T ]T to the mixed-state ordering. The augmented covariance is then 
+
+Psk, aug = Πsk
+
+ I 0Lsk Bsk
+
+  Pk 00 Ψsk
+
+  I 0Lsk Bsk
+
+T
+
+(Πsk)T .
+
+(18) The mixed-state formulation includes point-only and object-only RI-EKF SLAM as the special cases mo = 0 
+
+and mp = 0 , respectively. 
+
+B. Joint communicated state in compatible coordinates 
+
+A communicated error representation is compatible with robot k’s local state when the corresponding components use the same invariant retraction, tangent coordinates, and or-dering after selection. The resulting residual and covariance can then be used directly in partial-state CI without further coordinate transformation. Consider a neighbor l ∈ V k. Let Cpkl = Ipk ∩ I pl and 
+
+Cokl = Iok ∩I ol denote their common point and object features. To transmit this information for fusion with robot k’s local posterior, robot l must construct a joint estimate and express its covariance in error coordinates compatible with robot k’s local state. Using (5), robot l first constructs a virtual pose of robot 
+
+k as 
+
+( ˆRl→k, ˆxl→k) =   ˆRlRzlk , ˆxl + ˆRlzxlk 
+
+. (19) The communicated joint estimate is constructed from this virtual pose and robot l’s estimates of the common features: 
+
+ˆYl→k = ( ˆRl→k, { ˆRfb 
+
+> l
+
+}b∈C okl ,
+
+ˆxl→k, {ˆqal }a∈C pkl , {ˆf bl }b∈C okl ). (20) Let Yl→k denote the true counterpart of (20). Its error is defined using the same invariant error representation as robot 
+
+k’s corresponding partial state, with components ordered as 
+
+el→k = Log G
+
+
+
+Yl→k ⊖ ˆYl→k
+
+
+
+= (eRl→k)T , {(eRfb
+
+> l→k
+
+)T }, (exl→k)T ,
+
+{(eqa
+
+> l→k
+
+)T }, {(ef b
+
+> l→k
+
+)T }T ,
+
+(21) where Log G denotes the local inverse of Exp G .Let eS 
+
+> l
+
+denote the subvector of robot l’s local error associated with its pose and the common features: 
+
+(eS 
+
+> l
+
+)T = (eRl )T , (eRfb 
+
+> l
+
+)T
+
+> b∈C okl
+
+,
+
+(exl )T , (eqa 
+
+> l
+
+)T
+
+> a∈C pkl
+
+, (ef b 
+
+> l
+
+)T
+
+> b∈C okl
+
+. (22) Its covariance PS 
+
+> l
+
+is the principal submatrix of robot l’s local covariance Pl associated with the same state components. From (8) and (9), the rotation error of the robot component acts on every position component. In robot l’s local state, this common rotation error is eRl , whereas in the communi-cated state it is eRl→k. The common-feature estimates remain unchanged, but their tangent errors must be re-expressed relative to the rotation error of robot k’s virtual pose. The resulting first-order relations are 
+
+eRl→k ≃ eRl − ˆRlνRlk , eRfb 
+
+> l→k
+
+≃ eRfb 
+
+> l
+
+,
+
+exl→k ≃ exl − [ˆ xl→k]× ˆRlνRlk − ˆRlνxlk ,
+
+eyl→k ≃ eyl − [ˆ y]× ˆRlνRlk ,
+
+(23) where (ˆ y, eyl ) denotes the estimate and local error of any communicated point or object position. Stacking these rela-tions according to (21) gives el→k ≃ eS 
+
+> l
+
++ Dl→kνlk , where 
+
+Dl→k =
+
+
+
+− ˆRl 00 0
+
+−[ˆ xl→k]× ˆRl − ˆRl
+
+− col a∈C pkl ([ˆ qal ]× ˆRl) 0
+
+− col b∈C okl ([ ˆf bl ]× ˆRl) 0
+
+
+
+. (24) The two block columns of Dl→k correspond to νRlk and 
+
+νxlk , respectively. Assuming that the inter-robot observation noise is independent of robot l’s local estimation error, the communicated covariance is 
+
+Pl→k = PS 
+
+> l
+
++ Dl→kΨlk DTl→k. (25) The mapping in (24) changes the robot rotation error shared by the feature-position errors from that of robot l
+
+to that of the virtual pose of robot k. Consequently, Pl→k
+
+is expressed in invariant error coordinates compatible with robot k’s local state. It retains the robot–feature and feature– feature covariance blocks inherited from Pl, together with the correlations induced by the inter-robot observation noise. 
+
+C. Partial-state covariance intersection 
+
+The communicated estimate contains robot k’s pose and the common features, while its local posterior may contain additional features. Since Section III-B expresses the cor-responding components in a common error space, robot k
+
+fuses the two estimates using standard partial-state CI [24]. Let Ekl be the binary selection matrix such that eck =
+
+Ekl ek contains robot k’s pose error and the common-feature errors in the same order as el→k. Let ˆYck denote the corresponding local partial-state estimate of robot k with the same ordering. The invariant fusion residual is defined as 
+
+dlk = Log G ( ˆYl→k ⊖ ˆYck). (26) Under the first-order error model, this residual satisfies 
+
+dlk ≃ Ekl ek − el→k. (27) Then, the partial-state CI covariance and correction are 
+
+(P+ 
+
+> k
+
+)−1 = ωP−1 
+
+> k
+
++ (1 − ω)ETkl P−1
+
+> l→k
+
+Ekl ,
+
+∆ek = (1 − ω)P+ 
+
+> k
+
+ETkl P−1
+
+> l→k
+
+dlk , (28) where ω ∈ [0 , 1] is selected by minimizing tr( P+ 
+
+> k
+
+) over weights for which the fused information matrix is positive definite. If the communicated state omits local components, this requires ω > 0.The state estimate is updated as ˆX+ 
+
+> k
+
+= Exp G (∆ ek) ⊕
+
+ˆXk, and ( ˆX+ 
+
+> k
+
+, P+ 
+
+> k
+
+) becomes robot k’s local posterior for the subsequent RI-EKF recursion and communication events. For multiple neighbors, the communicated estimate and covariance are constructed for each l ∈ V k as in Section III-B, and fused with robot k’s local posterior using multi-estimate partial-state CI [22]: 
+
+(P+ 
+
+> k
+
+)−1 = ω0P−1 
+
+> k
+
++ X
+
+> l∈V k
+
+ωlETkl P−1
+
+> l→k
+
+Ekl ,
+
+∆ek = P+
+
+> k
+
+X
+
+> l∈V k
+
+ωlETkl P−1
+
+> l→k
+
+dlk . (29) The nonnegative weights sum to one and are selected by minimizing tr( P+ 
+
+> k
+
+) subject to a positive-definite fused infor-mation matrix. For a single neighbor, ω0 = ω and ωl = 1 −ω,which recovers (28). IV. C ONSISTENCY ANALYSIS 
+
+A. Gauge Preservation 
+
+Consider a fixed change of global frame Tg = ( Rg , tg ) ∈
+
+SE (3) , which maps every orientation R to Rg R and every position p to Rg p+tg . Direct substitution into (2)–(5) shows that the process model preserves this transformation and that all observations remain unchanged. States that differ only by this transformation are therefore indistinguishable from the available motion and observation data. Let ϕ, ρ ∈ R3 denote infinitesimal global rotation and translation perturbations, and define ξg = [ ϕT , ρT ]T . Ex-pressing the globally transformed state through the retraction (9) and retaining first-order terms gives eg = Nmp,m o ξg ,where 
+
+Nmp,m o =
+
+
+
+I 01mo ⊗ I 00 I0 1mp ⊗ I0 1mo ⊗ I
+
+ . (30) Here, 1m ⊗ I stacks m copies of the three-dimensional identity matrix. The six columns of Nmp,m o represent the global rotation and translation directions. Let Hk,n denote the stacked Jacobian of all feature ob-servations available to robot k at time n. For a fixed local feature set, the mixed-state Jacobians satisfy 
+
+Fk,n Nmp,m o = Nmp,m o , Hk,n Nmp,m o = 0. (31) Consequently, the finite-horizon observability matrix Ok,N ,which stacks Hk,n Fk,n −1 · · · Fk, 0 for n = 0 , . . . , N , sat-isfies Ok,N Nmp,m o = 0. That is, the linearized system acquires no information along the six gauge directions. The point and object initialization Jacobians satisfy 
+
+LqkNmp,m o = 0 I , LokNmp,m o =
+
+I 00 I
+
+
+
+. (32) After the insertion defined by Πsk, these rows extend the gauge-direction matrix to Nmp+1 ,m o for a new point feature or Nmp,m o+1 for a new object feature. Therefore, the local propagation, measurement update, and feature initialization preserve the six gauge directions. Define the gauge-direction matrix of robot k’s partial state involved in the fusion as Nckl := Ekl Nmp,m o . The selected local partial state therefore has error Nckl ξg . Applying the same global-frame transformation to (19) and (20) shows that the communicated estimate has the identical error Nckl ξg .Using the first-order residual relation (27), the resulting variation of the fusion residual is 
+
+δdlk =  Ekl Nmp,m o − Nckl 
+
+ ξg = 0. (33) Thus, the fusion residual is unchanged by a common global rotation or translation and introduces no information along the six gauge directions. The same argument applies to each communicated residual in the multi-neighbor update. 
+
+B. Fusion consistency 
+
+A covariance P is first-order consistent for an error e if 
+
+E[ee T ] ⪯ P, where ⪯ denotes the Loewner order. Assume that the local posteriors entering a fusion event satisfy E[ekeTk ] ⪯ Pk and E[eS 
+
+> l
+
+(eS 
+
+> l
+
+)T ] ⪯ PS 
+
+> l
+
+. Within the first-order model in (24), the zero-mean inter-robot observa-tion noise and the adopted independence assumptions give 
+
+E[el→keTl→k] = E[eS 
+
+> l
+
+(eS 
+
+> l
+
+)T ] + Dl→kΨlk DTl→k
+
+⪯ PS 
+
+> l
+
++ Dl→kΨlk DTl→k = Pl→k. (34) Therefore, (25) is a first-order consistent covariance for the communicated error expressed in coordinates compatible with robot k’s local state. Together with Pk, this provides the two consistent inputs for partial-state CI, so (28) preserves first-order consistency without tracking the unknown cross-correlation [22], [24]. Since l is arbitrary, the same construction applies to every neighbor, and (29) extends this to multiple neighbors when its weights are nonnegative and sum to one [22]. V. E XPERIMENTAL EVALUATION 
+
+A. Experimental setup 
+
+The three scenarios in Fig. 1 examine complementary operating conditions. The General scenario uses two robots to provide a controlled comparison across map types under intermittent communication. The High-overlap scenario tests whether consistency is maintained when frequent communi-cation and extensive shared map information cause repeated information reuse. The Five-robot scenario provides a more complex and diverse communication setting to test whether the fusion construction remains effective in a multi-neighbor network. An additional real-world dataset-derived scenario uses Sequence 7 of the YCB-Video dataset [28] to evaluate the same backend using recorded camera motion and object geometry, as illustrated in Fig. 2. All three simulation scenarios contain 50 features in a 
+
+100 m × 100 m environment, with each robot following a 2000-time-step trajectory. In mixed maps, a fixed randomly selected half of the features are represented as objects and the remainder as points. A 30 m feature-observation range and a 20 m communication range are used throughout. The common noise covariances are Φ = diag(0 .02 2I3, 0.52I3),
+
+Ψq = 0 .52I3, Ψo = 0 .52I6, and Ψkl = 0 .05 2I6, with rotational and translational components expressed in radians and meters, respectively. Two robots within communication range reciprocally exchange messages, using independent inter-robot observations in the two directions. Both updates at a communication event are computed from the pre-communication posteriors, preventing immediate reuse of information within that event. To avoid redundant configurations, the High-overlap and Five-robot scenarios use the mixed map as a representative of the unified formulation, which reduces to the point-only case when mo = 0 and the object-only case when mp = 0 .The object map is retained separately to enable comparison with the object-specific baseline. 
+
+1) Compared methods: The comparison includes five methods: 1) Local runs the coupled RI-EKF SLAM estimator without inter-robot fusion. 2) Pose-CI communicates and fuses only the virtual pose of the receiving robot using partial-state CI. 3) Joint-CI (ours) communicates the virtual pose and common features together with their complete covariance in compatible coordinates. 4) DInCIKFc-C is our controlled implementation of the object-level distributed invariant filter DInCIKFc proposed in [27]. 5) DIn-Local uses the local estimator underlying DInCIKFc-C without inter-robot fusion. DInCIKFc-C retains the state representation and fusion structure of DInCIKFc [27], in which the communicated covariance is block-diagonal, assembled from separately constructed robot and object blocks. For a paired comparison, it uses the same ground truth, observation availability, and physical noise realizations as Joint-CI. Noise covariances are mapped into the respective tangent coordinates using the corresponding first-order Jacobians. Historical accumulation of object estimates used in [27] is disabled so that all fusion methods process the same communication events, separating the state and covariance constructions from fusion schedul-ing. Because Joint-CI and DInCIKFc-C also use different local estimators, DIn-Local is included to isolate the effect of inter-robot fusion within DInCIKFc-C. 
+
+2) Evaluation criteria: For each scenario and map type, 
+
+100 Monte Carlo trials are conducted. Within each trial, all methods use the same ground truth, measurements, noise realizations, visibility sets, and communication events. The evaluation considers estimation accuracy, statistical consis-tency, communication payload, and fusion time. Root-mean-square error (RMSE) measures the accuracy of the robot and the applicable feature components. The normalized estimation error squared (NEES) and 95% cov-erage assess statistical consistency. NEES is computed in each estimator’s own error coordinates. A value close to one indicates that the reported covariance agrees with the observed estimation error. The 95% coverage is the fraction of Monte Carlo trials whose quadratic error lies below the (a) General scenario (b) High-overlap scenario (c) Five-robot scenario            
+
+> Fig. 1. Simulation environments and ground-truth trajectories for the three evaluation scenarios. The same environment and trajectories are used for the point, object, and mixed-map experiments. For visualization, all features are shown as oriented objects with their local coordinate axes.
+> Fig. 2. YCB-Video dataset-derived evaluation setting. Left: a representative RGB frame. Right: the recorded camera trajectory divided into three overlapping robot trajectories, together with the four object poses.
+
+95% chi-square threshold. A value close to 0.95 indicates agreement with the confidence level. Payload counts the communicated estimate and the inde-pendent entries of its symmetric covariance, together with the feature identifiers. Fusion time includes message con-struction, CI weight selection, and state update. 
+
+B. Two-robot evaluation 1) Setting: The robots are within communication range for 10 .0% and 32 .0% of the time steps in the General and High-overlap scenarios, with averages of 8.9 and 21 .6
+
+common features per communication event, respectively. 
+
+2) Results: Table I summarizes the two-robot results. Regarding accuracy, the RMSE results show that, in the General scenario, Pose-CI improves robot 1 for all three map types, whereas the more accurate estimate of robot 2 remains unchanged. The optimized CI weights of Pose-CI show that robot 2 consistently assigns unit weight to its local posterior, so the communicated estimate from robot 1 is rejected. In the High-overlap scenario, the optimized CI weight on the local posterior equals one in both commu-nication directions, so Pose-CI produces no effective fusion. This indicates that the local maps already contain substantial common information, and the pose-only message provides insufficient new information to reduce the minimum-trace objective. In both scenarios, Joint-CI reduces the RMSEs of both robots and achieves the lowest RMSEs, demonstrating the benefit of communicating the common features together with their joint covariance. For object maps, DInCIKFc-C also improves both robots over DIn-Local. When normalized by their respective local baselines, DInCIKFc-C and Joint-CI achieve similar relative RMSE reductions.    
+
+> Fig. 3. Robot-pose NEES and 95% robot-pose coverage in the High-overlap object-map scenario.
+
+Joint-CI yields NEES values slightly below one and cov-erage at or above the nominal level in most cases, indicating consistent and mildly conservative uncertainty estimates. This conservatism is expected for CI, which bounds rather than models the unknown cross-correlation. When Pose-CI performs effective fusion, its estimates are generally more conservative. In contrast, DInCIKFc-C produces larger NEES and lower coverage, especially in the High-overlap scenario, indicating overconfident uncertainty estimates. Fig. 3 further presents the time-resolved robot-pose NEES and 95% cov-erage in the High-overlap object-map scenario, with Pose-CI omitted because no effective fusion occurs. Throughout the trajectory, both local estimators and Joint-CI remain stable without progressive consistency degradation. In con-trast, DInCIKFc-C shows increasing NEES and decreasing coverage under frequent and repeated information exchange. A plausible cause is its block-diagonal communicated co-variance. Although the per-object invariant errors avoid re-expressing the object errors, the virtual pose still inherits the neighboring robot’s pose error, which is correlated with the TABLE I TWO -ROBOT MONTE CARLO COMPARISON . E ACH PAIRED ENTRY IS ORDERED AS ROBOT 1 | ROBOT 2. Sc. Map Method RMSE R RMSE x RMSE Rf RMSE f NEES r NEES p C95 ,r C95 ,p Payload Time GPoint Local 7.26 | 2.57 2.06 | 0.67 – | – 1.99 | 0.72 0.94 | 1.04 0.88 | 1.07 97 | 90 96 | 92 – | – – | –Pose-CI 6.34 | 2.57 1.55 | 0.67 – | – 1.21 | 0.72 0.73 | 1.04 0.72 | 1.07 100 | 90 99 | 92 216 | 216 3.75 | 8.11                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+
+> Joint-CI 6.22 |2.23 1.49 |0.55 –|–1.10 |0.50 0.85 |0.88 0.79 |0.85 96 |97 98 |98 4792 |4792 4.72 |8.46 Object Local 6.27 |2.57 1.91 |0.67 10.69 |9.50 1.94 |0.72 0.96 |1.05 0.98 |1.08 96 |89 95 |92 –|––|–Pose-CI 5.29 |2.57 1.41 |0.67 10.21 |9.50 1.19 |0.72 0.74 |1.05 0.78 |1.08 100 |89 99 |92 216 |216 17.65 |45.59 Joint-CI 5.15 |2.22 1.34 |0.55 9.69 |8.92 1.07 |0.50 0.86 |0.89 0.86 |0.89 94 |95 98 |98 15220 |15220 18.25 |41.79
+> DIn-Local 6.60 |2.88 2.03 |0.76 11.12 |9.82 2.05 |0.82 1.11 |1.32 1.06 |1.24 92 |79 93 |88 –|––|–DInCIKFc-C 5.43 |2.53 1.45 |0.63 10.18 |9.14 1.17 |0.58 1.24 |1.34 1.48 |1.25 74 |79 58 |80 2167 |2167 17.70 |42.65 Mixed Local 6.29 |2.57 1.92 |0.67 10.07 |10.10 1.94 |0.72 0.95 |1.04 0.93 |1.08 96 |91 96 |92 –|––|–Pose-CI 5.31 |2.57 1.41 |0.67 9.56 |10.10 1.18 |0.72 0.74 |1.04 0.75 |1.08 100 |91 99 |92 216 |216 8.81 |20.53 Joint-CI 5.17 |2.22 1.35 |0.55 9.17 |9.21 1.07 |0.50 0.85 |0.88 0.83 |0.87 95 |97 98 |98 8883 |8883 9.48 |19.41
+> HObject Local 6.36 |2.93 1.51 |0.87 12.00 |11.68 0.65 |0.66 1.02 |1.00 1.06 |1.04 95 |94 94 |96 –|––|–Pose-CI 6.36 |2.93 1.51 |0.87 12.00 |11.68 0.65 |0.66 1.02 |1.00 1.06 |1.04 95 |94 94 |96 216 |216 35.08 |57.61 Joint-CI 6.32 |2.56 1.49 |0.62 11.49 |10.41 0.61 |0.41 0.89 |0.79 0.92 |0.86 99 |98 97 |98 76917 |76917 35.89 |58.54 DIn-Local 6.56 |3.29 1.57 |0.97 12.71 |12.12 0.69 |0.73 1.27 |1.28 1.70 |1.26 92 |84 83 |87 –|––|–DInCIKFc-C 6.51 |2.92 1.54 |0.72 11.86 |10.84 0.63 |0.48 1.97 |2.08 5.04 |4.83 81 |44 10 |13 4960 |4960 36.01 |57.19
+> Mixed Local 6.70 |2.93 1.61 |0.87 11.99 |10.87 0.67 |0.66 1.01 |0.99 1.06 |1.02 95 |95 95 |97 –|––|–Pose-CI 6.70 |2.93 1.61 |0.87 11.99 |10.87 0.67 |0.66 1.01 |0.99 1.06 |1.02 95 |95 95 |97 216 |216 16.44 |28.27
+> Joint-CI 6.67 |2.56 1.59 |0.62 11.52 |9.84 0.63 |0.41 0.89 |0.78 0.92 |0.83 99 |98 97 |98 48728 |48728 17.55 |29.66
+
+Metrics and units: RMSE R/RMSE Rf , robot/feature rotation RMSE ( 10 −2 rad ); RMSE x/RMSE f , robot/feature position RMSE ( m); NEES r ,robot pose NEES; NEES p, mean normalized marginal feature NEES (3-D point position or 6-D object pose); C95 ,r /C95 ,p , final-step robot-pose/mean marginal feature coverage (%); Payload, bytes; Time, fusion time (ms), both per communication direction and event. 
+
+Notation: G, General scenario; H, High-overlap scenario. – denotes an inapplicable entry. Bold red marks the lowest RMSE, NEES closest to one, and coverage closest to 95% within each local-estimator group. For payload and time, it marks the lowest value among all fusion methods. 
+
+common object estimates. A covariance assembled without these nonzero cross-covariance blocks is not guaranteed to upper-bound the actual error covariance. Joint-CI achieves this consistency by communicating the complete covariance of the correlated robot–feature partial state, whose payload grows quadratically with the number of common features but is independent of the local map size. Since any principal submatrix of a consistent covariance remains consistent (the Loewner order is preserved under congruence), any subset of common features can be selected while preserving first-order covariance consistency, with Pose-CI as the special case of the empty subset. This enables payload reduction through feature selection. The fusion time of Joint-CI remains comparable to that of the baselines. 
+
+C. Multi-robot network evaluation 1) Setting: In the Five-robot scenario, at least one com-munication edge is active during 49 .3% of the time steps, with an average of 20 .0 common features per edge event. The largest connected component contains at least three robots during 3.25% of the time steps. Joint-CI directly applies the multi-estimate partial-state CI update in (29). DInCIKFc-C first combines neighboring messages using FastCI and then fuses the resulting message with the local posterior using (28), following the two-stage structure in [27]. For a controlled comparison, Joint-FastCI applies the same two-stage structure to the coordinate-compatible joint messages. Following [27], the dataset-derived experiment divides the recorded camera trajectory into three 672-step segments, one per robot, with a 30% overlap. The robots communicate reciprocally every ten time steps over a fixed chain graph 
+
+1 ↔ 2 ↔ 3, where robot 2 fuses messages from both neighbors at every communication event. Odometry, object, and inter-robot observations are generated from the recorded ground-truth geometry and independently perturbed in each Monte Carlo trial, while the recorded frame-wise object availability is preserved. The noise covariances are Φ =diag(0 .01 2I3, 0.01 2I3), Ψo = diag(0 .05 2I3, 0.01 2I3), and 
+
+Ψkl = diag(0 .01 2I3, 0.01 2I3).
+
+2) Results: Table II evaluates the proposed construction in multi-neighbor settings. Across the Five-robot and dataset-derived experiments, Joint-CI reduces the average RMSE relative to Local while maintaining consistent, mildly conser-vative uncertainty estimates. Pose-CI increases the average RMSE while its uncertainty remains conservative, indicating a loss of information rather than overconfidence. A plausible cause is that each pose-only fusion discounts the entire local posterior, including the map, whereas new information enters only the pose. DInCIKFc-C achieves larger RMSE reductions relative to DIn-Local, but its larger NEES and lower coverage indicate overconfident uncertainty estimates. In the Five-robot experiment, Joint-FastCI closely matches direct Joint-CI, showing that the compatible joint messages also support two-stage neighbor aggregation. For the mixed map, Joint-CI exhibits the same overall behavior, supporting the same construction when point and object features are represented in a unified state. The main cost of Joint-CI is its larger communication payload. VI. C ONCLUSION 
+
+This paper presented Joint-CI for distributed RI-EKF SLAM with point, object, and mixed feature maps. A direct error mapping constructs a correlated robot–feature estimate with a covariance compatible with the receiving filter, after which standard partial-state CI can be applied without track-ing inter-robot correlations. The analysis establishes preser-vation of the gauge directions and first-order covariance con-sistency of communication and fusion given consistent local inputs. Across the simulations and the real-world dataset-based experiment, Joint-CI reduces RMSE relative to the corresponding local RI-EKF and achieves lower RMSE than Pose-CI while maintaining consistent, mildly conservative TABLE II FIVE -ROBOT SIMULATION AND YCB-V IDEO DATASET -DERIVED MONTE CARLO COMPARISON .Sc. Map Method RMSE R RMSE x RMSE Rf RMSE f NEES r NEES p C95 ,r C95 ,p Payload Time Five-R Object Local 2.46 ± 0.36 54 .45 ± 4.51 9.81 ± 1.98 44 .26 ± 6.62 1.00 1.06 94 93 – –Pose-CI 3.50 ± 0.79 88 .98 ± 31 .16 12 .02 ± 3.06 82 .47 ± 37 .31 0.81 0.87 99 99 231 51.12 Joint-CI 2.27 ± 0.35 48 .78 ± 4.77 9.16 ± 1.20 34 .00 ± 4.39 0.84 0.85 98 98 71134 44.27                                                                                                                                                                                                        
+
+> Joint-FastCI 2.27 ±0.34 48 .49 ±4.84 8.97 ±1.15 33 .85 ±4.26 0.85 0.90 98 97 71134 44.60 DIn-Local 2.76 ±0.38 61 .35 ±5.00 10 .14 ±2.03 49 .55 ±8.02 1.27 1.20 86 90 ––DInCIKFc-C 2.43 ±0.41 50 .72 ±7.09 8.57 ±1.10 31 .16 ±2.62 1.56 2.45 69 33 4803 51.40 Mixed Local 2.46 ±0.37 54 .58 ±4.70 9.42 ±1.41 44 .30 ±6.71 0.99 1.05 95 93 ––Pose-CI 3.64 ±0.89 92 .69 ±34 .34 11 .66 ±2.27 86 .53 ±40 .66 0.81 0.85 99 99 231 20.16
+> Joint-CI 2.28 ±0.35 49 .12 ±4.74 9.09 ±1.25 34 .33 ±4.40 0.83 0.85 99 97 42237 21.02 YCB-V Object Local 2.85 ±0.04 2.62 ±0.15 2.09 ±0.03 0.81 ±0.03 1.00 1.00 94 95 ––Pose-CI 2.91 ±0.15 2.69 ±0.15 2.43 ±0.61 1.10 ±0.49 0.84 0.82 95 97 288 1.39
+> Joint-CI 2.67 ±0.12 2.47 ±0.28 1.87 ±0.18 0.73 ±0.10 0.89 0.81 97 98 5301 1.60 DIn-Local 2.85 ±0.05 2.62 ±0.15 2.09 ±0.03 0.81 ±0.03 1.00 1.00 95 95 ––DInCIKFc-C 2.44 ±0.02 2.24 ±0.17 1.53 ±0.01 0.55 ±0.01 1.34 6.52 84 61461 1.55
+
+Five-R and YCB-V denote the Five-robot and YCB-Video scenarios. Position RMSEs are in centimeters; other units and highlighting follow Table I. RMSEs are reported as mean ± standard deviation across robots. The remaining entries are equally weighted averages across robots. 
+
+uncertainty under repeated information exchange. This im-provement requires transmitting the complete joint covari-ance and therefore incurs a larger communication payload. Future work will investigate communication-aware fusion scheduling and feature selection, as well as extensions to unknown initial relative robot poses with uncertain transfor-mations between local maps. REFERENCES [1] A. Cunningham, V. Indelman, and F. Dellaert, “Ddf-sam 2.0: Consis-tent distributed smoothing and mapping,” in 2013 IEEE International Conference on Robotics and Automation , 2013, pp. 5220–5227. [2] Y. Tian, Y. Chang, F. Herrera Arias, C. Nieto-Granda, J. P. How, and L. Carlone, “Kimera-multi: Robust, distributed, dense metric-semantic slam for multi-robot systems,” IEEE Transactions on Robotics , vol. 38, no. 4, pp. 2022–2038, 2022. [3] P.-Y. Lajoie and G. Beltrame, “Swarm-slam: Sparse decentralized collaborative simultaneous localization and mapping framework for multi-robot systems,” IEEE Robotics and Automation Letters , vol. 9, no. 1, pp. 475–482, 2024. [4] D. G´ alvez-L´ opez, M. Salas, J. D. Tard´ os, and J. Montiel, “Real-time monocular object slam,” Robotics and Autonomous Systems , vol. 75, pp. 435–449, 2016. [5] M. Sualeh and G.-W. Kim, “Simultaneous localization and mapping in the epoch of semantics: A survey,” International Journal of Control, Automation and Systems , vol. 17, pp. 729–742, 2019. [6] J. Mccormac, R. Clark, M. Bloesch, A. Davison, and S. Leuteneg-ger, “Fusion++: Volumetric object-level slam,” in 2018 International Conference on 3D Vision (3DV) , 2018, pp. 32–41. [7] L. Nicholson, M. Milford, and N. S¨ underhauf, “Quadricslam: Dual quadrics from object detections as landmarks in object-oriented slam,” 
+
+IEEE Robotics and Automation Letters , vol. 4, no. 1, pp. 1–8, 2019. [8] S. Yang and S. Scherer, “Cubeslam: Monocular 3-d object slam,” IEEE Transactions on Robotics , vol. 35, no. 4, pp. 925–938, 2019. [9] J. Wang, M. R¨ unz, and L. Agapito, “Dsp-slam: Object oriented slam with deep shape priors,” in 2021 International Conference on 3D Vision (3DV) , 2021, pp. 1362–1371. [10] Y. Wang, C. Jiang, and X. Chen, “Voom: Robust visual object odometry and mapping using hierarchical landmarks,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) , 2024, pp. 10 298–10 304. [11] M. Xu, Y. Song, Y. Chen, S. Huang, and Q. Hao, “Invariant ekf based 2d active slam with exploration task,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) , 2021, pp. 5350– 5356. [12] J. A. Castellanos, J. Neira, and J. D. Tard´ os, “Limits to the consistency of ekf-based slam,” IFAC Proceedings Volumes , vol. 37, no. 8, pp. 716–721, 2004. [13] S. Huang and G. Dissanayake, “Convergence and consistency anal-ysis for extended kalman filter based slam,” IEEE Transactions on Robotics , vol. 23, no. 5, pp. 1036–1049, 2007. [14] G. P. Huang, A. I. Mourikis, and S. I. Roumeliotis, “Analysis and improvement of the consistency of extended kalman filter based slam,” in 2008 IEEE International Conference on Robotics and Automation ,2008, pp. 473–479. [15] A. Barrau and S. Bonnabel, “An ekf-slam algorithm with consistency properties,” 2016. [Online]. Available: https://arxiv.org/abs/1510. 06263 [16] T. Zhang, K. Wu, J. Song, S. Huang, and G. Dissanayake, “Conver-gence and consistency analysis for a 3-d invariant-ekf slam,” IEEE Robotics and Automation Letters , vol. 2, no. 2, pp. 733–740, 2017. [17] Y. Song, Z. Zhang, J. Wu, Y. Wang, L. Zhao, and S. Huang, “A right invariant extended kalman filter for object based slam,” IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 1316–1323, 2022. [18] S. Julier and J. Uhlmann, “A non-divergent estimation algorithm in the presence of unknown correlations,” in Proceedings of the 1997 American Control Conference (Cat. No.97CH36041) , vol. 4, 1997, pp. 2369–2373 vol.4. [19] S. J. Julier and J. K. Uhlmann, “Using covariance intersection for slam,” Robotics and Autonomous Systems , vol. 55, no. 1, pp. 3–20, 2007. [20] L. C. Carrillo-Arce, E. D. Nerurkar, J. L. Gordillo, and S. I. Roumeliotis, “Decentralized multi-robot cooperative localization using covariance intersection,” in 2013 IEEE/RSJ International Conference on Intelligent Robots and Systems , 2013, pp. 1412–1417. [21] T.-K. Chang, K. Chen, and A. Mehta, “Resilient and consistent multirobot cooperative localization with covariance intersection,” IEEE Transactions on Robotics , vol. 38, no. 1, pp. 197–208, 2022. [22] J. Ajgl and M. ˇ Simandl, “On linear estimation fusion under unknown correlations of estimator errors,” IFAC Proceedings Volumes , vol. 47, no. 3, pp. 2364–2369, 2014. [23] N. R. Ahmed, W. W. Whitacre, S. Moon, and E. W. Frew, “Factorized covariance intersection for scalable partial state decentralized data fusion,” in 2016 19th International Conference on Information Fusion (FUSION) , 2016, pp. 1049–1056. [24] J. Trumpf, B. Zamani, and C. Manzie, “Conservative fusion of unbiased partial state estimates: Ci is optimal,” 2026. [Online]. Available: https://arxiv.org/abs/2507.16216 [25] J. Xu, P. Zhu, Y. Zhou, and W. Ren, “Distributed invariant extended kalman filter using lie groups: Algorithm and experiments,” IEEE Transactions on Control Systems Technology , vol. 31, no. 6, pp. 2777– 2789, 2023. [26] H. Li, X. Li, S. Huang, C. Yang, and J. Wu, “Covariance intersection-based invariant kalman filtering for distributed pose estimation,” in 
+
+2024 IEEE 63rd Conference on Decision and Control (CDC) , 2024, pp. 1993–1998. [27] H. Li, Q. Zeng, H. Li, Y. Zhang, and J. Wu, “Distributed invariant kalman filter for object-level multi-robot pose slam,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , 2025, pp. 15 835–15 841. [28] Y. Xiang, T. Schmidt, V. Narayanan, and D. Fox, “Posecnn: Aconvolutional neural network for 6d object pose estimation in cluttered scenes,” in Proceedings of Robotics: Science and Systems , Pittsburgh, Pennsylvania, June 2018.

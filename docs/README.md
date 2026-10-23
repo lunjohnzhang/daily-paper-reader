@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-22</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-23</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 2 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-22 22:52:38 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-23 22:23:51 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读 2 篇多智能体方向论文，暂无精读，聚焦实时世界模型与系统优化。最值得看的是《LiveAct》提出的实时多智能体世界模型与异构动作接口（7.0/10），其次是贝叶斯进化优化用于多智能体系统设计与调参（6.0/10）。普通读者可先读《LiveAct》把握实时世界模型思路，再按兴趣了解贝叶斯进化调优方法。</p>
+<p>今日精选 11 篇，精读 5 篇、速读 6 篇，聚焦多智能体与多机器人协调前沿。最值得看的是 Transformer 实时多智能体路径规划与多机器人“分散树协议”这两篇 9.0 分工作。普通读者可优先读这两篇精读，再扫一眼机器人世界模型与 96 台机器人集体经验学习两篇速读。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">5 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="A Transformer-based Approach for Real-time Multi-agent Path Planning with Varying Initial/Final Conditions">A Transformer-based Approach for Real-time Multi-agent Path Planning with Varying Initial/Final Conditions</span></li><li><span class="dpr-home-dashboard-paper-title" title="Dispersive Tree Agreements for Multi-Robot Coordination">Dispersive Tree Agreements for Multi-Robot Coordination</span></li><li><span class="dpr-home-dashboard-paper-title" title="Extending Harmonic Function Methods via Root Locus for Coordinated Path Generation">Extending Harmonic Function Methods via Root Locus for Coordinated Path Generation</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">2 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="LiveAct: Towards Real-Time Multi-Agent World Models with Heterogeneous Action Interfaces">LiveAct: Towards Real-Time Multi-Agent World Models with Heterogeneous Action Interfaces</span></li><li><span class="dpr-home-dashboard-paper-title" title="Design and Tuning of Multi-Agent Systems Using Bayesian Evolutionary Optimization">Design and Tuning of Multi-Agent Systems Using Bayesian Evolutionary Optimization</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Skeleton-Grounded Latent Action Model for Robot World Models">Skeleton-Grounded Latent Action Model for Robot World Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning from Fleet Experience: Collective Experience Learning Across 96 Robots">Learning from Fleet Experience: Collective Experience Learning Across 96 Robots</span></li><li><span class="dpr-home-dashboard-paper-title" title="SpecMAGIC: Specification-Guided Multi-Task Generalization in Multi-Agent Reinforcement Learning">SpecMAGIC: Specification-Guided Multi-Task Generalization in Multi-Agent Reinforcement Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 </div>
 

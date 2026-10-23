@@ -1,0 +1,277 @@
+Title: UniFlowWAM: A Unified World-Action Model with Visual Semantics and 4D Geometry
+
+URL Source: https://arxiv.org/pdf/2610.30991v1
+
+Published Time: Fri, 23 Oct 2026 01:10:44 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+## MVIG @SJTU R E S E A R C H P A P E R 
+
+# UniFlowWAM: A Unified World–Action Model with Visual Semantics and 4D Geometry 
+
+Jialin Tian 1,2,* , Zhuofan Li 1,3,* , Xinkai Wang 2,3 , Bokai Lin 1,2,3 , Chenyi Wang 2, Xinyu Zhan 1,Cewu Lu 1,2,3 , Lixin Yang B1,2,3 
+
+> 1
+
+MVIG@SJTU, 2Shanghai Innovation Institute, 3Noematrix 
+
+## Abstract 
+
+Robot demonstrations record what the robot saw and what it did. They do not specify how the 3D world changed in between. Scene-level 3D flow describes it by tracking 3D scene points, providing the world representation with 4D geometry. Prior work has used flow to improve robot policies. Flow served as an intermediate prediction that a separate model converts into actions, as a prior injected at inference time, or as an extra output learned together with the action. In all of these designs, flow stays outside the policy, as a separate module or as an extra prediction head. We introduce UniFlowWAM, a Unified World–Action Model that makes 3D scene flow a third modality on par with vision and action. Its world representation therefore covers both visual semantics, through future visual features, and 4D geometry, through 3D flow, and flow receives its own supervision. UniFlowWAM is a diffusion transformer with one expert per modality, and the three experts exchange information through joint attention. We train UniFlowWAM under a ten-objective role grid, where each objective assigns every modality exactly one of three roles, namely target, condition, or absent. The same model thus serves as a policy, as forward and inverse dynamics, and as a predictor of future visual features or 3D flow. We evaluate UniFlowWAM on RoboCasa-GR1, LIBERO, and LIBERO-Plus in simulation, and on four real-world bimanual manipulation tasks. On RoboCasa-GR1, UniFlowWAM raises the success rate of its base model without flow from 52.1% to 56.4%. It preserves in-distribution success on LIBERO at 98.1% and reaches 87.7% zero-shot on LIBERO-Plus. On the real robot, it achieves 87.0% average success, compared with 68.5% for the strongest baseline. 
+
+ Project Page: https://kksham111.github.io/UniFlowWAM_ProjectPage/ 
+
+## 1 Introduction 
+
+A robot manipulates objects by moving its own body. Its action labels only record the commands that its joints or end-effector execute. What those commands do to the scene is left unwritten. A mug pushed across the table and a mug lifted and set back down can end in the same pose. The action labels do not describe how the mug translates or rotates along the way. Among possible world representations in a world–action model, a goal image describes the resulting state, but not the transition. A video sequence captures this process visually, but does not describe how scene points move in 3D. Scene-level 3D flow  
+
+> ∗Equal contribution. BCorresponding author.
+> 1arXiv:2610.30991v1 [cs.RO] 22 Oct 2026
+
+UniFlowWAM visual 3D flow actions three-expert MM-DiT (×16) visual expert flow expert action expert joint self-attention over all streams policy visual prediction flow prediction inverse dynamics flow-cond. policy forward dynamics dynamics from flow visual flow estimation action-driven flow gen. dual-cond. inverse dyn. vvisual mflow aaction vvisual mflow aaction   
+
+> Condition: clean input Target: noised input, supervised output Absent: learned placeholder p(a | c) p(v | c) p(m | c) p(a | v, c) p(a | m, c) p(v | a, c) p(v | m, c) p(m | v, c) p(m | a, c) p(a | m, v, c) vma
+> UniFlowWAM
+
+Figure 1. UniFlowWAM overview : UniFlowWAM couples visual features, scene-level 3D flow, and actions in one three-expert diffusion transformer, denoising the three jointly so that 3D flow carries scene displacement into the space where actions are executed. A grid of ten objectives assigns each modality the role of target, condition, or absent, so a single model covers policy, dynamics, and prediction, yet deploys as a direct policy that needs no flow at test time. 
+
+makes the effects of robot commands on the scene explicit: it describes how each scene point is displaced in 3D over time, providing a 4D geometric representation of this process. Prior work has used scene-level flow to improve robot policies. Flow served as intermediate representations that were predicted first and then converted into actions in a separate stage [38, 42]. A learned 3D scene-flow prior sharpened a vision-language-action policy when injected at inference [34]. Concurrent work trains sparse 3D keypoint flow jointly with the action [18]. These results establish flow as a useful control signal and as a variable that can be learned with actions. Unified future-image–action models learn actions together with predictions of the future. UWM [50] and UVA [17] train the policy together with forward and inverse dynamics and visual forecasting, so that both action-labeled and actionless data contribute. Latent-dynamics variants adopt the features of a frozen visual encoder [29] as the future-state target and scale to large robotic datasets [24]. The same model learns both to anticipate the visual consequences of actions and to infer actions from future visual features. Those features capture the semantics in the future goal image, but do not explicitly describe how the 3D scene evolves to reach that state. We ask: can a pretrained visual–action model learn where the 3D points of the scene go, and, more importantly, does learning this improve the actions it predicts? 
+
+We explicitly supervise the 3D displacement of scene points, beyond the geometric state that depth-based targets supervise. We introduce UniFlowWAM , a Unified World–Action Model whose world representation joins future visual semantics from DINOv3 [29] with 4D geometry from scene-level 3D flow. Actions, visual semantics, and flow are co-equal modalities of one diffusion transformer. Following UWM [50] and UVA [17], we call the model unified , as one model that is trained jointly on the three modalities serves as a policy, as forward and inverse dynamics, and as a predictor of future world state. Unlike the flow-based policies above, flow here is neither a separate module nor a tracked input, but a modality inside the model. From the same demonstration clips used for policy learning, we extract point maps and scene flow offline with a monocular 3D tracker [22] and encode them with a frozen 4D VAE [51]. Each modality has its own expert, and the three exchange information only through shared joint attention. We add flow to a pretrained visual–action model during mid-training and post-training. The visual and action experts start from the pretrained weights, while the flow expert is trained from scratch. All three 
+
+2UniFlowWAM 
+
+experts are then trained jointly, so the pretrained representations adapt to the new modality. Each function of the model corresponds to one training objective. Ten objectives form a role grid, which assigns each modality the role of target , condition , or absent . With one target per objective, the grid covers all four combinations of flow and future visual features being present or absent for action prediction, and retains three objectives each for flow and visual prediction. This deliberate asymmetry design prioritizes the conditioning choices for the control variable. The four objectives without flow recover the pretrained model’s task set. Under the direct policy objective, the flow stream carries learned placeholders, so deployment requires no scene-flow extraction or flow encoding. We evaluate UniFlowWAM in simulation on RoboCasa-GR1 [25], LIBERO, and LIBERO-Plus, and on four real-world bimanual tasks. On RoboCasa-GR1, adding flow to the base model improves the average success rate by 4.3 percentage points. The gain is largest on the tasks where the base model is weakest (Sec. 4.2). On LIBERO, UniFlowWAM preserves in-distribution success at 98.1%, and it reaches 87.7% zero-shot on LIBERO-Plus under out-of-distribution perturbations. On the real robot, UniFlowWAM achieves an average success rate of 87.0%, compared with 68.5% for 𝜋 0.5 [27], the strongest baseline (Sec. 4.3). Ablations show where the flow objectives matter. On the real robot, post-training with the full ten-objective grid outperforms policy-only post-training by 12 to 18 points on every task, and the gap is largest on object placements at the edge of the demonstrated region. 
+
+Contributions. (i) We make scene-level 3D flow a co-equal modality of a unified visual–action model, added to a pretrained model through a dedicated expert and joint mid-training and post-training on the same demonstrations. (ii) We organize actions, 3D flow, and future visual features through ten role-conditioned objectives, allowing flow to serve as a target or a condition while retaining a direct policy that needs no flow input. (iii) We show manipulation gains on RoboCasa-GR1 and improved robustness on LIBERO-Plus while retaining in-distribution performance on LIBERO. 
+
+## 2 Related Work 
+
+Unified models for manipulation. Most robot foundation models scale behavior cloning over expert demonstrations [2, 3]. Some other models also learn to predict the future. VPP [12] conditions actions on the predicted future representations of a video diffusion model, and unified models such as UWM [50], UVA [17], and Motus [1] predict future observations jointly with actions. Recent work, including DINO-WM [49], FLARE [47], and LDA [24], predicts the features of a pretrained visual encoder instead of pixels. UniVLA [4] learns latent actions in such a feature space, so that videos without action labels can be used to pretrain the policy. SpatialVLA [28], MolmoAct [15], DreamVLA [45], and X-WAM [10] further use depth to provide 3D information about the scene. 
+
+From optical flow to scene-level 3D flow. Flow was classically estimated in 2D, between adjacent frames [30]. Such flow is limited to the pixel level, with no awareness of 3D geometry. Lifting flow to 3D requires per-pixel geometry, which feed-forward models such as VGGT [33] now recover from ordinary video. 3D point trackers such as SpatialTrackerV2 [37] estimate world-space tracks jointly with depth and camera motion. Track4World [22] and TrackingWorld [21] extend such tracking to nearly all pixels, while MotionCrafter [51] estimates dense geometry and 3D flow directly. Either route yields scene-level 3D flow from monocular video alone. These advances make 3D flow a practical training modality, rich in 3D information and cheap to obtain. 
+
+How flow is used in policies. In the most direct use, flow serves as an explicit interface between perception and control. NovaFlow [16] extracts 3D object flow from generated videos without training a flow predictor, 
+
+> 3
+
+UniFlowWAM language instruction current / future observation point map + scene flow proprio State action chunk DINOv3 encoder 4D VAE encoder action encoder three-expert MM-DiT ( x16 ) joint self-attention over the concatenated tokens of all three experts predicted future latent predicted 3D flow latent predicted action “put the two pens into the drawer and close it” Qwen3-VL-4B     
+
+> point map scene flow future latent
+> cross-attention visual expert flow expert action expert
+> action chunk robot platform
+
+Figure 2. Network architecture. Actions, scene-level 3D flow, and future visual features are three modalities of one diffusion transformer, each processed by its own expert; the experts exchange information only through joint self-attention. The objective decides which modalities are noised targets and which are clean conditions. Predicted flow latents are decoded by the 4D VAE into point maps and scene flow. 
+
+and plans actions from it. Im2Flow2Act [38] and PointAction [31] predict flow or point trajectories and convert them into actions with a separate module, so the predictor is trained without action labels and reused across embodiments. Flow can also be used inside a single policy. TraceVLA [46], MolmoAct [15], 3D Flow Diffusion Policy [26], and LaMP [34] condition the actions on tracked or predicted flow at inference. Other methods use flow as a training signal. FlowVLA [48] and Track4Action [32] use it as supervision and keep it out of policy inference. Concurrently, UMA [5] and ChronoFlow-Policy [18] learn 3D keypoint trajectories jointly with actions. 
+
+## 3 Method 
+
+UniFlowWAM models robot actions, scene-level 3D flow, and future visual features within a single multimodal diffusion transformer (MMDiT) [7] (Fig. 2). Building on the visual–action backbone of LDA [24], we introduce a dedicated expert for the 3D flow representation and train the model with 10 role-conditioned objectives. Each objective specifies a prediction target and the modalities available as conditions. 
+
+3.1 Problem Formulation 
+
+At time 𝑡 , the model receives the context 𝑐 𝑡 = (o𝑡 , s𝑡 , ℓ ): the visual observation, the proprioceptive state, and the language instruction. Three variables are defined over a horizon of 𝐻 frames. The action chunk a = a𝑡 :𝑡 +𝐻 is the command sequence, and the future visual feature v refers to the frozen DINOv3 feature [29] of the frame o𝑡 +𝐻 at the end of the horizon and serves as the visual-semantic part of the world representation. The 3D flow representation m summarizes how the scene moves over [𝑡, 𝑡 +𝐻 ] (Sec. 3.2). Every objective in Sec. 3.4 is one conditional of the joint 𝑝 (a, m, v | 𝑐 𝑡 ).
+
+4UniFlowWAM 
+
+3.2 Scene-Level 3D Flow Representation 
+
+The 3D flow is defined by the displacement of each point in the scene to the next frame and by the 3D position of that point, so that it also carries the structure of the scene. A pretrained dense 3D point tracker [22] produces this pair for the clip over [𝑡, 𝑡 +𝐻 ]. We take m to be the latent of a pretrained 4D VAE [51], which jointly encodes both the point map of the scene and the 3D flow. For frame 𝑖 and pixel 𝑢 , the tracker returns 𝑃 𝑖 (𝑢 ), the 3D point seen at that pixel, and 𝐹 𝑖 (𝑢 ), the displacement of that point to the next frame. Every frame is anchored on its own pixel grid, and no point is followed beyond the next frame. The 4D VAE uses two frozen encoders to separately encode the 3D position and displacement sequences, then concatenates their outputs along the channel dimension, 
+
+m = E𝑃 (𝑃 𝑡 :𝑡 +𝐻 ); E𝐹 (𝐹 𝑡 :𝑡 +𝐻 ), where the two components represent scene geometry and frame-to-frame flow, respectively. Its decoder D recovers both 𝑃 and 𝐹 from m, so a predicted m can be decoded and inspected. The pipeline is monocular. Flow is extracted from the same RGB videos used for training, so no depth sensor is needed for data collection or deployment. 
+
+3.3 Three-Expert Setup 
+
+From variables to tokens. Each of the three variables enters through its own mapping. Action tokens encode the action chunk and are prefixed by state tokens. A visual token carries two things at once: the DINOv3 features of the current frame, and the future-frame slot; a linear layer merges them, so the current observation is present under every objective. Flow arrives as the latent m, already encoded offline by the 4D VAE. A flow patchifier then cuts m into the tokens of the flow expert. The rest of the context enters as conditioning. The instruction and the current frame are encoded by the Qwen3-VL-4B vision–language model (VLM), and each expert reads the VLM outputs through cross-attention. 
+
+Within a modality, and across them. Each expert keeps its own normalization, its own Q/K/V projections, its own feed-forward network and its own AdaLN modulation, so no parameter is shared between modalities. They meet in joint self-attention. Writing ˆ 𝑥 𝑘 for the modulated tokens of modality 𝑘 ∈ { 𝑎, 𝑚, 𝑣 }, each expert projects its own queries, keys and values, (𝑄 𝑘 , 𝐾 𝑘 , 𝑉 𝑘 ) = 𝑊 𝑘 ˆ𝑥 𝑘 , with private weights 𝑊 𝑘 . Its queries then attend over the keys and values of all three. This is the one place where a modality sees the other two, and query–key normalization bounds its logits. Besides the learned absolute position embedding of the base model, added by sequence index, MM-RoPE [43] rotates the queries and keys of all three experts in one shared (𝑡, ℎ, 𝑤 ) frame over the horizon and the visual patch grid. A visual token takes 𝑡 = 𝐻 , the frame it predicts, and its patch position. Action and state tokens take their step or frame index, with (ℎ, 𝑤 ) = (0, 0). The flow patchifier merges two latent frames into each token, so the 𝑡 ′-th flow token takes 𝑡 = 2𝑡 ′, and the center of its latent cell is rescaled onto the visual patch grid. 
+
+From tokens back to variables. Each expert ends in its own head, which predicts a flow-matching velocity [19] in that modality’s own space, and therefore output DINO latent, Flow latent, or action latent. 
+
+3.4 Role-Conditioned Multi-Objective Learning 
+
+A visual–action model has four natural tasks. They come from choosing which of action and future visual features is the target and whether the other is given, namely policy 𝑝 (a | 𝑐 𝑡 ), forward dynamics 𝑝 (v | a, 𝑐 𝑡 ),inverse dynamics 𝑝 (a | v, 𝑐 𝑡 ), and visual prediction 𝑝 (v | 𝑐 𝑡 ) [50]. When we add the third modality, it naturally extends the set in the same way. An objective assigns each of the three modalities one of three roles. Target means the slot is noised and supervised. Condition means it holds a clean input, with its 
+
+> 5UniFlowWAM
+
+Table 1. The ten training objectives (Sec. 3.4).                                                                    
+
+> #Objective Fixed Cond. Abs. Tar. 1policy †𝑐 𝑡 –m,va
+> 2visual prediction †𝑐 𝑡 –a,mv
+> 3flow prediction 𝑐 𝑡 –a,vm
+> 4inverse dynamics †𝑐 𝑡 vma
+> 5flow-cond. policy 𝑐 𝑡 mva
+> 6forward dynamics †𝑐 𝑡 amv
+> 7dynamics from flow 𝑐 𝑡 mav
+> 8visual flow estimation 𝑐 𝑡 vam
+> 9action-driven flow generation 𝑐 𝑡 avm
+> 10 dual-cond. inverse dynamics 𝑐 𝑡 m,v–a
+> Fixed denotes the context 𝑐 𝑡 shared by all objectives. Cond. = Condition; Abs. = Absent; Tar. = Target. a,m, and vdenote action, 3D flow, and visual features, respectively. A dash indicates no modality assigned to that role. †marks the four tasks of the base model.
+
+flow-matching time fixed at the clean end. Absent means the slot holds a learned placeholder that remains visible to attention and indicates that the modality is not provided for the current objective. Table 1 lists the ten objectives we use, in three kinds. Three predict one modality from the context alone (rows 1–3), namely policy, visual prediction, and flow prediction. Six predict one modality with one other given (rows 4–9). For each target, they cover the two ways of conditioning on a single other modality. These nine are symmetric across the three modalities. The tenth conditions the action on both flow and visual features (row 10). We add it for the action alone, as action is the highlighted modality for downstream use. The objective is a learned embedding, added to the timestep embedding before AdaLN. Each training sample draws one objective. A task-balanced sampler keeps every objective present in each batch, and the loader skips the modalities that objective does not need. The loss is the flow-matching velocity loss, on target slots only, 
+
+L = Í𝑘 ∈𝑇 (𝑟 ) L (𝑘 ) 
+
+> FM
+
+, 𝑘 ∈ { 𝑎, 𝑚, 𝑣 }, (1) where 𝑟 indexes the objective, 𝑇 (𝑟 ) denotes its target set, and L (𝑘 ) 
+
+> FM
+
+is the flow-matching loss for expert 𝑘 .Condition slots receive clean inputs and no loss, and absent slots receive neither. 
+
+3.5 Training Strategy 
+
+We initialize the visual–action backbone from the publicly released pretrained checkpoint of LDA [24]. We then perform mid-training to incorporate scene-level 3D flow into the model, jointly optimizing the ten objectives in Sec. 3.4 over actions, future visual features, and 3D flow. This stage extends the pretrained visual–action model to support 3D flow as both a prediction target and a conditioning modality. The resulting model is subsequently post-trained on demonstrations from each downstream domain. 
+
+## 4 Experiments 
+
+Our experiments assess manipulation performance, robustness to distribution shifts, and the contribution of scene-level 3D flow. We evaluate UniFlowWAM on RoboCasa-GR1, LIBERO, and LIBERO-Plus in simulation, and on an ALOHA-style robot for real-world bimanual manipulation. 
+
+> 6UniFlowWAM
+
+4.1 Experimental Setup 
+
+Mid-training data. We use a filtered mixture of three public robot-demonstration datasets; all are robot-camera recordings. RoboCOIN [36] is a bimanual manipulation dataset collected on 15 robot platforms in residential, commercial, and industrial settings; we use 47,050 episodes from six of these platforms. RoboMIND 2.0 [11] is a dual-arm and mobile manipulation dataset collected on six robot embodiments; we use 140,231 episodes from three of them, including Franka and UR arms. MolmoAct2-BimanualYAM [8] is AllenAI’s teleoperated bimanual dataset collected on a single low-cost platform, the YAM arms; we use 27,162 episodes. The combined corpus covers ten embodiments, with 214,443 episodes and 133.0 million frames. We sample 16-step chunks at three-frame intervals, yielding around 42 million training windows. We extract scene-level 3D flow offline with frozen Track4World [22] and encode its point maps and flow into latents using a frozen MotionCrafter 4D VAE [51]. 
+
+Model and training. Starting from LDA’s released pretrained checkpoint [24], our model UniFlowWAM adds a dedicated 3D flow expert to the MMDiT backbone to incorporate flow as a third modality. Qwen3-VL-4B supplies visual–language conditioning through cross-attention, while DINOv3 provides visual prediction targets. Both encoders remain frozen during mid-training. We train on 48 NVIDIA H200 GPUs with a global batch size of 1,536. 
+
+4.2 Simulation Experiments  
+
+> 4.2.1 Benchmarks
+
+RoboCasa [25] targets everyday household tasks for generalist robots. We use its GR-1 tabletop tasks: 24 tasks for a GR-1 humanoid with dexterous hands, observed by a single egocentric camera and controlled through 29 joint dimensions across the arms, hands, and waist. Each task comes with 1,000 demonstrations, 24,000 in total, or 6.0 million frames and 83.6 hours at 20 fps. LIBERO [20] targets lifelong robot learning with a single Franka Panda arm. It contains 4 suites of 10 tasks each: Spatial varies the layout of the same objects, Object varies the objects to manipulate, Goal varies the goal within one scene, and Long collects long-horizon tasks. We use the no-noops release introduced by OpenVLA [13]. We evaluate in two settings. LIBERO itself is the in-distribution test. LIBERO-Plus [9] perturbs the same tasks along seven axes, camera viewpoint, robot initial state, language, lighting, background, sensor noise, and object layout, for 10,030 episodes in total. Following its official zero-shot protocol, we train only on LIBERO and evaluate on LIBERO-Plus.  
+
+> 4.2.2 Post-training and Results
+
+On RoboCasa-GR1, we train one model on all 24 tasks jointly. UniFlowWAM without mid-training starts from the released LDA pretrained checkpoint, and UniFlowWAM with mid-training starts from our mid-training checkpoint. Both follow a 500k-step cosine schedule with 5k warmup steps. The learning rate is 10 −4 for the action model and 10 −5 for the VLM, while DINOv3 remains frozen. We evaluate released and reproduced LDA checkpoints and both UniFlowWAM variants over 11 shared evaluation seeds (0–10), with 50 episodes per task and seed. UniFlowWAM achieves mean SRs of 54.84% without mid-training and 56.38% with mid-training (Table 2, bottom). Both exceed released LDA (52.11%) and reproduced LDA (52.76%). UniFlowWAM with mid-training improves over released LDA by 4.27 percentage points. The gain concentrates on the tasks where released LDA is weaker. On the 10 tasks where its mean SR is below 50%, UniFlowWAM with mid-training improves on all 10, by 6.47 percentage points on average; on the remaining 14 tasks the average gain is 2.71 points. 
+
+> 7
+
+UniFlowWAM 
+
+Table 2. Success rates (%) on RoboCasa-GR1 tabletop. 
+
+Comparison with published results 
+
+Model SR (%) ↑
+
+UWM [50] 14.2 GR00T-N1.6 [2] 47.6 StarVLA [6] 47.8 Being-H0.7 [23] 49.2 FLARE [47] 55.0 LDA-1B [24] 55.4 UniFlowWAM 58.9 †
+
+OpenWAM-𝛼 [35] 60.5 
+
+Repeated evaluation (seed 0–seed 10) 
+
+Model Average ± SD (%) ↑
+
+LDA (released) 52.11 ± 2.24 LDA (reproduced) 52.76 ± 1.16 UniFlowWAM w/o mid-training 54.84 ± 1.00 UniFlowWAM w/ mid-training 56.38 ± 1.47 
+
+> †: UniFlowWAM’s best result over evaluation seeds 0–10. Bold marks the best score in each block, underline the second best.
+
+Table 3. Success rates (%) on LIBERO and LIBERO-Plus.                                                                                                                   
+
+> Model LIBERO LIBERO-Plus Avg Cam. Robot Lang. Light Bg. Noise Layout Total OpenVLA-OFT [14] 97.1 56.4 31.9 79.5 88.7 93.3 75.8 74.2 69.6
+> 𝜋 0.5[27] 96.9 72.2 76.8 85.1 96.2 95.5 87.0 86.9 84.7 StarVLA-𝛼 [41] –48.7 63.4 86.8 95.8 94.6 75.0 80.2 77.8 Fast-WAM [44] 97.6 40.0 65.3 68.8 91.4 58.2 63.8 75.5 65.3 4D-WAM [40] 98.6 45.2 64.3 90.6 94.3 57.7 69.1 79.2 71.0 FLEX-𝜋 [39] 98.5 73.7 53.1 84.3 91.9 93.8 93.4 82.9 80.9 OpenWAM-𝛼 [35] 99.3 33.8 76.1 88.0 97.0 87.1 39.8 77.5 69.2 LaMP [34] 98.3 64.5 69.6 88.2 95.3 97.4 76.9 73.8 79.3 Track4Action [32] 97.0 76.6 60.7 87.1 96.3 96.1 88.4 78.7 82.3 LDA [24] 92.8 33.1 71.2 76.0 89.9 91.1 72.0 66.2 69.5 UniFlowWAM (ours) 98.1 96.9 66.0 87.4 98.0 87.3 98.1 81.7 87.7
+> Bold marks the best score in each column, underline the second best. –: not reported.
+
+On LIBERO, we post-train one model on the four suites jointly, for 120k steps by default, and evaluate it on LIBERO and, zero-shot without adaptation, on LIBERO-Plus. On LIBERO, UniFlowWAM reaches 98.05% average SR (Table 3). Leading methods already score 97–99% on this benchmark; at this level of success rate observed, a difference of one percentage point is not informative, and we report LIBERO only to verify that in-distribution performance is preserved. LIBERO-Plus separates the methods more clearly. UniFlowWAM reaches 87.65% with its best evaluated checkpoint, and Table 3 reports its success rates across all seven perturbation categories. The margin is widest under camera perturbations, where UniFlowWAM reaches 96.9%, against 76.6% for the strongest baseline in that category. 
+
+4.3 Real-World Experiments on ALOHA 
+
+Hardware. We use AgileX Cobot Magic, an ALOHA-style platform with two 6-DoF PiPER arms and parallel-jaw grippers. A top-mounted camera provides the main view, and two wrist cameras provide the wrist views. Both the proprioceptive state and the action command are 14-dimensional, with six joint positions and one gripper position per arm. 
+
+8UniFlowWAM Cabbage : put cabbage into pot and close lid 
+
+Chili : place green and chilies on the plate 
+
+Pen : put two pens in drawer and close it 
+
+Towel : Fold a rectangular towel into quarters.    
+
+> Grasp opposite edge midpoints with both arms. Lift the towel at the grasped midpoints Lower the towel to fold it in half Grasp a corner of the halved towel Fold it over to form a quarter-sized towel Pick up the first pen Place first pen into drawer Pick up the second pen Place second pen into drawer Hold the drawer unit steady Push the drawer closed Grasp the green chili Place the green chili on the plate Grasp the red chili Place the red chili on the plate Grasp the cabbage Place the cabbage into the pot Grasp the lid by its knob Cover the pot with the lid
+
+Figure 3. Real-world manipulation tasks. Instructions and scored milestones for four tasks: placing a cabbage in a pot and closing the lid, transferring two chilies onto a plate, placing two pens in a drawer and closing it, and folding a towel. 
+
+Demonstrations. We consider four tasks that differ in what they demand of the two arms (Fig. 3). Chili transfer repeats a single pick-and-place primitive, moving two chilies onto a plate. Cabbage transfer 
+
+chains distinct primitives instead of repeating one, placing a cabbage into a pot and then covering the pot with a lid. Pen manipulation adds an articulated object and asymmetric arm roles, as one arm holds the drawer steady while the other places two pens into it in succession, after which the drawer is pushed closed. Towel folding replaces the rigid objects with a deformable one that has no pose to track, requiring two successive folds. After preprocessing, we retain 50 demonstrations per task and post-train a separate model for each task. At inference, each model uses the policy mode to predict 16-step action chunks. 
+
+Evaluation. For model with full objective setup as our default model, each policy is evaluated for 50 trials per task. We fix the starting conditions in advance instead of drawing them at random. Within a task we change one thing at a time, in equal steps. For chili transfer we keep the chili at the same spot on the table and turn it about the vertical axis to five fixed orientations. Each orientation is run the same number of times, and the plate position varies slightly across trials. The other three tasks follow the same idea along the factor that matters for them. All conditions stay inside the area the demonstrations cover. Every policy sees the same starting conditions, so the differences we report come from the policies and not from where the objects happened to start. We report full-task success rate and a process score, the fraction of milestones completed, scaled to 100. The milestones are those in Fig. 3, four for cabbage (grasp, place in pot, grasp lid, close) and chili (grasp and place each chili), six for pen (pick and place each pen, support the drawer with the right gripper, push it closed), and five for towel (grasp, lift, fold in half, fold again, press flat). Milestones are scored independently, so a trial that fails one but recovers on a later one still 
+
+9UniFlowWAM LDA DreamZero 𝜋 0.5 UniFlowWAM (ours) success rate process score 
+
+020 40 60 80 100 Score Chili Cabbage Towel Pen    
+
+> 20 22.5 40 42.5 70 76 94 96.5 810.5 10 12 64 80 80 92.5 16 18 30 36 72 76.8 84 88 18 20 40 47.5 68 75.3 90 92.3
+
+Figure 4. Results of real-world manipulation on ALOHA. Solid bars give the full-task success rate; the lighter dashed segment extends to the process score, the fraction of ordered milestones completed (Fig. 3), scaled to 100. 50 trials per task and policy. 0% 10% 20% 30% 
+
+616 11 35 22 10  
+
+> −90° −60° −30° 0° 30° 60° train edge
+
+Figure 5. Demonstration coverage on two real-robot tasks. Left: chili transfer, with coverage measured over the chili’s rotation angle: 0 ◦ is lengthwise, ±90 ◦ sideways. Right: pen manipulation, with coverage measured over the pen’s placement in the top camera. The red box spans the initial pen positions of all 49 demonstrations; the blue band is its boundary, where demonstrations are naturally sparse. 
+
+earns credit for the later one. Both metrics are averaged over trials, then over tasks. 
+
+Task performance. UniFlowWAM reaches 87.0% average success with a process score of 92.3, against 68.5% and 77.0 for 𝜋 0.5, 30.0% and 34.5 for DreamZero, and 15.5% and 17.8 for LDA (Fig. 4). It is the strongest policy on every task. The two metrics also separate the failure modes. Averaged over the trials it does not complete, UniFlowWAM still earns 41 of 100 milestone points and 𝜋 0.5 earns 27, whereas LDA earns 3, so LDA tends to fail at the first milestone rather than partway through. The failure for LDA comes from severe arm tremor. Our reproduced LDA shakes strongly during execution, so the arm often knocks the object away before the gripper closes, and the trial rarely recovers. The two metrics diverge most on cabbage transfer. Its first two milestones handle the cabbage and the last two handle the lid. The round cabbage can roll out of the gripper while the lid is still grasped and closed, so UniFlowWAM succeeds on 80% of trials yet completes 92.5% of the milestones. 
+
+4.4 Ablation Studies 
+
+Post-training objectives. We first ask what the objective grid contributes on its own, varying the objectives used in LIBERO post-training while holding the mid-trained initialization and the demonstration data fixed. The four variants form a nested ladder. The full grid uses all ten objectives, with 3D flow as both a target and a condition. The flow-as-condition variant drops the three objectives that predict flow and keeps the other seven. The no-flow variant also drops flow conditioning and keeps the four visual–action objectives of the base model. Policy-only training keeps the single action-prediction objective. Every 
+
+> 10 UniFlowWAM
+
+Table 4. Objective ablations on ALOHA (success rate, %).                
+
+> Training objectives Chili Pen Towel obj-1: policy only 76 76 72 obj-4: without flow objectives 92 80 76 obj-7: flow as condition only 92 88 76 obj-10: full UniFlowWAM 94 90 84
+> The three ablation rows are measured over 25 trials per task. The obj-10 row below the rule is the main experiment, measured over 50 trials, and is the run reported in Fig. 4. The obj-4 variant retains the four visual–action objectives and omits all 3D flow objectives. The obj-7 variant adds three objectives that use 3D flow as a condition but never as a prediction target. These variants change the post-training objectives while retaining the model architecture, and all of them deploy without flow input.
+
+variant acts through the direct policy objective and takes no flow input at test time, so the differences come from training rather than from the inference path. All four objective sets are first post-trained on the same 120k-step schedule. The reduced sets level off within this budget, whereas the full ten-objective grid is still improving at 120k steps. We therefore extend the full grid alone to a 200k-step schedule, and at 170k steps it reaches 87.0% on LIBERO-Plus. More objectives thus call for a longer schedule rather than lowering the attainable success rate. Because the simulated benchmark separates the objective sets mainly by training speed, we compare them on the real robot below, where at equal training steps the full grid clearly outperforms policy-only training. 
+
+Objectives on the real robot. On the real robot, the four variants differ noticeably in success rate (Table 4). Policy-only post-training reaches 76% on chili transfer, 76% on pen manipulation, and 72% on towel folding, while the full ten-objective grid reaches 94%, 90%, and 84%, a gain of 12 to 18 points on every task. The no-flow variant, which keeps the four visual–action objectives, closes most of this gap on chili transfer (92%), but the gap largely remains on pen manipulation (80%), where the two variants that use 3D flow reach 88% and 90%. On all three tasks, success rate improves overall as objectives are added. Relative to the no-flow variant, the 3D flow objectives add 10 points on pen manipulation and 8 on towel folding, the two more demanding tasks, but only 2 on chili transfer, the simplest one. 
+
+Where the failures fall. The losses concentrate in one place. Chili transfer splits its trials evenly into five orientation groups, and 4 of the 6 failures of policy-only post-training fall in the sideways 90 ◦ group alone. In that group, policy-only post-training succeeds in only 1 of its 5 trials, a success rate of 20%, against 76% over the whole task. The full grid succeeds in 80% of its trials in the same group. Although the group contains few trials, a gap of 20% against 80% is large enough that we read it as a real difference rather than as sampling noise. Why that group is hard is visible in the training data. Fig. 5 shows that the demonstrations are far from uniform. Most chili grasps cluster near the lengthwise placement, so the sideways orientation is the condition the model has seen least, and it is where policy-only post-training fails most. In the pen demonstrations, most pens start in the middle of a compact region, and few start near its edge. When the pens start near this edge, policy-only post-training succeeds less often. The two variants differ in one respect. Policy-only post-training never sees 3D flow, neither as a conditioning input nor as a prediction target, whereas the full grid uses it as both. Initialization, data, schedule, and the deployment path are identical, and neither takes flow as input at test time, so the difference at the edge of the demonstrated region is attributable to the flow objectives themselves. 
+
+Position encoding. Removing MM-RoPE lowers LIBERO-Plus at every evaluated checkpoint, by 1.1–2.8 points and by 2.5 at the best checkpoint, with the loss concentrated under robot-initial-state perturbations. 
+
+> 11 UniFlowWAM
+
+Removing the absolute embedding costs 1.5 points at the best checkpoint and up to 4.4 at matched steps, with the gap narrowing as training proceeds. We keep both. Observation and flow tokens lie on the image grid, while action tokens have no image location. We tested two placements for the action tokens, the grid origin and the grid center. The origin is better by less than one point in the best LIBERO success rate. We therefore adopt the grid origin, while considering the difference between the two placements to be small. 
+
+4.5 Discarded Designs 
+
+While developing joint training with 3D flow, we tried several designs that did not work well. The two below were not run as controlled ablations, but each bears on a natural design choice. 
+
+Encoding flow with an image VAE. Im2Flow2Act [38] wrote 2D point tracks into image channels and encoded them with a Stable Diffusion autoencoder. Our first version extended this idea to 3D. It mapped the displacement (Δ𝑥, Δ𝑦, Δ𝑧 ) of each tracked point, relative to its position in the first frame of the clip, directly to the R, G, and B channels and encoded the result with the frozen SDXL image VAE. The VAE reconstructs these images faithfully, and the flow denoising loss decreases normally. The generated flow, however, is nearly the same for every input, so the model has collapsed to an average flow over the dataset. Revising the training data and the patch embedding reduced the collapse but never produced usable flow. We later replaced the image VAE with the 4D VAE of MotionCrafter [51], which is trained on geometry and flow. 
+
+Gating the flow modality. To preserve what the LDA backbone learned in pretraining, we first admitted flow gradually through a per-layer gate on the attention logits from the existing tokens to the flow tokens. The gate starts closed and opens on a fixed fast or slow schedule. On RoboCasa-GR1, neither schedule helps. The faster one trails the ungated model by 3.3 points in mean success rate over 21 seeds. All later experiments, including every UniFlowWAM result in this paper, therefore use no gate. 
+
+## 5 Limitations 
+
+Flow tracking noise and representation shift. We use Track4World to generate offline 3D flow pseudo-labels from demonstration videos. These labels can contain temporal inconsistencies, such as an isolated reversal of flow direction within a continuous trajectory. In our pipeline, we use SAM-based segmentation to separate the manipulation foreground from the background and retain only foreground 3D flow for latent encoding. The pretrained 4D VAE [51] remains effective at compressing these foreground-only inputs. 
+
+Limited flow pretraining. Our 3D flow mid-training uses approximately 1,200 hours of demonstrations, substantially less than the EI-30k corpus used for LDA pretraining [24]. The added flow expert has not been pretrained alongside the visual–action backbone on that scale. As tracking models continue to improve, flow extraction is expected to become faster and more accurate, making flow easier to scale for robot training in the same way as video. We leave larger-scale joint pretraining to future work. 
+
+## References    
+
+> [1] H. Bi, H. Tan, S. Xie, Z. Wang, S. Huang, H. Liu, R. Zhao, Y. Feng, C. Xiang, Y. Rong, et al. Motus: A unified latent action world model. In CVPR , 2026. [2] J. Bjorck, F. Castañeda, N. Cherniadev, X. Da, R. Ding, L. Fan, Y. Fang, D. Fox, F. Hu, S. Huang, et al. GR00T N1: An open foundation model for generalist humanoid robots. arXiv:2503.14734 , 2025. [3] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, et al.
+> 𝜋 0: A vision-language-action flow model for general robot control. In RSS , 2025.
+> 12 UniFlowWAM
+
+[4] Q. Bu, Y. Yang, J. Cai, S. Gao, G. Ren, M. Yao, P. Luo, and H. Li. Learning to Act Anywhere with Task-centric Latent Actions. In RSS , 2025. [5] Y. Cao, S. Liu, C. Feng, M. Zhang, X. Lu, A. Owens, and K. Fang. Unified motion-action modeling for heterogeneous robot learning. arXiv:2606.16917 , 2026. [6] S. Community. StarVLA: A Lego-like codebase for vision-language-action model developing. 
+
+arXiv:2604.05014 , 2026. [7] P. Esser, S. Kulal, A. Blattmann, R. Entezari, J. Müller, H. Saini, Y. Levi, D. Lorenz, A. Sauer, F. Boesel, et al. Scaling rectified flow transformers for high-resolution image synthesis. In ICML , 2024. [8] H. Fang, J. Duan, D. Clay, S. Wang, S. Liu, W. Huang, X. Fan, W.-C. Tsai, S. Chen, Y. R. Wang, et al. MolmoAct2: Action reasoning models for real-world deployment. In CoRL , 2026. [9] S. Fei, S. Wang, J. Shi, Z. Dai, J. Cai, P. Qian, L. Ji, X. He, S. Zhang, Z. Fei, et al. LIBERO-Plus: A Progressive Robustness Benchmark for Visual-Language-Action Models. In CVPR , 2026. [10] J. Guo, Q. Li, P. Li, Z. Chen, N. Sun, Y. Su, H. Wang, Y. Zhang, X. Li, and H. Liu. Unified 4D world action modeling from video priors with asynchronous denoising. arXiv:2604.26694 , 2026. [11] C. Hou, K. Wu, J. Liu, Z. Che, D. Wu, F. Liao, G. Li, J. He, Q. Feng, Z. Jin, et al. RoboMIND 2.0: A multimodal, bimanual mobile manipulation dataset for generalizable embodied intelligence. arXiv:2512.24653 ,2025. [12] Y. Hu, Y. Guo, P. Wang, X. Chen, Y.-J. Wang, J. Zhang, K. Sreenath, C. Lu, and J. Chen. Video prediction policy: A generalist robot policy with predictive visual representations. In ICML , 2025. [13] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, et al. OpenVLA: An open-source vision-language-action model. In CoRL , 2024. [14] M. J. Kim, C. Finn, and P. Liang. Fine-tuning vision-language-action models: Optimizing speed and success. In RSS , 2025. [15] J. Lee, J. Duan, H. Fang, Y. Deng, S. Liu, B. Li, B. Fang, J. Zhang, Y. R. Wang, S. Lee, et al. MolmoAct: Action reasoning models that can reason in space. In ICRA , 2026. [16] H. Li, L. Sun, Y. Hu, D. Ta, J. Barry, G. Konidaris, and J. Fu. NovaFlow: Zero-shot manipulation via actionable flow from generated videos. In ICRA , 2026. [17] S. Li, Y. Gao, D. Sadigh, and S. Song. Unified Video Action Model. In RSS , 2025. [18] B. Lin, Y. Xu, X. Zhan, H. Fang, J. Tian, F.-C. Zhang, Y.-L. Li, C. Lu, and L. Yang. ChronoFlow-Policy: Unifying past-current-future interaction flow in visuomotor policy learning. In ECCV , 2026. [19] Y. Lipman, R. T. Chen, H. Ben-Hamu, M. Nickel, and M. Le. Flow matching for generative modeling. In 
+
+ICLR , 2023. [20] B. Liu, Y. Zhu, C. Gao, Y. Feng, Q. Liu, Y. Zhu, and P. Stone. LIBERO: Benchmarking knowledge transfer for lifelong robot learning. In NeurIPS , 2023. [21] J. Lu, W. Xiong, J. Deng, P. Li, T. Huang, Z. Dou, C. Lin, S.-K. Yeung, and Y. Liu. TrackingWorld: World-centric monocular 3D tracking of almost all pixels. In NeurIPS , 2025. [22] J. Lu, J. Xu, W. Hu, R. Zhu, C. Zhao, S.-K. Yeung, Y. Shan, and Y. Liu. Track4World: Feedforward world-centric dense 3D tracking of all pixels. In ECCV , 2026. [23] H. Luo, W. Zhang, Y. Feng, S. Zheng, H. Xu, C. Xu, Z. Xi, Y. Fu, and Z. Lu. Being-H0.7: A latent world-action model from egocentric videos. arXiv:2605.00078 , 2026. [24] J. Lyu, K. Liu, X. Zhang, H. Liao, Y. Feng, W. Zhu, T. Shen, J. Chen, J. Zhang, Y. Dong, et al. LDA-1B: Scaling latent dynamics action model via universal embodied data ingestion. In RSS , 2026. [25] S. Nasiriany, A. Maddukuri, L. Zhang, A. Parikh, A. Lo, A. Joshi, A. Mandlekar, and Y. Zhu. RoboCasa: Large-Scale Simulation of Household Tasks for Generalist Robots. In RSS , 2024. [26] S. Noh, D. Nam, K. Kim, G. Lee, Y. Yu, R. Kang, and K. Lee. 3D flow diffusion policy: Visuomotor policy learning via generating flow in 3D space. arXiv:2509.18676 , 2025. [27] Physical Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, et al. 𝜋 0.5: a vision-language-action model with open-world generalization. In CoRL , 2025. 
+
+> 13 UniFlowWAM
+
+[28] D. Qu, H. Song, Q. Chen, Y. Yao, X. Ye, Y. Ding, Z. Wang, J. Gu, B. Zhao, D. Wang, et al. SpatialVLA: Exploring Spatial Representations for Visual-Language-Action Models. In RSS , 2025. [29] O. Siméoni, H. V. Vo, M. Seitzer, F. Baldassarre, M. Oquab, C. Jose, V. Khalidov, M. Szafraniec, S. Yi, M. Ramamonjisoa, et al. DINOv3. arXiv:2508.10104 , 2025. [30] Z. Teed and J. Deng. RAFT: Recurrent all-pairs field transforms for optical flow. In ECCV , 2020. [31] M. Tong, H. Jiang, Q. Feng, L. Liu, and J. Gu. PointAction: 3D points as universal action representations for robot control. arXiv:2606.03943 , 2026. [32] C. Wang, X. Wang, B. Lin, J. Tian, F. Zhang, C. Lu, and L. Yang. Track4Action: Distilling world-centric 3D tracker into vision-language-action policies. arXiv:2608.03727 , 2026. [33] J. Wang, M. Chen, N. Karaev, A. Vedaldi, C. Rupprecht, and D. Novotny. VGGT: Visual geometry grounded transformer. In CVPR , 2025. [34] X. Wang, C. Wang, Y. Xu, M. Ye, F. Zhang, J. Tian, X. Zhan, L. Zhu, C. Lu, and L. Yang. LaMP: Learning Vision-Language-Action Policy with 3D Scene Flow as Latent Motion Prior. In ECCV , 2026. [35] Y. Wang, S. Huang, M. Li, C. Zhang, J. Liang, W. Jin, Y. Chen, X. Chi, D. Zhou, Q. Yu, et al. OpenWAM: An open, modular exploration towards systematic world-action model pretraining. arXiv:2609.07398 , 2026. [36] S. Wu, X. Liu, S. Xie, P. Wang, X. Li, B. Yang, Z. Li, K. Zhu, H. Wu, Y. Liu, et al. RoboCOIN: An open-sourced bimanual robotic data collection for integrated manipulation. arXiv:2511.17441 , 2025. [37] Y. Xiao, J. Wang, N. Xue, N. Karaev, Y. Makarov, B. Kang, X. Zhu, H. Bao, Y. Shen, and X. Zhou. SpatialTrackerV2: Advancing 3D Point Tracking with Explicit Camera Motion. In ICCV , 2025. [38] M. Xu, Z. Xu, Y. Xu, C. Chi, G. Wetzstein, M. Veloso, and S. Song. Flow as the cross-domain manipulation interface. In CoRL , 2024. [39] G. Yan, J. Liu, Y. Fan, L. Cai, M. Liao, J. Zhang, and D. Fox. Flex-𝜋 : A multi-stream world-action model with compute flexibility. arXiv:2608.10860 , 2026. [40] L. Yang, W. Song, X. Wang, P. Sheng, Z. Fang, Z. Zhou, J. He, H. Yan, J. Chen, N. Sun, et al. 4D-WAM: Infusing spatiotemporal awareness into world action models through trajectory fields. arXiv:2608.08023 , 2026. [41] J. Ye, N. Gao, S. Yang, J. Zheng, Z. Wang, Y. Chen, P. Chen, Y. Chen, S. Liu, and J. Jia. StarVLA-𝛼 : Reducing complexity in vision-language-action systems. In ECCV , 2026. [42] C. Yuan, C. Wen, T. Zhang, and Y. Gao. General flow as foundation affordance for scalable robot learning. In 
+
+CoRL , 2024. [43] H. Yuan, W. Chen, J. Cen, H. Yu, J. Liang, S. Chang, Z. Lin, T. Feng, P. Liu, J. Xing, et al. Lumos-1: On Autoregressive Video Generation with Discrete Diffusion from a Unified Model Perspective. In ICLR , 2026. [44] T. Yuan, Z. Dong, Y. Liu, and H. Zhao. Fast-WAM: Do world action models need test-time future imagination? 
+
+arXiv:2603.16666 , 2026. [45] W. Zhang, H. Liu, Z. Qi, Y. Wang, X. Yu, J. Zhang, R. Dong, J. He, H. Wang, Z. Zhang, et al. DreamVLA: A vision-language-action model dreamed with comprehensive world knowledge. In NeurIPS , 2025. [46] R. Zheng, Y. Liang, S. Huang, J. Gao, H. Daumé III, A. Kolobov, F. Huang, and J. Yang. TraceVLA: Visual trace prompting enhances spatial-temporal awareness for generalist robotic policies. In ICLR , 2025. [47] R. Zheng, J. Wang, S. Reed, J. Bjorck, Y. Fang, F. Hu, J. Jang, K. Kundalia, Z. Lin, L. Magne, et al. FLARE: Robot learning with implicit world modeling. In CoRL , 2025. [48] Z. Zhong, H. Yan, J. Li, X. Liu, X. Gong, T. Zhang, W. Song, J. Chen, X. Zheng, H. Wang, et al. FlowVLA: Visual chain of thought-based motion reasoning for vision-language-action models. arXiv:2508.18269 , 2025. [49] G. Zhou, H. Pan, Y. LeCun, and L. Pinto. DINO-WM: World models on pre-trained visual features enable zero-shot planning. In ICML , 2025. [50] C. Zhu, R. Yu, S. Feng, B. Burchfiel, P. Shah, and A. Gupta. Unified world models: Coupling video and action diffusion for pretraining on large robotic datasets. In RSS , 2025. [51] R. Zhu, J. Lu, W. Hu, X. Han, J. Cai, Y. Shan, and C. Zheng. MotionCrafter: Dense geometry and motion reconstruction with a 4D VAE. In CVPR , 2026.

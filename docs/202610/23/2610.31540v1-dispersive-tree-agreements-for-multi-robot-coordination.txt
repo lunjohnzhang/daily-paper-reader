@@ -1,0 +1,2278 @@
+Title: Dispersive Tree Agreements for Multi-Robot Coordination
+
+URL Source: https://arxiv.org/pdf/2610.31540v1
+
+Published Time: Fri, 23 Oct 2026 01:37:16 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+> 1
+
+# Dispersive Tree Agreements for Multi-Robot Coordination 
+
+Shashank A. Deshpande, Blake T. Edwards, and Jonathan P. How 
+
+Abstract —Multi-robot coordination of nonlinear systems is naturally formulated as joint-space optimal control subject to constraints over groups of robots. Existing methods that approach joint optimality remain largely centralized, offline, and confined to collision-free motion planning, while decentralized, real-time counterparts target safe navigation without pursuing the joint optimum. This paper develops a decentralized, real-time planner that approaches the joint optimum as an anytime process. We extend a recent single-robot framework that searches dispersive trees of forward-propagated commands for differentially flat systems to coordinate a multi-robot team near-optimally. We first show that the inter-robot coupling can be effectively replaced by some local constraints, under which locally grown dispersive trees contain a near-optimal agreement. It is this structure that the robots pursue by decentralized column generation, negotiating rents on the shared space that guide the search of each robot’s tree. The negotiation settles on an agreement whose near-optimality is certified at quiescence. Our protocol, WarpWeaver, implements this negotiation as an asynchronous real-time loop over a receding horizon, and demonstrates effective closure to quiesced agreements even when real-time deadlines cut the negotiation short. In simulation, WarpWeaver reduces total travel time by up to 22% 
+
+against centralized offline planners on the Dynobench suite and by up to 37% against a decentralized real-time baseline, and nearly doubles the success rate of a task-specific planner on graph connectivity. Hardware experiments on six robots planning onboard demonstrate real-world implementability. 
+
+Index Terms —Multi-robot systems, path planning for multiple mobile robots or agents, distributed robot systems, optimization and optimal control, planning, scheduling and coordination. 
+
+I. I NTRODUCTION 
+
+This paper addresses the coordination of a team of robots with differentially flat nonlinear dynamics, formulated as optimal control in the joint space of the team subject to constraints over groups of robots. We seek control inputs whose cost lies near the joint optimum, via distributed computation across the robots in real time, to maintain robustness to changes in the individual objectives of the robots as well as in the dynamics of the environment. Existing approaches to this problem divide broadly into centralized, offline planners with guarantees of asymptotic optimality, and real-time decentralized planners that work with simplified dynamics, without pursuing the joint optimum. A range of centralized planners derive from multi-agent path finding [1] and handle pairwise conflicts in a high-level search on top of low-level single-robot planners running model predictive control [2], sampling-based planning [3], or search 
+
+The authors are with the Department of Aeronautics and Astronautics, Massachusetts Institute of Technology, Cambridge, MA 02139, USA (e-mail: croshank@mit.edu; blakete@mit.edu; jhow@mit.edu). 
+
+Fig. 1. (a) Iterated Best Response, F = 7 .5 + 10 .0 = 17 .5 s, vs. (b) Dispersive Tree Agreement, F = 8 .0 + 5 .5 = 13 .5 s, where the total travel time F sums the arrival times of the blue and red robots. 
+
+over graphs of discontinuity-bounded motion primitives [4–6]. Sampling-based planners search the composite configuration space of the team [7, 8]. These planners provide asymptotic guarantees of completeness or optimality, and focus on motion planning with pairwise separation. Decentralized planning, on the other hand, comes with real-time advantages such as robustness to changes in the individual objectives or in the environment. Decentralized trajectory optimization involves high-frequency replanning of safe splines around the incumbents communicated by peer robots, while often simplifying the robots’ dynamics [9–14]. Consensus-based distributed optimization instead lets the robots negotiate, with gradient-based local optimization driven by penalties on mutual disagreement [15, 16]. Coordination across these methods, however, often settles in local optima, without pursuing the joint optimum. In summary, real-time multi-robot coordination deals with multiple sources of complexity. First, planning and control at the level of a single robot must respect the nonlinear dynamics of its control system. In addition, these control trajectories must coordinate to satisfy various constraints over groups of robots while evading the many local minima of the joint problem. Finally, the algorithm that addresses these challenges must arXiv:2610.31540v1 [cs.RO] 22 Oct 2026 2
+
+decentralize across the robots under limited communication and maintain robustness to communication delays within the team. While existing approaches handle this complexity in part, this paper develops a decentralized framework that tackles each of its sources in unison. We employ dispersive forward tree search [17], which finds near-optimal control inputs for differentially flat systems, for single-robot planning and control. To solve coordination, we first show that the coupling among the robots can be absorbed into suitable constraints on each robot alone, so that tractably sized dispersive trees grown locally by the robots jointly contain a near-optimal agreement. It is this structure that the remainder of our development pursues. We formulate the selection of this joint agreement as an integer linear program and approach its solution by column generation [18, 19], in which the dual of its linear relaxation sets rents on the shared space. Under these rents, the search for a new column becomes a single-robot problem that each robot solves near-optimally with its own dispersive forward tree. Notably, this column generation procedure is effectively decentralized, to distribute the computational load of the process across the robots while limiting communication within the team to a manageable amount. We show that the resulting process implements an anytime negotiation whose agreement is certified near-optimal once it reaches quiescence, up to the resolution of the search and a gap that the agents compute online. This development culminates in WarpWeaver, the real-time multi-robot planner that we propose, which runs the negotiation asynchronously across the team over a receding horizon and remains robust to bounded communication delays. Our experiments thereby demonstrate that this negotiation, driven by decentralized column generation, is a pattern well suited to real-time multi-robot coordination, as the agreements that it commits within real-time deadlines come close in cost to those that it reaches when given time to quiesce. In summary, this paper makes the following contributions. 
+
+• Joint optimal control as distributed dispersive forward search. We cast a broad class of multi-robot coordination problems as joint-space optimal control of differentially flat nonlinear systems, and prove that suitably constrained, locally grown dispersive forward trees contain a near-optimal agree-ment (Proposition 1). 
+
+• Decentralized column generation. We pursue this structure by decentralized column generation under limited communica-tion, in which rents on the shared space guide the tree search of each robot, and prove that the negotiated agreement is certified near-optimal at quiescence, relative to the joint solutions robust at the search resolution (Proposition 4 and Theorem 2). 
+
+• Real-time protocol. We develop WarpWeaver, an asyn-chronous protocol that runs decentralized column generation over a receding horizon onboard each robot, to coordinate the team in real time under bounded communication delays, whose agreements within real-time deadlines come close in cost to quiesced ones. 
+
+• Evaluation and hardware experiments. We benchmark WarpWeaver in simulation against centralized offline, decen-tralized real-time, and task-specific planners. It reduces total travel time by up to 22% against centralized offline planners on Dynobench and by up to 37% against a decentralized real-time baseline. Further, on a graph connectivity task, it nearly doubles the success rate of a task-specific planner. We further deploy it on a team of six robots, each planning onboard in real time. The remainder of this paper is organized as follows. Sec-tion II reviews related work. Section III formulates the joint op-timal control problem and its flat reformulation, and Section IV reviews dispersive forward tree search. Section V develops the decentralized column generation scheme, its near-optimality certificate, and the WarpWeaver protocol. Section VI presents the simulation experiments and benchmarks, and Section VII the real-robot experiments. We conclude in Section VIII. The proofs are deferred to Appendix A. II. R ELATED WORK 
+
+In this section, we present a brief review of existing literature on multi-robot planning and control, along with related techniques relevant to our work. 
+
+A. Sampling and Search for Multi-Robot Motion Planning 
+
+Sampling-based planning extends to multi-robot motion plan-ning in the composite configuration space of the team [7, 8]. For geometric paths, search over the tensor product of individual roadmaps has been shown to be asymptotically optimal [8], and near-optimal at a finite sample size [20]. While it is unclear how this decomposition carries over to robots with continuous dynamics, kinodynamic tree search in the composite state space has been shown to be probabilistically complete [21]. Decentralized implementations of composite search have also been demonstrated, with robots replanning in turn by merit-based token passing [22] or exchanging probability distributions over their plans [23]. Kinodynamic extensions of multi-agent path finding on graphs [1] retain its two-level structure, a high-level search that coordinates the team on top of low-level local planners. The low-level graph search is then replaced by a range of methods spanning sampling-based tree search [3], model predictive control [2], and search over graphs of motion primitives joined up to a bounded discontinuity [4–6]. These implementations are predominantly centralized and offline, and guarantee solution properties ranging from probabilistic or resolution completeness to asymptotic optimality. 
+
+B. Trajectory Optimization for Multi-Robot Motion Planning 
+
+Centralized trajectory optimization coordinates the team within a single program [24, 25], whose size grows with the number of robots. Scalable variants involve a discrete coordi-nation layer, such as priority-based search over mixed-integer programs for tracked reference paths [26] and multi-agent path finding over Bézier curves [27]. Decentralized trajectory optimization segregates the program across the robots, each of which replans a trajectory around the incumbent commitments of its peers. These commitments enter as collision penalties in gradient-based optimization [9], or as separating constraints 3
+
+robust to imperfect communication [10, 11]. Distributed model predictive control [12, 13] follows a similar pattern over short horizons, with linear safe corridors [14] preserving feasibility. These planners run in real time at scale, typically on simplified models of the dynamics. Instead of iterative replanning around incumbent commit-ments, consensus-based distributed optimization lets the robots negotiate. Each robot keeps local copies of the shared variables and optimizes them under its nonlinear dynamics. Penalties on mutual disagreement, updated by the alternating direction method of multipliers, drive the team toward agreement on these variables [15, 16]. 
+
+C. Coordination Beyond Inter-Robot Separation 
+
+Several tasks of utility constrain groups of robots beyond pairwise separation, such as maintaining a connected commu-nication network [28] or keeping robots tethered to each other. Existing work typically addresses these tasks by deploying dedicated mechanisms. For instance, connectivity maintenance is commonly enforced by potential functions that keep the algebraic connectivity of the communication graph positive [28], a design that Realm [29, 30] extends to line-of-sight constraints derived in real time from onboard point clouds. Our method is able to address coordination beyond collision avoidance by specification of hard constraints on the joint-space dynamics, as we demonstrate by implementing connectivity maintenance in simulation and tethering in hardware experiments. 
+
+D. Column Generation and Decentralized Pricing 
+
+Column generation is a canonical technique for solving large linear programs by generating their variables on demand [18, 19]. Dual prices from a restricted master program guide the search for new columns, with a Lagrangian bound on the gap [31] and branching for integrality [32]. This technique has been applied to multi-agent path finding on graphs by branch-and-cut-and-price [33], and to multi-robot routing over space-time positions with pricing by resource-constrained shortest paths [34]. Column generation has been shown to distribute effectively across robots, with local pricing and an exchange of columns among neighbors, for task assignment [35]. We formulate joint optimal control as a search over the dispersive forward trees of the robots [17] and distribute this search across the team via column generation, running asynchronously in real time with a certificate of near-optimality at quiescence, relative to the joint solutions that are robust at the search resolution. III. P ROBLEM FORMULATION 
+
+Consider a team of N agents, agent i governed by the nonlinear control system 
+
+˙xi(t) = f i xi(t), u i(t), (1) with state xi ∈ X i ⊂ Rni and control input ui ∈ Ui ⊂ Rmi .We address the coordination of the team over a horizon T ,formalized as the joint optimal control problem (JOCP) 
+
+min  
+
+> u1: N(·)
+
+Φ x1(·), . . . , x N (·)
+
+s.t. ˙xi(t) = f i xi(t), u i(t), t ∈ [0 , T ],g xi(·) ≥ 0 ∀ g ∈ G i,g (xj (·)) j∈e
+
+ ≥ 0 ∀ g ∈ G e, ∀ e, xi(0) = xi
+
+> init
+
+, i = 1 , . . . , N, 
+
+(2) in which Φ is the joint cost, and the trajectories are constrained by individual predicates Gi and joint predicates Ge over groups 
+
+e ⊂ { 1, . . . , N } of agents. Without loss of generality, let T ∈
+
+N, dividing the horizon into the unit time windows [k, k + 1] ,
+
+0 ≤ k < T , and let d(·, ·) denote the supremum metric on trajectories over a window. We make the following assumptions on the structure of the coordination problem. (i) Cost function: The joint cost is a monotone, convex, piecewise-linear aggregate of private agent-wise costs Ji :
+
+C([0 , T ]; Xi) → R, i.e., for αℓi ≥ 0,
+
+Φ x1(·), . . . , x N (·) = max 
+
+> 1≤ℓ≤L
+
+P 
+
+> i
+
+αℓi Ji
+
+ xi(·). (3) Each agent-wise cost is in turn additive over the windows, with 
+
+Lϱ-Lipschitz stage costs ϱik : C([ k, k + 1]; Xi) → R,
+
+Ji
+
+ xi(·) = 
+
+> T−1
+
+X
+
+> k=0
+
+ϱik
+
+ xi|[k, k +1] 
+
+,
+
+ϱik(w) − ϱik(w′) ≤ Lϱ d(w, w ′),
+
+(4) for all window trajectories w, w ′ of agent i. The Lipschitz constant of the cost Ji over the horizon is then LJ := T L ϱ.(ii) Individual predicates: The predicates g ∈ G i decompose windowwise into Lipschitz predicates gk : C([ k, k + 1]; Xi) →
+
+R on the window trajectories, of which they are the minimum, 
+
+g xi(·) = min  
+
+> 0≤k<T
+
+gk
+
+ xi|[k, k +1] 
+
+,
+
+gk(w) − gk(w′) ≤ LG d(w, w ′).
+
+(5) (iii) Joint predicates: Each g ∈ G e is the running minimum over time of a function of the states of the group, 
+
+g (xj (·)) j∈e
+
+ = min   
+
+> t∈[0 ,T ]
+
+ht
+
+ (xj (t)) j∈e
+
+, (6) in which ht : Q 
+
+> j∈e
+
+Xj → R is LG -Lipschitz, uniformly in t,with respect to the maximum of the members’ distances. While the supposed structure of the JOCP is rather abstract, it allows our treatment to admit coordination problems of generic interest, as the examples of the following section illustrate. 
+
+A. Examples 
+
+Example 1 (Multi-robot kinodynamic motion planning) . Given, for each agent i, a time-varying free space X i
+
+> free
+
+(t) ⊆ X i, a 4
+
+goal region X i 
+
+> goal
+
+⊆ X i, and an initial state xi
+
+> init
+
+, the multi-robot kinodynamic motion planning problem over the horizon 
+
+T is 
+
+min  
+
+> u1: N(·)
+
+P 
+
+> i
+
+dist  xi(T ), X i
+
+> goal
+
+
+
+s.t. ˙xi(t) = f i xi(t), u i(t), t ∈ [0 , T ],xi(t) ∈ X i
+
+> free
+
+(t), t ∈ [0 , T ],dsep 
+
+ xi(t), x j (t) ≥ 0, t ∈ [0 , T ], ∀ j̸ = i, 
+
+v xi(T ) ≤ εv , xi(0) = xi
+
+> init
+
+,
+
+(7) where dist( x, Y ) denotes the distance of the state x from a set 
+
+Y , v(x) denotes the velocity components of the state, so that the terminal constraint requires each agent to end the horizon at approximate rest, π(x) denotes the position components of the state, and dsep (xi, x j ) = |π(xi) − π(xj )| − Ri − Rj separates the bodies of radii Ri, Rj of the agents. This problem is an instance of (2) with the sum of costs as the aggregator, the terminal costs 
+
+Ji
+
+ xi(·) = dist  xi(T ), X i
+
+> goal
+
+,
+
+the individual predicates Gi = {gi
+
+> free
+
+, g i
+
+> rest
+
+} encoding the free space and terminal rest, 
+
+gi
+
+> free
+
+ xi(·) = min   
+
+> t∈[0 ,T ]
+
+sd  xi(t), Xi \ X i
+
+> free
+
+(t),gi
+
+> rest
+
+ xi(·) = εv − v xi(T ) ,
+
+with sd( x, Y ) the signed distance of x from the set Y , and, for each pair e = {i, j }, the separation predicate Ge = {gij 
+
+> sep
+
+}
+
+of the form (6) with h(xi, x j ) = |π(xi) − π(xj )| − Ri − Rj .The costs and the predicates satisfy (i) to (iii) with Lϱ = 1 
+
+and LG = 2 .
+
+Example 2 (Connectivity maintenance) . Let a base station be located at y0 ∈ R3, and let two nodes communicate when they are within a range Rc of each other and their connecting segment clears the obstacle set O ⊂ R3 by a distance δc. The team is to reach its goal regions while the communication graph on the team and the base stays connected, with no edge prescribed, 
+
+min  
+
+> u1: N(·)
+
+P 
+
+> i
+
+dist  xi(T ), X i
+
+> goal
+
+
+
+s.t. ˙xi(t) = f i xi(t), u i(t), t ∈ [0 , T ],xi(t) ∈ X i
+
+> free
+
+(t), t ∈ [0 , T ],dsep 
+
+ xi(t), x j (t) ≥ 0, t ∈ [0 , T ], ∀ j̸ = i, G x1(t), . . . , x N (t) connected , t ∈ [0 , T ],
+
+v xi(T ) ≤ εv , xi(0) = xi
+
+> init
+
+,
+
+(8) where G is the graph on the nodes 0, 1, . . . , N , with π(x0) ≡
+
+y0 for the base, that joins i and j when their link margin 
+
+ℓ(xi, x j ) = min  Rc − | π(xi) − π(xj )|,
+
+dist  [π(xi), π (xj )] , O  − δc
+
+is nonnegative. This problem is an instance of (2) with the costs and the individual and pairwise predicates of Example 1, and one connectivity predicate on the group of all agents, of the form (6) with 
+
+h(x1, . . . , x N ) = max  
+
+> S∈S
+
+min  
+
+> {i,j }∈ S
+
+ℓ(xi, x j ),
+
+where S is the set of spanning trees of the complete graph on the nodes 0, 1, . . . , N . The margin h is nonnegative exactly when some spanning tree has all of its links alive, that is, when 
+
+G is connected, and is attained by a maximum spanning tree under the weights ℓ. The link margin is Lipschitz since the distance of the segment from the obstacles is a minimum over convex combinations of its endpoints, and h, a maximum of minima of link margins, inherits its constant, LG = 2 . The predicate couples the whole team: no single link is required, and a link may break whenever the others keep the graph connected. Fixing the tree S recovers the maintenance of a prescribed graph, the pairwise case, and the path from the base through agents 1, . . . , N is a relay chain. 
+
+B. Flat Reformulation 
+
+We restrict the dynamics f i of each agent to the sufficiently regular differentially flat structure of [17]. In particular, we make the following assumptions about the agents’ dynamics. (a) Regularity: The dynamics f i is regular enough that, starting from any state x ∈ X i, each admissible control ui : [0 , T ] → Ui
+
+generates a unique trajectory of (1). (b) Differential flatness with indices Ri: The system (1) is differentially flat in the sense of [17], with a state-determined flat output zi = hi(xi) ∈ Rdi and indices Ri = ( ri
+
+> 1
+
+, . . . , r idi ),
+
+|Ri| := P 
+
+> l
+
+ril , on a fixed open domain of regular points, which excludes the singular locus of the flatness maps [17]. Denote 
+
+jet zi :=  zil , ˙zil , . . . , z i (ril −1) 
+
+> l
+
+di
+
+> l=1
+
+, zi (Ri) :=  zi (ril )
+
+> l
+
+di
+
+> l=1
+
+.
+
+(9) The flatness maps accordingly take the continuously differen-tiable form 
+
+xi(t) = Ψ ix
+
+ jet zi(t), ui(t) = Ψ iu
+
+ jet zi(t), z i (Ri)(t)
+
+(10) along every trajectory. Conversely, let zi(·) be a curve with components zil in the Sobolev space W ril ,∞([0 , T ]; R) of scalar functions with essentially bounded derivatives up to order ril ,and suppose that Ψiu(jet zi(t), z i (Ri)(t)) ∈ Ui for almost every 
+
+t ∈ [0 , T ]. Then zi = hi(xi(·)) for a trajectory xi(·) of (1), realized by the control ui(t) = Ψ iu(jet zi(t), z i (Ri)(t)) from the state xi(0) = Ψ ix(jet zi(0)) .(c) Compact input set: The input set Ui ⊂ Rmi is compact. (d) Jet observability: There is a map Ξi such that, along every trajectory of (1), jet zi(t) = Ξ i(xi(t)) . An extension of the state renders the jet observable whenever required [17]. By flatness (b) and jet observability (d), the state along a trajectory is the function xi(t) = Ψ ix(jet zi(t)) of the output jet, so the cost and the predicates of (2) induce functionals of the output jet curves, which we continue to denote by Φ, Ji, and 
+
+g. Moreover, by the flatness converse in (b), the trajectories of admissible controls from xi 
+
+> init
+
+are exactly the state realizations of the output curves zi(·), zil ∈ W ril ,∞([0 , T ]; R), whose 5
+
+induced control lies in Ui almost everywhere and that start at the initial jet. The problem (2) is therefore equivalent to the output-space problem 
+
+min  
+
+> z1: N(·)
+
+Φ jet z1(·), . . . , jet zN (·)
+
+s.t. Ψiu
+
+ jet zi(t), z i (Ri)(t) ∈ Ui a.e. on [0 , T ],g jet zi(·) ≥ 0 ∀ g ∈ G i,g (jet zj (·)) j∈e
+
+ ≥ 0 ∀ g ∈ G e, ∀ e, 
+
+jet zi(0) = Ξ i xi
+
+> init
+
+, i = 1 , . . . , N. 
+
+(11) Note that the structural assumptions (i) to (iii) of Section III transfer to this output-space reformulation. Indeed, the state maps Ψix are continuously differentiable, hence Lipschitz on compact sets with a common constant Lx, so that for all window jet curves ζ, ζ ′ of agent i, in the supremum metric over the window induced by the maximum norm on the jet space, 
+
+d Ψix ◦ ζ, Ψix ◦ ζ′ ≤ Lx d(ζ, ζ ′). (12) The stage costs, the window predicates, and the joint predicates induce 
+
+˜ϱik(ζ) := ϱik
+
+ Ψix ◦ ζ, ˜gk(ζ) := gk
+
+ Ψix ◦ ζ,
+
+˜ht
+
+ (ζj )j∈e
+
+ := ht
+
+ (Ψ jx ◦ ζj )j∈e
+
+, (13) which reproduce (4), (5), and (6) on the jet curves. By (12), 
+
+˜ϱik(ζ) − ˜ϱik(ζ′) ≤ LϱLx d(ζ, ζ ′),
+
+˜gk(ζ) − ˜gk(ζ′) ≤ LG Lx d(ζ, ζ ′), (14) and likewise for ˜ht in each of its arguments. We henceforth let d denote this metric on jet curves over a window, as well as the maximum-norm distance between jets, absorb the factor 
+
+Lx into Lϱ and LG , and drop the tildes. Our development henceforth addresses (2) through the flat reformulation (11). IV. D ISPERSIVE FORWARD TREES AND NEAR -O PTIMAL 
+
+CONTROL 
+
+In this section, we review the dispersive forward tree (DFT) search approach of [17] for near-optimal solutions of optimal control problems in the flat form of Section III-B. The development reviewed concerns a single agent system 
+
+˙x = f (x, u ) with state x ∈ X ⊂ Rn and control u ∈ U ⊂ Rm,with flat dynamics f satisfying (a) to (d) of flatness index 
+
+R = ( r1, . . . , r d) and flat output z = h(x) ∈ Rd. Let πxu
+
+denote the trajectory generated by an admissible control u
+
+from a state x, and jet zπ := Ξ( π(·)) the output jet curve of a trajectory π.
+
+Definition 1 (Smooth and eroded trajectory classes) . (i) For 
+
+M > 0, a trajectory is M -smooth if its output jet and flat input are bounded by M ,
+
+z(k) 
+
+> l
+
+(t) ≤ M, 1 ≤ k ≤ rl, 1 ≤ l ≤ d. 
+
+(ii) For ε > 0, the ε-eroded input set is 
+
+U ε :=  u ∈ U : u + [ −ε, ε ]m ⊆ U ,
+
+and UεM (x) denotes the class of controls taking values in U ε
+
+a.e. whose trajectory from x is M -smooth. Let LΨ be a Lipschitz constant of Ψu on the 2M -smooth trajectory class, and fix ε ∈ (0 , L ΨM ].
+
+Definition 2 (Dispersive command sets and trees) . Fix a dispersion δA > 0 and a pruning radius s > 0, and let 
+
+qs(ξ) := s⌊ξ/s ⌋ denote the componentwise cell quantization on R|R|.(i) A command set A is a finite set of commands a : X → 
+
+U [0 ,1] , each assigning to a state x ∈ X an admissible control signal a(x) : [0 , 1] → U . We say A is δA-dispersive if, for any state x ∈ X and any u ∈ U ε/ 22M (x),
+
+min  
+
+> a∈A
+
+d jet zπxa(x) , jet zπxu
+
+ ≤ δA.
+
+(ii) Given the initial state xinit , a command sequence a =(a1, . . . , a k) ∈ Ak generates the trajectory πa on [0 , k ]
+
+following 
+
+πa(j − 1 + t) = πxj−1 
+
+> aj(xj−1)
+
+(t), t ∈ [0 , 1] ,x0 := xinit , xj := πa(j), j = 1 , . . . , k, 
+
+while roll( a) := jet zπa denotes its output jet curve and 
+
+Σ( a) := Pkj=1 ϱj−1
+
+ roll( a)|[j−1, j ]
+
+ its running cost, the partial sum of (4). The complete tree of depth T generated by 
+
+A is the family 
+
+T ◦ :=  πa : a ∈ A k, 0 ≤ k ≤ T .
+
+(iii) A dispersive tree at the pruning radius s is a subtree 
+
+T ⊂ T ◦ retaining one representative node per occupied spatiotemporal cell (c, k ) ∈ sZ|R| × N, namely the node of the best running cost among those sharing the cell. In particular, the tree is generated by depthwise de-duplication from the root, 
+
+V0 := {() }, and 
+
+bVk+1 := 
+
+(a, a )
+
+a ∈ Vk, a ∈ A ,gk
+
+ roll(( a, a )) |[k, k +1] 
+
+ ≥ 0 ∀ g ∈ G ,
+
+roll(( a, a )) |[k, k +1] 2M -smooth 
+
+ ,Vk+1 := 
+
+a ∈ bVk+1 
+
+Σ( a) ≤ Σ( a′) ∀ a′ ∈ bVk+1 
+
+with qs(roll( a′)( k+1)) = qs(roll( a)( k+1)) 
+
+ ,
+
+with ties resolved by a fixed rule, so that exactly one sequence per occupied terminal cell survives. Then T = { πa : a ∈STk=0 Vk }.While the complete tree of depth T requires O(|A| T )
+
+forward computation, a dispersive tree is grown in 
+
+O(|A| T d+1 (M/s )|R|) forward computation [17], polynomial in the horizon T , and provides a near-optimality guarantee. In particular, for the single agent formulation of (11), 
+
+min  
+
+> z(·)
+
+J jet z(·)
+
+s.t. Ψu
+
+ jet z(t), z (R)(t) ∈ U a.e. on [0 , T ],g jet z(·) ≥ 0 ∀ g ∈ G ,
+
+jet z(0) = Ξ  xinit 
+
+,
+
+(15) the dispersive tree is near-optimal in the following sense. 6
+
+Theorem 1. There are constants cB , C B > 0 such that the following holds. Let the dispersion and the pruning radius satisfy δA + s ≤ cB ε, and let ρ := ( CB + 1)( δA + s). Let 
+
+π = πxinit  
+
+> u
+
+be a feasible solution of (15) with u ∈ U εM (xinit )
+
+and the margin 
+
+g jet zπ
+
+ ≥ γ ≥ LG ρ ∀ g ∈ G .
+
+Then the dispersive tree of depth T retains a command sequence 
+
+a ∈ A T , feasible for (15) , with 
+
+J roll( a) ≤ J jet zπ
+
+ + LJ ρ. 
+
+As we shall see in the next section, Theorem 1 provides a path to a near-optimal solution of the joint problem (11), viewed in the form (15) for the team as a single system with stacked states and controls. A joint-space dispersive tree then generated by the product command set A1 × · · · × A N contains a near-optimal joint solution. In this work, we address (11) in a decentralized manner, in which each agent repeatedly grows trees generated by its own command set Ai against what it learns from its peers, and an anytime approach to the joint solution is set up under limited communication, iterated over multiple rounds. V. D ISPERSIVE TREE AGREEMENTS FOR NEAR -O PTIMAL 
+
+COORDINATION 
+
+In this section, we develop Dispersive Tree Agreements and the protocol that negotiates them, WarpWeaver. WarpWeaver, as implemented, provides a decentralized anytime approach to a near-optimal solution of the JOCP (11). We begin with an overview of our mathematical results, followed by their presentation and the protocol as implemented. We defer the proofs of these results to Appendix A. 
+
+A. Overview 
+
+Our presentation begins with an existence result in Sec-tion V-B, in which we show that there exists a near-optimal 
+
+agreement on agent-local dispersive trees, each pruned at a resolution that keeps its growth computation tractable. This result motivates the development of our decentralized protocol. We begin this development in Section V-C by restricting the problem of finding an optimal agreement to an integer linear program (ILP), over the command sequence sets ATi of all agents, at a chosen resolution of space and time. Subsequently, in Section V-D, we develop our solution scheme for the ILP based on column generation. We show that the search for a near-optimal agreement can be decomposed into an iterative loop that involves solving the linear relaxation of the ILP restricted to a small pool of the agents’ command sequences, or columns , and a decentralized column generation procedure that enlarges the pool until no agent finds an im-proving column. We prove that, whenever this process reaches quiescence, the agents select from the pool an agreement that is near-optimal relative to the solutions of the JOCP that are robust at the search resolution, up to a gap that the agents compute online. 
+
+B. Existence of Near-Optimal Agreements 
+
+For each agent i, fix the constants Mi and εi of Definition 1, a δAi -dispersive command set Ai, and a pruning radius si
+
+satisfying the hypotheses of Theorem 1 for its own dynamics, let cB,i , C B,i be the corresponding constants, and let the search resolution be 
+
+ρ := max  
+
+> i
+
+ρi, ρi := ( CB,i + 1)( δAi + si). (16) For a command sequence ai ∈ ATi , let roll i(ai) denote the output jet curve of agent i generated from xi 
+
+> init
+
+as in Definition 2(ii). Restricting the JOCP (11) to the joint command space Q 
+
+> i
+
+ATi and expanding the joint cost by (3) yields the 
+
+joint command problem (JCP) 
+
+min 
+
+> a1: N
+
+max 
+
+> 1≤ℓ≤L
+
+X
+
+> i
+
+αℓi Ji
+
+ roll i(ai)
+
+s.t. g roll i(ai) ≥ 0 ∀ g ∈ G i,g (roll j (aj )) j∈e
+
+ ≥ 0 ∀ g ∈ G e, ∀ e, 
+
+ai ∈ A Ti , i = 1 , . . . , N. 
+
+(17) We call a feasible solution of the JCP an agreement , and show that agent-local dispersive trees contain a near-optimal agreement in the following sense. 
+
+Proposition 1. Let z1(·), . . . , z N (·) be a feasible solution of 
+
+(11) generated by controls ui ∈ U εi 
+
+> Mi
+
+(xi
+
+> init
+
+) with the margins 
+
+g jet zi ≥ LG ρ ∀ g ∈ G i, ∀ i, g (jet zj )j∈e
+
+ ≥ LG ρ ∀ g ∈ G e, ∀ e. (18) 
+
+Then there exist families G′ 
+
+> i
+
+⊇ G i of individual predicates of the form (5) such that the product Q 
+
+> i
+
+Ti of the dispersive trees 
+
+Ti generated by Ai at the pruning radii si under the predicates 
+
+G′ 
+
+> i
+
+contains an agreement (a1, . . . , aN ) with 
+
+Φ roll 1(a1), . . . , roll N (aN )
+
+≤ Φ jet z1, . . . , jet zN  + LΦ ρ, 
+
+where LΦ := max ℓ
+
+P 
+
+> i
+
+αℓi LJ .
+
+Proposition 1 thus guarantees a priori that restricting the JOCP to agreements loses at most LΦ ρ relative to the solutions with the margins (18), and that agent-local dispersive trees suffice to represent a near-optimal agreement. Note that the predicates G′ 
+
+> i
+
+confine each agent i to a corridor of radius 
+
+ρ around zi(·) (Section A-A), and thus replace the joint predicates by individual ones, under which the agents search independently. As these predicates depend on the solution itself, Proposition 1 is an existence result. The remainder of this section develops a distributed computing scheme that pursues this structure, coordinating the independent searches of the agents through a negotiation. 
+
+C. Discretized Restriction of the Agreement Problem 
+
+We begin by restricting the JCP (17) to an ILP over the command sequences of all agents. To this end, we partition the jet space of each agent into cells of a chosen diameter and the time horizon into substeps of a chosen length, and enforce 7
+
+each joint predicate by forbidding the members of its group to jointly occupy a tuple of cells on which the predicate fails. Let M := max i Mi. Fix a cell size S > 0 and a substep 
+
+h := 1 /n s, ns ∈ N. Denote the timestamp tm := mh and the interval Im := [ tm, t m+1 ] for m = 0 , . . . , T n s − 1, and fix a partition Ki of the jet space R|Ri| of each agent i into cells of diameter at most S. A jet curve ζ of agent i occupies at the substep m the collection of cells 
+
+occ i(ζ, m ) :=  κ ∈ K i : ζ(t) ∈ κ for some t ∈ Im . (19) For a joint predicate g ∈ G e and a substep m, we enumerate the forbidden tuples of cells, on which g fails to hold, as 
+
+Fm(g) := 
+
+n
+
+(κj )j∈e : inf 
+
+> t∈Im
+
+inf    
+
+> ξj∈κj, j ∈e
+
+ht
+
+ (ξj )j∈e
+
+ < 0
+
+o
+
+. (20) For each command sequence c ∈ A Ti of agent i, let the binary variable λi,c ∈ { 0, 1} indicate that agent i selects c, and denote for concision Ji(c) := Ji(roll i(c)) and occ i(c, m ) := occ i(roll i(c), m ). The ILP at the resolution (S, h ) reads 
+
+min  
+
+> ϑ, λ
+
+ϑ s.t. 
+
+ϑ ≥ X
+
+> i
+
+αℓi 
+
+X
+
+> c∈A Ti
+
+Ji(c) λi,c ℓ = 1 , . . . , L, 
+
+X
+
+> c∈A Ti
+
+λi,c = 1 i = 1 , . . . , N, g roll i(c) λi,c ≥ 0 ∀ g ∈ G i, ∀ c ∈ A Ti , ∀ i, 
+
+X
+
+> j∈e
+
+X
+
+> c∈A Tj
+
+1κj ∈ occ j (c, m ) λj,c ≤ | e| − 1
+
+∀ κ ∈ Fm(g), ∀ g ∈ G e, ∀ e, ∀ m, λi,c ∈ { 0, 1}.
+
+(21) The ILP selects one sequence per agent through the binary variables λ, bounds the weighted sums in the maximum of (17) by ϑ, and admits only the sequences that obey the individual predicates. The joint predicates couple the selections within a group and enter through the occupancy rows , which disallow all members of a group e to occupy their respective cells of a forbidden tuple. Relative to the JCP (17), the ILP tightens the joint predicates by at most the discretization margin γS := 
+
+LG (S + 2 M h ), as formalized by the proposition below. 
+
+Proposition 2. (i) Let (ϑ, λ ) be a feasible solution of (21) .Then the joint command sequence (c1, . . . , c N ) with λi,c i = 1 
+
+is an agreement with Φ(roll 1(c1), . . . , roll N (cN )) ≤ ϑ.(ii) Let (a1, . . . , aN ) be an agreement whose rollouts roll i(ai)
+
+are 2Mi-smooth, with the margins 
+
+g (roll j (aj )) j∈e
+
+ ≥ γS ∀ g ∈ G e, ∀ e. 
+
+Then (ϑ, λ ) with 
+
+λi, ai = 1 , i = 1 , . . . , N, ϑ = Φ  roll 1(a1), . . . , roll N (aN )
+
+is a feasible solution of (21) , and hence the optimal value of 
+
+(21) is at most ϑ.JOCP JCP ILP ILP( Q)                  
+
+> approximation discrete restriction restriction to pool Q
+> Restricted master LP( Q)Dual DP( Q)
+> relaxation dual
+> Agent 1 Agent N
+> T1TN
+> · · ·
+> each agent searches its own tree under the prices, independently prices wi,μ,πi
+> new column ci
+> if ˆJi<0
+> Certified agreement
+> all ˆJi≥0
+> Fig. 2. Decentralized column generation. The dual of the restricted master over the pool Qsets common prices, under which each agent searches its own dispersive tree. Sequences that improve the pool return as new columns until the agreement is certified at quiescence.
+
+D. Decentralized Column Generation 
+
+As formulated, the ILP (21) holds a binary decision variable 
+
+λi,c for each command sequence c of each agent i, and is thus of enormous size. Column generation [18, 19, 32] is the canonical method to address integer programs with too many variables to enumerate. The procedure involves solving the linear relaxation of the ILP over a small pool of variables, or 
+
+columns , and enlarging the pool with columns that improve the relaxation under prices derived from its dual. For multi-robot coordination problems with our structure, we show that column generation can be effectively decentral-ized across the agents due to the separable structure of the corresponding ILP, in which the agents interact only through the aggregator and the joint predicates. This allows each agent to solve a local problem akin to the single-agent problem (15), priced by its interactions with its peers, on its onboard computer. In this section, we formalize the mathematical apparatus, summarized by Fig. 2, that underlies our coordination protocol described in the subsequent section. We first compress the notation of the ILP (21). Let 
+
+C :=  (i, c ) : c ∈ A Ti , i = 1 , . . . , N (22) denote the set of columns , one per command sequence of each agent, so that λ ∈ { 0, 1}C . The constraints of (21) form four blocks of rows , given by the matrices over the columns 
+
+Jℓ, (i,c ) := αℓi Ji(c), ℓ = 1 , . . . , L, 
+
+Ei′,(i,c ) := 1[ i′ = i ], i′ = 1 , . . . , N, 
+
+G(i′,g,c ′),(i,c ) := g roll i(c) 1[ ( i′, c ′) = ( i, c ) ] ,
+
+(i′, c ′) ∈ C , g ∈ G i′ ,
+
+Or, (i,c ) := 1 i ∈ e, κ i ∈ occ i(c, m ) ,r = ( g, m, κ ) ∈ R ,
+
+(23) where R collects the rows r = ( g, m, κ ) with κ ∈ Fm(g) and 
+
+g ∈ G e over all groups e and substeps m, with the right-hand 8
+
+sides br := |e| − 1. For a pool Q ⊆ C of columns, the ILP (21) restricted to this pool, denoted ILP( Q), reads 
+
+ILP( Q) : min  
+
+> ϑ, λ
+
+ϑ s.t. 
+
+ϑ1 ≥ Jλ, Eλ = 1, Gλ ≥ 0,
+
+Oλ ≤ b, λ ∈ { 0, 1}C , λ(i,c ) = 0 ∀ (i, c ) /∈ Q, 
+
+(24) with Q = C recovering (21) exactly. Likewise, JCP( Q) denotes the JCP (17) with each ai restricted to the sequences c with 
+
+(i, c ) ∈ Q.The restricted master problem , denoted LP( Q), relaxes 
+
+ILP( Q) in two respects. It lets each agent select its pooled command sequences fractionally, with the relaxed λ ≥ 0, and lets the members of each group e occupy a forbidden tuple 
+
+κ ∈ Fm(g) of a joint predicate g ∈ G e at a price P > 0 for a slack sr ≥ 0 on its row r = ( g, m, κ ),
+
+LP( Q) : min  
+
+> ϑ, λ, s
+
+ϑ + P 1⊤s s.t. 
+
+ϑ1 ≥ Jλ, Eλ = 1, Gλ ≥ 0,
+
+Oλ ≤ b + s, λ ∈ RC≥0, s ∈ RR≥0,λ(i,c ) = 0 ∀ (i, c ) /∈ Q. 
+
+(25) The slack variable priced at P per unit slack keeps the restricted master feasible for every Q that holds a column for each agent. This procedure for initializing column generation is standard in the literature [19, Sec. 4.1.1]. With s = 0 , every feasible solution of ILP( Q) is feasible for LP( Q) at the same cost, so that LP( Q) ≤ ILP( Q) holds. Its dual, denoted DP( Q), in the variables β ∈ RL of the aggregator rows ϑ1 ≥ Jλ, π ∈ RN of the selection rows Eλ = 1, ν of the individual predicate rows 
+
+Gλ ≥ 0, and μ ∈ RR of the occupancy rows Oλ ≤ b + s, is then 
+
+DP( Q) : max  
+
+> β, π, ν, μ
+
+1⊤π − b⊤μ s.t. 
+
+ J⊤β − E⊤π − G⊤ν + O⊤μ 
+
+> (i,c )
+
+≥ 0 ∀ (i, c ) ∈ Q, 
+
+1⊤β = 1 , β ≥ 0, ν ≥ 0, 0 ≤ μ ≤ P 1.
+
+(26) The dual variable μr corresponding to each occupancy row r is therefore capped at P . Following the feasibility of the restricted master, DP( Q) has an optimal solution, with DP( Q) = LP( Q)
+
+by strong duality. We henceforth, with some overload of notation, use JCP( Q), ILP( Q), LP( Q), and DP( Q) to also denote the optimal values of the respective programs. For a feasible solution (β, π, ν, μ ) of DP( Q), define the reduced cost 
+
+of the command sequence c ∈ A Ti of agent i as 
+
+¯Ji(c) :=  J⊤β − E⊤π + O⊤μ
+
+> (i,c )
+
+. (27) Note that we have omitted the term −G⊤ν corresponding to the individual predicates since we only pool and price sequences that satisfy them. In particular, the rows g(roll i(c)) λi,c ≥ 0
+
+of such a sequence c hold for every λi,c ≥ 0, and thus never constrain LP( Q), so that their duals ν can be taken to be zero. The reduced cost of a sequence of agent i depends on its peers only through the solution (β, π, ν, μ ) of the dual DP( Q).Indeed, the reduced cost (27) of a sequence c of agent i can be expanded as 
+
+¯Ji(c) = wi Ji(c) +  
+
+> T−1
+
+X
+
+> k=0
+
+ri,k 
+
+ roll i(c) − πi, (28) where wi := P 
+
+> ℓ
+
+βℓ αℓi is the weight of agent i in the aggregator under the dual, and ri,k (ζ) denotes the rent that a jet curve ζ of agent i pays over the window [k, k + 1] ,
+
+ri,k (ζ) := X  
+
+> m:Im⊆[k, k +1]
+
+X
+
+> κ∈occ i(ζ,m )
+
+μi,κ,m , (29) for the rent 
+
+μi,κ,m := X
+
+> r=( g,m,κ ′)∈R
+> i∈e, κ ′
+> i=κ
+
+μr (30) that agent i pays for occupying the cell κ at the substep m. The rent sums the duals of the occupancy rows that assign the cell 
+
+κ to agent i. In linear programming, an optimal dual variable measures the marginal change of the optimal value per unit increase of the right-hand side of its row, and thus the value of the resource that the row constrains [36]. Accordingly, we refer to the weight wi, the rents μi,κ,m , and πi as the prices faced by agent i. The rents price the conflicts that an occupancy may cause with the peers, and the reduced cost (28) evaluates a sequence of agent i at these prices. The goal of column generation is a pool Q whose restricted master attains the relaxation over all columns, that is, LP( Q) = LP( C). Such a pool Q ⊆ C may fall short of this requirement only if columns outside it, in C \ Q, can lower LP( Q). By a standard result of column generation [19, Sec. 2.3], this requires the existence of a column (i, c ) ∈ C \ Q with a negative reduced cost ¯Ji(c) < 0 under any optimal solution of DP( Q). The pool can thus be tested through the pricing problem of each agent 
+
+i, which minimizes the reduced cost over its sequences that obey the individual predicates, 
+
+¯J∗ 
+
+> i
+
+:= min  ¯Ji(c) : c ∈ A Ti , g (roll i(c)) ≥ 0 ∀g ∈ G i . (31) This test follows from a relationship between the dual objective 1⊤π − b⊤μ of DP( Q), the optimal values ¯J∗ 
+
+> i
+
+of the pricing problems (31), and LP( C). Ultimately, however, we measure the pool against the solutions of the JOCP (11), which are jet curves that command sequences need not generate. The dual objective is similarly related to the joint cost of such curves ζ1, . . . , ζ N , provided that they obey the occupancy rows of the ILP (24), that is, occupy no forbidden tuple of cells, 
+
+X
+
+> j∈e
+
+1κj ∈ occ j (ζj , m ) ≤ | e| − 1 ∀(g, m, κ ) ∈ R . (32) The reduced cost can be similarly extended to a jet curve ζ of agent i as 
+
+¯Ji(ζ) := wi Ji(ζ) +  
+
+> T−1
+
+X
+
+> k=0
+
+ri,k (ζ) − πi, (33) so that, by (28), ¯Ji(roll i(c)) = ¯Ji(c) for every command sequence c ∈ A Ti . We state the bounds and the pool sufficiency test in the following proposition. 9
+
+Proposition 3. Let (β, π, ν, μ ) be a feasible solution of DP( Q).(i) If the jet curves ζ1, . . . , ζ N of the agents occupy no forbidden tuple, then 
+
+1⊤π − b⊤μ + X
+
+> i
+
+¯Ji(ζi) ≤ Φ( ζ1, . . . , ζ N ).
+
+(ii) If a locally feasible command sequence ci of each agent i
+
+attains the optimal value ¯Ji(ci) = ¯J∗ 
+
+> i
+
+of the pricing problem 
+
+(31) , then 
+
+1⊤π − b⊤μ + X
+
+> i
+
+¯Ji(ci) ≤ LP( C) ≤ LP( Q).
+
+(iii) If the dual solution (β, π, ν, μ ) is optimal, i.e., DP( Q) = 
+
+1⊤π − b⊤μ, and ¯J∗ 
+
+> i
+
+= 0 for all i, then LP( Q) = LP( C).
+
+Proposition 3(iii) thus suggests that each agent must compute optimal command sequences under prices (wi, μ i,κ,m , π i) set by the current pool Q to either certify its sufficiency or enlarge it appropriately. We now show that this computation can be formulated in the structure of a single-agent problem (15) and that a dispersive tree pruned at some resolution si under a specific running cost can search for a near-optimal command sequence in polynomial time. Note that the reduced cost is additive over the windows, so that the priced running cost 
+
+Σμi (a) := wi Σi(a) + 
+
+> k
+
+X
+
+> j=1
+
+ri,j −1
+
+ roll i(a) − πi, a ∈ A ki
+
+(34) is consistent with the running cost of Definition 2. At depth 
+
+T , Σμi (a) = ¯Ji(a), thus reproducing the reduced cost. The following proposition extends Theorem 1 to show that local dispersive tree search can solve (31) near-optimally. 
+
+Proposition 4. Suppose that (β, π, ν, μ ) is a feasible solution of the dual DP( Q), and that zi(·) is a feasible solution of 
+
+(15) for agent i, generated by a control ui ∈ U εi 
+
+> Mi
+
+(xi
+
+> init
+
+) with the margin 
+
+g jet zi ≥ LG ρ ∀ g ∈ G i,
+
+at the search resolution ρ of (16) . For the dispersive tree generated by Ai at the pruning radius si with the priced running cost (34) , let ˆJi denote the reduced cost of its best command sequence at depth T . Then ¯J∗ 
+
+> i
+
+≤ ˆJi, and the tree retains a command sequence ci ∈ A Ti , feasible for (15) , with 
+
+ˆJi ≤ ¯Ji(ci) ≤ wi
+
+ Ji
+
+ jet zi + LJ ρ
+
++ X
+
+> m
+
+X  
+
+> κ∈occ ρi(jet zi,m )
+
+μi,κ,m − πi,
+
+where occ ρi inflates the occupancy (19) by ρ,
+
+occ ρi (ζ, m ) :=  κ ∈ K i : d ξ, ζ (t) ≤ ρ
+
+for some ξ ∈ κ, t ∈ Im .
+
+Proposition 4 thus shows that the pricing problem (31) of each agent i can be solved near-optimally, with the value ˆJi
+
+approximating its optimal value ¯J∗ 
+
+> i
+
+. While the test ¯J∗ 
+
+> i
+
+= 0 of Proposition 3(iii) on the complete tree ATi is intractable, the theorem below shows that the values ˆJi of the forward trees pruned at the search resolution ρ suffice to certify how close the pool Q comes to the solutions of the JOCP (11) that are robust at the search resolution ρ.
+
+Theorem 2. Suppose that (β, π, ν, μ ) is a feasible solution of the dual DP( Q), and that z1(·), . . . , z N (·) is a feasible solution of (11) , generated by controls ui ∈ U εi 
+
+> Mi
+
+(xi
+
+> init
+
+), with the margins 
+
+g jet zi ≥ LG ρ ∀ g ∈ G i, ∀ i, g (jet zj )j∈e
+
+ ≥ LG (ρ + S + M h ) ∀ g ∈ G e, ∀ e, 
+
+at the search resolution ρ of (16) . For each agent i, let ˆJi
+
+denote the reduced cost of the best command sequence at depth 
+
+T of the dispersive tree generated by Ai at the pruning radius 
+
+si with the priced running cost (34) .(i) It holds that 
+
+1⊤π − b⊤μ + X
+
+> i
+
+ˆJi ≤ Φ jet z1, . . . , jet zN  + LΦ ρ. 
+
+(ii) If the dual solution is optimal, i.e., DP( Q) = 1⊤π − b⊤μ,then 
+
+LP( Q) + X
+
+> i
+
+ˆJi ≤ Φ jet z1, . . . , jet zN  + LΦ ρ, 
+
+and in particular LP( Q) ≤ Φ(jet z1, . . . , jet zN ) + LΦ ρ if 
+
+ˆJi ≥ 0 for all i.
+
+The values ˆJi thus either exhibit columns that enlarge the pool Q or certify it. If ˆJi < 0, the command sequence of agent i that attains ˆJi has a negative reduced cost and is to be added to the pool. If ˆJi ≥ 0 for all i, Theorem 2(ii) shows that the pool is certified up to LΦ ρ relative to the solutions of the JOCP that are robust at the search resolution ρ. This result allows us to develop a decentralized anytime protocol, presented below, in which the agents select an agreement from the pool with its cost certified against the JOCP. 
+
+E. Protocol and Real-Time Implementation 
+
+We now present the WarpWeaver protocol, which implements decentralized column generation among the agents as a real-time negotiation process in a receding-horizon manner. In Algorithm 1, we state the negotiation from the perspective of agent i, and Fig. 3 depicts the same. Each agent runs an identical loop onboard and communicates by broadcasting generated columns as well as endorsing joint solutions over the joint pool. In Algorithm 1, a joint solution is globally endorsed 
+
+once every agent has published or endorsed it, and the best such solution has the least cost Φ, with ties broken by a common rule. An iteration is quiescent once all agents hold the same pool Q,compute ˆJi ≥ 0 under the common optimal solution of DP( Q),and endorse a common solution of JCP( Q). Since quiescence cannot be guaranteed within the real-time deadlines, the agents commit at the pick time tn to the best globally endorsed solution, whose cost is certified by Proposition 5(ii) below only if the iteration is quiescent. An agent sends no message after time tn − δcomm , even within a pass of the loop begun before it. The pick margin τ leaves time to commit before the committed windows begin at time (n + 1) ∆ s. Proposition 5 formalizes the properties of WarpWeaver stated above. 10 x ← xi
+
+> init
+
+Start iteration n
+
+Root Ti at x,
+
+Q ← initial agreement 
+
+Augment pool 
+
+Q ← Q∪{received columns }
+
+Solve dual 
+
+DP( Q) −→ (β, π, ν, μ )
+
+Generate column 
+
+Grow Ti under Σ μi , Gi
+
+ci ← best in Ti
+
+Broadcast if improving 
+
+If ˆJi < 0: 
+
+Q ← Q ∪ { (i, c i)},broadcast ( i, c i)
+
+Publish and endorse 
+
+Publish c? ← JCP( Q)Endorse peers’ solutions 
+
+t < t n−δcomm ?
+
+Pick and commit at tn
+
+Receive until tn
+
+cn ← best globally endorsed Commit cni , x ← πcni (∆ s)
+
+yes no       
+
+> Agent isends no message after tn−δcomm , as it is not guaranteed to reach all agents by tn
+> n ← n + 1
+> Other agents
+
+columns, solutions (i, c i)
+
+c?, endorsements columns, solutions, endorsements Agent i
+
+Local computation Inter-agent communication   
+
+> Fig. 3. The WarpWeaver protocol (Algorithm 1), visualized as a flowchart at the onboard computer of agent i. Each agent asynchronously runs an identical loop onboard.
+
+Proposition 5. Suppose that the following hold. (a) Bounded delay. Every message broadcast by an agent reaches every other agent within time δcomm .(b) Common dual. Agents that share a pool compute the same optimal solution of DP( Q).(c) Recursive feasibility. The pool of every iteration is initialized with an agreement endorsed by every agent. Then the following hold. (i) Completeness and consistency. At every pick time tn, all agents commit to the same joint solution cn.(ii) Certificate at quiescence. If iteration n is quiescent with the pool Q before time tn − δcomm , then, for every solution 
+
+z1(·), . . . , z N (·) of (11) with the margins of Theorem 2, 
+
+Φ( cn) − Φ jet z1, . . . , jet zN  ≤ Γn + LΦ ρ, 
+
+where Γn := Φ( cn) − LP( Q).Therefore, the cost of the solution committed at quiescence exceeds the ρ-robust optimum by no more than its excess Γn
+
+over the restricted master, up to the resolution loss LΦ ρ.
+
+Remark 1. (i) Our implementation ensures the common dual by a canonical restricted master and a deterministic solver. We use P = max ℓ, (i,c )∈Q αℓi Ji(c), the largest weighted cost of a command sequence in the pool, to drive the column generation. (ii) Recursive feasibility and its enforcement are specific to the JOCP at hand. In practice, if recursive feasibility is lost, computational speed becomes essential for completeness, so that a globally endorsed solution can be found before the commit is due. (iii) In our simulations, Γn ≤ 0 at each of the 1502 quiescent iterations (Tables II to IV and VI), so that Proposition 5(ii) held with the resolution loss LΦ ρ alone. VI. S IMULATION EXPERIMENTS AND BENCHMARKS 
+
+We evaluate WarpWeaver in simulation in three settings. First, we compare its cost against state-of-the-art offline kinodynamic planners on the multi-robot Dynobench suite. Second, we compare it against a decentralized real-time planner on swarms of ten drones, including a high-fidelity nonlinear quadrotor model. We also evaluate WarpWeaver on a task that requires 11 
+
+TABLE I PLATFORMS , COMMAND SETS , AND SEARCH PARAMETERS . C OMMANDS ARE HELD OVER WINDOWS OF LENGTH ∆ (S) [17], AND EACH SET ALSO CONTAINS A HOLD AND , FOR THE INTEGRATORS , A BRAKE TOWARD REST . Gn[l, u ]: THE n-LEVEL GRID ON [l, u ]; eθ = (cos θ, sin θ). T RIPLE INTEGRATOR AT x = ( p, v, a ): j1¯v = −a/ ∆ ± 4λ1(¯ v − v − ∆a/ 2) /∆2 , WITH + ON THE FIRST HALF WINDOW , AND j2¯v = 2 λ2(¯ v − v − ∆a)/∆2 , WITH λ1, λ 2 ≤ 1
+
+> MAXIMAL WITHIN THE BOUNDS
+
+; V (x) = {σ(cos ϕ e ψ+θ , sin ϕ)}, σ ∈ { 43 , 83 , 4}, θ ∈ { 0, ±5◦, ±10 ◦, ±20 ◦}, ϕ ∈ { 0, ±20 ◦}, ψ THE HEADING OF v.X500: ATTITUDE q, BODY AXIS b3 , BODY RATE ω, ROTOR THRUSTS η (N), MIXER B, MOTOR TIME CONSTANT tm . T : HORIZON IN WINDOWS ; ∆s (S): 
+
+> STRIDE
+
+; si : PRUNING RADIUS ; εg : GOAL TOLERANCE ; S (M): CELL DIAMETER ; ns : SUBSTEPS PER WINDOW .Platform fi, Ui Ei Ri Bi (m) A Search Parameters Unicycle ˙p = ve θ , ˙θ = ω,
+
+|v|, |ω| ≤ 0.5
+
+– – Box 0.5 × 0.25 Constant (v, ω ) on a lattice 
+
+(v, ω ) ∈ G8
+
+− 12 , 12
+
+2 ∆ = 0 .5, T = 10 ,
+
+∆s = 0 .5, s i = 0 .08 ,
+
+εg = 0 .5,
+
+S = 0 .6, n s = 5 
+
+Double Int. (3D) ¨p = a, ∥a∥∞ ≤ 2 ∥v∥∞ ≤ 0.5 ∥v∥∞ ≤ 0.17 Ball 0.1 Constant a on a lattice of the admissible box 
+
+a ∈ G4
+
+ J(x), with J(x) = [−2, 2] 3 ∩  [− 12 , 12 ]3 − v/∆∆ = 0 .5, T = 10 ,
+
+∆s = 0 .5, s i = 0 .25 ,
+
+εg = 0 .5,
+
+S = 0 .25 , n s = 5 
+
+Triple Int. (3D) ... 
+
+p = j, ∥j∥ ≤ 25 ∥v∥ ≤ 4,
+
+∥a∥ ≤ 8
+
+∥v∥∞ ≤ 0.3,
+
+∥a∥∞ ≤ 0.6
+
+Ball 0.15 Admissible jerk profiles to diverse reference velocities 
+
+j ∈ j1¯v , j 2¯v : ¯ v ∈ V (x)
+
+∆ = 0 .5, T = 8 ,
+
+∆s = 0 .5, s i = 2 ,
+
+εg = 0 .75 ,
+
+S = 0 .35 , n s = 10 
+
+X500 ˙p = v,
+
+m ˙v = c b 3(q) − mge 3,
+
+˙q = 12 q ⊗ ω,
+
+J ˙ω = M − ω × Jω ,
+
+(c, M ) = Bη ,
+
+tm ˙η = u − η,
+
+u ∈ [0 .19 , 8.55] 4
+
+∥v∥ ≤ 4,
+
+|ω1,2| ≤ 3.84 ,
+
+|ω3| ≤ 3.49 ,
+
+∠(b3, e 3) ≤ 45 ◦
+
+∥v∥∞ ≤ 0.5,
+
+∥ω∥∞ ≤ 0.5
+
+Ball 0.1 Smooth acceleration references on a lattice, tracked by the geometric controller of [17] 
+
+a ∈ G5[−8, 8] 2 ×{− 8, −4, 0, 1.85 , 3.7},
+
+c− ≤ ∥ a + ge 3∥ ≤ c+
+
+∆ = 0 .25 , T = 6 ,
+
+∆s = 0 .5, s i = 2 ,
+
+εg = 0 .75 ,
+
+S = 0 .6, n s = 25 
+
+Single Int. (2D) ˙p = u, ∥u∥ ≤ 1.5 – – Disk 0.36 Constant u on a polar lattice 
+
+u ∈ { σe 2πk/ 16 : σ ∈{0.5, 1, 1.5}, k < 16 }
+
+∆ = 1 , T = 10 ,
+
+∆s = 1 , s i = 0 .1,
+
+εg = 1 .5,
+
+S = 0 .75 , n s = 10 
+
+(a) (b) (c) (d) Fig. 4. WarpWeaver in simulation. (a) Circle-10, unicycles. (b) Forest-10, 3D double integrators. (c) Ten triple integrators on a forest map of EGO-Swarm. (d) Connectivity maintenance in the forest world of Realm, with the live links at three instants. In (a) and (d), each robot has its own colour and is drawn at three instants, later ones more opaque. In (b) and (c), trajectories and bodies are coloured by time from start (circle) to goal (star). 
+
+maintaining connectivity of the communication graph across the team, and compare its performance against a dedicated planner. Unless stated otherwise, each robot runs Algorithm 1 in real time on its own share of a GPU, eight streaming multiprocessors of an RTX 3090, equivalent in compute to an Orin Nano. We set the pick margin to τ = 20 ms and the communication delay bound to δcomm = 30 ms. Each robot runs as its own process and exchanges its messages with the others through inter-process queues, with real delays. In two trials of the largest instance on each platform of Tables II and III, the 358 ,550 
+
+messages arrived after a median delay of 0.7 ms, 99 .9% of them within 10 ms and all within 26 ms, under the delay bound 
+
+δcomm , and the robots committed the same agreement at all 
+
+264 picks. 
+
+A. Multi-Robot Kinodynamic Motion Planning 
+
+A major portion of our comparative evaluation focuses on the canonical problem of navigating multiple robots to their goals while avoiding collisions with environmental clutter and with each other. The task can be specified as an instance of (2), for all t ∈ [0 , T ],
+
+min  
+
+> u1: N(·)
+
+P
+
+> i
+
+PT −1 
+
+> k=0
+
+ϱi
+
+ xi(k + 1) 
+
+s.t. ˙xi = f i(xi, u i), ui(t) ∈ Ui,xi(t) ∈ X i 
+
+> free
+
+∩ Ei,xi(T ) ∈ Ri, xi(0) = xi
+
+> init
+
+,Bi
+
+ xi(t) ∩ Bj
+
+ xj (t) = ∅, ∀ j̸ = i, 
+
+(35) where we use the stage cost 
+
+ϱi(x) := A 1di(x) > ε g
+
+ + max di(x), ε g (36) charges A = 10 3 for every window that robot i ends outside the ball of radius εg around its goal state xi
+
+> goal
+
+, plus its distance 
+
+di(x) to the goal, floored at εg . The free space X i 
+
+> free
+
+excludes the static obstacles and the workspace boundary, and the state 12 
+
+Algorithm 1 WarpWeaver at agent i
+
+Require: Initial state xi
+
+> init
+
+, command set Ai, cost Ji, pred-icates Gi, stride ∆s, pick margin τ , delay bound 
+
+δcomm  
+
+> 1:
+
+x ← xi 
+
+> init
+> 2:
+
+for n = 0 , 1, 2, . . . do ▷ Pick time tn := ( n + 1) ∆ s − τ 
+
+> 3:
+
+Root the dispersive tree Ti at x, and Q ← the columns of the initial agreement  
+
+> 4:
+
+while t < t n − δcomm do ▷ Nothing sent after tn −
+
+δcomm  
+
+> 5:
+
+Q ← Q ∪ { received columns } 
+
+> 6:
+
+(β, π, ν, μ ) ← optimal solution of DP( Q) 
+
+> 7:
+
+Grow Ti subject to Σμi and Gi 
+
+> 8:
+
+ci ← the best sequence in Ti 
+
+> 9:
+
+if ˆJi < 0 
+
+> 10:
+
+Q ← Q ∪ { (i, c i)}, and broadcast (i, c i) 
+
+> 11:
+
+Publish c⋆ ← best solution of JCP( Q) found, if any  
+
+> 12:
+
+Endorse peers’ solutions with columns in Q 
+
+> 13:
+
+Receive until tn 
+
+> 14:
+
+cn ← best globally endorsed solution  
+
+> 15:
+
+Commit cni on [( n + 1)∆ s, (n + 2)∆ s] 
+
+> 16:
+
+x ← πcni (∆ s)
+
+envelope Ei, the terminal rest set Ri, and the body Bi are listed in Table I for each of the platforms we use. 
+
+Remark 2. The indicator in (36) makes the stage cost jump by A at the boundary of the goal ball, violating the Lipschitz requirement (4). Our results nonetheless transfer with a small patch as follows. The proofs of Theorem 1 and Proposition 4 use the Lipschitz property only in (42), where a trajectory that tracks the reference zi(·) to within ρ over a window incurs a stage cost at most Lϱ ρ above that of the reference. If the jets of the reference and of the tracking trajectory at the end of the window are ξ and ξ′, then d(ξ′, ξ ) ≤ ρ and (36) give 
+
+ϱi(ξ′) ≤ A 1di(ξ) > ε g − Ld ρ + max di(ξ), ε g + Ld ρ, 
+
+with Ld the Lipschitz constant of di, which takes the place of Lϱ. The results thus hold with the cost of the reference evaluated on the goal ball shrunk by Ld ρ, which raises it by 
+
+A only for the windows at the end of which the reference lies inside the ball within Ld ρ of its boundary. For the cost (36), the cost of the reference in Propositions 1 and 4 and Theorem 2 and Proposition 5(ii), and hence the ρ-robust optimum, is accordingly evaluated on the shrunk goal ball. The command sets of Table I follow the construction presented in [17, Sec. 6.2.2]. For the unicycle, the single and double integrators, and the X500, the commands hold a lattice quantization of the flat input over the window, through the geometric tracking controller for the X500, and are dispersive by the arguments detailed in [17, App. B], with a dispersion that vanishes as the lattice and the windows are refined. For the triple integrator, the commands instead disperse the velocity reached at the end of the window, over directions about the current heading that successive windows extend.                                                                                                                                         
+
+> TABLE II MULTI -ROBOT DYNOBENCH :TOTAL TRAVEL TIME (S)SUMMED OVER AGENTS ,MEDIAN . Q UIESCED : W ARP WEAVER WITH THE WORLD PAUSED UNTIL εq-QUIESCENCE OR FOR AT MOST 5S(S ECTION VI-C),
+> εq-QUIESCENT AT MORE THAN 84% OF THE ITERATIONS OF EVERY RUN ,
+> MEDIAN OVER FIVE TRIALS .Instance N
+> Warp-Weaver Quie-sced db-CBS db-ECBS db-PIBT db-LaCAM @60 s Unicycle  swap2 211 .011 .012 .014 .416 .815 .6
+> swap4 424 .022 .527 .627 .1–72 .0
+> atgoal 26.57.08.48.325 .216 .8
+> circle6 684 .583 .590 .082 .997 .296 .0
+> circle8 8113 .0113 .0121 .2117 .8141 .6136 .8
+> circle10 10 140 .5139 .5150 .0156 .3182 .4196 .8
+> Double Int.  swap2 213 .013 .014 .0(4/5) 17 .0(3/5) 15 .0(2/5) 16 .5
+> forest4 426 .026 .030 .534 .5––passage6 641 .541 .548 .555 .5–57 .5
+> swap8 844 .044 .047 .054 .0–59 .5
+> forest10 10 80 .080 .093 .0109 .5––TABLE III TEN DRONES ON THE EGO-S WARM FOREST MAPS .F:TOTAL TRAVEL TIME
+> (S)SUMMED OVER AGENTS ,MEDIAN (MIN –MAX )OVER SUCCESSFUL TRIALS .Map Planner Success F(min–max) Forest 1 WarpWeaver, triple int. 5/591 .5(91.0–94.5) WarpWeaver, X500 5/597 .5(97.5–101.0) EGO-Swarm 4/5145 .7(142.4–148.5) Forest 2 WarpWeaver, triple int. 5/592 .5(91.0–93.0) WarpWeaver, X500 5/599 .0(98.0–102.0) EGO-Swarm 5/5145 .9(136.0–154.0) Forest 3 WarpWeaver, triple int. 5/590 .5(89.5–90.5) WarpWeaver, X500 5/597 .0(96.0–103.5) EGO-Swarm 3/5141 .6(135.8–165.8)
+
+Comparative Evaluation and Results: We evaluate on the two platforms of the multi-robot Dynobench suite [4], the unicycle and the 3D double integrator, against the centralized planners of the discontinuity-bounded family, db-CBS [4], db-ECBS [5], db-PIBT, and db-LaCAM [6] (Table II). Moreover, the triple integrator and the X500 are used in our evaluation against EGO-Swarm [9], with ten drones on three of its forest maps (Table III). The tables report the median over five trials per instance of the total travel time summed over agents. On Dynobench (Table II), WarpWeaver completes every trial and attains the lowest total travel time on ten of the eleven instances, improving on the best baseline by 8% at the median and by up to 22% , while committing in real time against planners that solve the full problem offline. Against EGO-Swarm (Table III), WarpWeaver succeeds in all fifteen trials on both platforms, against twelve for EGO-Swarm, and reduces the total travel time by 36 –37% with the triple integrator and by 31 –33% with the X500. 
+
+Scaling Tests: We evaluate the scaling performance of Warp-Weaver as the number of randomly initialized unicycles in an empty 20 × 20 m environment is scaled as N = 10 , 20 , . . . , 50 ,on the instances of the scalability test of db-LaCAM [6, Sec. 5.2], with five trials per N . To emulate faithfully without requiring our host computer to scale linearly with the number of robots, we give each robot a virtual clock that advances only by the measured wall time of its own computation on its own share of the GPU and a CPU core. A message is delivered once the clock of its receiver passes that of its sender at sending, 13 
+
+plus 1 ms, and the robot with the earliest clock always runs next. This preserves the asynchrony of Algorithm 1 while the simulation runs about N times slower than real time.                                              
+
+> TABLE IV SCALING TESTS ,UNICYCLES IN A 20 ×20 M ARENA ,FIVE TRIALS PER N,WARP WEAVER IN REAL TIME (EMULATED ). T OTAL TRAVEL TIME SUMMED OVER AGENTS AND PER ROBOT (S), MEDIAN (MIN –MAX )FOR
+> WARP WEAVER AND THE MEDIAN BEST SOLUTION OF DB -L ACAM WITHIN
+> 300 S.WarpWeaver db-LaCAM
+> NTotal per robot Total per robot
+> 10 167 .5(167 .0–168 .5)16 .8217 .221 .720 435 .5(432 .5–438 .0)21 .8522 .026 .130 649 .5(645 .0–654 .0)21 .7884 .429 .540 910 .5(904 .0–913 .0)22 .81400 .435 .050 1126 .5(1107 .5–1165 .5)22 .51470 .029 .4
+
+Table IV presents the total travel time of WarpWeaver against the best solution of db-LaCAM within its 300 s limit, run offline. WarpWeaver completes all 25 trials without collision, with a total travel time 17 –35% lower than that of db-LaCAM at every N . Its travel time per robot rises from 16 .8 s at N = 10 
+
+to about 22 s at N = 20 and stays flat up to N = 50 .
+
+B. Connectivity Maintenance 
+
+While collision avoidance only requires pairwise coordina-tion, we now evaluate on a task that requires coordination across the whole team. In connectivity maintenance, the robots must reach their individual targets while their communication graph stays connected, with every link requiring both range and an unobstructed line of sight through an environment mapped online. For four planar single integrators, the task can be specified as an instance of (2), for all t ∈ [0 , T ],
+
+min 
+
+> u1:4 (·)
+
+P
+
+> i
+
+PT −1
+
+> k=0
+
+ 1 − νi ϱi
+
+ pi(k + 1) 
+
+s.t. ˙pi = ui, ∥ui(t)∥ ≤ 1.5,pi(t) ∈ X free , pi(0) = pi
+
+> init
+
+,
+
+∥pi(t) − pj (t)∥ ≥ 2r, ∀ j̸ = i, 
+
+max  
+
+> S∈S
+
+min  
+
+> {i,j }∈ S
+
+ℓ pi(t), p j (t) ≥ 0,
+
+(37) where we use the stage cost ϱi of (36) with di(p) the shortest-path distance from p to the target yi on the map, and νi = 1 
+
+once the executed trajectory of robot i has come within εg of yi,after which the robot may leave its target to relay for the others. As νi is fixed over each planning horizon, Remark 2 applies to this cost as well. The last constraint is the connectivity predicate of Example 2 on the robots, with S the spanning trees of the complete graph on the four robots and the link margin 
+
+ℓ(p, p ′) = min Rc − ∥ p − p′∥, dist  [p, p ′], O  − δc ,
+
+nonnegative when the two robots are within the range Rc =30 m and their segment clears the blocked set O by δc = 0 .2 m, and r is the body radius of Table I. The free space Xfree is mapped online from the 2D lidar scans of the robots, fused across the team, and O is its complement, every cell not yet observed free.                                               
+
+> TABLE V CONNECTIVITY MAINTENANCE AGAINST REALM ,FOUR ROBOTS . T IME :
+> ARRIVAL OF THE LAST ROBOT (S), MEDIAN (MIN –MAX ); C ONN .: FRACTION OF TIME CONNECTED ,WORST TASK ; P ATH :SUMMED PATH LENGTH (M),
+> MEDIAN .World Planner Success Time (s) Conn. Path Clutter WarpWeaver 5/523 .9(19.7–39.1) 1.00 122
+> Realm 5/558 .3(31.0–109.2) 1.00 193
+> Garage WarpWeaver 5/543 .8(25.8–54.0) 1.00 234
+> Realm 3/561 .9(55.3–85.5) 1.00 226
+> Forest WarpWeaver 5/554 .6(45.3–73.8) 1.00 273
+> Realm 0/5–1.00 –
+
+Comparative Evaluation and Results: We compare against Realm [29], a planner dedicated to line-of-sight connectivity maintenance, at its released configuration [30] and in its simulation environment, on three worlds with five tasks each (Table V). Both planners receive the same lidar scans and issue the same pose commands, and WarpWeaver runs on the simulation clock. The table reports the time at which the last robot reaches its target, the fraction of time the graph is connected, and the total path length. WarpWeaver completes all fifteen tasks against eight for Realm, which solves none in the forest, and brings the last robot to its target 59% sooner in the clutter world and 29% 
+
+sooner in the garage at the median. Both planners keep the team connected throughout. Robots that have reached their targets leave them to relay for the others, a joint maneuver that the formulation produces without a dedicated mechanism. 
+
+C. The Cost of a Real-Time Cutoff 
+
+Since the real-time implementation of WarpWeaver commits the negotiated solution as soon as the deadline is up, it is of some interest to understand how far the executed performance of the real-time loop falls from the anytime guarantee of Proposition 5, which holds only at quiescence. In our scaling tests, for instance, we observe that the fraction of quiescent iterations in real-time emulations falls from 70% at N = 10 
+
+to none at N = 50 (Table VI), as each agent receives more columns, solves a larger restricted master, and completes fewer pricing steps per window, from 11 to 5.We therefore rerun the scaling tests in a deliberation mode, which pauses the world at every iteration until the team is quiescent, or for at most 5 s (to keep runtimes reasonable). Since exact quiescence is reached within this cap at 98% of the iterations at N = 10 but at 2% at N = 50 , we also measure the time to εq -quiescence, ˆJi ≥ − εq for every agent i, with 
+
+εq = 1 , under which the bound of Theorem 2 loosens by N ε q .Regardless, we find that the real-time loop commits to solutions close to quiesced agreements. On the instances of Table II, its median total travel time matches the quiesced one on seven of the eleven instances, and exceeds it by at most 1.2% on all but swap4 of the unicycle, by 1.5 s. In the scaling tests, it exceeds that of the εq -quiesced agreements by at most 0.3% up to N = 30 (Table VI), and, at N = 40 
+
+and 50 , where the paused negotiation rarely quiesces within the 5 s cap, remains within 1.3% and 6% of the agreements after 5 s of negotiation. The real-time loop thus commits close 14                                                                                                
+
+> TABLE VI QUIESCENCE IN REAL TIME AND WITH THE WORLD PAUSED (CAP 5S,ONE TRIAL PER N). Q UIESC .: ITERATIONS THAT END QUIESCENT ,IN REAL TIME
+> (MEDIAN OVER THE TRIALS OF TABLE IV) AND WITHIN THE CAP AT εq= 0
+> AND εq= 1 ;tq:TIME TO QUIESCENCE AT εq= 1 (S), CAPPED ITERATIONS COUNTED AS >5;F:TOTAL TRAVEL TIME (S)IN REAL TIME (MEDIAN ,TABLE IV) AND WITH UP TO 5S OF NEGOTIATION PER ITERATION .Quiesc. tq,εq= 1 FNRT εq= 0 εq= 1 p50 p90 p99 RT εq= 0 εq= 1 10 70% 98% 100% 0.11 0 .31 1 .26 167 .5167 .5167 .020 16% 58% 99% 1.32 2 .41 >5435 .5431 .5435 .030 6% 33% 93% 1.48 4 .63 >5649 .5643 .0658 .040 1% 7% 60% 3.56 >5>5910 .5899 .5898 .550 0% 2% 7% >5>5>5 1126 .5 1072 .0 1065 .5
+
+to the solution that a longer negotiation attains, and chasing quiescence only buys a slightly improved solution alongside the certificate, as is typical of column generation [19]. VII. R EAL -R OBOT EXPERIMENTS 
+
+We deploy WarpWeaver on a team of six ground robots, each planning onboard its own Jetson Orin and exchanging messages with the others over Wi-Fi through ROS 2, with positions from a Vicon motion capture system and a hand-entered obstacle map. The robots are of two classes with unicycle dynamics 
+
+˙p = ve θ, ˙θ = ω, two JR robots with a clearance disc of radius 0.4 m and acceleration limit | ˙v| ≤ 1.5 m/s 2, and four RR robots with 0.5 m and 2.0 m/s 2, and | ˙ω| ≤ 2 rad/s 2 for both. We evaluate three tasks (Fig. 5). In the swap, the six robots exchange positions across a circle around four pillars of radius 
+
+0.15 m. In the tethered swap, two pairs of robots in the same scene are additionally tied to each other. In the doorway swap, two groups of three exchange sides through a 1.6 m door in a wall. Each task is an instance of (35) on the unicycle dynamics above, with |v| ≤ vmax , |ω| ≤ ωmax , the disc bodies, and the stage cost (36). In the tethered swap, each tied pair (i, j )
+
+further satisfies, for all t ∈ [0 , T ],
+
+min L − ∥ pi(t) − pj (t)∥, dist  [pi(t), p j (t)] , O  ≥ 0,
+
+the link predicate of Example 2 with Rc = L = 2 .4 m and 
+
+δc = 0 , which keeps each pair within range and in line of sight. Each robot runs Algorithm 1 over target commands 
+
+(v, ω ) on a 13 × 13 lattice of the input box, each reached from the previous command by a ramp at the acceleration limits, so that the rollouts, the collision checks, and the tracked plans respect these limits, with cells of diameter S = si and 
+
+ns = 5 substeps per window, ∆ = 1 s, ∆s = 1 s, τ = 0 .2 s, 
+
+δcomm = 0 .2 s, and εg = 0 .25 m. The swap uses T = 10 ,
+
+si = 0 .25 , vmax = 0 .5 m/s, and ωmax = 0 .5 rad/s, the tethered swap T = 8 , si = 0 .35 , and vmax = 0 .8 m/s, and the doorway swap T = 6 , si = 0 .25 , vmax = 0 .8 m/s for RR and 1.0 m/s for JR, and ωmax = 1 .0 rad/s. Over 71 ,800 round trips of 
+
+2 KB messages among the six onboard computers during three runs, the round-trip time had a median of 13 ms and a 99 th percentile of 106 ms, and exceeded 0.2 s for 0.2% of them, with a maximum of 635 ms. A round trip takes at least as long as the one-way delay that δcomm concerns. The robots                                       
+
+> TABLE VII REAL -ROBOT EXPERIMENTS ,SIX ROBOTS ,THREE CONSECUTIVE TAKES PER TASK . T IME :ARRIVAL OF THE LAST ROBOT (S)AND TOTAL TRAVEL TIME SUMMED OVER ROBOTS (S), MEDIAN (MIN –MAX ); S EP .: SMALLEST DISTANCE BETWEEN TWO ROBOTS MINUS BOTH CLEARANCE RADII (M); TETHER :LARGEST DISTANCE WITHIN A TIED PAIR (M), AGAINST
+> L= 2 .4M.Task Success Last arrival Total Sep. Tether Swap 3/320 .2(20 .0–20 .8)108 .10.28 –Tethered swap 3/330 .4(24 .5–31 .9)125 .40.28 2.37
+> Doorway swap 3/333 .6(25 .3–35 .6)162 .10.12 –
+
+committed the same agreement at 311 of the 312 picks, the exception following the restart of a robot after a battery swap. Every robot reached its goal in every take, without contact between robots or with the obstacles (Table VII). The tied pairs stayed within range and in line of sight throughout, reaching at most 2.37 m of the 2.4 m tether, and the executed trajectories tracked the committed plans to within 0.03 –0.07 m on average. VIII. C ONCLUSION 
+
+In this paper, we formulated a broad class of multi-robot coordination problems as joint-space optimal control subject to constraints over groups of robots, and extended a recent single-robot framework of dispersive forward tree search to approach its joint optimum. We showed that suitable constraints on each robot can effectively replace the inter-robot coupling, so that dispersive forward trees grown locally by the robots jointly contain a near-optimal agreement. This structure was pursued by decentralized column generation, in which the robots search their trees under common prices and negotiate an agreement certified near-optimal at quiescence. This de-velopment culminated in WarpWeaver, a real-time protocol that runs the negotiation asynchronously over a receding horizon onboard each robot. In simulation, WarpWeaver was shown to match or outperform state-of-the-art centralized offline, decentralized real-time, and task-specific planners, with total travel times up to 22% on Dynobench and 37% lower than the former two and nearly double the success rate of the latter. Notably, we find that WarpWeaver demonstrates effective closure to quiesced agreements even when real-time deadlines cut the negotiation short, implying that decentralized column generation is well suited for real-time multi-robot coordination. In real-robot experiments, we used a team of six unicycle robots to demonstrate its real-time implementability for kinodynamic planning around obstacles and through a doorway, and additionally with pairs of robots tethered to each other. A limitation of our approach is that a coordination task is only as tractable as its integer linear restriction. Constraints that tie many robots tightly together, such as the maintenance of a rigid formation, admit few joint solutions among the individual trees and yield programs whose relaxations are weak, where differential methods that exploit the local geometry of the constraint may be better suited. Incorporating such differential information into dispersive search remains a direction for future research. 15  
+
+> (a)
+> (b)
+> (c) Fig. 5. Six robots, one take per task. Left: executed trajectories from motion capture, each robot in its own colour, with the robots at the start, midway, and at the last arrival, later instants more opaque. Right: the camera frames overlaid, later ones more opaque. (a) Swap around four pillars. (b) Tethered swap, with the tied pairs joined by dashed lines. (c) Doorway swap.
+
+APPENDIX APROOFS 
+
+A. Proof of Proposition 1 
+
+For each i, let gz,i be the individual predicate of the form (5) with the windowwise predicates 
+
+gz,i k (w) := LG
+
+
+
+ρ − d w, jet zi|[k, k +1] 
+
+
+
+, (38) which keeps agent i within ρ of its reference, and let 
+
+G′ 
+
+> i
+
+:= Gi ∪ { gz,i }. The reference satisfies gz,i with the margin 
+
+gz,i (jet zi) = LG ρ ≥ LG ρi, and the predicates Gi with the margin (18). Theorem 1, applied to the problem (15) of agent 
+
+i under G′
+
+> i
+
+, thus gives a sequence ai in Ti that satisfies every 
+
+g ∈ G ′
+
+> i
+
+, with Ji(roll i(ai)) ≤ Ji(jet zi) + LJ ρi. Since αℓi ≥ 0
+
+and ρi ≤ ρ, (3) gives 
+
+Φ roll 1(a1), . . .  ≤ max 
+
+> ℓ
+
+X
+
+> i
+
+αℓi 
+
+ Ji(jet zi) + LJ ρ
+
+≤ Φ jet z1, . . .  + LΦ ρ. 
+
+It remains to show that (a1, . . . , aN ) satisfies the joint pred-icates. As it satisfies every gz,i , d(roll i(ai)( t), jet zi(t)) ≤ ρ
+
+for every i and t. For g ∈ G e of the form (6), the Lipschitz property of ht and the margin (18) then give, for every t,
+
+ht
+
+ (roll j (aj )( t)) j∈e
+
+ ≥ ht
+
+ (jet zj (t)) j∈e
+
+ − LG ρ ≥ 0.16 
+
+Hence (a1, . . . , aN ) ∈ Q 
+
+> i
+
+Ti is an agreement. 
+
+B. Proof of Proposition 2 
+
+We recall that the occupancy rows of (21) forbid the members of a group e to occupy, during a substep m, the cells of a tuple on which a joint predicate g ∈ G e fails, 
+
+Fm(g) = 
+
+n
+
+(κj )j∈e : inf 
+
+> t∈Im
+
+inf    
+
+> ξj∈κj, j ∈e
+
+ht
+
+ (ξj )j∈e
+
+ < 0
+
+o
+
+, (20) and that jet curves ζ1, . . . , ζ N obey them, that is, occupy no forbidden tuple, when 
+
+X
+
+> j∈e
+
+1κj ∈ occ j (ζj , m ) ≤ | e| − 1 ∀(g, m, κ ) ∈ R . (32) We first show that these rows discretize the joint predicates, soundly and completely up to the discretization margin, in the following sense. 
+
+Lemma 1. (a) If jet curves ζ1, . . . , ζ N of the agents occupy no forbidden tuple (32) , then g(( ζj )j∈e) ≥ 0 for all g ∈ G e
+
+and all e.(b) Let z1(·), . . . , z N (·) be M ′-smooth with g((jet zj )j∈e) ≥
+
+LG (η + S + M ′h) for all g ∈ G e and all e, and let jet curves 
+
+ζ1, . . . , ζ N satisfy d(ζi(t), jet zi(t)) ≤ η for all i and t. Then they occupy no forbidden tuple (32) .Proof. (a) Suppose ht(( ζj (t)) j∈e) < 0 for some g ∈ G e
+
+and t ∈ Im. Let κj be the cell containing ζj (t). Then 
+
+κj ∈ occ j (ζj , m ) for every j ∈ e, and (κj )j∈e ∈ Fm(g)
+
+by (20), contradicting (32) at the row (g, m, (κj )j∈e) ∈ R .(b) Suppose (32) fails at some row r = ( g, m, κ ) ∈ R , so that ζj (tj ) ∈ κj for some tj ∈ Im, j ∈ e, and, as κ ∈ Fm(g),
+
+ht(( ξj )j∈e) < 0 for some t ∈ Im and ξj ∈ κj . By the triangle inequality and the M ′-smoothness of zj ,
+
+d ξj , jet zj (t) ≤ S + d ζj (tj ), jet zj (tj )
+
++ d jet zj (tj ), jet zj (t)
+
+≤ S + η + M ′h, 
+
+so that, by the Lipschitz property of ht in the maximum metric, 
+
+ht(( ξj )j∈e) ≥ ht((jet zj (t)) j∈e) − LG (η + S + M ′h) ≥ 0, a contradiction. We now prove the two parts of Proposition 2. (i) Let (ϑ, λ ) be a feasible solution of (21). As λi,c ∈ { 0, 1}
+
+and P 
+
+> c
+
+λi,c = 1 , each agent i selects exactly one sequence 
+
+ci, with λi,c i = 1 and λi,c = 0 for c̸ = ci, and the constraints of (21) reduce to constraints on (c1, . . . , c N ). Those on the individual predicates give g(roll i(ci)) ≥ 0 for every g ∈ G i and 
+
+i. The occupancy rows give P 
+
+> j∈e
+
+1[κj ∈ occ j (cj , m )] ≤ | e| − 
+
+1 for every (g, m, κ ) ∈ R , so that the rollouts ζj := roll j (cj )
+
+occupy no forbidden tuple (32), and satisfy the joint predicates by Lemma 1(a). Thus (c1, . . . , c N ) is an agreement. Finally, the constraints on ϑ reduce to ϑ ≥ P 
+
+> i
+
+αℓi Ji(ci), ℓ = 1 , . . . , L ,so that, by (3), 
+
+ϑ ≥ max 
+
+> ℓ
+
+X
+
+> i
+
+αℓi Ji
+
+ roll i(ci) = Φ  roll 1(c1), . . . , roll N (cN ).
+
+(ii) Let λi,c := 1[c = ai] and ϑ := Φ(roll 1(a1), . . . , roll N (aN )) . Then λ is binary with 
+
+P 
+
+> c
+
+λi,c = 1 , and the constraints on the individual predicates hold, as each ai satisfies every g ∈ Gi. The rollouts 
+
+ζi := roll i(ai) are 2M -smooth and satisfy the joint predicates with the margin γS = LG (S + 2 M h ), so that Lemma 1(b), with jet zi := ζi, η = 0 , and M ′ = 2 M , shows that they occupy no forbidden tuple. As the occupancy rows reduce to (32) for these rollouts, they hold. Finally, the constraints on ϑ
+
+reduce to P 
+
+> i
+
+αℓi Ji(roll i(ai)) ≤ ϑ, which holds by (3). Hence 
+
+(ϑ, λ ) is feasible for (21), whose optimal value is at most ϑ.
+
+C. Proof of Proposition 3 
+
+(i) We recall from (33), (29), and (30) that 
+
+¯Ji(ζ) = wi Ji(ζ) + X
+
+> k
+
+ri,k (ζ) − πi, wi = X
+
+> ℓ
+
+βℓ αℓi ,ri,k (ζ) = X  
+
+> m:Im⊆[k, k +1]
+
+X
+
+> κ∈occ i(ζ,m )
+
+μi,κ,m ,μi,κ,m = X
+
+> r=( g,m,κ ′)∈R
+> i∈e, κ ′
+> i=κ
+
+μr ,
+
+where e is the group of the predicate g ∈ G e of the row r. We first derive an upper bound on the total rent P
+
+> i
+
+P 
+
+> k
+
+ri,k (ζi). As each substep lies in exactly one window, we have, reordering the summation, 
+
+X
+
+> i
+
+X
+
+> k
+
+ri,k (ζi) = X
+
+> i
+
+X
+
+> m
+
+X
+
+> κ∈occ i(ζi,m )
+
+μi,κ,m 
+
+= X
+
+> r=( g,m,κ )∈R
+
+μr
+
+X
+
+> i∈e
+
+1κi ∈ occ i(ζi, m ).
+
+(39) Since the curves ζ1, . . . , ζ N occupy no forbidden tuple, the inner sum following μr is at most |e| − 1 = br by (32), and given μ ≥ 0, X
+
+> i
+
+X
+
+> k
+
+ri,k (ζi) ≤ b⊤μ. 
+
+Next, as β ≥ 0 and 1⊤β = 1 , the weighted costs form a convex combination of the terms maximized in (3), 
+
+X
+
+> i
+
+wi Ji(ζi) = X
+
+> ℓ
+
+βℓ
+
+X
+
+> i
+
+αℓi Ji(ζi)
+
+≤ max 
+
+> ℓ
+
+X
+
+> i
+
+αℓi Ji(ζi) = Φ( ζ1, . . . , ζ N ).
+
+Summing (33) over i and applying the two upper bounds above, 
+
+X
+
+> i
+
+¯Ji(ζi) = X
+
+> i
+
+wi Ji(ζi) + X
+
+> i
+
+X
+
+> k
+
+ri,k (ζi) − 1⊤π
+
+≤ Φ( ζ1, . . . , ζ N ) + b⊤μ − 1⊤π, 
+
+which rearranges to the claim. (ii) The second inequality, LP( C) ≤ LP( Q), follows as 
+
+LP( Q) is a restriction of LP( C) with the additional constraints 
+
+λ(i,c ) = 0 , (i, c ) /∈ Q. For the first, let (ϑ, λ, s ) be a feasible solution of LP( C). By (27) and the constraints ϑ1 ≥ Jλ,
+
+Eλ = 1, and Oλ ≤ b + s of (25), with β ≥ 0, 1⊤β = 1 ,
+
+0 ≤ μ ≤ P 1, and s ≥ 0,
+
+X
+
+> (i,c )∈C
+
+λ(i,c ) ¯Ji(c) = β⊤Jλ − π⊤Eλ + μ⊤Oλ
+
+≤ ϑ + P 1⊤s − 1⊤π + b⊤μ, 17 
+
+Moreover, by (23), the constraints Gλ ≥ 0 read 
+
+g(roll i(c)) λ(i,c ) ≥ 0 and force λ(i,c ) = 0 for every sequence 
+
+c of agent i that violates one of its individual predicates. With 
+
+Eλ = 1, the weights λ(i,c ) of each agent thus form a probability distribution over its locally feasible sequences, whence, by (31), 
+
+X
+
+> (i,c )∈C
+
+λ(i,c ) ¯Ji(c) ≥ X
+
+> i
+
+¯J∗ 
+
+> i
+
+= X
+
+> i
+
+¯Ji(ci).
+
+The two bounds give 1⊤π − b⊤μ + P 
+
+> i
+
+¯Ji(ci) ≤ ϑ + P 1⊤s for every feasible solution of LP( C), and hence the first inequality. (iii) If the dual solution is optimal, then 1⊤π − b⊤μ =DP( Q) = LP( Q) by strong duality. With ¯Ji(ci) = ¯J∗ 
+
+> i
+
+= 0 
+
+for all i, the inequalities of (ii) then read LP( Q) ≤ LP( C) ≤
+
+LP( Q).
+
+D. Proof of Proposition 4 
+
+Recall that, in Theorem 1, the cost Ji(xi(·)) of a trajectory of agent i is the sum of the Lϱ-Lipschitz stage costs of its window trajectories, Ji(xi(·)) = P 
+
+> k
+
+ϱik(xi|[k, k +1] ) by (4). In Proposition 4, we deal with a single-agent problem of a similar kind, with the priced running cost (34), 
+
+Σμi (a) = wi Σi(a) + 
+
+> k
+
+X
+
+> j=1
+
+ri,j −1
+
+ roll i(a) − πi,
+
+violating the structure imposed by Theorem 1 due to the rent 
+
+ri,k charged for each window, which is not Lipschitz in the window trajectory. The proof of Proposition 4 is therefore an extension of the proof of Theorem 1 to handle this deviation in cost structure. We first briefly recall the proof of Theorem 1 detailed in [17]. Let ϱ∗ 
+
+> k
+
+:= ϱik(jet zi|[k, k +1] ) denote the stage costs of the reference zi(·) in the proposition statement. The proof shows, by induction over the depth k, that the tree retains a sequence 
+
+ak ∈ A ki with d(roll i(ak)( k), jet zi(k)) ≤ δAi + si, whose running cost satisfies 
+
+Σi(ak) ≤ X
+
+> j<k
+
+ϱ∗ 
+
+> j
+
++ k L ϱ ρi. (40) In the inductive step from the depth k to k+1 , the erosion of the reference control and the dispersion of Ai furnish a command 
+
+a ∈ A i whose window tracks the reference. Specifically, from the end state of ak, within δAi + si of the reference, the margin correction lemma [17, Lemma 5.9] gives an admissible corrector control that rejoins the reference at k + 1 and stays within CB,i (δAi +si) of it over the window, and the dispersion of Ai gives a command within δAi of this corrector, so that 
+
+d roll i(( ak, a )) |[k, k +1] , jet zi|[k, k +1] 
+
+ ≤ ρi, (41) with d(roll i(( ak, a ))( k + 1) , jet zi(k + 1)) ≤ δAi . By the margin and the smoothness of the reference, the window of the extension (ak, a ) satisfies gk ≥ 0 for every g ∈ G i and is 2Mi-smooth, as Definition 2(iii) requires. By (41) and the 
+
+Lϱ-Lipschitz property (4) of the stage costs, its stage cost satisfies 
+
+ϱik
+
+ roll i(( ak, a )) |[k, k +1] 
+
+ ≤ ϱ∗ 
+
+> k
+
++ Lϱ ρi. (42) The pruning procedure of Definition 2(iii) then retains, in the cell of roll i(( ak, a ))( k + 1) , a sequence ak+1 of no greater running cost, which thus satisfies (40) at the depth k + 1 and 
+
+d(roll i(ak+1 )( k + 1) , jet zi(k + 1)) ≤ δAi + si.Controlling the stage cost of the extension relative to that of the reference, as in (42), relies on the Lipschitz property, which no longer holds for the rent ri,k . We instead contain the rent of the extension over the window [k, k + 1] through the tracking (41). For every substep Im ⊆ [k, k + 1] , (41) and ρi ≤ ρ give 
+
+d(roll i(( ak, a ))( t), jet zi(t)) ≤ ρ at every t ∈ Im, so that every cell that the extension occupies at the substep m lies in the ρ-inflated occupancy occ ρi (jet zi, m ) of the reference. As 
+
+μ ≥ 0,
+
+ri,k 
+
+ roll i(( ak, a ))  ≤ X  
+
+> m:Im⊆[k, k +1]
+
+X  
+
+> κ∈occ ρi(jet zi,m )
+
+μi,κ,m .
+
+(43) The proof of Proposition 4 now follows as described below. The arguments surrounding the tracking (41), the predicates 
+
+gk ≥ 0 for g ∈ G i, and the 2Mi-smoothness of the windows carry over from the proof of Theorem 1. It remains to establish the extended counterpart of (40), 
+
+Σμi (ak) ≤ wi
+
+X 
+
+> j<k
+
+ϱ∗ 
+
+> j
+
++ k L ϱ ρ
+
+
+
++ X  
+
+> m:Im⊆[0 , k ]
+
+X  
+
+> κ∈occ ρi(jet zi,m )
+
+μi,κ,m − πi. (44) At k = 0 , both sides of (44) equal −πi. Now suppose that (44) holds at the depth k. As the extension (ak, a ) shares its first k windows with ak, (34) gives 
+
+Σμi (( ak, a )) = Σ μi (ak)+ wi ϱik
+
+ roll i(( ak, a )) |[k, k +1] 
+
+
+
++ ri,k 
+
+ roll i(( ak, a )) .
+
+(45) As wi ≥ 0 and ρi ≤ ρ, (42) gives 
+
+wi ϱik
+
+ roll i(( ak, a )) |[k, k +1] 
+
+ ≤ wi
+
+ ϱ∗ 
+
+> k
+
++ Lϱ ρ.
+
+Inserting this inequality, (43), and (44) at the depth k into (45) yields (44) at the depth k + 1 for the extension. The pruning procedure retains a sequence ak+1 with Σμi (ak+1 ) ≤
+
+Σμi (( ak, a )) , which therefore satisfies (44) at the depth k + 1 
+
+as well. At the depth T , we have P 
+
+> j<T
+
+ϱ∗ 
+
+> j
+
+= Ji(jet zi) by (4), and 
+
+T L ϱ = LJ . For the retained sequence ci := aT , (44) then gives ¯Ji(ci) = Σ μi (ci)
+
+≤ wi
+
+ Ji
+
+ jet zi + LJ ρ
+
++ X
+
+> m
+
+X  
+
+> κ∈occ ρi(jet zi,m )
+
+μi,κ,m − πi,
+
+where the equality follows from (34) and (28), as Σi(ci) = 
+
+Ji(ci). Finally, ci is feasible for the single-agent problem (15), as each of its windows satisfies gk ≥ 0 for every g ∈ G i. As the tree retains ci, ˆJi ≤ ¯Ji(ci). The retained depth-T sequences are likewise feasible for the pricing problem (31), so ¯J∗ 
+
+> i
+
+≤ ˆJi.18 
+
+E. Proof of Theorem 2 
+
+(i) The proof follows that of Proposition 3(i), with the bound of Proposition 4 in place of the reduced cost (33) of a jet curve. Each zi(·) is a feasible solution of the single-agent problem (15) with the margin g(jet zi) ≥ LG ρ for every g ∈ G i, as Proposition 4 requires. Proposition 4 thus furnishes, for every 
+
+i, ˆJi ≤ wi
+
+ Ji
+
+ jet zi + LJ ρ
+
++ X
+
+> m
+
+X  
+
+> κ∈occ ρi(jet zi,m )
+
+μi,κ,m − πi. (46) We show in two steps below that the right side of (46) summed over i is at most Φ(jet z1, . . . , jet zN ) + LΦ ρ + b⊤μ − 1⊤π.
+
+Step one: We show that no forbidden tuple lies in the ρ-inflated occupancies of the reference, 
+
+X
+
+> j∈e
+
+1κj ∈ occ ρj (jet zj , m ) ≤ | e| − 1 ∀ (g, m, κ ) ∈ R .
+
+(47) In summary, every point of a cell in occ ρj (jet zj , m ) lies within 
+
+ρ+S+M h of jet zj (t) for all t ∈ Im, and, by the joint margins, 
+
+ht is nonnegative on tuples of such points. A forbidden tuple contains points at which ht < 0 for some t ∈ Im, and thus cannot lie in the inflated occupancies. To formalize, suppose to the contrary that κj ∈ occ ρj (jet zj , m ) for every j ∈ e at some row r = ( g, m, κ ) ∈ R , so that d(ξj , jet zj (tj )) ≤ ρ for some 
+
+ξj ∈ κj and tj ∈ Im. As κ ∈ Fm(g), also ht(( ξ′ 
+
+> j
+
+)j∈e) < 0 for some t ∈ Im and ξ′ 
+
+> j
+
+∈ κj . By the triangle inequality and the 
+
+M -smoothness of zj , for each j ∈ e,
+
+d ξ′ 
+
+> j
+
+, jet zj (t) ≤ d(ξ′ 
+
+> j
+
+, ξ j ) + d ξj , jet zj (tj )
+
++ d jet zj (tj ), jet zj (t)
+
+≤ S + ρ + M h, 
+
+so that, by the Lipschitz property of ht in the maximum metric and the joint margins, 
+
+ht
+
+ (ξ′ 
+
+> j
+
+)j∈e
+
+ ≥ ht
+
+ (jet zj (t)) j∈e
+
+ − LG (ρ + S + M h ) ≥ 0,
+
+a contradiction. Reordering the summation as in (39), we then have, by (47), μ ≥ 0, and br = |e| − 1,
+
+X
+
+> i
+
+X
+
+> m
+
+X  
+
+> κ∈occ ρi(jet zi,m )
+
+μi,κ,m 
+
+= X
+
+> r=( g,m,κ )∈R
+
+μr
+
+X
+
+> j∈e
+
+1κj ∈ occ ρj (jet zj , m )
+
+≤ b⊤μ. 
+
+(48) 
+
+Step two: Recall that wi = P 
+
+> ℓ
+
+βℓ αℓi , where β ≥ 0 and 1⊤β =1. The weighted sums below thus form convex combinations of the terms maximized in (3) and in the definition LΦ := max ℓ
+
+P 
+
+> i
+
+αℓi LJ of Proposition 1, 
+
+X
+
+> i
+
+wi Ji
+
+ jet zi = X
+
+> ℓ
+
+βℓ
+
+X
+
+> i
+
+αℓi Ji
+
+ jet zi
+
+≤ max 
+
+> ℓ
+
+X
+
+> i
+
+αℓi Ji
+
+ jet zi
+
+= Φ  jet z1, . . . , jet zN ,
+
+X
+
+> i
+
+wi LJ = X
+
+> ℓ
+
+βℓ
+
+X
+
+> i
+
+αℓi LJ ≤ LΦ.
+
+(49) Summing (46) over i and applying (48) and (49), 
+
+X
+
+> i
+
+ˆJi ≤ Φ jet z1, . . . , jet zN  + LΦ ρ + b⊤μ − 1⊤π, 
+
+which rearranges to (i). (ii) If the dual solution is optimal, then 1⊤π − b⊤μ =DP( Q) = LP( Q) by strong duality. The first claim of (ii) then follows from (i), and the second from ˆJi ≥ 0 for all i.
+
+F. Proof of Proposition 5 
+
+Both parts follow iteration n of Algorithm 1 line by line. (i) Completeness and consistency. Initialization (line 3): Every agent initializes its pool with the initial agreement, which every agent endorses by (c). The initial agreement is thus globally endorsed at time tn.
+
+Negotiation (lines 4–12): An agent broadcasts columns, pub-lishes solutions, and endorses solutions only before time 
+
+tn − δcomm . By (a), every such message reaches every agent before time tn.
+
+Reception (line 13): At time tn, all agents thus hold the same columns and endorsements, and hence the same set of globally endorsed solutions. By the initialization, this set contains the initial agreement and is nonempty. 
+
+Pick (line 14): All agents thus pick the same best globally endorsed solution cn, with ties broken by the common rule. Every globally endorsed solution is either the initial agreement or was published at line 11 of Algorithm 1 as a solution of 
+
+JCP( Q′) for the pool Q′ of some agent. It thus satisfies all predicates, and cn is an agreement. (ii) Certificate at quiescence. Pricing (lines 9–10): At quiescence, ˆJi ≥ 0 for all i, so that no agent broadcasts a column. The pool Q is thus the final pool of iteration n.
+
+Endorsement (lines 11–12): Before time tn − δcomm , each agent publishes a solution of JCP( Q) at line 11, which every agent endorses at line 12, as its columns lie in Q. As in (i), it is globally endorsed at time tn.
+
+Pick (line 14): Every globally endorsed solution has its columns in Q and satisfies the joint predicates, and thus costs at least JCP( Q).As DP( Q) has an optimal solution, with DP( Q) = LP( Q),Theorem 2(ii) with ˆJi ≥ 0 for all i gives 
+
+LP( Q) ≤ Φ jet z1, . . . , jet zN  + LΦ ρ, 
+
+and subtracting this inequality from Φ( cn) gives the claim. REFERENCES [1] G. Sharon, R. Stern, A. Felner, and N. R. Sturtevant, “Conflict-based search for optimal multi-agent pathfinding,” Artificial Intelligence , vol. 219, pp. 40–66, 2015. [2] A. Tajbakhsh, L. T. Biegler, and A. M. Johnson, “Conflict-based model predictive control for scalable multi-robot motion planning,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2024, pp. 14 562–14 568. [3] J. Kottinger, S. Almagor, and M. Lahijanian, “Conflict-based search for multi-robot motion planning with kinodynamic constraints,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS) , 2022, pp. 13 494–13 499. 19 
+
+[4] A. Moldagalieva, J. Ortiz-Haro, M. Toussaint, and W. Hönig, “db-CBS: Discontinuity-bounded conflict-based search for multi-robot kinodynamic motion planning,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2024, pp. 14 569–14 575. [5] A. Moldagalieva, J. Ortiz-Haro, and W. Hönig, “db-ECBS: Interaction-aware multirobot kinodynamic motion planning,” IEEE Trans. Robot. ,vol. 42, pp. 244–260, 2026. [6] A. Moldagalieva, K. Okumura, A. Prorok, and W. Hönig, “db-LaCAM: Fast and scalable multi-robot kinodynamic motion planning with discontinuity-bounded search and lightweight MAPF,” in Proc. Int. Conf. Autom. Plan. Sched. (ICAPS) , 2026, pp. 738–746. [7] M. ˇ Cáp, P. Novák, J. Vokˇ rínek, and M. Pˇ echouˇ cek, “Multi-agent RRT*: Sampling-based cooperative pathfinding,” in Proc. Int. Conf. Auton. Agents Multiagent Syst. (AAMAS) , 2013, pp. 1263–1264. [8] R. Shome, K. Solovey, A. Dobson, D. Halperin, and K. E. Bekris, “dRRT*: Scalable and informed asymptotically-optimal multi-robot motion planning,” Auton. Robots , vol. 44, no. 3–4, pp. 443–467, 2020. [9] X. Zhou, J. Zhu, H. Zhou, C. Xu, and F. Gao, “EGO-Swarm: A fully autonomous and decentralized quadrotor swarm system in cluttered environments,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2021, pp. 4101–4107. [10] J. Tordesillas and J. P. How, “MADER: Trajectory planner in multiagent and dynamic environments,” IEEE Trans. Robot. , vol. 38, no. 1, pp. 463–476, 2022. [11] K. Kondo, R. Figueroa, J. Rached, J. Tordesillas, P. C. Lusk, and J. P. How, “Robust MADER: Decentralized multiagent trajectory planner robust to communication delay in dynamic environments,” IEEE Robot. Autom. Lett. , vol. 9, no. 2, pp. 1476–1483, 2024. [12] C. E. Luis and A. P. Schoellig, “Trajectory generation for multiagent point-to-point transitions via distributed model predictive control,” IEEE Robot. Autom. Lett. , vol. 4, no. 2, pp. 375–382, 2019. [13] C. E. Luis, M. Vukosavljev, and A. P. Schoellig, “Online trajectory generation with distributed model predictive control for multi-robot motion planning,” IEEE Robot. Autom. Lett. , vol. 5, no. 2, pp. 604–611, 2020. [14] J. Park, D. Kim, G. C. Kim, D. Oh, and H. J. Kim, “Online distributed trajectory planning for quadrotor swarm with feasibility guarantee using linear safe corridor,” IEEE Robot. Autom. Lett. , vol. 7, no. 2, pp. 4869– 4876, 2022. [15] L. Ferranti, L. Lyons, R. R. Negenborn, T. Keviczky, and J. Alonso-Mora, “Distributed nonlinear trajectory optimization for multi-robot motion planning,” IEEE Trans. Control Syst. Technol. , vol. 31, no. 2, pp. 809–824, 2023. [16] A. D. Saravanos, Y. Aoyama, H. Zhu, and E. A. Theodorou, “Distributed differential dynamic programming architectures for large-scale multiagent control,” IEEE Trans. Robot. , vol. 39, no. 6, pp. 4387–4407, 2023. [17] S. A. Deshpande and J. P. How, “Dispersive forward tree search for optimal control: Coverage, complexity, and computation,” arXiv preprint arXiv:2608.26314 , 2026. [18] G. B. Dantzig and P. Wolfe, “Decomposition principle for linear programs,” Oper. Res. , vol. 8, no. 1, pp. 101–111, 1960. [19] M. E. Lübbecke and J. Desrosiers, “Selected topics in column generation,” 
+
+Oper. Res. , vol. 53, no. 6, pp. 1007–1023, 2005. [20] D. Dayan, K. Solovey, M. Pavone, and D. Halperin, “Near-optimal multi-robot motion planning with finite sampling,” IEEE Trans. Robot. , vol. 39, no. 5, pp. 3422–3436, 2023. [21] D. Le and E. Plaku, “Cooperative, dynamics-based, and abstraction-guided multi-robot motion planning,” J. Artif. Intell. Res. , vol. 63, pp. 361–390, 2018. [22] V. R. Desaraju and J. P. How, “Decentralized path planning for multi-agent teams with complex constraints,” Auton. Robots , vol. 32, no. 4, pp. 385–403, 2012. [23] G. Best, O. M. Cliff, T. Patten, R. R. Mettu, and R. Fitch, “Dec-MCTS: Decentralized planning for multi-robot active perception,” Int. J. Robot. Res. , vol. 38, no. 2–3, pp. 316–337, 2019. [24] D. Mellinger, A. Kushleyev, and V. Kumar, “Mixed-integer quadratic program trajectory generation for heterogeneous quadrotor teams,” in 
+
+Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2012, pp. 477–483. [25] F. Augugliaro, A. P. Schoellig, and R. D’Andrea, “Generation of collision-free trajectories for a quadrocopter fleet: A sequential convex programming approach,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS) , 2012, pp. 1917–1922. [26] J. Chen, J. Li, C. Fan, and B. C. Williams, “Scalable and safe multi-agent motion planning with nonlinear dynamics and bounded disturbances,” in 
+
+Proc. AAAI Conf. Artif. Intell. , 2021, pp. 11 237–11 245. [27] J. Yan and J. Li, “Multi-agent motion planning with bézier curve optimization under kinodynamic constraints,” IEEE Robot. Autom. Lett. ,vol. 9, no. 3, pp. 3021–3028, 2024. [28] M. M. Zavlanos, M. B. Egerstedt, and G. J. Pappas, “Graph-theoretic connectivity control of mobile robot networks,” Proc. IEEE , vol. 99, no. 9, pp. 1525–1540, 2011. [29] R. Bai, S. Yuan, K. Li, H. Guo, W.-Y. Yau, and L. Xie, “Realm: Real-time line-of-sight maintenance in multi-robot navigation with unknown obstacles,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2025, pp. 7363–7369. [30] R. Bai, S. Yuan, X. Xu, X. Ji, X. Li, H. Guo, W.-Y. Yau, and L. Xie, “Line-of-sight-constrained multi-robot mapless navigation via polygonal visible regions,” 2026. [31] A. A. Farley, “A note on bounding a class of linear programming problems, including cutting stock problems,” Oper. Res. , vol. 38, no. 5, pp. 922–923, 1990. [32] C. Barnhart, E. L. Johnson, G. L. Nemhauser, M. W. P. Savelsbergh, and P. H. Vance, “Branch-and-price: column generation for solving huge integer programs,” Oper. Res. , vol. 46, no. 3, pp. 316–329, 1998. [33] E. Lam, P. Le Bodic, D. Harabor, and P. J. Stuckey, “Branch-and-cut-and-price for multi-agent path finding,” Comput. Oper. Res. , vol. 144, p. 105809, 2022. [34] N. Haghani, J. Li, S. Koenig, G. Kunapuli, C. Contardo, and J. Yarkony, “Integer programming for multi-robot planning: A column generation approach,” 2020. [35] A. Testa and G. Notarstefano, “Generalized assignment for multi-robot systems via distributed branch-and-price,” IEEE Trans. Robot. , vol. 38, no. 3, pp. 1990–2001, 2022. [36] D. Bertsimas and J. N. Tsitsiklis, Introduction to Linear Optimization .Belmont, MA: Athena Scientific, 1997.
