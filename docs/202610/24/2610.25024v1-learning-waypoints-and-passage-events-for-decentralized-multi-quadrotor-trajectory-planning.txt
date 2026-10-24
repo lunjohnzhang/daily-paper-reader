@@ -1,0 +1,535 @@
+Title: Learning Waypoints and Passage Events for Decentralized Multi-Quadrotor Trajectory Planning
+
+URL Source: https://arxiv.org/pdf/2610.25024v1
+
+Published Time: Tue, 20 Oct 2026 01:19:18 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Learning Waypoints and Passage Events for Decentralized Multi-Quadrotor Trajectory Planning 
+
+Yunhan Shi 1, Jia Deng 2, Zehao Jia 2,Lin Cheng 1,* , Shengping Gong 1
+
+> 1
+
+School of Astronautics, Beihang University, Beijing 100191, China 
+
+> 2
+
+Astroup(Beijing) Technology Co., Ltd. 
+
+syunham@buaa.edu.cn , dengjia@astroup.com , jiazehao@astroup.com 
+
+> *
+
+Corresponding author: chenglin5580@buaa.edu.cn gongsp@buaa.edu.cn 
+
+Abstract —Multi-quadrotor passage planning requires coordi-nated spatial routes and passage times under vehicle dynamics and actuation constraints. Optimizing these decisions jointly couples temporal allocation, nonlinear motion, and inter-vehicle interactions, creating a computational challenge for local trajec-tory generation. We propose a learning–optimization framework that predicts spatial waypoints and ordered passage events for independently solved quadrotor planners. A common physical time grid aligns the vehicles, with intermediate events fixed by the networks and terminal progress optimized locally to permit different completion metrics. Differentiable sequential convex programming incorporates rigid-body dynamics and rotor-thrust bounds, allowing collision and completion gradients to train both networks through the generated trajectories. In a two-quadrotor evaluation across 24 layouts, the adapted policy passes physical feasibility and sampled separation checks in all five held-out layouts. Their mean completion metric decreases by 1.52% relative to the inherited policy. The median forward time is 21.01 ms on the held-out exchange layout with matching numerical trajectory references. These results demonstrate that learned spatial and event parameters can coordinate independent rigid-body planners while preserving local vehicle constraints in the evaluated scenarios. 
+
+Index Terms —Multi-robot planning, quadrotors, differentiable optimization, event timing, sequential convex programming. 
+
+I. I NTRODUCTION 
+
+Multi-quadrotor passage planning concerns the coordinated motion of several vehicles through prescribed gates toward individual targets. Such tasks arise in swarm racing and navigation through cluttered environments, where vehicles share limited passage space [1], [2]. Successful traversal requires each trajectory to satisfy vehicle dynamics and each pair of vehicles to maintain suitable separation. Spatial route selection and passage timing therefore form a common planning problem for coordinated flight. The central computational difficulty is the coupling between passage timing, vehicle motion, and inter-vehicle separation. Changing an arrival time changes where a vehicle meets its neighbors, and generating the corresponding motion requires satisfying nonlinear attitude and actuation constraints. Solving these decisions jointly introduces temporal variables and interaction constraints into the trajectory optimization. This coupling motivates three complementary approaches: direct optimization, learned motion generation, and hybrid learning– optimization planning. Optimization-based methods provide explicit representations of trajectory objectives and physical constraints. Minimum-snap and MINCO formulations exploit polynomial structure for efficient trajectory generation [3], [4], while complementary progress constraints (CPC) optimize ordered waypoint comple-tion together with motion [1], [5]. Decentralized planners such as MADER and Robust MADER incorporate shared trajectory information into local collision handling [6], [7]. The resulting formulations make passage allocation and inter-vehicle coupling explicit, identifying the decisions that a learned planner can help organize. Learning-based methods offer a direct mapping from ob-servations to motion decisions. Sensor-to-trajectory policies have been trained through privileged imitation learning for high-speed flight [8], and differentiable simulation has supplied analytical gradients for quadrotor control from states and visual features [9]. Their training objectives encode desired behavior in network parameters and support rapid inference. For con-strained multi-vehicle passage, this motivates learning spatial and temporal decisions together with a physical trajectory-generation model. Hybrid learning–optimization methods provide a mechanism for coupling neural predictions to constrained planning. Alloc-Net predicts segment durations for a differentiable trajectory quadratic program [10], Jiang et al. jointly learn waypoints and time allocations [11], and Marino et al. combine learned multi-UAV trajectory parameters with a differentiable correction layer [12]. These approaches show how optimization gradients can shape planning parameters during training. Inspired by these approaches, we learn spatial and event parameters to coordinate independently solved rigid-body trajectories on a shared time grid. This design involves three linked challenges. First, pairwise separation must be evaluated at common physical times even when the vehicles complete their routes at different times. Second, the trajectory layer must incorporate nonlinear rigid-body motion and rotor-level limits while retaining usable derivatives for network training. Third, independent local solves need spatial and temporal decisions that respond to arXiv:2610.25024v1 [cs.RO] 18 Oct 2026 neighboring vehicles. A suitable hierarchy must therefore connect synchronized event allocation, constrained local motion, and inter-vehicle learning within one training objective. We propose a learning–optimization framework that connects these three requirements through spatial waypoints and passage events. As illustrated in Fig. 1, shared networks use the vehicle state, known gate locations, and current relative neighbor positions to predict waypoint centers and ordered intermediate events. Independent differentiable CPC-based planners then generate trajectories on a common physical grid, and the outer objective evaluates collision and completion costs across the resulting trajectories. This hierarchy makes learned event allocation the connection between multi-vehicle coordination and local physical planning. The framework has three main technical contributions: 1) A shared-grid event representation organizes spatial targets and passage timing for independent local planners. Continuous intermediate timestamps parameterize inter-polated passage constraints, and the final CPC progress distribution remains a local decision variable. This con-struction supports common-time interaction evaluation together with vehicle-specific completion metrics. 2) A differentiable sequential convex programming (SCP) trajectory layer incorporates rigid-body dynamics and individual rotor-thrust limits. Local approximations of the dynamics and terminal progress yield convex conic subproblems whose parameterization satisfies disciplined parametrized programming. The layer provides a con-strained trajectory map through which waypoint and event predictions can be trained. 3) An outer coordination objective adapts both networks through independently generated trajectories. Collision penalties act on synchronized vehicle positions, and the completion term links the learned parameters to local progress. This objective makes inter-vehicle behavior part of parameter learning while keeping the trajectory solves independent. The numerical evaluation examines coordination, physical feasibility, and computation within a two-vehicle setting. Gate-perturbation and goal-exchange layouts test spatial and temporal adaptation, a frozen-policy experiment examines thrust-difference regularization, and selected finite differences check the network derivatives. Warm-reference forward timings characterize the solver’s computational cost. Together, these experiments assess the framework through trajectory behavior, local constraint satisfaction, and measured planning cost. II. R ELATED WORK 
+
+A. Waypoint Timing and Trajectory Optimization 
+
+Polynomial minimum-snap trajectories provide an effi-cient representation for quadrotor flight through waypoint sequences [3]. MINCO provides a compact polynomial rep-resentation with efficient spatial–temporal deformation and supports geometrical and dynamic constraints through trajectory optimization [4]. CPC models ordered completion through continuous progress variables and jointly optimizes passage allocation and vehicle motion [5]. Shen et al. extend this principle to a swarm racing task [1]. Our formulation retains complementary progress only for the final event and uses learned continuous timestamps for intermediate events, which restrict the feasible trajectories to those compatible with the assigned passage times. 
+
+B. Decentralized Multi-Vehicle Planning 
+
+MADER generates trajectories asynchronously using en-closing polyhedra, optimized separating planes, and collision checks against other agents’ committed trajectories [6]. Robust MADER extends trajectory sharing with delay checks and a two-step publication scheme to accommodate communication delays in dynamic environments [7]. EGO-Swarm combines gradient-based local planning, collision-risk penalties, and lightweight topological trajectory generation for decentralized navigation in cluttered environments [2]. These methods make exchanged trajectory information part of decentralized collision handling. In our formulation, current relative neighbor positions condition the shared networks, and synchronized local trajectories enter the outer collision objective during training. 
+
+C. Learning with Differentiable Planners 
+
+Differentiable MPC learns controller costs and dynamics by differentiating the KKT conditions of a convex approx-imation at a controller fixed point [13]. AllocNet predicts segment durations and differentiates through the fixed-duration trajectory QP [10]. Jiang et al. combine depth-based waypoint prediction, time allocation, and differentiable minimum-snap optimization [11]. Marino et al. predict MINVO control points and a learned collision constraint from point clouds and communicated features, then use an OptNet-based QP layer during imitation learning [12], [14]. These works establish the broader learning–optimization architecture. Our focus is the event representation and the separation of outer inter-agent collision learning from local rotor-level planning. For interacting aerial systems, learned model predictive games project neural reference strategies into dynamically feasible trajectories and train with game objectives [15]. DiffCo-ord differentiates a distributed ADMM–DDP pipeline to learn problem and solver parameters for cooperative trajectories [16]. Our local optimizers interact through shared observations and the outer training objective. This choice reduces explicit coupling in each local solve, while leaving collision avoidance dependent on the learned policy and numerical validation. Learning also connects visual observations to aerial motion. Loquercio et al. train a sensor-to-trajectory policy through privileged imitation learning in simulation for high-speed flight [8]. Heeg et al. train quadrotor control policies using analytical gradients through differentiable dynamics and learned visual-state representations [9]. These studies provide con-text for trajectory-level learning and dynamics-based policy gradients. The present formulation learns spatial and event parameters from state observations through differentiable local optimization. Shared policy, independently solved trajectories      
+
+> Observations
+> Own state + gates Neighbor positions
+> Waypoint network
+> Two spatial waypoints
+> Event network
+> Ordered times Adjacent-node encoding
+> Differentiable CPC / SCP
+> Fixed events + free final progress Rigid-body dynamics
+> Trajectory
+> State and rotor thrusts Common physical time grid Training: six unrolled convex subproblems
+> 123456
+> Team loss
+> Collision + completion metric
+> Analytical gradients through the optimization layers
+> Per-agent planning
+> Shared policy weights Independent local solves No inner pairwise collision constraints
+
+Fig. 1. Schematic of the learning and planning architecture. The waypoint block illustrates two learned intermediate points, which are combined with prescribed gate centers to define the passage events. The event block assigns their temporal locations on a shared grid. The repeated SCP blocks illustrate differentiable local planning under linearized rigid-body dynamics. Dashed green arrows denote gradients of the outer collision and completion objectives. The waypoint count and unrolling depth shown here are example design choices. 
+
+III. P ROBLEM FORMULATION 
+
+We consider a multi-quadrotor racing scenario in which vehicles traverse prescribed gates and proceed to individual terminal targets. Each quadrotor has real-time access to its own state and the race-gate positions, and observes the current relative positions of neighboring quadrotors. These local observations provide the spatial information used to coordinate passage timing and generate dynamically feasible trajectories. 
+
+A. Observations and Shared Time Grid 
+
+Consider na vehicles indexed by i. The local observation is 
+
+oi = ( xi, 0, g i, 1, g i, 2, {pj, 0 − pi, 0}j∈N i ) , (1) where Ni is the set of neighboring vehicles observed at the current planning instant, gi, 1 is the shared passage center, and 
+
+gi, 2 is the individual terminal target. Neighbor observations consist of current relative positions. The formulation is state based. Every vehicle uses the same grid tk = kh , k = 0 , . . . , N ,with a common horizon H = N h . Independent completion events may occur at different grid locations. Full trajectories are retained to H, including the segments after the completion event, and remain active in collision evaluation. 
+
+B. Rigid-Body Dynamics 
+
+The state and input are 
+
+xi = ( pi, v i, q i, ω i) ∈ R13 ,ui = ( fi, 0, f i, 1, f i, 2, f i, 3) ∈ R4, (2) where qi is a scalar-first quaternion and fi,r is an individual rotor thrust. With e3 = (0 , 0, 1) ⊤, the model is 
+
+˙pi = vi,
+
+˙vi = m−1 X 
+
+> r
+
+fi,r 
+
+
+
+R(qi)e3 − ge 3,
+
+˙qi = 12 qi ⊗ (0 , ω i),
+
+˙ωi = J−1 (τi − ωi × Jω i) .
+
+(3) Rotor thrusts map to torque through the X-configuration allocation 
+
+τi =
+
+
+
+a a −a −a
+
+−a a a −acτ −cτ cτ −cτ
+
+ ui, a = ℓ/ √2. (4) The discrete transition map Fh propagates the rigid-body state over each time interval with a unit-quaternion attitude representation. The model resolves rotor thrusts, attitude, and angular-rate dynamics under a rigid-body assumption with gravity and rotor forces. 
+
+C. Passage Events and Coordination Objective 
+
+Each vehicle follows E ordered event centers that interleave learned spatial waypoints and prescribed gates, with the terminal target as the last event. For example, the two-waypoint schematic in Fig. 1 corresponds to 
+
+yi, 1:4 = ( wi, 1, g i, 1, w i, 2, g i, 2), (5) where wi, 1:2 denote learned intermediate points, gi, 1 is the shared passage center, and gi, 2 is the terminal target. Each event couples a spatial center, a tolerance radius, and a passage-time condition. A gate is represented by a position tolerance ball ∥p − yi,j ∥2 ≤ ri,j , which specifies positional proximity to its center. Training minimizes an objective of the form 
+
+min  
+
+> θ
+
+Es∈D train 
+
+"
+
+Lcol (Xθ ) + η 1
+
+naH
+
+X
+
+> i
+
+T θi
+
+#
+
+, (6) where (Xθi , U θi , μ θi,E ) are outputs of the local planner condi-tioned on the network predictions. Ti, defined in Sec. IV-D, is an interval-index completion metric. IV. L EARNED SPATIAL AND EVENT PARAMETERS 
+
+A. Waypoint Network 
+
+A shared encoder maps each relative neighbor position to a feature vector using a linear layer and a tanh nonlinearity. Mean pooling gives a fixed-size neighborhood embedding, which is concatenated with the own state and gate coordinates. A waypoint head predicts bounded offsets from a smooth geometric reference. For example, the waypoint block in Fig. 1 represents intermediate spatial points whose locations can adjust the route before and after a prescribed gate. These points become event centers for the local planner; their passage times are assigned by the event network. 
+
+B. Ordered Event Encoding 
+
+The event network receives the ordered event centers and radii. Its hidden layer produces corrections to E + 1 baseline gap logits, including the gaps before the first and after the last event. For N > E + 1 , with zi ∈ RE+1 denoting corrected logits, define 
+
+di,j = 1 + ( N − E − 1) softmax( zi)j , (7) 
+
+ci,j =
+
+> j
+
+X
+
+> l=1
+
+di,l , j = 1 , . . . , E. (8) Thus the gaps sum to N , each exceeds one grid interval, and the event centers remain ordered inside the horizon. For kj = ⌊ci,j ⌋ and αj = ci,j − kj , the adjacent-node code is 
+
+μenc  
+
+> i,j,k
+
+= (1 − αj )1k=kj + αj 1k=kj +1 . (9) Its mass sums to one and its grid-index expectation is ci,j . For example, the colored stems in Fig. 2(a) represent the masses assigned to two adjacent nodes for an illustrative event of each vehicle. The dotted vertical lines mark the corresponding fractional event locations. Panel (b) shows the associated remaining progress, which decreases as the event is completed. This encoding retains gradients inside a selected grid cell. The cell-selection operation is discrete, so gradients are evaluated locally within the selected event support. 
+
+C. Continuous Intermediate Event Constraints 
+
+The first E − 1 event times τi,j = hc i,j are fixed during each local solve. At α ∈ [0 , 1] in cell k, the event position is interpolated from the adjacent position and velocity states as 
+
+ˆpi(τ ) = H00 (α)pi,k + hH 10 (α)vi,k 
+
++ H01 (α)pi,k +1 + hH 11 (α)vi,k +1 , (10) where H00 = 2 α3 − 3α2 + 1 , H10 = α3 − 2α2 + α, H01 =
+
+−2α3 + 3 α2, and H11 = α3 − α2. The event constraint is 
+
+∥ˆpi(τi,j ) − yi,j ∥2 ≤ ri,j − δr , j = 1 , . . . , E − 1, (11) where δr > 0 is an interpolation margin. For fixed event coefficients, this is a second-order-cone constraint affine in the state variables. The margin compensates numerically for interpolation discrepancy; an independent dynamics rollout checks the integrated motion at the assigned event times. 0.0 0.5 1.0              
+
+> Event mass  μk
+> a Two-node encoding of a continuous event
+> Drone 1 event Drone 2 event
+> 012345678
+> Common grid index k
+> 0.0 0.5 1.0
+> Progress  λk
+> b Ordered progress on the same time grid
+> Fig. 2. Schematic of event encoding on a shared time grid. (a) Each color illustrates one vehicle’s event: stem heights are the adjacent-node masses
+> μenc , and the dotted vertical line marks their grid-index expectation c. (b) The associated progress λdecreases from one to zero. The event locations illustrate the representation. Each intermediate code parameterizes a single continuous-time passage constraint at its fractional timestamp.
+
+D. Free Terminal Progress 
+
+The last event retains nonnegative decision variables μi,E,k .Progress satisfies 
+
+λi,j, 0 = 1 , λi,j,k +1 = λi,j,k − μi,j,k , λi,j,N = 0 . (12) Intermediate rows use (9); the final row is optimized. Define 
+
+Ci,j,k = Pkl=0 μi,j,l . The condition Ci,E,k ≤ Ci,E −1,k 
+
+prevents terminal progress from preceding completion of the previous event. Terminal mass is normalized and restricted to support beginning at the preceding event cell. The remain-ing nonredundant cumulative-order inequalities are imposed explicitly. After eliminating the original CPC tolerance variable, the relaxed terminal condition is 
+
+μi,E,k 
+
+
+
+∥pi,k − gi, 2∥22 − r2
+
+> i,E
+
+
+
+≤ ε, (13) where ε > 0 is the complementarity relaxation tolerance. The interval-index completion metric is 
+
+Ti = h 
+
+> N−1
+
+X
+
+> k=0
+
+(k + 1) μi,E,k . (14) The (k + 1) convention associates terminal progress with the end of an indexed interval. The distance in (13) is evaluated at node k. Thus Ti measures the expected interval-end index of terminal progress. The local optimizer chooses the final mass distribution subject to the terminal proximity and ordering constraints. V. D IFFERENTIABLE LOCAL PLANNING AND TRAINING 
+
+A. Sequential Convex Subproblems 
+
+SCP constructs local convex trajectory subproblems using dynamics approximations and trust-region updates [17]. At iteration s, linearization of the discrete transition map Fh
+
+around (¯ xk, ¯uk) gives 
+
+xk+1 = A(s) 
+
+> k
+
+xk + B(s) 
+
+> k
+
+uk + b(s) 
+
+> k
+
+, (15) 
+
+A(s) 
+
+> k
+
+= ∂xFh(¯ xk, ¯uk), B(s) 
+
+> k
+
+= ∂uFh(¯ xk, ¯uk). (16) The affine offset reproduces Fh at the reference. Quaternion normalization is included in these Jacobians. For the terminal product, let ¯dk = ∥¯pk − gi, 2∥22 and 
+
+ak = max(¯ μk, a min ), with a positive curvature floor amin .The convex partial-product approximation is 
+
+ak ∥pk − gi, 2∥22 + ( ¯dk − r2 
+
+> i,E
+
+)μk − ak ¯dk ≤ ε. (17) Equation (17) is a local partial-product approximation to (13). State, thrust, and progress trust regions restrict each update, and the original nonlinear residual is checked after the solve. Each convex subproblem minimizes 
+
+J(s) 
+
+> i
+
+= Ti + ρu
+
+X
+
+> k
+
+∥uk − uhov ∥22 + ρ∆
+
+h 
+
+> N−2
+
+X
+
+> k=0
+
+∥uk+1 − uk∥22
+
++ ρx X − ¯X 2 
+
+> F
+
++ ρ0 ∥X∥2 
+
+> F
+
+, (18) subject to the affine dynamics, event constraints, terminal progress conditions, and vehicle bounds. Here uhov =(mg/ 4) 1. The terminal state has pN = gi, 2, vN = 0 , zero quaternion vector part, and ωN = 0 .Speed and angular-rate limits, event balls, and the quadratic terminal surrogate yield convex conic subproblems with second-order-cone constraints. Coefficients such as √ak, ¯dk −r2 
+
+> i,E
+
+, and 
+
+−ak ¯dk are formed outside CVXPY [18] and passed as separate parameters. Auxiliary residual variables separate parameterized targets from quadratic expressions. This construction permits a disciplined parametrized programming (DPP) template em-bedded with CvxpyLayer [19]. 
+
+B. Training Objective and Gradients 
+
+At sampled physical times t ∈ T , define 
+
+Dij (t) = ∥S(pi(t) − pj (t)) ∥2 , S = diag( sx, s y , s z ).
+
+(19) The collision loss is 
+
+Lcol = 1
+
+|P| |T | 
+
+X
+
+> (i,j )∈P
+
+X
+
+> t∈T
+
+[dtrain − Dij (t)] 2+ , (20) where P is the set of unordered vehicle pairs and the positive diagonal entries of S set the directional distance scaling. The training margin dtrain and evaluation threshold deval both specify required inter-vehicle distances in this scaled metric. The analytical chain from the outer loss to waypoint and event parameters passes through K unrolled SCP steps. Each CvxpyLayer differentiates its conic solution map using diffcp [20]. Dynamics derivatives and event interpolation coefficients remain in the computational graph, which enables optimization-based gradient training of both networks. 
+
+Algorithm 1 Training with independent event-conditioned planners 
+
+Require: Training layouts, shared network weights θ, numeri-cal references  
+
+> 1:
+
+for each training update do  
+
+> 2:
+
+Sample a batch of training layouts  
+
+> 3:
+
+for each layout and each vehicle i do  
+
+> 4:
+
+Predict spatial waypoints and ordered intermediate events  
+
+> 5:
+
+Construct event interpolation coefficients and ter-minal support  
+
+> 6:
+
+for s = 1 , . . . , K do  
+
+> 7:
+
+Linearize Fh and form terminal coefficients  
+
+> 8:
+
+Solve the DPP-safe convex conic subproblem  
+
+> 9:
+
+Update state, thrust, and terminal-progress ref-erence  
+
+> 10:
+
+end for  
+
+> 11:
+
+end for  
+
+> 12:
+
+Evaluate (6) on synchronized trajectories  
+
+> 13:
+
+Backpropagate and propose an Adam update  
+
+> 14:
+
+Accept a feasible loss-decreasing candidate using backtracking  
+
+> 15:
+
+end for 
+
+C. Numerical Forward Backend 
+
+The forward backend reuses the sparse conic template and directly updates Clarabel numerical data [21]. A cached dynamics function supplies the state and control derivatives used for linearization [22]. Adaptive stopping checks the current nonlinear dynamics defect, terminal CPC residual, physical bounds, event constraints, and quaternion consistency. A stored trajectory can initialize the numerical reference when available; otherwise, the planner constructs an initial reference for the requested layout. Template reuse and numerical-reference reuse are separate mechanisms: the former preserves the problem structure, while the latter also supplies state, thrust, and progress values. Their evaluation protocols are specified in Sec. VI. No online pairwise collision constraint is added to the local planner. VI. E XPERIMENTAL EVALUATION 
+
+A. Setup and Evaluation Protocol 
+
+Table I lists the final configuration. The two vehicles start at (−0.5, −0.3, 1) m and (−0.5, 0.3, 1) m, with zero velocity, identity attitude, and zero body rate. Twenty original gate-perturbation layouts retain their split of 12 training, four validation, and four test layouts. Four additional layouts exchange the destination sides across a shared gate: two are used for training, one for validation, and one for held-out testing. The combined split is therefore 14/5/5. The implementation uses two learned waypoints and four event centers, as illustrated in Fig. 1, with h = 0 .15 s, N = 20 ,and H = 3 s. The neighbor encoder has 16 features; the own state and gate coordinates give a 35-dimensional concatenated TABLE I RIGID -BODY PLANNING AND TRAINING CONFIGURATION 
+
+Parameter Value Vehicle mass m 0.713 kg Inertia diagonal J (0 .03 , 0.03 , 0.055) kg m 2
+
+Arm length ℓ; torque coefficient cτ 0.17 m; 0.01 m Rotor thrust range [1 .0, 3.3] NSpeed; body-rate limit 1.5 m/s; 8 rad/s Height range [0 .5, 1.5] mGrid step; intervals; training SCP steps 0.15 s; 20; 6 Waypoint radius 0.045 m Shared gate; terminal target radius 0.24 m; 0.12 m Training; evaluation scaled separation 0.30 m; 0.25 m 
+
+ρu; ρ∆; ρx; ρ0 10 −3; 0.002; 10 −3; 10 −5
+
+Waypoint; event learning rate 0.001; 0.002 
+
+input. Both network heads use 48 hidden units. The way-point head produces six offsets, bounded componentwise by 
+
+(0 .10 , 0.25 , 0.05) m, around reference points at grid indices 5 and 15. The event head corrects five baseline gap logits. Training unrolls K = 6 convex subproblems, with three integration substeps per interval and conic-solver differentiation through diffcp. The interpolation margin is δr = 0 .0003 m, and ε = amin = 10 −5. Neither virtual dynamics controls nor terminal CPC slack variables are used. The final progress is initialized by shifting the preceding event row by one interval. The CVXPY template passes DPP checks. Each training update samples one exchange layout and one ordinary layout. The collision loss uses five subinterval samples per interval, S =diag(1 , 1, 1/3) , and η = 0 .005 in (6). The exchange adaptation starts from the inherited two-waypoint policy. Both networks remain trainable. Thirty-six candidate updates are accepted. Checkpoints are selected by validation loss; stopping occurs after the validation checkpoints at updates 30 and 36 both pass feasibility and sampled separation checks, with relative loss change below 1%. Gradient updates use training layouts, and the stopping rule uses validation layouts. The recorded training, validation, and final evaluation loop takes 27.36 min, excluding preparation and the initial baseline evaluation. The independent audit rolls out the full rigid-body model with 20 substeps per interval, producing 401 state samples per vehicle over the full horizon. It checks dynamics defects, rotor and state bounds, quaternion consistency, assigned intermediate events, terminal residuals, event order, and pairwise separation. The dynamics-defect tolerance is 5 × 10 −5, and the maximum allowed positional mismatch between node states and rollout is 0.002 m. All attempted layouts are retained in the reported counts. Collision assessment is limited to these sampled times. 
+
+B. Multi-Layout Adaptation 
+
+Table II reports the combined layout split. The inherited policy is physically feasible in all 24 layouts, but the two exchange training layouts, the exchange validation layout, and the exchange test layout violate the separation threshold. After adaptation, all 24 layouts pass both checks. The mean test completion metric decreases from 2.40039 to 2.36384 s, a 
+
+> TABLE II LAYOUT -LEVEL RESULTS BEFORE AND AFTER EXCHANGE ADAPTATION
+
+Sampled separation passed Mean Ti (s) Split Before After Before After Training 12/14 14/14 2.40039 2.36335 Validation 4/5 5/5 2.40040 2.36397 Held-out test 4/5 5/5 2.40039 2.36384 
+
+> TABLE III ADDED EXCHANGE LAYOUTS AND THEIR TEMPORAL SEPARATION
+
+Layout Min. scaled distance (m) ∆tx (s) Before After After Training A 0.01128 0.30550 0.40319 Training B 0.00737 0.28798 0.37837 Validation 0.01877 0.31195 0.42926 Held-out test 0.00724 0.30822 0.40033 
+
+1.52% reduction relative to the inherited policy, which measures adaptation within the current architecture. Figure 3 shows the associated exchange trajectories. Figure 4 shows the recorded batch objective and validation progress. The batch curve reflects changing sampled layouts, while each validation checkpoint covers the same five layouts. The exchange validation clearance increases from approxi-mately 0.019 to 0.312 m. These curves describe successive updates within one adaptation run. 
+
+C. Goal-Exchange Trajectories 
+
+Figure 3 shows all four added layouts and both learned waypoints per vehicle. Each vehicle finishes on the opposite lateral side from its start. Figure 5 evaluates the vehicles at equal physical times, avoiding the ambiguity of geometric path intersections. The final minimum scaled separation ranges from 0.28798 to 0.31195 m, compared with 0.00724–0.01877 m before adaptation (Table III). The original 20 layouts continue to satisfy the evaluation threshold. The assigned shared-gate event times differ by approximately 0.101 s after adaptation. The diagnostic first left-to-right cross-ing of the plane x = g1,x has a time difference ∆tx of 0.378– 0.429 s. These plane-crossing times are interpolated from the audited rollout for post-processing. At the closest approaches, horizontal separation is approximately 0.288–0.312 m, and vertical separation is 0.006–0.018 m. The observed avoidance is predominantly associated with horizontal and temporal separation under joint adaptation of the waypoint and event networks. 
+
+D. Thrust-Difference Regularization 
+
+A separate experiment isolates the ρ∆ term with the earlier two-waypoint policy frozen. Both variants use the original 20 layouts (12/4/4 split), the same references, and the same recovery rule; only the inner thrust-difference weight changes. The evaluation uses this experiment’s original configuration. Across the four original test layouts, the scene-averaged max-imum rotor-thrust jump decreases from 0.23734 to 0.07581 N, −0.5 0.0 0.5 
+
+> x (m)
+> −0.4
+> −0.2 0.0 0.2 0.4
+> y (m)
+> Minimum scaled separation: 0.305 m
+
+a Training A   
+
+> −0.5 0.0 0.5
+> x (m)
+> −0.4
+> −0.2 0.0 0.2 0.4
+> y (m)
+> Minimum scaled separation: 0.288 m
+
+b Training B   
+
+> −0.5 0.0 0.5
+> x (m)
+> −0.4
+> −0.2 0.0 0.2 0.4
+> y (m)
+> Minimum scaled separation: 0.312 m
+
+c Validation   
+
+> −0.5 0.0 0.5
+> x (m)
+> −0.4
+> −0.2 0.0 0.2 0.4
+> y (m)
+> Minimum scaled separation: 0.308 m
+
+d Held-out test 
+
+> Drone 1 Drone 2 Before adaptation Learned waypoint Simultaneous closest points
+
+Fig. 3. Top-view projections of all four added goal-exchange layouts: two training layouts, one validation layout, and one held-out test layout. Solid blue and dashed orange lines are the adapted trajectories; faint dotted lines show the inherited-policy trajectories. Open waypoint markers denote learned spatial targets, circles indicate initial positions, and stars indicate final positions. Gray disks are projections of the position tolerance balls used to represent gates. Filled markers and their dotted connector identify both vehicles at the same closest-approach time. All 401 rollout samples per vehicle are used. 4567
+
+> Outer loss ( 10 −3)
+
+a Adaptation objective        
+
+> Training batch Five-layout validation
+> 0510 15 20 25 30 35
+> Accepted update
+> 0.1 0.2 0.3
+> Minimum separation (m)
+
+b Exchange validation layout 
+
+Fig. 4. Recorded exchange adaptation. (a) All 36 accepted batch updates and seven validation checkpoints, including update zero. Each batch contains one exchange and one ordinary training layout; validation uses five layouts. (b) Minimum audited scaled separation on the single exchange validation layout. The dotted line is the 0.25 m evaluation threshold. No smoothing or independent-seed confidence interval is applied. 
+
+while the RMS jump decreases from 0.03802 to 0.02062 N. The mean completion metric changes from 2.40005 to 2.40044 s. Figure 6 includes every test-layout pair. The reported jumps are finite differences of piecewise-constant thrusts, which quantify discrete control variation. The full pipeline permits nonlinear reinitialization followed by six SCP steps if the initial attempt fails. Two of the four penalty-off test layouts require this recovery, compared with none for penalty-on. Restricting the comparison to the two test layouts that both variants solve in the initial six steps still reduces the scene-averaged maximum thrust jump from 0.16980 to 0.08064 N. This paired subset is reported separately from the four-layout full-pipeline result. 
+
+E. Forward Runtime and Numerical Derivatives 
+
+The timed forward evaluation includes both networks, both local planners, and node-level feasibility checks. It excludes copying a stored reference into the planner and excludes the independent dense audit. Figure 7 shows all recorded calls. Thirty repeated calls on the fixed held-out exchange layout have median 21.01 ms and 95th percentile 21.86 ms. Thirty calls switching across the four exchange layouts have median 21.54 ms and 95th percentile 24.07 ms. Every call passes the recorded feasibility and sampled separation checks. Both settings use matching numerical trajectory references and stop after one adaptive SCP round. 0.0 0.5 1.0 1.5 2.0 2.5 3.0 
+
+> Physical time (s)
+> 0.0 0.2 0.4 0.6
+> Scaled separation (m)
+
+a Training A       
+
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+> Physical time (s)
+> 0.0 0.2 0.4 0.6
+> Scaled separation (m)
+
+b Training B       
+
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+> Physical time (s)
+> 0.0 0.2 0.4 0.6
+> Scaled separation (m)
+
+c Validation       
+
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+> Physical time (s)
+> 0.0 0.2 0.4 0.6
+> Scaled separation (m)
+
+d Held-out test   
+
+> Before adaptation After adaptation 0.25 m evaluation threshold
+
+Fig. 5. Audited scaled inter-vehicle separation over the complete common 3 s horizon, including post-event trajectory tails. All four exchange layouts are shown. The metric is ∥diag(1 , 1, 1/3)( p1 − p2)∥2. The 0.25 m threshold is exceeded after adaptation in each layout. The panels describe two training layouts, one validation layout, and one held-out test layout. Off On 0.10 0.15 0.20 0.25 0.30  
+
+> Max. thrust jump (N)
+> a Thrust jumps
+> Off On 0.02 0.04 0.06 0.08 0.10
+> Max. accel. jump (m/s 2)
+> b Acceleration jumps
+
+Fig. 6. Controlled thrust-difference penalty experiment with frozen network weights. Each line links the same original test layout with the penalty off and on; all four test layouts are included. Values are the maximum rotor-thrust or acceleration jump over both vehicles and the full common horizon. Two penalty-off layouts use nonlinear recovery after the initial six-step SCP attempt; all penalty-on layouts pass without that recovery. 
+
+The comparison of analytical and finite-difference derivatives, which is a local check of selected derivative entries, uses two selected final-layer weights on the exchange training layout B. The finite-difference perturbation is 10 −4. The waypoint-network derivative is 2.11464 × 10 −4 analytically versus 
+
+2.15084 × 10 −4 numerically; the event-network derivative is 2.35052 × 10 −4 versus 2.33841 × 10 −4. Both pass the recorded tolerance of 5% plus 10 −7. Both perturbed plans remain feasible, and their event supports remain unchanged. Fixed held-out layout Four-layout switching 18 20 22 24 26 28 
+
+> Forward time (ms)
+> Median 95th percentile
+
+Fig. 7. All 60 recorded warm-reference forward timings, with 30 calls per setting. Solid horizontal marks show medians and dashed marks show 95th percentiles. Fixed-layout calls use the held-out exchange layout; switching includes two training, one validation, and one held-out layout. Each setting measures repeated solver calls with prepared trajectory references. 
+
+VII. D ISCUSSION AND CONCLUSION 
+
+The shared network adapts spatial waypoints and intermedi-ate events so that independently solved rigid-body trajectories coordinate on a common physical grid. The final progress variable permits different completion metrics while retaining post-event motion. Thrust-difference regularization reduces the measured control jumps, and the forward backend pro-vides millisecond-scale execution with matching trajectory references. The evidence concerns state-based two-vehicle planning with gates represented by position tolerance balls. Terminal CPC uses a local approximation, and inter-vehicle collision avoidance is learned through the outer objective and assessed by sampled trajectory audits. Within this scope, the implementation demonstrates event-conditioned coordination with nonlinear local planners and separately measured timing, feasibility, and sampled separation. REFERENCES [1] Y. Shen, J. Xu, J. Zhou, D. Xu, F. Zhao, J. Chen, and S. Li, “Aggressive trajectory generation for a swarm of autonomous racing drones,” arXiv:2303.00851, 2023. [Online]. Available: https://arxiv.org/ abs/2303.00851 [2] X. Zhou, J. Zhu, H. Zhou, C. Xu, and F. Gao, “EGO-Swarm: A fully autonomous and decentralized quadrotor swarm system in cluttered environments,” in Proc. IEEE Int. Conf. Robotics and Automation , 2021, pp. 4101–4107, doi: 10.1109/ICRA48506.2021.9561902. [3] D. Mellinger and V. Kumar, “Minimum snap trajectory generation and control for quadrotors,” in Proc. IEEE Int. Conf. Robotics and Automation ,2011, pp. 2520–2525, doi: 10.1109/ICRA.2011.5980409. [4] Z. Wang, X. Zhou, C. Xu, and F. Gao, “Geometrically constrained trajectory optimization for multicopters,” IEEE Transactions on Robotics ,vol. 38, no. 5, pp. 3259–3278, 2022, doi: 10.1109/TRO.2022.3160022. [5] P. Foehn, A. Romero, and D. Scaramuzza, “Time-optimal planning for quadrotor waypoint flight,” Science Robotics , vol. 6, no. 56, Art. no. eabh1221, 2021, doi: 10.1126/scirobotics.abh1221. [6] J. Tordesillas and J. P. How, “MADER: Trajectory planner in multiagent and dynamic environments,” IEEE Transactions on Robotics , vol. 38, no. 1, pp. 463–476, 2022, doi: 10.1109/TRO.2021.3080235. [7] K. Kondo, R. Figueroa, J. Rached, J. Tordesillas, P. C. Lusk, and J. P. How, “Robust MADER: Decentralized multiagent trajectory planner robust to communication delay in dynamic environments,” IEEE Robotics and Automation Letters , vol. 9, no. 2, pp. 1476–1483, 2024, doi: 10.1109/LRA.2023.3342561. [8] A. Loquercio, E. Kaufmann, R. Ranftl, M. Müller, V. Koltun, and D. Scaramuzza, “Learning high-speed flight in the wild,” Science Robotics ,vol. 6, no. 59, Art. no. eabg5810, 2021, doi: 10.1126/scirobotics.abg5810. [9] J. Heeg, Y. Song, and D. Scaramuzza, “Learning quadrotor control from visual features using differentiable simulation,” in Proc. IEEE Int. Conf. Robotics and Automation , 2025. [Online]. Available: https: //rpg.ifi.uzh.ch/docs/ICRA25_Heeg.pdf [10] Y. Wu, X. Sun, I. Spasojevic, and V. Kumar, “Deep learning for optimiza-tion of trajectories for quadrotors,” IEEE Robotics and Automation Letters ,vol. 9, no. 3, pp. 2479–2486, 2024, doi: 10.1109/LRA.2024.3357399. [11] Y. Jiang, Y. Zhan, H. V. Gupta, C. Borde, and J. Geng, “A self-supervised learning approach with differentiable optimization for UAV trajectory planning,” arXiv:2504.04289, 2025, revised 2026. [Online]. Available: https://arxiv.org/abs/2504.04289 [12] A. Marino, C. Pacchierotti, and P. Robuffo Giordano, “Multi-UAVs end-to-end distributed trajectory generation over point cloud data,” IEEE Robotics and Automation Letters , vol. 9, no. 9, pp. 7629–7636, 2024. [13] B. Amos, I. D. Jimenez Rodriguez, J. Sacks, B. Boots, and J. Z. Kolter, “Differentiable MPC for end-to-end planning and control,” in Advances in Neural Information Processing Systems , vol. 31, 2018. [14] B. Amos and J. Z. Kolter, “OptNet: Differentiable optimization as a layer in neural networks,” in Proc. Int. Conf. Machine Learning , vol. 70, 2017, pp. 136–145. [15] A.-C. Papuc, L. Peters, S. Sun, L. Ferranti, and J. Alonso-Mora, “Strategizing at speed: A learned model predictive game for multi-agent drone racing,” arXiv:2602.06925, 2026. [Online]. Available: https://arxiv.org/abs/2602.06925 [16] B. Wang, Y. Gao, T. Sun, S. Ajay, and L. Zhao, “DiffCoord: Differen-tiable coordination for distributed multi-agent trajectory optimization,” arXiv:2509.01630, version 3, 2026. [Online]. Available: https://arxiv.org/ abs/2509.01630 [17] D. Malyuta, T. P. Reynolds, M. Szmuk, T. Lew, R. Bonalli, M. Pavone, and B. Açıkme¸ se, “Convex optimization for trajectory generation: A tutorial on generating dynamically feasible trajectories reliably and efficiently,” IEEE Control Systems Magazine , vol. 42, no. 5, pp. 40– 113, 2022, doi: 10.1109/MCS.2022.3187542. [18] S. Diamond and S. Boyd, “CVXPY: A Python-embedded modeling language for convex optimization,” Journal of Machine Learning Research , vol. 17, no. 83, pp. 1–5, 2016. [19] A. Agrawal, B. Amos, S. Barratt, S. Boyd, S. Diamond, and J. Z. Kolter, “Differentiable convex optimization layers,” in Advances in Neural Information Processing Systems , vol. 32, 2019. [20] A. Agrawal, S. Barratt, S. Boyd, E. Busseti, and W. Moursi, “Differ-entiating through a cone program,” Journal of Applied and Numerical Optimization , vol. 1, no. 2, pp. 107–115, 2019. [21] P. J. Goulart and Y. Chen, “Clarabel: An interior-point solver for conic programs with quadratic objectives,” arXiv:2405.12762, 2024. [Online]. Available: https://arxiv.org/abs/2405.12762 [22] J. A. E. Andersson, J. Gillis, G. Horn, J. B. Rawlings, and M. Diehl, “CasADi: A software framework for nonlinear optimization and optimal control,” Mathematical Programming Computation , vol. 11, no. 1, pp. 1–36, 2019, doi: 10.1007/s12532-018-0139-4.

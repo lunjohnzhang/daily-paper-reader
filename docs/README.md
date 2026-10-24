@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-23</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-24</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>5</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>0</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-23 22:23:51 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-24 22:01:53 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日精选 11 篇，精读 5 篇、速读 6 篇，聚焦多智能体与多机器人协调前沿。最值得看的是 Transformer 实时多智能体路径规划与多机器人“分散树协议”这两篇 9.0 分工作。普通读者可优先读这两篇精读，再扫一眼机器人世界模型与 96 台机器人集体经验学习两篇速读。</p>
+<p>今日精读 1 篇：关于多旋翼去中心化轨迹规划的论文，得分 8.0。最值得看的是“航点学习”和“通道事件”两条思路，它们把多机路径规划拆成更易协同的决策环节。普通读者可先关注它如何降低多机冲突与通信依赖，再判断是否跟进复现。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">5 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="A Transformer-based Approach for Real-time Multi-agent Path Planning with Varying Initial/Final Conditions">A Transformer-based Approach for Real-time Multi-agent Path Planning with Varying Initial/Final Conditions</span></li><li><span class="dpr-home-dashboard-paper-title" title="Dispersive Tree Agreements for Multi-Robot Coordination">Dispersive Tree Agreements for Multi-Robot Coordination</span></li><li><span class="dpr-home-dashboard-paper-title" title="Extending Harmonic Function Methods via Root Locus for Coordinated Path Generation">Extending Harmonic Function Methods via Root Locus for Coordinated Path Generation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Learning Waypoints and Passage Events for Decentralized Multi-Quadrotor Trajectory Planning">Learning Waypoints and Passage Events for Decentralized Multi-Quadrotor Trajectory Planning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>5</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">0 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Skeleton-Grounded Latent Action Model for Robot World Models">Skeleton-Grounded Latent Action Model for Robot World Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning from Fleet Experience: Collective Experience Learning Across 96 Robots">Learning from Fleet Experience: Collective Experience Learning Across 96 Robots</span></li><li><span class="dpr-home-dashboard-paper-title" title="SpecMAGIC: Specification-Guided Multi-Task Generalization in Multi-Agent Reinforcement Learning">SpecMAGIC: Specification-Guided Multi-Task Generalization in Multi-Agent Reinforcement Learning</span></li></ul>
+<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
+
 </section>
 </div>
 

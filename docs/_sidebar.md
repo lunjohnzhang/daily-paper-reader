@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-10-24 <!--dpr-date:20261024-->
+    * 精读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202610/24/2610.25024v1-learning-waypoints-and-passage-events-for-decentralized-multi-quadrotor-trajectory-planning" data-sidebar-item="{&quot;title&quot;: &quot;Learning Waypoints and Passage Events for Decentralized Multi-Quadrotor Trajectory Planning&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2610.25024v1-learning-waypoints-and-passage-events-for-decentralized-multi-quadrotor-trajectory-planning&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;多四旋翼的分散式协同轨迹规划&quot;}">Learning Waypoints and Passage Events for Decentralized Multi-Quadrotor Trajectory Planning</a>
   * 2026-10-23 <!--dpr-date:20261023-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202610/23/2610.30388v1-a-transformer-based-approach-for-real-time-multi-agent-path-planning-with-varying-initialfinal-conditions" data-sidebar-item="{&quot;title&quot;: &quot;A Transformer-based Approach for Real-time Multi-agent Path Planning with Varying Initial/Final Conditions&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2610.30388v1-a-transformer-based-approach-for-real-time-multi-agent-path-planning-with-varying-initialfinal-conditions&quot;, &quot;score&quot;: &quot;9.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;带智能体间避碰约束的实时多智能体路径规划&quot;}">A Transformer-based Approach for Real-time Multi-agent Path Planning with Varying Initial/Final Conditions</a>
