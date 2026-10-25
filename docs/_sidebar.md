@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-10-25 <!--dpr-date:20261025-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202610/25/2610.26043v1-omniinteract-towards-unified-whole-body-interaction-control-for-dual-humanoids" data-sidebar-item="{&quot;title&quot;: &quot;OmniInteract: Towards Unified Whole-Body Interaction Control for Dual Humanoids&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2610.26043v1-omniinteract-towards-unified-whole-body-interaction-control-for-dual-humanoids&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;双人形机器人协调全身交互控制&quot;}">OmniInteract: Towards Unified Whole-Body Interaction Control for Dual Humanoids</a>
   * 2026-10-24 <!--dpr-date:20261024-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202610/24/2610.25024v1-learning-waypoints-and-passage-events-for-decentralized-multi-quadrotor-trajectory-planning" data-sidebar-item="{&quot;title&quot;: &quot;Learning Waypoints and Passage Events for Decentralized Multi-Quadrotor Trajectory Planning&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2610.25024v1-learning-waypoints-and-passage-events-for-decentralized-multi-quadrotor-trajectory-planning&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;multi-robot&quot;}], &quot;evidence&quot;: &quot;多四旋翼的分散式协同轨迹规划&quot;}">Learning Waypoints and Passage Events for Decentralized Multi-Quadrotor Trajectory Planning</a>
