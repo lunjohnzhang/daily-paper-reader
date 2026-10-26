@@ -1,0 +1,431 @@
+Title: Vector-Quantized World Model: Latent Feedback Motion Planning for Robot Manipulation
+
+URL Source: https://arxiv.org/pdf/2610.25600v1
+
+Published Time: Tue, 20 Oct 2026 01:58:30 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+> 1
+
+# Vector-Quantized World Model: Latent Feedback Motion Planning for Robot Manipulation 
+
+Xuezhou Xu ∗1, Chung-Pang Wang ∗1, Zhenzhen Li 2, and Benjamin Riviere 1
+
+Abstract —Visual world models have shown strong potential for robot planning, yet long-horizon manipulation remains challeng-ing due to compounding prediction errors, large search complex-ity, and latent plans that the low-level controller cannot reliably reach. In this work, we introduce Vector-Quantized World Model (VQ-WM), a latent feedback motion planning framework that integrates discrete long-horizon search with continuous visual feedback control: a discrete latent predictor models transitions between vector-quantized latent states, allowing the planner to look far ahead and find a shortest path to the goal through discrete search and a continuous learned controller sequentially reaches the planned states through visual feedback, correcting deviations to mitigate compounding errors. Whereas most vector quantization uses Euclidean distance, we use a novel estimator of the first-passage-time as a quasi-metric, which aligns the planning abstraction with the controller’s capabilities. We evaluate on the physical robot manipulation of the Tower of Hanoi puz-zle: whereas existing state-of-the-art foundation models (VLAs, WAMs) only succeed when the solution trace in their training dataset, our method achieves 100% success rate with only short-play data, demonstrate its ability to compose long-horizon solutions beyond the short demonstrated trajectories and execute them reliably. Our solution also outperforms strongest world-models by 13.3–85.3 percentage points on simulation benchmarks spanning manipulation and locomotion, demonstrating consistent progress and new capabilities. 
+
+I. I NTRODUCTION 
+
+Visual world models combine latent representations with predictive dynamics, enabling planners to evaluate action sequences directly from visual inputs and select those that lead toward a desired long-term outcome before acting in the envi-ronment. Recent advances in model architectures and training methods allow these models to learn from reward-free offline trajectories and perform zero-shot planning from visual ob-servations [1], [2]. However, long-horizon manipulation tasks requiring multi-stage decision making and precise sequential execution remain challenging. Existing world-model planners typically optimize action sequences through autoregressive rollouts in continuous latent space. As the planning horizon grows, prediction errors can accumulate across rollout steps, while longer action sequences become harder to optimize. These limitations constrain the effective planning horizon and can cause failure even when the dynamics model is accurate over short horizons. Recent work has improved long-horizon world-model plan-ning by addressing these limitations. Hierarchical approaches such as H-JEPA learn multiple levels of latent abstraction to 
+
+> ∗
+
+These authors contributed equally to this paper. 
+
+> 1
+
+New York University, New York, NY, USA. 2NVIDIA. Z
+
+qinit 
+
+q1 qgoal 
+
+zinit 
+
+zgoal 
+
+> R(qinit )
+> R(q1)
+> R(qgoal )
+> Encoding Prediction Planning Vector quantization Feedback control
+
+Fig. 1: Overview of VQ-WM. The initial (green) and goal (red) images are encoded into latent states and vector-quantized ac-cording to controller reachability, so that each vector-quantized state serves as a target the controller is expected to reach. The planner performs discrete search over these vector-quantized states using a discrete latent predictor. A continuous controller then drives the robot toward each planned target in turn, using visual feedback to correct deviations along the way. support coarse-to-fine planning [3]. Discrete latent represen-tations have also been explored for hierarchical planning and control [4], [5], while Hi-LeWM investigates vector-quantized macro-actions for high-level prediction and planning [6]. Hy-dra [7] uses vector-quantized multimodal intents for sampling-based navigation planning. Other approaches improve the geometry of the latent planning space by encouraging locally straighter latent trajectories [8]. Despite these advances, plans formed in latent space may still be difficult to execute reliably. Replanning can correct deviations, but does not by itself ensure that proposed targets are compatible with the controller’s capabilities. The planning abstraction should reflect which states the controller can reliably reach and stabilize, a principle central to classical feedback motion planning [9], [10]. The LQR-Trees framework makes this connection explicit by associating each trajectory with a feedback controller and a region of attraction, characterizing the states from which the controller can recover deviations and steer the system toward the goal [11]. Motivated by these limitations and the principle of coupling planning and control, we propose Vector-Quantized World Model (VQ-WM), a latent feedback motion planning frame-arXiv:2610.25600v1 [cs.RO] 19 Oct 2026 2
+
+work for long-horizon robotic manipulation. As illustrated in Fig. 1, VQ-WM uses vector quantization to construct a discrete planning space whose vector-quantized states serve as targets for visual feedback control. The planner runs discrete search on the resulting graph to find a path to the goal, and the controller runs tracking control between consecutive vector-quantized states on the path. The central design choice is to define vector quantization through the controller’s ability to reach these targets, aligning the planning abstraction with the controller’s capabilities. In particular, we use the first-passage time, which is the number of controller calls until a trajectory driven by the controller first enters a neighborhood of its target. We estimate this quantity through closed-loop controller rollouts in a latent world model learned from offline data, and use it to construct the state codebook and assign continuous latent states to vector-quantized states. Our main contributions are:  
+
+> •
+
+We introduce VQ-WM, a latent feedback motion plan-ning framework that uses vector quantization to integrate discrete long-horizon search with continuous visual feed-back control.  
+
+> •
+
+We propose first-passage time as a measure of controller reachability for state vector quantization and estimate it through closed-loop controller rollouts in a learned latent world model. The first-passage time from one state to another is the number of controller calls until the closed-loop trajectory first reaches it. This aligns the planning abstraction with the controller’s capabilities and supports effective planning with compact state codebooks.  
+
+> •
+
+We validate VQ-WM in hardware and simulation. Learn-ing from short play data without full-task demonstrations, it solves the physical Tower of Hanoi puzzle with 100% task progress, outperforming the competitive industrial baselines by at least 95 percentage points. In simulation, it surpasses the strongest world-model planner, H-JEPA, by 13.3–34.6 percentage points on challenging long-horizon manipulation tasks, and adding proprioceptive inputs to the controller raises Walker success from 22.0% to 97.3%. II. R ELATED WORK 
+
+A. World Models for Visual Planning 
+
+World models learn predictive dynamics from observations to support action selection. Early approaches combine visual representations with latent dynamics for control [12], [13], or predict future images for goal-directed manipulation [14]. Universal Planning Networks jointly learn representations and differentiable action planning [15], while Dreamer learns be-havior through latent imagination [16] and TD-MPC meth-ods combine short-horizon latent planning with value esti-mation [17], [18]. More recent methods support image-goal planning from pretrained visual features or reward-free offline trajectories [1], [2], [19], [20]. Planning efficiency is improved through alternative rollout mechanisms [21]. However, contin-uous action-sequence planning becomes increasingly challeng-ing over long horizons as search complexity grows rapidly and prediction errors can accumulate during autoregressive rollouts. VQ-WM instead performs discrete search over vector-quantized states without optimizing the full sequence of low-level actions. 
+
+B. Abstractions for Long-Horizon Planning 
+
+Temporal hierarchies decompose extended tasks into shorter planning problems [4]. HWM learns world models at multiple temporal scales and demonstrates hierarchical planning for real-world pick-and-place from a single goal image [22]. H-JEPA combines multiple prediction horizons with latent spaces at different abstraction levels [3]. However, predicted subgoals can still be difficult for the execution mechanism to realize [23]. Vector quantization provides a compact state space for efficient discrete search, but the resulting state assignments must also reflect controller reachability. Graph-based methods incorporate reachability into planning through learned goal-conditioned control. SoRB searches over replay-buffer states using distances learned through goal-conditioned reinforcement learning [24], while L3P learns latent landmarks and graph edges from reachability estimates distilled from value functions [25]. VQ-WM vector-quantizes states based on first-passage times estimated through closed-loop controller rollouts in a learned world model, then learns vector-quantized transitions from offline trajectories for discrete search. This couples the planning abstraction to the controller’s ability to reach the assigned targets. 
+
+C. Feedback Motion Planning and Goal-Conditioned Control 
+
+Feedback motion planning accounts for feedback control during planning to avoid trajectories that are difficult or costly to stabilize [11]. Classical approaches compose local controllers so that each brings the system into a region where the next can succeed, using domains of attraction or trajectory funnels to characterize these regions [9]–[11]. Goal-conditioned methods learn reusable behaviors from play [26] or generate goal-directed action sequences through inverse dynamics models [27]. Composing such behaviors into long-horizon plans requires accounting for the states from which each target can be reached. VQ-WM applies this composition principle to a learned goal-conditioned controller in visual latent space. Instead of formally verifying funnels, it estimates controller reachability using first-passage times from closed-loop rollouts in a learned world model. These estimates guide the composition of local behaviors into long-horizon plans, which the controller executes using continuous visual feedback. We demonstrate reliable long-horizon manipulation on real hardware using this latent feedback motion planning framework. III. P ROBLEM DEFINITION AND BACKGROUND 
+
+Our work follows a vision-based control framework, which models the environment as a controlled Markov process 
+
+⟨O , A, P O ⟩, where O is the observation space and A is the physical action space. At each time step t, the robot receives an observation ot ∈ O and applies an action at ∈ A . The transition distribution PO (ot+1 | ot, a t) describes how the robot’s observation changes in response to its action. 3
+
+Given a pre-collected, reward-free offline dataset D =
+
+{(o(n)0 , a (n)0 , . . . , a (n)
+
+> Tn−1
+
+, o (n) 
+
+> Tn
+
+)}Nn=1 of N observation–action trajectories with respective episode lengths Tn, our goal at test time is to steer the system from an initial observation oinit to a state specified by a goal image ogoal .IV. M ETHODS 
+
+A. Overview 
+
+At a high level, VQ-WM interweaves discrete planning over a controller-aware state codebook Q with continuous feedback control using π.The components of VQ-WM are {EZ , E U , P Z , P Q, ϕ Z , ϕ U ,π}. The pretrained, frozen encoder EZ maps observations to continuous latent states zt = EZ (ot) ∈ Z . For example, in this work, we use V-JEPA 2 [20]. The trained encoder EU maps pairs of vector-quantized states to continuous latent actions. The quantizers ϕZ and ϕU assign these representations to entries in finite state and action codebooks Q ⊂ Z and U,respectively. The predictors PZ and PQ model continuous and vector-quantized latent transitions, respectively, and the goal-conditioned controller π(· | z, z ′) maps the current and target latent states to a physical action. A natural choice for the state quantizer ϕZ is to assign each latent state to its nearest codebook entry under Euclidean distance. However, geometric proximity in latent space does not necessarily reflect the effort required by a feedback controller to reach a target. We therefore use first-passage time (FPT) as a directed, controller-dependent reachability cost for state vector quantization. FPT measures the number of controller calls required for a closed-loop trajectory to first enter a neighborhood of its target. Using such a distance measure for state vector quantization couples discrete planning with continuous control, enabling efficient search over targets aligned with the controller’s capabilities. During offline learning, we first train π and the continuous latent predictor PZ , which predicts the next latent state as 
+
+ˆzt+1 ∼ PZ ( · | zt, a t). Their closed-loop rollouts provide first-passage time estimates d(z, z ′), which we use to construct Q
+
+and quantize continuous latent states z ∈ Z as q = ϕZ (z) ∈Q. With Q fixed, we jointly learn the latent action encoder 
+
+EU , action codebook U, and discrete latent predictor PQ. The predictor PQ outputs a categorical distribution PQ(q′ | q, u )
+
+over the next vector-quantized state, conditioned on the current vector-quantized state q and vector-quantized action u. At inference time, our planner performs graph search using PQ to select a sequence of intermediate targets in Q, which π tracks using visual feedback. The inference and training pipelines of VQ-WM are shown in Fig. 2. 
+
+B. Inference 
+
+VQ-WM performs discrete planning and continuous feed-back control at different rates, as shown in Fig. 2(a). Planning operates at a slower rate and uses the discrete latent predic-tor PQ to expand the search graph online, while the goal-conditioned controller π operates at a faster rate with visual feedback. 
+
+1) Planning Loop: Our planner searches the vector-quantized state graph for a shortest path to the goal. Given initial and goal observations, we encode them as zinit =
+
+EZ (oinit ) and zgoal = EZ (ogoal ), then quantize them into the vector-quantized states qinit and qgoal .Starting from qinit , our planner explores successor states predicted by PQ(· | q, u ) for all vector-quantized actions 
+
+u ∈ U at each expanded state q. It builds the graph online by continuing to expand newly discovered vector-quantized states until qgoal is found. The predicted categorical distributions define a stochastic transition graph that can be used with stochastic shortest-path algorithms. In our implementation, we retain the most likely successor arg max q′∈Q PQ(q′ | q, u )
+
+for each state–action pair and use breadth-first search (BFS) to find a shortest path from qinit to qgoal with the fewest graph transitions. We denote this path by the sequence of vector-quantized states (q0, q 1, . . . , q L), where q0 = qinit and 
+
+qL = qgoal . If the goal is predicted to be reachable within R
+
+controller calls, d(zinit , z goal ) ≤ R, we bypass graph search and use π with zgoal as its target. Our planner can be implemented in a receding-horizon manner by periodically updating the plan from the current observation and executing only its initial portion before re-planning, or in open-loop by setting the replanning frequency to zero. The quantization procedure makes planning compu-tationally efficient, allowing VQ-WM to compute a complete plan spanning approximately five minutes of robot execution in under one second on an NVIDIA RTX 5080 GPU. In our experiments, to evaluate the stability of our feedback motion planning framework, we use open-loop planning once per episode and execute the resulting plan using continuous visual feedback. 
+
+2) Control Loop: The continuous controller operates at a higher rate than the planner, tracking the planned path using visual feedback. At each control step, we encode the current observation as zt = EZ (ot) and apply an action 
+
+at ∼ π(· | zt, q i) toward the current planned state qi. The controller follows the planned states in order, beginning with 
+
+qinit , and finally target zgoal . For each planned transition, it runs for the number of controller calls specified by the first-passage time estimated between consecutive planned states before switching to the next target. Execution succeeds when the task is completed and fails if it remains incomplete after the final target has been attempted. 
+
+C. Training 
+
+We train VQ-WM from the offline dataset D defined in Sec. III, following the pipeline in Fig. 2(b). We first train the goal-conditioned controller π and continuous latent predictor 
+
+PZ , then construct the state quantizer ϕZ and codebook Q, and finally learn the vector-quantized latent dynamics. A pretrained latent state encoder EZ maps observations to latent states zt =
+
+EZ (ot) and remains frozen throughout training. 
+
+1) Controller: We train the goal-conditioned controller π
+
+on state–goal pairs (zt, z t+r ) from the same offline trajectory, sampling r ∼ Uniform {0, . . . , R } to provide targets at dif-ferent temporal distances. When r = 0 , we replace at with 4(a) Inference (b) Training 
+
+EZ
+
+EZ
+
+EZ π control 
+
+π PZ rollout 
+
+ϕZ
+
+EU ϕU PQ
+
+transition  
+
+> +VQ
+> 
+
+Planning  
+
+> ⋯
+> PQ
+> u′ uu″
+
+π
+
+Control     
+
+> at∼π(⋅ ∣ zt,qi)
+
+World Vector Quantization     
+
+> qt
+> qgoal
+> ϕZ
+> ϕZ
+> ogoal
+> qinit ,qi, …, qgoal ,zgoal
+
+at
+
+ot
+
+zt
+
+fast  
+
+> every step
+> zinit ←zt
+
+slow 
+
+> re-plan (MPC)
+
+Controller Continuous latent predictor State codebook construction Vector-quantized latent dynamics     
+
+> ot,ot+r
+
+zt, zt + r̂ at
+
+at
+
+zt, zt + r̂ ak̂       
+
+> zk+ 1 ̂
+> zk
+> zt+ min( k+ 1, r)
+> closed-loop rollout
+> z,ed(z,e)̂
+> (e)
+> greedy set cover
+
+ 
+
+> qt,qt′
+
+̃ ut ut̂ qt′
+
+> qt
+
+Fig. 2: VQ-WM components and pipeline. (a) Inference encodes the initial and goal images, searches over state codes, and executes the planned targets with visual feedback. (b) Offline training learns the controller and continuous latent predictor, performs state vector quantization using first-passage time, and then learns vector-quantized latent dynamics. a hold action so the controller learns to maintain the current state. We train π by minimizing: 
+
+Lcontrol = at − ˆat 1, ˆat = Ea∼π(·| zt,z t+r )[a]. (1) For a target z′, we approximate its R-step region of attraction 
+
+R(z′) as the set of initial latent states from which closed-loop control with π reaches an ϵ-neighborhood of z′ within R
+
+controller calls with arrival tolerance ϵ > 0.
+
+2) Continuous Latent Predictor: The continuous latent pre-dictor PZ predicts the next latent state from the current latent state and a physical action. We supervise its predictions over closed-loop rollouts with π, matching the rollout procedure used for first-passage time estimation. Given a latent state 
+
+zt and a target z′ = zt+r with r ∼ Uniform {0, . . . , R },we initialize ˆz0 = zt and predict R steps with the closed-loop rollout. The predicted trajectory is supervised with the recorded one, which is held at the target once it is reached: 
+
+Lrollout = 1
+
+R
+
+> R−1
+
+X
+
+> k=0
+
+ˆzk+1 − zt+min {k+1 , r }
+
+> 22
+
+. (2) 
+
+3) State Vector Quantization: We estimate the first-passage time from z to z′ by rolling out the controller π toward z′ in closed loop with the continuous latent predictor PZ :
+
+ˆak ∼ π(· | ˆzk, z ′), ˆzk+1 ∼ PZ
+
+ · | ˆzk, ˆak
+
+, ˆz0 = z, d(z, z ′) = min k ∈ { 0, . . . , R } : ∥ˆzk − z′∥2 ≤ ϵ . (3) We set d(z, z ′) = ∞ if the target is not reached within R calls. This first-passage time estimate guides construction of the state codebook. During inference, it is used to vector quantize the initial and goal states and determine the number of controller calls allocated to each planned target. 
+
+Algorithm 1 Codebook Construction via Greedy Set Cover 
+
+Require: Latent states ZD , first-passage time estimate d, controller-call budget R, number of neighbors K
+
+Ensure: State codebook Q, vector-quantized states {q}z∈Z D 
+
+> 1:
+
+for each e ∈ Z D do ▷ approximate regions of attraction  
+
+> 2:
+
+ˆR(e) ← { e} 
+
+> 3:
+
+for each zn,t ∈ KNN( e, K ) with ρ = d(zn,t , e ) ≤ R do  
+
+> 4:
+
+ˆR(e) ← ˆR(e) ∪ { zn,t −m}min( R−ρ,t ) 
+
+> m=0
+> 5:
+
+end for  
+
+> 6:
+
+end for  
+
+> 7:
+
+Q ← ∅ , V ← Z D ▷ greedy set cover  
+
+> 8:
+
+while V̸ = ∅ do  
+
+> 9:
+
+e⋆ ← arg max e∈Z D | ˆR(e) ∩ V|  
+
+> 10:
+
+Q ← Q ∪ { e⋆}, V ← V \ ˆR(e⋆) 
+
+> 11:
+
+end while  
+
+> 12:
+
+assign each z ∈ Z D to q = ϕZ (z) 
+
+> 13:
+
+return Q, {q}z∈Z D
+
+Let ZD ⊆ Z denote the latent states encoded from the dataset, with z(n) 
+
+> t
+
+= EZ (o(n) 
+
+> t
+
+) for step t of trajectory n. For each candidate code e ∈ Z D , we identify states z from which 
+
+π can reach e within R calls, using d(z, e ):
+
+ˆR(e) = {z ∈ Z D : d(z, e ) ≤ R}. (4) This set estimates the R-step region of attraction of e. We seek the smallest codebook whose estimated regions of attraction collectively cover ZD , and use greedy set cover to approximate this selection (Fig. 2(b)). For efficient computation, we approximate ˆR(e) by using local rollout evaluations and recorded trajectories. Starting with all states uncovered, greedy set cover repeatedly adds the code covering the largest number of uncovered states and 5
+
+marks these states as covered. The procedure stops when the selected sets cover the entire encoded dataset, ZD =S 
+
+> q∈Q
+
+ˆR(q). The vector quantizer then assigns each state to the code it reaches in the fewest controller calls: 
+
+ϕZ (z) = arg min  
+
+> q∈Q
+
+d(z, q ). (5) Since d is directed, we assign the goal zgoal to the code from which the controller can reach it in the fewest calls, 
+
+qgoal = arg min q∈Q d(q, z goal ). Algorithm 1 details region approximation, greedy selection, and state assignment. 
+
+4) Vector-Quantized Latent Dynamics: With the state code-book fixed, we jointly learn the latent action encoder, the action codebook and the discrete latent predictor (Fig. 2(b)). The fixed state codebook Q consists of latent states se-lected from the encoded dataset ZD , while U denotes the learned action codebook. Let qt = ϕZ (zt) denote the vector-quantized state of zt. The vector-quantized action ut repre-sents a transition between vector-quantized states, whereas 
+
+at is the physical action produced by the controller π. Let 
+
+t′ = min {s > t : qs̸ = qt} denote the first subsequent time step at which the vector-quantized state changes. We train on the resulting transitions (qt, q t′ ). Given such a pair, 
+
+EU produces a continuous latent action ˜ut = EU (qt, q t′ ),which ϕU assigns to its nearest entry in the action codebook, 
+
+ut = ϕU (˜ ut) = arg min u∈U ∥˜ut − u∥22. We train the action codebook with the standard vector quantization objective [28], 
+
+LVQ = ∥sg(˜ ut) − ut∥22 + β∥˜ut − sg( ut)∥22, (6) where sg stops gradients and β weights the commitment loss. The discrete latent predictor PQ outputs a categorical distribution over the vector-quantized states in Q, conditioned on the current vector-quantized state and vector-quantized action, PQ(qt′ | qt, u t). It is trained with the cross-entropy loss Ltransition = − log PQ
+
+ qt′ | qt, u t
+
+, and the joint training objective is Ltransition + LVQ .V. E XPERIMENTS 
+
+We evaluate VQ-WM through real-world and simulated experiments to investigate three questions: 
+
+Q1: Compositionality. Can VQ-WM compose local tran-sitions into long-horizon solutions beyond demon-strated trajectory lengths? 
+
+Q2: Long-horizon execution. Can discrete planning with continuous feedback control sustain performance across long-horizon manipulation tasks? 
+
+Q3: Controller-aware abstraction. Does first-passage-time-based vector quantization provide a more com-pact and effective planning abstraction than Eu-clidean vector quantization? We investigate Q1 and Q2 through real-world Tower of Hanoi experiments and simulated manipulation benchmarks, and Q3 through controlled vector quantization ablations in simulated Tower of Hanoi. We additionally examine the flexibility of separating planning and control by incorporating propriocep-tive observations in the Walker locomotion task. 
+
+A. Simulation Benchmarks 
+
+Long-horizon manipulation. We evaluate manipula-tion in the Cube and Scene environments from Stable-WorldModel [29], using task-specific evaluation protocols. Cube-Easy follows LeWM’s protocol [2], with a goal 25 environment steps ahead and an execution budget of 50 steps. Cube-Hard follows H-JEPA’s protocol [3], using 50 held-out, 20-step windows centered on a grasp and an execution budget of 30 steps to evaluate complete pick-and-place behavior. For Scene, we define an evaluation with initial and goal images sampled 50 environment steps apart from expert trajectories and an execution budget of 100 steps. Reaching the goal typically requires sequential subtasks involving the cube, but-tons, drawer, or window, with success requiring all objects to simultaneously match their goal states. VQ-WM achieves the highest success on all three tasks (Table I), and its margin over the strongest baseline grows with the task horizon: 8.0 percentage points on Cube-Easy, 13.3 on Cube-Hard, and 28.0 on Scene. We attribute these gains to two mechanisms. First, VQ-WM decouples rep-resentation from planning geometry. Temporal straightening (TS) [8] couples the two by reshaping the latent space so that Euclidean distance becomes a useful planning metric, whereas VQ-WM keeps a frozen encoder and learns the geometry separately through first-passage time under the controller. VQ-WM improves over TS by 16.7 and 28.0 percentage points on Cube-Easy and Scene, and reaches 73.3% on Cube-Hard, where TS largely fails at 10.7%. Second, VQ-WM replaces long-horizon action optimization with discrete search over controller-reachable vector-quantized states. Cube-Easy goals often involve little change in cube position, so short-horizon planners already perform well, whereas Scene requires sequential subtasks over which errors in continuous rollouts accumulate. Compared with the predicted subgoals of H-JEPA [3], which the controller may fail to reach, planning over reachable vector-quantized states is consistent with the 13.3-point gain on Cube-Hard over this strongest hierarchical baseline. TABLE I: Long-horizon Manipulation success rates.                                                 
+
+> Method Cube-Easy Cube-Hard Scene
+> LeWM [2] 74 .0±2.832 .0±6.142 .7±1.9
+> TS [8] 68 .0±2.810 .7±0.947 .3±2.5
+> PLDM [19] 62 .0±4.311 .3±3.844 .7±4.1
+> H-JEPA [3] 76 .7±2.560 .0±5.040 .7±2.5
+> Ours 84 .7±2.573 .3±0.975 .3±5.0
+
+Locomotion. We evaluate goal-conditioned motion control in the DeepMind Control Walker environment from Stable-WorldModel [29] to examine the advantage of separating planning from control. Goal images are sampled 50 steps ahead on expert walking trajectories, and success requires the torso height, torso pitch, and all six leg joint angles to be within 0.3 of their goal values. With visual inputs only, both DINO-WM [1] and VQ-WM perform poorly, reaching 12.7% and 22.0%, since such poses depend on precise joint coordination that images convey poorly. After adding pro-6
+
+TABLE II: Success rate (%) on Walker with different obser-vation inputs. Method Images Images + Proprio. DINO-WM 12.7 ± 3.4 12.0 ± 4.9 
+
+Ours 22.0 ±5.9 97.3 ±2.5 
+
+prioception, DINO-WM remains at 12.0%, whereas VQ-WM rises to 97.3% (Table II). The difference arises because VQ-WM handles control separately and its vector quantization is controller-aware: the additional input improves the controller, and the vector-quantized states adapt to what it can now reach without any change to the planner. The same property allows VQ-WM to be readily extended to other sensing modalities at the control level. 
+
+B. Real-World Experiments Initial Goal 
+
+Fig. 3: Real-world execution of VQ-WM on the four-disk Tower of Hanoi puzzle. To evaluate VQ-WM’s ability to compose and execute long-horizon plans from local behaviors, we test it on a real-world four-disk Tower of Hanoi puzzle using a WidowX AI robotic arm [30], as shown in Fig. 3. The goal is to transfer the entire stack to another rod, moving one disk at a time without placing a larger disk on a smaller one. Solving the full puzzle optimally requires 15 puzzle moves (H15), combining planning over minutes of execution with precise grasping, alignment, and disk insertion. We also evaluate single-move tasks (H1) to compare performance across short and long task horizons. 
+
+Data Collection. Tower of Hanoi play data was collected autonomously using a WidowX AI arm at 30 Hz. A symbolic planner generated randomized legal move sequences using board states detected by the video object segmentation model Cutie [31] at episode boundaries. Each disk transfer was executed using a predefined Cartesian pick-and-place motion. 
+
+Evaluation Protocol. We compare VQ-WM against the world action model (WAM) Cosmos Policy [32], the vision-language-action model (VLA) π0.5 [33], and the world foun-dation model V-JEPA 2-AC [20] under expert training on H1 and H15 and non-expert training on H15. The expert dataset contains complete solution demonstrations for six initial–goal configuration pairs. The VLA and WAM baselines are trained jointly on these six tasks. In the non-expert dataset setting, the VLA and WAM baselines are trained on play-data subtasks spanning at most five puzzle moves and evaluated on full H15 tasks, testing whether they can compose shorter subtasks into long-horizon solutions. To reduce unsupported predictions during planning, we augment VQ-WM’s discrete latent predic-tor with an additional rejection class for unseen transitions and exclude predictions in this class from graph search. For V-JEPA 2-AC, we restrict the action sampler to actions observed in the dataset. Following [20], we also evaluate V-JEPA 2-AC* with six manually specified subgoal images per puzzle move. These subgoals provide the high-level solution structure, leaving the model to perform local planning and control between successive targets. We evaluate each method on the same six test cases with three trials per case, using a single NVIDIA RTX 5080 GPU for inference. We present the results in Fig. 4. The Tower of Hanoi puzzle challenges both planning and control: solving it requires planning far ahead while repeatedly executing precise transfers of small disks between pegs. 
+
+Expert data setting. Cosmos Policy and π0.5 both achieve 100% task progress on H1, but drop to 76% and 23%, respectively, on H15. This decline suggests that execution errors compound across successive disk transfers, reducing reliability over the full puzzle. V-JEPA 2-AC uses the cross-entropy method (CEM) [34] to optimize continuous action sequences over a fixed horizon, executing only the first action before replanning, as in receding-horizon control. Extending its lookahead requires searching over longer action sequences, whose predicted outcomes become less reliable as predic-tion errors accumulate across autoregressive latent rollouts. Frequent replanning alone cannot ensure progress when the benefits of necessary intermediate actions lie beyond this horizon. This is particularly relevant to Tower of Hanoi, where intermediate puzzle moves and physical grasping and lifting motions may not immediately bring the observed state closer to the final goal. V-JEPA 2-AC achieves 0% task progress on both H1 and H15, suggesting that even a single puzzle move lies beyond its effective planning horizon. By providing subgoal images manually selected from the dataset as sequential planning targets, V-JEPA 2-AC* raises its task progress to 94% ±6% . The gap between the two settings points to a limitation: the model can reach a nearby target when one is provided, but cannot discover the intermediate moves on its own. Even with manually provided subgoals, V-JEPA 2-AC* struggles to execute full H15 solutions reliably. VQ-WM instead searches for the shortest path through controller-aware latent abstractions, allowing the planner to reason far into the future without optimizing the full sequence of low-level actions. This also makes our planner efficient, allowing us to use an infinite replanning interval and compute the complete solution in a single planning call. A continuous controller then executes the plan by sequentially reaching the targets using visual feedback to correct local deviations and mitigate compounding execution errors. VQ-WM achieves 99.6% task progress on H15, demonstrating reliable execution over the full 15-move horizon. 
+
+Non-Expert play data setting. Cosmos Policy and π0.5
+
+achieve only 5% and 3% task progress, respectively, indicat-ing that these behavior-cloning policies struggle to compose shorter subtasks into complete H15 solutions. Although V-JEPA 2-AC can plan beyond demonstrated trajectories, it still struggles with long-horizon planning and execution, as 7Cosmos Policy 0.5                
+
+> (VLA) V-JEPA 2-AC V-JEPA 2-AC*
+> Ours Cosmos Policy 0.5
+> (VLA) V-JEPA 2-AC V-JEPA 2-AC*
+> Ours Cosmos Policy 0.5
+> (VLA) V-JEPA 2-AC V-JEPA 2-AC*
+> Ours
+> 020 40 60 80 100
+> Average task progress (%)  100 ± 0 100 ± 0 0 ± 0 94 ± 6 100 ± 0 76 ± 7 23 ± 6 0 ± 0 22 ± 4 99.6 ± 0.4 5 ± 2 3 ± 1 0 ± 0 27 ± 5 100 ± 0
+> Expert data (H1) Expert data (H15) Non-expert data
+> Cosmos Policy 0.5 (VLA) V-JEPA 2-AC V-JEPA 2-AC* Ours
+
+Fig. 4: Real-world results. VLA and WAM baselines without runtime search fail to extrapolate from short play subtasks to full-puzzle solutions, whereas VQ-WM composes local behaviors into complete plans and executes them reliably. V-JEPA 2-AC struggles even on H1, suggesting a limited effective planning horizon. V-JEPA 2-AC* receives manually specified subgoals that supply the solution sequence, leaving the model to perform local planning and control. discussed above. Providing manual subgoals improves task progress to 27% for V-JEPA 2-AC*, though reliable execution over the full H15 horizon remains challenging. VQ-WM achieves 100% task progress, demonstrating its ability to compose observed transitions into long-horizon solutions and reliably execute the resulting plans. 
+
+C. Ablation on State Vector Quantization 
+
+To enable extensive trials for statistically meaningful com-parisons, we conduct this ablation study on a simulated version of Tower of Hanoi in MuJoCo [35] with the same robotic arm and puzzle setup as our real-world experiment. The dataset contains 104 walk trajectories covering all legal disk-move transitions. We compare first-passage time with squared Euclidean distance for codebook construction and state assignment, keeping the encoder, controller, and training procedure unchanged. Each point is evaluated over three seeds with 50 trajectories per seed, using randomly sampled initial and goal configurations spanning shortest-path lengths of 1–15 disk moves. Figure 5 shows that first-passage time achieves approxi-mately 90% peak success, compared with 40% for Euclidean distance, an improvement of about 50 percentage points. It also sustains high success across a broad range of codebook sizes, roughly 250–2000, spanning an eightfold change. Performance decreases at both extremes: overly small codebooks merge distinct puzzle configurations, producing unexecutable plans, while overly large codebooks leave fewer observed examples per transition, reducing the accuracy of the discrete latent predictor. These results highlight the benefits of using first-passage time to align state abstraction and feedback control with the controller’s capabilities. First, Euclidean distance ignores controller reachability, so consecutive planned targets may be unreachable under the controller. Second, during control loop, the Euclidean variant declares a target reached when 
+
+∥zt −qi∥2 ≤ ϵ. Since latent proximity does not always indicate physical arrival, the target may switch too early or fail to switch after arrival. Instead, in the first-passage-time variant, the number of controller calls required to reach each target is estimated using the continuous latent predictor. 200 500 1000 2000 5000 codebook size jQj 
+
+025 50 75 100 success rate (%) 
+
+> First-passage time Euclidean
+
+Fig. 5: State vector quantization with different codebook sizes. VI. L IMITATIONS AND FUTURE WORK 
+
+VQ-WM provides a foundation for further improvements in planning efficiency and task generality. First, the computa-tional efficiency of its discrete search makes frequent MPC-style replanning practical. Our experiments use a single plan per episode to evaluate the reliability of our feedback motion planning framework, leaving the benefits of replanning unex-plored. Future work can investigate how replanning frequency affects computational cost and recovery from deviations that require revising the planned sequence. Second, VQ-WM’s modular design offers a direct path toward multi-task settings. A pretrained vision-language model can provide instruction-conditioned representations, while a multi-task policy can serve as the controller. Controller-aware vector quantization can then adapt the planning space to the selected controller with planning process unchanged. Evaluating these combina-tions across tasks is a promising direction for extending VQ-WM’s applicability. VII. C ONCLUSION 
+
+We presented VQ-WM, a latent feedback motion planning framework that integrates discrete long-horizon search with a 8
+
+continuous controller for closed-loop execution. First-passage time estimated under learned closed-loop dynamics connects these two roles: it defines controller-dependent coverage re-gions and uses them to construct vector-quantized planning states. Discrete search uses the discrete latent predictor to plan over representative states, while feedback control exe-cutes the resulting targets. Real-world Tower of Hanoi ex-periments demonstrate the effectiveness of this integration of planning and control, with VQ-WM outperforming state-of-the-art VLA, WAM, and world foundation model baselines. Simulation benchmarks spanning manipulation, and locomo-tion further demonstrate its broader applicability. These results support controller-dependent state abstraction as a practical foundation for long-horizon planning and reliable closed-loop execution. REFERENCES [1] G. Zhou, H. Pan, Y. LeCun, and L. Pinto, “Dino-wm: World models on pre-trained visual features enable zero-shot planning,” 2024. [Online]. Available: https://arxiv.org/abs/2411.04983 [2] L. Maes, Q. Le Lidec, D. Scieur, Y. LeCun, and R. Balestriero, “LeWorldModel: Stable end-to-end joint-embedding predictive architecture from pixels,” arXiv preprint arXiv:2603.19312 , 2026. [Online]. Available: https://arxiv.org/abs/2603.19312 [3] W. Zhang, B. Terver, M. Rabbat, Y. LeCun, and R. Balestriero, “H-JEPA: End-to-end learning of hierarchical world models for visual planning,” arXiv preprint arXiv:2610.06805 , 2026. [Online]. Available: https://arxiv.org/abs/2610.06805 [4] D. Hafner, K.-H. Lee, I. Fischer, and P. Abbeel, “Deep hierarchical planning from pixels,” Advances in Neural Information Processing Systems , vol. 35, pp. 26 091–26 104, 2022. [5] C. Gumbsch, N. Sajid, G. Martius, and M. V. Butz, “Learning hierarchi-cal world models with adaptive temporal abstractions from discrete latent dynamics,” in International Conference on Learning Representations (ICLR) , 2024. [6] N. Caselli, F. Massafra, S. Punzo, S. Lo Sardo, I. Pantelidis, and S. K. Bhethanabhotla, “Mind the gap: Promises and pitfalls of hierarchical planning in LeWorldModel,” arXiv preprint arXiv:2607.12547 , 2026. [7] M. Nazeri, A. Card, S. Huber, A. Pokhrel, Y. Wang, R. Hammele, D. Song, S. Pirk, and X. Xiao, “Hydra: A navigation world action model with discrete latent planning and continuous flow-matching execution,” 
+
+arXiv preprint arXiv:2608.28995 , 2026. [8] Y. Wang, O. Bounou, G. Zhou, R. Balestriero, T. G. Rudner, Y. LeCun, and M. Ren, “Temporal straightening for latent planning,” arXiv preprint arXiv:2603.12231 , 2026. [9] R. R. Burridge, A. A. Rizzi, and D. E. Koditschek, “Sequential com-position of dynamically dexterous robot behaviors,” The International Journal of Robotics Research , vol. 18, no. 6, pp. 534–555, 1999. [10] A. Majumdar and R. Tedrake, “Funnel libraries for real-time robust feed-back motion planning,” The International Journal of Robotics Research ,vol. 36, no. 8, pp. 947–982, 2017. [11] R. Tedrake, “LQR-trees: Feedback motion planning on sparse random-ized trees,” in Proceedings of Robotics: Science and Systems , Seattle, USA, June 2009. [12] M. Watter, J. T. Springenberg, J. Boedecker, and M. Riedmiller, “Embed to control: A locally linear latent dynamics model for control from raw images,” in Advances in Neural Information Processing Systems ,vol. 28, 2015. [Online]. Available: https://arxiv.org/abs/1506.07365 [13] D. Hafner, T. Lillicrap, I. Fischer, R. Villegas, D. Ha, H. Lee, and J. Davidson, “Learning latent dynamics for planning from pixels,” in Proceedings of the 36th International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 97, 2019, pp. 2555–2565. [Online]. Available: https://proceedings.mlr.press/ v97/hafner19a.html [14] F. Ebert, C. Finn, S. Dasari, A. Xie, A. Lee, and S. Levine, “Visual foresight: Model-based deep reinforcement learning for vision-based robotic control,” arXiv preprint arXiv:1812.00568 , 2018. [Online]. Available: https://arxiv.org/abs/1812.00568 [15] A. Srinivas, A. Jabri, P. Abbeel, S. Levine, and C. Finn, “Universal planning networks: Learning generalizable representations for visuomotor control,” in Proceedings of the 35th International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 80, 2018, pp. 4732–4741. [Online]. Available: https://proceedings.mlr.press/v80/srinivas18b.html [16] D. Hafner, T. Lillicrap, J. Ba, and M. Norouzi, “Dream to control: Learning behaviors by latent imagination,” in International Conference on Learning Representations , 2020. [Online]. Available: https://openreview.net/forum?id=S1lOTC4tDS [17] N. Hansen, X. Wang, and H. Su, “Temporal difference learning for model predictive control,” in Proceedings of the 39th International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 162, 2022. [Online]. Available: https: //proceedings.mlr.press/v162/hansen22a.html [18] N. Hansen, H. Su, and X. Wang, “TD-MPC2: Scalable, robust world models for continuous control,” in International Conference on Learning Representations , 2024. [Online]. Available: https: //arxiv.org/abs/2310.16828 [19] U. Sobal, W. Zhang, K. Cho, R. Balestriero, T. G. J. Rudner, and Y. LeCun, “Learning from reward-free offline data: A case for planning with latent dynamics models,” in Advances in Neural Information Processing Systems , vol. 38, 2025. [20] M. Assran, A. Bardes, D. Fan, Q. Garrido, R. Howes, M. Komeili 
+
+et al. , “V-JEPA 2: Self-supervised video models enable understanding, prediction and planning,” arXiv preprint arXiv:2506.09985 , 2025. [Online]. Available: https://arxiv.org/abs/2506.09985 [21] Y. Gao and X. Xu, “Fast leworldmodel,” arXiv preprint arXiv:2606.26217 , 2026. [22] W. Zhang, B. Terver, A. Zholus, S. Chitnis, H. Sutaria, M. Assran, R. Balestriero, A. Bar, A. Bardes, Y. LeCun et al. , “Hierarchical planning with latent world models,” arXiv preprint arXiv:2604.03208 , 2026. [23] N. Caselli, F. Massafra, S. Punzo, S. L. Sardo, I. Pantelidis, and S. K. Bhethanabhotla, “Mind the gap: Promises and pitfalls of hierarchical planning in leworldmodel,” arXiv preprint arXiv:2607.12547 , 2026. [24] B. Eysenbach, R. Salakhutdinov, and S. Levine, “Search on the replay buffer: Bridging planning and reinforcement learning,” in Advances in Neural Information Processing Systems , vol. 32, 2019. [Online]. Available: https://proceedings.neurips.cc/paper files/ paper/2019/hash/5c48ff18e0a47baaf81d8b8ea51eec92-Abstract.html [25] L. Zhang, G. Yang, and B. C. Stadie, “World model as a graph: Learning latent landmarks for planning,” in Proceedings of the 38th International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 139, 2021, pp. 12 611–12 620. [Online]. Available: https://proceedings.mlr.press/v139/zhang21x.html [26] C. Lynch, M. Khansari, T. Xiao, V. Kumar, J. Tompson, S. Levine, and P. Sermanet, “Learning latent plans from play,” in Proceedings of the Conference on Robot Learning , ser. Proceedings of Machine Learning Research, vol. 100, 2020, pp. 1113–1132. [Online]. Available: https://proceedings.mlr.press/v100/lynch20a.html [27] K. Paster, S. A. McIlraith, and J. Ba, “Planning from pixels using inverse dynamics models,” in International Conference on Learning Representations , 2021. [Online]. Available: https://openreview.net/ forum?id=V6BjBgku7Ro [28] A. van den Oord, O. Vinyals, and K. Kavukcuoglu, “Neural discrete representation learning,” in Advances in Neural Information Processing Systems , vol. 30, 2017. [29] L. Maes, Q. L. Lidec, L. Facury, N. Massaudi, A. Chaurasia, F. Capuano, R. Gao, T. Gillin, D. Haramati, D. Scieur et al. , “stable-worldmodel: A platform for reproducible world modeling research and evaluation,” 
+
+arXiv preprint arXiv:2605.21800 , 2026. [30] Trossen Robotics, “WidowX AI robotic arm,” https://www. trossenrobotics.com/widowx-ai, accessed: October 6, 2026. [31] H. K. Cheng, S. W. Oh, B. Price, J.-Y. Lee, and A. Schwing, “Putting the object back into video object segmentation,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024. [32] M. J. Kim, Y. Gao, T.-Y. Lin, Y.-C. Lin, Y. Ge, G. Lam, P. Liang, S. Song, M.-Y. Liu, C. Finn et al. , “Cosmos policy: Fine-tuning video models for visuomotor control and planning,” arXiv preprint arXiv:2601.16163 , 2026. [33] K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail 
+
+et al. , “π0.5: a vision-language-action model with open-world generalization,” in Proceedings of The 9th Conference on Robot Learning , ser. Proceedings of Machine Learning Research, J. Lim, S. Song, and H.-W. Park, Eds., vol. 305. PMLR, 27–30 Sep 2025, pp. 9
+
+17–40. [Online]. Available: https://proceedings.mlr.press/v305/black25a. html [34] R. Y. Rubinstein, “Optimization of computer simulation models with rare events,” European Journal of Operational Research ,vol. 99, no. 1, pp. 89–112, 1997. [Online]. Available: https: //www.sciencedirect.com/science/article/pii/S0377221796003852 [35] E. Todorov, T. Erez, and Y. Tassa, “Mujoco: A physics engine for model-based control,” in 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems , 2012, pp. 5026–5033.

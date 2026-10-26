@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-25</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-26</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 1 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-25 21:39:59 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-26 22:56:06 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日速读 1 篇论文，聚焦双人形机器人统一全身交互控制。值得关注的是 OmniInteract 用统一策略处理双人形机器人的全身交互，但评分 6.0 显示成熟度中等。普通读者可先看摘要和演示，再留意其泛化性与实机验证。</p>
+<p>今日筛选4篇机器人研究，精读多机器人系统“柔性集群”框架，速读覆盖世界模型规划、鲁棒优化与自然语言导航。最值得看的是《Facultative Swarming》对“能力而非类别”的界定，以及Vector-Quantized世界模型用潜在反馈做机械臂运动规划。普通读者可先读精读篇建立多机器人协作的概念框架，再按兴趣挑一篇速读了解应用方向。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Facultative Swarming: A Capability, Not a Category, for Multi-Robot Systems">Facultative Swarming: A Capability, Not a Category, for Multi-Robot Systems</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="OmniInteract: Towards Unified Whole-Body Interaction Control for Dual Humanoids">OmniInteract: Towards Unified Whole-Body Interaction Control for Dual Humanoids</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Vector-Quantized World Model: Latent Feedback Motion Planning for Robot Manipulation">Vector-Quantized World Model: Latent Feedback Motion Planning for Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="CVaR-RMD: CVaR Selection Pressure for Robust Metaheuristic Discovery">CVaR-RMD: CVaR Selection Pressure for Robust Metaheuristic Discovery</span></li><li><span class="dpr-home-dashboard-paper-title" title="Natural-Language to Nav2: Operational Policies for Costmap-Based Navigation">Natural-Language to Nav2: Operational Policies for Costmap-Based Navigation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 </div>
 
