@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-26</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-27</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 4 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-26 22:56:06 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-27 22:55:08 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日筛选4篇机器人研究，精读多机器人系统“柔性集群”框架，速读覆盖世界模型规划、鲁棒优化与自然语言导航。最值得看的是《Facultative Swarming》对“能力而非类别”的界定，以及Vector-Quantized世界模型用潜在反馈做机械臂运动规划。普通读者可先读精读篇建立多机器人协作的概念框架，再按兴趣挑一篇速读了解应用方向。</p>
+<p>今日完成11篇机器人/多智能体论文筛选，精读3篇、速读8篇，重点锁定神经形态决策与异构协同运输。最值得看的是9.0分《Neuromorphic Decision Dynamics for Deadlock-free Safe Navigation in Congested Environments》的无死锁安全导航思路，以及8.0分HA-DiPO的异构协同运输扩散策略优化。普通读者可先读这两篇精读笔记，再按兴趣浏览DSGN、分布式预测集群等速读条目。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +71,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">1 篇</strong>
+    <strong class="dpr-home-dashboard-count">3 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Facultative Swarming: A Capability, Not a Category, for Multi-Robot Systems">Facultative Swarming: A Capability, Not a Category, for Multi-Robot Systems</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Neuromorphic Decision Dynamics for Deadlock-free Safe Navigation in Congested Environments">Neuromorphic Decision Dynamics for Deadlock-free Safe Navigation in Congested Environments</span></li><li><span class="dpr-home-dashboard-paper-title" title="HA-DiPO: Diffusion Policy Optimization for Heterogeneous Cooperative Transport">HA-DiPO: Diffusion Policy Optimization for Heterogeneous Cooperative Transport</span></li><li><span class="dpr-home-dashboard-paper-title" title="MATE-BT: A Behavior-Tree-Based Framework for Hierarchically Decentralized Mission Autonomy in Heterogeneous Multi-Robot Teams">MATE-BT: A Behavior-Tree-Based Framework for Hierarchically Decentralized Mission Autonomy in Heterogeneous Multi-Robot Teams</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +84,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">8 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Vector-Quantized World Model: Latent Feedback Motion Planning for Robot Manipulation">Vector-Quantized World Model: Latent Feedback Motion Planning for Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="CVaR-RMD: CVaR Selection Pressure for Robust Metaheuristic Discovery">CVaR-RMD: CVaR Selection Pressure for Robust Metaheuristic Discovery</span></li><li><span class="dpr-home-dashboard-paper-title" title="Natural-Language to Nav2: Operational Policies for Costmap-Based Navigation">Natural-Language to Nav2: Operational Policies for Costmap-Based Navigation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DSGN: A Dual-Stream Gated Network for Scalable Simultaneous Surveillance and Containment">DSGN: A Dual-Stream Gated Network for Scalable Simultaneous Surveillance and Containment</span></li><li><span class="dpr-home-dashboard-paper-title" title="Distributed Predictive Flocking for a Swarm of Miniature Vibration-Driven Robots in a Confined Arena">Distributed Predictive Flocking for a Swarm of Miniature Vibration-Driven Robots in a Confined Arena</span></li><li><span class="dpr-home-dashboard-paper-title" title="Preference-Guided Cooperation in Multi-Objective Multi-Agent Reinforcement Learning">Preference-Guided Cooperation in Multi-Objective Multi-Agent Reinforcement Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>8</strong></span></div>
 </section>
 </div>
 

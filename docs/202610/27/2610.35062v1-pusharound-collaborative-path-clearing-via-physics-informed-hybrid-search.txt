@@ -1,0 +1,452 @@
+Title: PushAround: Collaborative Path Clearing via Physics-Informed Hybrid Search
+
+URL Source: https://arxiv.org/pdf/2610.35062v1
+
+Published Time: Tue, 27 Oct 2026 02:14:41 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+> IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED OCTOBER, 2026 1
+
+# PushAround: Collaborative Path Clearing via Physics-Informed Hybrid Search 
+
+Zili Tang 1, Zongyuan Li 2, Zishao Qiao 1, and Meng Guo 1
+
+Abstract —Large vehicles in cluttered environments are often blocked by movable obstacles, motivating mobile robot teams to clear traversable corridors. Navigation Among Movable Ob-stacles (NAMO) approaches often abstract obstacle displace-ments while neglecting robot dimensions, obstacle mass, con-tact geometry and forces, yielding physically infeasible plans. 
+
+PushAround is a physics-informed hybrid search that couples geometric connectivity reasoning with short-horizon simulation to construct executable clearing plans. Repeated W–clearance connectivity graph (WCCG) queries expose frontier gaps requir-ing widening and rank them by estimated downstream costs. The search generates direct or recursive pushing candidates, selecting obstacles, directions, contacts and forces, and admits physics-evaluated candidates. Numerical experiments validate WCCG against standard connectivity checks and demonstrate scaling to denser clutter and teams of up to four robots, with robustness to simulated execution-side physical-parameter mismatch. 
+
+Index Terms —Multi-Robot Systems, Task and Motion Plan-ning, Manipulation Planning. 
+
+I. I NTRODUCTION 
+
+# IN warehouses, disaster sites and urban spaces, movable ob-stacles such as pallets, boxes and equipment can block large vehicles, motivating mobile robot teams to clear traversable corridors. Conventional path planners assume static obstacles and fail once routes are blocked [1]. Navigation Among Mov-able Obstacles (NAMO) creates routes by pushing, pulling or rotating obstacles [2], yet many methods abstract away robot dimensions, obstacle size and mass, contact geometry, forces and dynamics, producing geometrically valid but physically unrealizable plans . As shown in Fig. 1, a large robot may be unable to reach obstacle boundaries while a small robot lacks pushing force. Cooperative pushing by several small robots offers an alternative, but simultaneous pushes can trigger chained motions of several obstacles, introducing physical coupling that complicates planning. 
+
+A. Related Work 1) Navigation Among Movable Obstacles: NAMO extends motion planning to cluttered environments by planning obsta-cle displacements through pushing, pulling, or rotating [2], 
+
+Manuscript received: June 24, 2026; Revised: September 16, 2026; Ac-cepted: October 20, 2026. This paper was recommended for publication by Editor M. Ani Hsieh upon evaluation of the Associate Editor and Reviewers’ comments. This work was supported by the National Natural Science Foundation of China under grants U2241214 and T2121002. (Corresponding author: Meng Guo.) 
+
+The authors are with Peking University, Beijing 100871, China: 1School of Advanced Manufacturing and Robotics; 2College of Engineering (e-mail: meng.guo@pku.edu.cn). Author accepted manuscript. 
+
+Fig. 1. Collaborative path clearing in simulation ( Top ) and hardware (Bottom ). Two robots push movable obstacles to create a W –clear path for a large vehicle from start to goal. 
+
+[3]. Later work considers heuristic search, learning-based local planning, physics-based rollouts, and collaborative push-ing [3]–[7]. However, many NAMO formulations simplify robot geometry, actuation limits, object mass, and contact dynamics, which can yield unrealizable plans. 
+
+2) Collaborative Pushing: Studies cover pushing mechan-ics and limit surfaces [8], [9], cooperative transport with robot swarms [10], multi-robot box pushing with rein-forcement learning [11], collaborative pushing of polytopic objects in cluttered scenes [7], and learning-based loco-manipulation [12]. These studies focus on a prescribed object rather than multi-object corridor clearing. 
+
+3) Physics-Informed Planning: Dynamics models, contact reasoning, and simulation feedback inform motion generation: learned dynamics for humanoid contact planning [13], multi-contact force control [14], demonstration-guided optimal con-trol over contact modes [15], physics simulation interleaved with multi-agent pathfinding [16], [17], and learned physical priors [18], [19]. These methods typically address a prescribed target or a small set of objects. Corridor clearing instead re-quires choosing which of many movable obstacles to rearrange so that a larger vehicle can pass. 
+
+B. Our Method 
+
+As shown in Fig. 2, this work introduces PushAround ,a physics-informed framework for collaborative multi-robot pushing that constructs traversable corridors for large vehicles in cluttered environments. Its central novelty is a hybrid search that jointly determines which obstacles to displace and how to push them, coupling the high-level clearing sequence with low-level pushing modes specifying contact points, directions         
+
+> © 2026 IEEE. Personal use of this material is permitted. Permission from IEEE must be obtained for all other uses, in any current or future media, including reprinting/republishing this material for advertising or promotional purposes, creating new collective works, for resale or redistribution to servers or lists, or reuse of any copyrighted component of this work in other works. arXiv:2610.35062v1 [cs.RO] 26 Oct 2026 2IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED OCTOBER, 2026
+> Fig. 2. Overview of the proposed framework. Top: Scene inputs, WCCG construction, gap ranking, and sampling of pushing modes for breaking frontier gaps; Bottom-left: Sim-in-the-loop hybrid search with parallel validation in simulation; Bottom-right: Online execution and adaptation during path clearing.
+
+and forces. The framework integrates a W–clearance con-nectivity graph (WCCG) that certifies vehicle passage under width constraints, frontier-gap ranking by estimated effort, and pushing-mode generation under geometric and actuation constraints. Guided by the selected gap, the search proposes direct pushes or recursively clears blocking obstacles, and expands the plan through physics-evaluated transitions that account for robot dimensions, object mass, contact geometry and coupled pushing dynamics. Execution feedback updates connectivity and triggers replanning when needed. The contributions are twofold: (I) it introduces a unified framework that couples collaborative pushing with physics-informed verification, producing executable plans for path clearing in cluttered environments; and (II) it demonstrates empirical gains in feasibility, efficiency and scalability over evaluated NAMO and collaborative-clearing baselines, with robustness to execution-side physics mismatch. II. P ROBLEM DESCRIPTION 
+
+A. Workspace and Robots 
+
+The workspace is a bounded planar region W Ă R2
+
+containing immovable structures O Ă W and M ě 0 movable rigid polygons Ω fi tΩ1, ¨ ¨ ¨ , ΩM u. Each movable obsta-cle Ωm Ă W has mass Mm, inertia Im, frictional parameters and state smptq fi pxmptq, ψ mptqq , with xmptq P R2 the centroid position and ψmptq P R the orientation; Ωmptq
+
+denotes the region it occupies at time t. A team of N robots, 
+
+R fi tR1, ¨ ¨ ¨ , R N u, operates as a cooperative unit. Each robot Ri is a rigid body with state sRi ptq fi pxRi ptq, ψ Ri ptqq 
+
+and footprint Riptq. The instantaneous free space is given by: 
+
+xWptq fi Wz
+
+´
+
+O Y
+
+> M
+
+ď
+
+> m“1
+
+Ωmptq Y 
+
+> N
+
+ď
+
+> i“1
+
+Riptq
+
+¯
+
+. (1) 
+
+B. External Vehicle and Clearance Goal 
+
+An external vehicle V whose footprint is enclosed by a disk of radius W {2 ą 0 must navigate within the workspace from a start position xSV P W to a goal position xGV P W. The robots rearrange obstacles to admit this disk. At time t, the admissible center space is FW ptq fi tp P xWptq | BW {2ppq Ă xWptqu ,where BW {2ppq is the disk of radius W {2 centered at p. The 
+
+W -clearance condition is: 
+
+D PW 
+
+> V
+
+Ă FW ptq : xSV ⇝ xGV, (2) which certifies a collision-free centerline path for any vehicle footprint contained in the enclosing disk. 
+
+C. Collaborative Pushing Modes 
+
+To enlarge blocked gaps, the robots may actively reconfig-ure Ω by pushing movable obstacles. For obstacle Ωm P Ω,a pushing mode is denoted by ξm fi pcm, umq, where cm “pc1, ¨ ¨ ¨ , c N q is an ordered tuple of contact points on BΩm,and the ordering specifies the robot-to-contact assignment. The vector um P R2N stacks the corresponding planar contact forces, expressed in the body frame of Ωm; an inactive robot carries a null contact ci “ ∅ with zero force. For a contact tuple cm, the set of admissible forces Umpcmq Ă R2N collects contact forces satisfying the robot pushing limits, robot–object friction, and unilateral contact constraints. The body wrench induced by a mode is defined as: 
+
+qmpξmq fi Gmpcmqum, (3) where Gmpcmq P R3ˆ2N is the contact-to-wrench mapping; and qmpξmq P R3. The admissible mode set is state dependent as denoted by Ξmpsq. It contains modes whose contacts are reachable from the current robot configurations, pre-contact configurations are feasible in the current clutter, and forces satisfy um P Umpcmq. Hence, applying a feasible mode ξm P
+
+Ξmpsptqq yields the physical transition: 
+
+spt`q fi Φ`sptq, m, ξm
+
+˘, (4) where sptq stacks all robot and obstacle states. The force vector um serves as a feasibility variable to certify wrench generation under the modeled contact and actuation constraints rather than a directly commanded control input. 
+
+D. Problem Statement 
+
+The goal is to compute a hybrid schedule that reconfigures movable obstacles to admit a W -feasible path for the external vehicle. The schedule is defined as: 
+
+π fi tp Ωmk , vk, ξkqu Kk“1 , (5) TANG et al. : PUSHAROUND: COLLABORATIVE PATH CLEARING 3 
+
+> Fig. 3. Overview of the proposed physics-informed hybrid search (PIHS): WCCG construction, gap ranking, mode generation and physics validation.
+
+where Ωmk P Ω is the manipulated obstacle, vk its pushing direction, ξk P Ξmk its pushing mode. The node cost is: 
+
+Jclr pπq fi T ` α
+
+> K
+
+ÿ
+
+> k“1
+
+J pmk, ξk, sptkqq , (6) where T fi řKk“1 ∆tk denotes the robotic clearance duration excluding vehicle traversal, with ∆tk ą 0 the duration that evaluation in (13) returns for the k-th push, and Jp¨q is the simulation-estimated manipulation cost weighted by α ą 0.Vehicle traversal enters only through the terminal W -clearance condition in (2). The constraints in (1)–(4) enforce valid push-ing transitions. The realized clearance cost is defined in (6); PIHS samples finitely and does not guarantee optimality. 
+
+Remark 1. The objective couples obstacle selection, pushing-mode generation and switching in one hybrid planning prob-lem. Its combinatorial-continuous search includes robot-team contacts and forces alongside the obstacle rearrangements considered in NAMO [2], [3]. ■
+
+III. P ROPOSED SOLUTION 
+
+As shown in Figs. 2 and 3, PushAround first uses the W-Clearance Connectivity Graph in Sec. III-A and gap ranking in Sec. III-B to identify and prioritize blocking gaps. It then generates and evaluates physically feasible collaborative pushing modes in Sec. III-C. These components are integrated into the simulation-in-the-loop hybrid search of Sec. III-D and the online execution procedure of Sec. III-E. 
+
+A. W–Clearance Connectivity Graph 
+
+The feasibility of routing the vehicle reduces to whether a W -width corridor connects xSV and xGV. A W–clearance con-nectivity graph (WCCG) encodes obstacle adjacencies under clearance W for fast queries, as shown in Fig. 3. Grid- and sampling-based clearance checks typically depend on a chosen grid or sampling resolution and must update their queries when obstacles move [20]. Built from obstacle geometry, the WCCG needs no grid-resolution parameter in these repeated queries. 
+
+1) Graph Construction: The WCCG is built by decompos-ing all clearance-relevant obstacle and workspace boundaries into convex components or segments. From each compo-nent C, a centroid node vc is created. When two compo-nents Cu and Cv have closest points pu P Cu and pv P Cv with distance less than W , bridge nodes are added at pu and pv .These bridge nodes are connected by a bridge–bridge edge, annotated with the gap width wuv fi }pu ´ pv }, and further linked back to their centroids with centroid–bridge edges. Narrow passages with wuv ă W are marked as potential bottlenecks. The resulting graph is given by: 
+
+GW fi pV, Ec Y Ebq, (7) where V contains centroid and bridge nodes; Ec contains centroid–bridge edges; and Eb contains bridge–bridge edges annotated by gap width. 
+
+2) Connectivity Criterion: Once GW has been constructed, connectivity queries can be performed without explicitly com-puting a geometric path. Let Face pGW q denote the set of connected planar faces induced by the embedded WCCG, i.e., the maximal regions separated by obstacle components and WCCG bottleneck edges. The criterion for (2) is given by 
+
+`xSV, xGV P FW ptq˘ ^ `DF P Face pGW q : xSV, xGV P F ˘, (8) where the faces follow the standard configuration-space in-flation interpretation: expanding obstacles by a disk of radius 
+
+W {2 turns gaps narrower than W into overlapping barriers, and non-convex obstacles are decomposed into clearance-relevant components, after which WCCG records the separat-ing bottlenecks. The consistency of WCCG connectivity with both continuous and rasterized configuration-space references is further evaluated numerically in Sec. IV-A3. A frontier-tracing procedure, similar to the BugPlanner [21], is then used to extract a skeleton Σ as an ordered sequence of centroid and bridge nodes. Starting from xSV, it casts a ray toward xGV and follows the encountered frontier loop until either a valid exit is found or a blocking cycle is returned. 
+
+B. Ranking of Frontier Gaps 
+
+When (8) fails, the planner ranks blocking gaps on the reachable frontier of GW by predicted downstream cost and passes them to the hybrid search as local clearance targets, linking the gap-ranking and pushing modules in Fig. 2. 
+
+1) Frontier Extraction and Candidate Gaps: A BugPlanner query on GW above either confirms connectivity or returns a counter–clockwise frontier loop L that separates the two endpoints. The bridge–bridge edges on L define the first–hop candidate set ΓL fi tg1, ¨ ¨ ¨ , g K u, where each gap gk is repre-sented by its two closest boundary points, its width wgk ă W ,and the adjacent obstacles that can potentially be moved. 
+
+2) Evaluation for Immediate Cost: Each candidate g P ΓL
+
+is evaluated by combining the cost for the robots to reach the gap and the effort required to widen it. Let sR be the current robot positions, and og the outside insertion point of gap g.The resulting one–hop cost is given by: 
+
+C`g | L, sR
+
+˘ “ λt CtpsR, og q ` λp
+
+`Cdp pgq ` Crp pgq˘, (9) where λt, λ p ą 0 weight the costs and Ct, Cdp , Crp are the transition, direct and recursive terms. 
+
+3) Long-term Cost w.r.t. Goal: Furthermore, to prioritize gaps closer to the goal, a heuristic is added to the evaluation, i.e., hpgq “ η ››og ´ xGV
+
+››, with the scaling constant η ą 0.The gap-lookahead procedure performs an A ‹-style presearch with bounded width and depth, virtually crossing gaps and recomputing frontiers. The cost-to-connect is predicted by: 
+
+yCost pgq fi C`g | L, sR
+
+˘ ` ÿ
+
+> g1PΠ‹pgq
+
+␣Cpg1 | ¨q ` hpg1q(, (10) 4 IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED OCTOBER, 2026     
+
+> Fig. 4. Direct pushing (Top) moves a gap-side blocker along a gap-opening direction, whereas recursive pushing (Bottom) first clears movable blockers in the swept region and then returns to the root gap-opening task.
+
+where Π‹pgq is the sequence of subsequent gaps discovered after virtually crossing g. The module returns the ranked list 
+
+Rank `ΓL
+
+˘ fi argsort gPΓL
+
+yCost pgq, in ascending predicted cost, so promising gaps are expanded first. This geometric presearch estimates a promising bottleneck sequence without moving obstacles; the associated pushing actions are generated and evaluated in Sec. III-C. 
+
+C. Pushing Mode Generation and Evaluation 
+
+For a selected frontier gap g, this subsection constructs candidate pushing strategies Ξg fi tp Ωm, v, ξqu , where v “pvx, v y , ω q P R3 is a short-horizon pushing direction for Ωm,and ξ “ p cm, uq is its mode in (4). Wrench feasibility screens contact configurations that can realize the required motion within actuation limits. The forces certify feasibility rather than serving as hardware setpoints; candidate motion is then checked by rollout or quick-pass approximation. 
+
+1) Direct and Recursive Pushing Tasks: For direct push ,let Ωm denote one of the two movable obstacles adjacent to g. For each such obstacle, a small set of candidate body velocities tvkmuKm 
+
+> k“1
+
+is sampled with a bias toward enlarging the gap g, while a few angular components are included to account for local geometry. If the swept region of a direct push intersects movable blockers, recursive push tasks are required instead: for each out-layer blocker Ωm, the nominal direction moves it away from both the swept region and the reference gap sequence Π‹pgq. The bounded dependency chain in Fig. 4 prioritizes the outermost blocker Ωm. Clearing this blocker can free space for its parent push, allowing the search to return toward the original gap-opening task. 
+
+2) Pushing Mode Generation: At a search state s, a pushing mode is generated for each candidate direction vkm and obsta-cle Ωm. In this subsubsection, contact tuples, object velocities, forces, and wrenches are expressed in the body frame of Ωm.For a contact tuple c, its multi-directional force feasibility is: 
+
+Jm
+
+> MF
+
+pc, vkmq fi ÿ
+
+> vdPDkm
+
+wd min 
+
+> uPUmpcq
+
+}qmpc, uq ` qμmpvdq} , (11) where } ¨ } is a weighted ℓ1 wrench norm, the finite set 
+
+Dkm contains perturbations of vkm with weights wd ą 0,and qμmpvdq is the quasi-static friction wrench; the inner minimization is a small LP over the admissible forces Umpcq.A state- and direction-dependent contact set Akmpsq Ă B Ωm is  
+
+> Fig. 5. Mode generation for a gap-opening task: (a) local reachability, (b) the reachable contact candidates after twist filtering, (c) a compatible initial contact tuple, (d) greedy replacement of individual contacts, (e) the force balance of the optimized push, and (f) rollout validation of the mode.
+
+drawn from the robot-reachable boundary of Ωm by velocity– force compatibility filtering (Fig. 5), retaining only contacts with collision-free pre-contact poses. Starting from cached lay-outs or random initializations, sequential greedy replacement refines the tuple. At iteration ℓ, cℓr,c denotes the tuple with contact r replaced by candidate c. The replacement is: 
+
+c‹ “ argmin 
+
+> cPAkmpsq
+
+Jm
+
+> MF
+
+`cℓr,c , vkm
+
+˘. (12) The tuple is updated with c‹. Contact slots are swept until 
+
+Jm 
+
+> MF
+
+stops decreasing or the evaluation budget is exhausted. The best tuple over initializations gives ck, ‹ 
+
+> m
+
+, from which 
+
+ukm follows from the inner minimization in (11), yielding 
+
+ξkm “ p ck, ‹ 
+
+> m
+
+, ukmq; each mode is stored in the mode-cache for subsequent warm starts. If the sequential replacement cannot assign a contact to every robot, a bounded backtracking search over robot–contact combinations attempts the full-team assign-ment. If no feasible full-team mode is found within this budget, for instance on small faces or under the pairwise pusher-clearance constraint, one robot is temporarily left inactive and the assignment is repeated with the remaining team. Reduced-team modes carry a ranking penalty, so a feasible full-team mode is preferred, and the inactive robot returns for the next task. The best few admissible pairs are retained for gap g.
+
+3) Pushing Strategy Evaluation: For a current state s and candidate strategy pΩm, v, ξq P Ξg , a short-horizon rollout evaluates the transition in (4) under the selected mode. As shown in Fig. 5, a strategy is accepted if the robots reach the pre-contact poses, maintain stable contact and induce obstacle motion above threshold. The simulation returns: 
+
+ps1, δ T, δ Jq fi EvalSim `s, pΩm, v, ξq˘, (13) where s1 contains the resulting robot and object configurations, 
+
+δT ą 0 is duration and δJ control effort. Joint rollout captures contact-induced interactions among all bodies. Optionally, quick-pass approximates a transition using a cached rollout or a mechanically feasible reference trajectory, subject to compatible relative configurations and physical parameters, reachability, and swept-clearance checks. The trajectory end-point and associated duration and effort estimates supply s1,TANG et al. : PUSHAROUND: COLLABORATIVE PATH CLEARING 5 
+
+> Fig. 6. Sampled push tasks are evaluated via parallel simulation, producing updated states for search expansion.
+
+δT, and δJ. This shortcut trades prediction accuracy for reduced online simulation effort. 
+
+D. Physics-Informed Hybrid Search 
+
+The physics-informed hybrid search (PIHS) selects blocking gaps and evaluates pushing strategies in parallel (Fig. 6, Alg. 1), using short-horizon simulation or the optional quick-pass approximation of Sec. III-C. The evaluated clearance cost of a partial schedule in (6) supplies the accumulated-cost term in the node priority of (14). Finite sampling gives no global optimality or completeness guarantee. 
+
+1) Tree and Initialization: Tree nodes ν “ p s, π q contain the states in (4) and partial schedule in (5). Rank pνq orders frontier gaps using (10), and χpνq accumulates execution cost from the root. Alg. 1 initializes ν0 “ p s0, Hq and its queue. 
+
+2) Node Selection: At each iteration, line 4 of Alg. 1 selects the node with minimum priority: 
+
+f pνq fi χpνq ` min 
+
+> gPRank pνq
+
+yCost pgq. (14) The second term estimates the minimum remaining cost over unexplored gaps. Gap ranking orders local clearance targets within a node, whereas this priority compares partial schedules with different clearing histories. This heuristic need not be admissible, so the priority gives no A* optimality guarantee. 
+
+3) Node Expansion with Parallel Simulation: Alg. 1 ex-pands the selected node ν “ p s, π q in lines 7–17. For each sampled gap g P Rank pνq, its predicted gap sequence Π‹pgq
+
+in (10) is first derived. Then, fresh direction samples and mode optimization by (11) provide a candidate strategy set 
+
+Ξg fi tp Ωm, v, ξqu , including direct pushes of gap-side obstacles and recursive pushes of outer blockers. Thus, ex-pansion is prioritized first by the gap ordering in Rank pνq,and then by the candidate ordering within Ξg . Each candidate is evaluated by (13), using quick-pass approximation or a rollout as described in Sec. III-C. A successful evaluation yields ps1, δ T, δ Jq, from which a child node ν1 fi ps1, π 1q is created with π1 fi π Y t τ u, appending τ fi pΩm, v, ξq to π.The cumulative cost is updated by: χpν1q fi χpνq ` pCpν, τ q,where pCpν, τ q fi δT ` α δ J is the incremental cost. With 
+
+reinsertion in line 17, the parent node is requeued for later expansion with new target and direction samples. 
+
+4) Termination: Alg. 1 terminates when a node admits a 
+
+W –clear path by (8). The returned schedule satisfies nominal clearance and evaluated pushing transitions but need not minimize Jclr in (6). Vehicle traversal follows clearing. 
+
+Remark 2. Gap-lookahead reduces unproductive branches, 
+
+> MODE
+
+-CACHE warm-starts optimization, and optional quick-pass approximates transitions to reduce rollout effort. ■
+
+Algorithm 1: Physics-Informed Hybrid Search                                                                                       
+
+> Input: s0,α,EvalSim p¨q ,W–criterion by (8)
+> Output: Clearing schedule π‹, or failure
+> 1ν0Ð p s0,Hq , χ pν0q “ 0;
+> 2Init Qby (14);
+> 3while Q‰ H and budget remains do
+> 4ν“ p s, π q Ð Q.pop_min pq by (14);
+> 5if sadmits PW
+> Vby (8) then
+> 6return π;
+> 7foreach sampled gPRank pνqdo
+> 8Compute Π‹pgq, generate Ξg;
+> 9foreach pΩm,v,ξq P Ξgdo
+> 10 τ“ p Ωm,v,ξq// Direct or recur.
+> 11 ps1, δ T, δ Jq Ð EvalSim ps, τ qby (13);
+> 12 if success then
+> 13 π1ÐπY t τu;
+> 14 ν1Ð p s1, π 1q;
+> 15 χpν1q Ð χpνq ` δT`α δ J;
+> 16 Add ν1to Q;
+> 17 Reinsert νinto Qfor further sampling;
+> 18 return failure;
+
+E. Overall Analyses 1) Execution and Online Adaptation: The schedule π “tτ1, ¨ ¨ ¨ , τ K u is executed in a receding-horizon manner, with 
+
+τk “ p Ωmk , vk, ξkq. Robots reach the assigned contacts and follow vk from the current state in (13). On hardware, the optimized forces certify wrench feasibility within actuation limits; they are not control setpoints. At each control interval, 
+
+EvalSim predicts object motion tracked with motion-capture feedback. Between pushes, robot reassignment preserves con-tact order along the obstacle boundary [7] to reduce path crossings. After each push, the state and WCCG are updated until a W -clear path connects xSV and xGV. Failed contacts, stalled pushing, or invalidated connectivity trigger replanning by Alg. 1 from the latest observed state. 
+
+2) Computational Complexity: Given M movable obsta-cles, the computational cost of one node expansion in Alg. 1 is dominated by candidate generation and physics valida-tion. WCCG updating and gap ranking on the node’s fron-tier loop Lν incur OpM log M ` | V| ` | Ec| ` | Eb|q and 
+
+Op| ΓLν | log |ΓLν |q costs. The dominant cost is physics vali-dation, which grows with the number of evaluated candidates; parallel workers reduce the rollout wall time. Robot-team size affects mode generation: each greedy sweep evaluates at most 
+
+N |A| single-contact substitutions, where |A| bounds the reach-able contact candidates considered per robot, rather than |A|N
+
+joint tuples, and refinement is capped by a bounded evaluation budget; failures are handled by bounded backtracking with budget B and a reduced-team fallback over at most N one-robot-excluded subsets. Each candidate is checked by an LP over at most 2N force variables. IV. E XPERIMENTS 
+
+PIHS is evaluated in simulation and hardware for con-nectivity, clearing performance, scalability, and robustness to execution-side physical mismatch. The algorithms use 
+
+Python3 and PyBullet [22] on an Intel i9-14900KF with an RTX 4080. The accompanying video illustrates the simulation and hardware experiments. 6 IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED OCTOBER, 2026                                                                                             
+
+> Fig. 7. Execution and planning alignment in Scenario 1 ( Left ) and Scenario 2 ( Right ). Top: simulated snapshots during path clearing. Bottom: corresponding WCCG overlays with the start face in blue. The executed pushes progressively expand the reachable W–clearance region until the goal is connected. TABLE I WCCG CONNECTIVITY VALIDATION AND MEAN RUNTIME .Validation Runtime (ms) Type CC “FR FP/FN :CC FR WCCG Convex 100/100 0/0 1.23 282.9 0.86
+> Non-convex 98/100 0/0 1.51 204.1 1.30
+> Mixed 98/100 0/0 1.33 242.4 1.05
+> Total 296/300 0/0 1.36 243.1 1.07
+> :WCCG errors relative to the continuous configuration-space reference (CC). All runtimes use the same 300-scene harness with the compiled WCCG backend.
+> TABLE II PERFORMANCE COMPARISON AND ABLATIONS ON SCENARIO 1
+> OVER 40 RANDOMIZED TRIALS .A
+> Method / Variant Succ.(%) PT (s) ET (s) #Sims #Pushes DFS-WCCG 25.0 ą100.0 51.2 ą500 8.0 SL-Push (offline) 62.5 0.06 44.1 0.0 7.3 SL-Push (sim) 75.0 18.2 64.6 20.0 10.2 Rec-NAMO 37.5 13.3 42.4 0.0 7.8
+> PushAround (ours) 97.5 10.3 28.6 121.5 6.0
+> w/o gap-lookahead 82.5 16.9 35.2 178.3 7.2 w/o mode-cache 92.5 17.1 33.4 164.6 6.5 w/o quick-pass 90.0 23.6 41.9 208.2 6.1 w/o reinsertion 85.0 12.8 31.1 151.7 7.8
+> aTimes are averaged over successful trials; failures count in the success rate only. For DFS-WCCG, P T and #Sims are not comparable and are given as lower bounds ( ą).
+
+A. Numerical Simulations 1) Setup and Configuration: The simulation step is ∆t “
+
+1{240 s and the control period is 1{40 s. Robots are disk or box pushers, and obstacle masses range from 5 to 15 kg in Scenarios 1–2 and from 20 to 30 kg in the generalization studies. The nominal 8 ˆ 5 m workspace contains bottleneck-forming bar obstacles, with two robots and 10 –15 movables under minimum-separation constraints. Unless stated other-wise, comparisons and ablations use Scenario 1 with ten movables and 40 trials; Scenario 2 has 14 movables and provides an additional cluttered case in Fig. 7. All methods share robot footprints, obstacle configurations, collision and reachability checks, and the execution simulator. They use eight workers, an 800 s planning cap, and an execution cap of 
+
+20 ,000 control steps, equivalent to 500 s. A trial succeeds when the vehicle reaches its goal through a W -clear path. Planning time P T and execution time ET average over successful trials unless stated otherwise; failures count only in success rates, while scalability timing curves cap failures at the budgets. 
+
+2) Results: Across the 40 Scenario 1 trials, PushAround achieves a 97 .5% success rate, with mean planning and execution times of 10 .3 s and 28 .6 s, respectively, and 6.0 
+
+> Fig. 8. Failure cases by baselines Rec-NAMO, SL-Push and DFS-WCCG.
+
+pushes per successful trial, as shown in Table II. Fig. 7 shows representative runs in both scenarios. In Scenario 1 with 10 
+
+movable obstacles and two robots, PushAround generates a 
+
+6-push plan in 7.4 s and completes execution in 42 .3 s. In Scenario 2 with 14 obstacles, it generates a 9-push plan in 
+
+11 .2 s, with 61 .3 s of execution. Planning effort is dominated by simulation-based validation: a successful trial uses 121 .5
+
+simulations on average for 6.0 executed pushes. The abla-tions indicate that mode-cache, quick-pass, gap-lookahead, and reinsertion mainly affect this validation load rather than plan length. Execution takes longer because each selected push is physically carried out and observed, whereas inter-push repositioning is handled by geometric reachability checks. 
+
+3) WCCG Connectivity Validation: Table I compares WCCG against two references on 300 random convex, non-convex, and mixed scenes. The continuous reference (CC) resolves collisions geometrically after inflating boundaries by W {2, with no grid discretization [23]; the fine-raster ref-erence (FR) discretizes the workspace on a 0.01 m occupancy grid. CC and FR disagree in 4 of 300 cases, all near narrow contacts and rasterization-related, whereas WCCG matches CC on all 300 scenes without false positives or negatives. A query takes 1.07 ms, comprising 0.67 ms for querying and 
+
+0.40 ms for construction, versus 1.36 ms for CC and 243 ms for FR. It also supplies the gap graph for PIHS. Per-push WCCG rebuilding is negligible next to physics rollouts. 
+
+4) Ablation Studies: Four ablations remove individual mechanisms: w/o gap-lookahead omits downstream costs in gap ranking; w/o mode-cache disables cached warm starts; 
+
+w/o quick-pass evaluates every candidate by rollout; and w/o reinsertion expands each node only once. Table II shows success drops exceeding ten percentage points without gap-lookahead or reinsertion. Removing quick-pass lowers success TANG et al. : PUSHAROUND: COLLABORATIVE PATH CLEARING 7                                                                                                                                                                       
+
+> TABLE III SCALABILITY AND ROBUSTNESS .Case Trials Succ.(%) P T (s) ET (s)
+> Obstacle density (PushAround, N“2, nominal)
+> M“15 10 100 2.5 ˘0.9 37.1 ˘21.0
+> M“30 10 100 11.7 ˘3.7 100.9 ˘34.7
+> M“45 10 100 53.4 ˘24.5 272.7 ˘97.4
+> Robot-team size (M“30 , nominal; 10 trials per cell) PushAround, N“310 100 30.0 ˘12.7 97.3 ˘42.1 PushAround, N“410 100 29.2 ˘8.9 110.1 ˘33.1 SL-Push (sim), N“310 80 30.0 ˘46.3 193.3 ˘111.3 SL-Push (sim), N“410 80 23.4 ˘18.2 171.7 ˘61.2 DFS-WCCG, N“310 100 142.6 ˘183.1 178.1 ˘72.1 DFS-WCCG, N“410 90 101.9 ˘103.9 175.9 ˘113.6
+> Physics mismatch (M“30 ,N“2)Nominal 10 100 16.8 ˘3.4 104.7 ˘37.4 Mass ˆ0.6–1.440 100 16.8 ˘5.4 105.9 ˘44.6 Lateral fric. ˆ0.6–1.440 97.5 16.5 ˘5.7 114.0 ˘48.5 Spin fric. ˆ0.6–1.440 97.5 15.2 ˘3.6 100.1 ˘35.7 Force limit ˆ0.6–1.440 95.0 18.9 ˘10.9 115.9 ˘58.5 All perturbed 160 97.5 16.9 ˘7.0 108.9 ˘47.4 Each perturbed row scales one parameter; the others stay nominal. Times and budget are as in Table II.
+
+to 90 .0% ; removing mode-cache increases simulations. 
+
+5) Comparisons: Four baseline variants run on Scenario 1 over 40 randomized trials under the same W -clearance crite-rion, scene distribution, and execution simulator. DFS-WCCG 
+
+searches fixed object–direction pushes depth first and checks transitions by physics rollout. SL-Push clears blockers from a straight corridor by pushing them sideways; its offline variant plans geometric displacements, while its simulation-validated variant checks candidate pushes by rollout. Rec-NAMO re-cursively clears blocking objects using geometric planning without rollout validation during search. These variants repre-sent search-based, local-pushing, and recursive NAMO strate-gies [3]–[5], [16]. Table II shows that PushAround reaches the highest success rate, 97 .5% , at the lowest combined planning-and-execution time among successful trials ( 38 .9 s). DFS-WCCG exhibits rapid branching growth, offline SL-Push produces displacements that fail in execution, and Rec-NAMO often fails to connect the W -clear corridor in clutter (Fig. 8). 
+
+6) Scalability and Robustness Analysis: Table III and Figs. 9–10 report generalization in an 8 ˆ 8 m workspace. Density runs query a precomputed mode table; its preparation is excluded from P T . Mismatch and team-size runs optimize modes greedily. With M “ 30 and N “ 2, nominal P T is 
+
+11 .7, 16 .8, and 23 .9 s, respectively. The team-size study uses a different realization of the same seeds. 
+
+(I) Obstacle density: with two robots and ten trials per density, PushAround maintains 100% success for M “ 15 –
+
+45 , planning in 2.5–53 .4 s. At M “ 45 , none of the evaluated baselines succeeds, while the no-recursion ablation solves 
+
+7{10 trials. Across the clutter sweep, branching stays near six while expansions rise from 3.5 to 24 .5. Median search effort is ten expansions and 48 visited snapshots, with about 
+
+60 simulations at 165 ms each versus 22 ms per mode. 
+
+(II) Robot-team size: at M “ 30 , PushAround solves all ten trials for each of N “ 2, 3, and 4. The shared mode generator first tries the full team and may temporarily leave one robot inactive. Across N “ 2–4, search effort remains near ten expansions and 60 –63 simulations; aggregate mode-generation time rises from 15 .8 to 46 .4 s.                                     
+
+> Fig. 9. Scalability of the clearing process. Left: density scaling ( M“45 , two robots): snapshots during clearing ( top ) and WCCG overlays with the start face in blue ( bottom ). Right: team scaling ( M“30 , four robots): initial and final states ( top ) and one push before contact and during execution ( bottom ). 15 25 35 45
+> number of obstacles M
+> 025 50 75 100
+> (a) success (%)
+> 15 25 35 45
+> number of obstacles M
+> 10 0
+> 10 1
+> 10 2
+> 10 3cap
+> (b) planning time (s)
+> 15 25 35 45
+> number of obstacles M
+> 0200 400 600
+> cap
+> (c) execution time (s)
+> PushAround w/o rec. SL-Push (sim) DFS-WCCG Rec-NAMO
+> Fig. 10. Obstacle-density scaling ( 8ˆ8m, 10 seeds per density). Times are budget-capped (planning 800 s, execution 20 ,000 steps “500 s; dotted).
+
+(III) Physics mismatch: the planner retains nominal physics while execution varies one parameter family at a time. Nominal and perturbed conditions reuse ten base seeds for PushAround and five per baseline. Under ˘40% per-turbations to four parameter families, PushAround, SL-Push (sim), and DFS-WCCG achieve 97 .5% , 32 .5% , and 57 .5% 
+
+success, respectively. Their P T averages 18 .4, 31 .5, and 
+
+229 .1 s, averaging successful-trial means over conditions with successes. Nominal success is 10 {10 for PushAround and 3{5
+
+per baseline. Comparisons reflect end-to-end performance, not normalized degradation; joint errors are untested. 
+
+B. Hardware Experiments 1) System Description: Experiments use a 5 ˆ 6 mworkspace of interlocking 0.6 ˆ 0.6 m foam mats (Fig. 11), 
+
+2 UGVs and 6 cardboard boxes; robots and movables carry motion-capture markers streamed to PyBullet in real time. The UGVs are velocity-controlled, and the optimized contact forces are used only for feasibility evaluation, not for motor control. Motion-capture poses are compared with EvalSim 
+
+predictions: position or orientation errors above 0.3 m or π{4
+
+trigger replanning, as do the failures in Sec. III-E1. 
+
+2) Results: Two representative real-world runs are shown in Fig. 11. In hardware Scenario 1, PIHS considers five candidate gaps and plans a four-task schedule in 6.5 s using 12 node expansions and 49 visited snapshots at depth 6; the robots then execute it, first rotating the yellow L-shaped object to open a gap near an immovable obstacle and then separating the green and orange objects until a W –clear path is established at t “ 52 s. In hardware Scenario 2, PushAround succeeds in 8{10 trials with an average of 5.2 pushes and 11 .4 s of planning. In the illustrated run, the first direct push on the 8 IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED OCTOBER, 2026 
+
+Fig. 11. Real-world pushing experiments with execution–planning alignment (over 20 runs, 2 scenarios). Top: two robots pushing obstacles in a 5ˆ6 m 
+
+workspace. Bottom: WCCG overlays with the start face in blue. 
+
+blue L-shaped object also moves the adjacent T-shaped block and opens the first gap. Coupled rigid-body rollout in EvalSim 
+
+predicts this neighboring-object motion without a separately encoded action. The resulting snapshot updates the WCCG be-fore execution continues. Execution takes 77 .1 ˘ 15 .9 s (mean 
+
+˘ standard deviation); online replanning handles deviations due to force limits, drift and wheel slip. V. C ONCLUSION 
+
+This work presents PushAround, a multi-robot framework that jointly plans obstacle selection, contacts and forces through a hybrid search. Geometric gap reasoning identifies where the corridor must widen, while pushing evaluation assesses the corresponding rearrangements under physical constraints. Simulation studies examine obstacle density, team size, and execution-side physics mismatch; hardware experi-ments demonstrate path clearing with state-feedback replan-ning. Future work targets obstacle-state estimation without external sensing or known masses. REFERENCES [1] L. Liu, X. Wang, X. Yang, H. Liu, J. Li, and P. Wang, “Path planning techniques for mobile robots: Review and prospect,” Expert Systems with Applications , vol. 227, p. 120254, 2023. [2] M. Stilman and J. J. Kuffner, “Navigation among movable obstacles: Real-time reasoning in complex environments,” International Journal of Humanoid Robotics , vol. 2, no. 04, pp. 479–503, 2005. [3] M. Stilman, J.-U. Schamburek, J. Kuffner, and T. Asfour, “Manipulation planning among movable obstacles,” in IEEE International Conference on Robotics and Automation (ICRA) , 2007, pp. 3327–3332. [4] L. Yao, V. Modugno, A. M. Delfaki, Y. Liu, D. Stoyanov, and D. Kanoulas, “Local path planning among pushable objects based on reinforcement learning,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2024, pp. 3062–3068. [5] Z. Ren, B. Suvonov, G. Chen, B. He, Y. Liao, C. Fermuller, and J. Zhang, “Search-based path planning in interactive environments among movable obstacles,” in IEEE International Conference on Robotics and Automa-tion (ICRA) , 2025, pp. 533–539. [6] J. J. Weeda, S. Bakker, G. Chen, and J. Alonso-Mora, “Pushing through clutter with movability awareness of blocking obstacles,” in IEEE International Conference on Robotics and Automation (ICRA) , 2025, pp. 512–518. [7] Z. Tang, Y. Zhang, and M. Guo, “PushingBots: Collaborative pushing via neural accelerated combinatorial hybrid optimization,” IEEE Trans-actions on Robotics , vol. 42, pp. 579–599, 2026. [8] S. Goyal, A. Ruina, and J. Papadopoulos, “Limit surface and moment function descriptions of planar sliding,” in IEEE International Confer-ence on Robotics and Automation (ICRA) , 1989, pp. 794–795. [9] K. M. Lynch, H. Maekawa, and K. Tanie, “Manipulation and active sensing by pushing using tactile feedback,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , vol. 1, 1992, pp. 416–421. [10] J. Chen, M. Gauci, W. Li, A. Kolling, and R. Groß, “Occlusion-based cooperative transport with a swarm of miniature mobile robots,” IEEE Transactions on Robotics , vol. 31, no. 2, pp. 307–321, 2015. [11] Y. Wang and C. W. De Silva, “Multi-robot box-pushing: Single-agent Q-learning vs. team Q-learning,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2006, pp. 3694–3699. [12] Y. Feng, C. Hong, Y. Niu, S. Liu, Y. Yang, and D. Zhao, “Learning multi-agent loco-manipulation for long-horizon quadrupedal pushing,” in IEEE International Conference on Robotics and Automation (ICRA) ,2025, pp. 14 441–14 448. [13] Y.-C. Lin, B. Ponton, L. Righetti, and D. Berenson, “Efficient humanoid contact planning using learned centroidal dynamics prediction,” in IEEE International Conference on Robotics and Automation (ICRA) , 2019, pp. 5280–5286. [14] Q. Rouxel, S. Ivaldi, and J.-B. Mouret, “Multi-contact whole-body force control for position-controlled robots,” IEEE Robotics and Automation Letters , vol. 9, no. 6, pp. 5639–5646, 2024. [15] T. Xue, H. Girgin, T. S. Lembono, and S. Calinon, “Demonstration-guided optimal control for long-term non-prehensile planar manipula-tion,” in IEEE International Conference on Robotics and Automation (ICRA) , 2023, pp. 4999–5005. [16] D. M. Saxena and M. Likhachev, “Planning for complex non-prehensile manipulation among movable objects by interleaving multi-agent pathfinding and physics-based simulation,” in IEEE International Conference on Robotics and Automation (ICRA) , 2023, pp. 8141–8147. [17] K. Ren, G. Wang, A. S. Morgan, L. E. Kavraki, and K. Hang, “Object-centric kinodynamic planning for nonprehensile robot rearrangement manipulation,” IEEE Transactions on Robotics , vol. 41, pp. 5761–5780, 2025. [18] R. Ni and A. H. Qureshi, “Progressive learning for physics-informed neural motion planning,” in Robotics: Science and Systems , 2023. [19] Y. Liu, R. Ni, and A. H. Qureshi, “Physics-informed neural mapping and motion planning in unknown environments,” IEEE Transactions on Robotics , vol. 41, pp. 2200–2212, 2025. [20] S. Karaman and E. Frazzoli, “Sampling-based algorithms for optimal motion planning,” The International Journal of Robotics Research ,vol. 30, no. 7, pp. 846–894, 2011. [21] K. N. McGuire, G. C. H. E. de Croon, and K. Tuyls, “A comparative study of bug algorithms for robot navigation,” Robotics and Autonomous Systems , vol. 121, p. 103261, 2019. [22] E. Coumans and Y. Bai, “PyBullet, a Python module for physics simulation for games, robotics and machine learning,” http://pybullet.org, 2016–2019. [23] T. Lozano-P´ erez, “Spatial planning: A configuration space approach,” 
+
+IEEE Transactions on Computers , vol. C-32, no. 2, pp. 108–120, 1983.
