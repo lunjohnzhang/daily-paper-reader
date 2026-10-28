@@ -1,0 +1,1522 @@
+Title: A Hyper-Logical View on Multi-Agent Path Planning
+
+URL Source: https://arxiv.org/pdf/2610.35964v1
+
+Published Time: Wed, 28 Oct 2026 00:03:10 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# A Hyper-Logical View on Multi-Agent Path Planning 
+
+## Hadar Frenkel, Dor Atzmon 
+
+Bar-Ilan University 
+
+Abstract 
+
+Multi-Agent Path Planning (MAPP) requires collision-free paths for multiple agents. MAPP has numerous real-life ap-plications, including the navigation of automated vehicles, and has therefore many variants considering different constraints, requirements, and objectives. For each such variant, a new algorithmic treatment is often developed. This paper takes a complementary, specification-centered view: we show that many MAPP variants can be modeled in HyperLTL , a tempo-ral logic that reasons about multiple paths and their evolution through time, and in its ω-regular extension HyperQPTL. The contribution is not a claim that current hyperproperty model checkers replace specialized MAPP solvers. Rather, the hyper-logical view gives a unified language for comparing MAPP variants, adding cross-agent constraints, expressing optimal-ity, and connecting MAPP to verification, explanation, and causality techniques for hyperproperties. 
+
+## 1 Introduction 
+
+In Multi-Agent Path Planning (MAPP), we require planning a set of paths for a set of agents without conflicts (colli-sions). MAPP is derived from various real-world applica-tions in which physical agents must navigate without col-liding with other agents. These applications range from in-door environments, such as robot navigation in automated warehouses (Hönig et al. 2019; Li et al. 2020), to planning outdoor routes for autonomous vehicles (e.g., cars, trains, or drones) (Atzmon, Diei, and Rave 2019; Li et al. 2019). MAPP is general and, due to its broad applicability, has many variants addressing different real-life tasks of plan-ning conflict-free paths. A commonly known MAPP variant is Multi-Agent Path Finding (MAPF) (Stern et al. 2019), in which each agent’s path leads to its given goal. Op-timally solving MAPF for standard objective functions is NP-hard (Surynek 2010; Yu and LaValle 2013b). Neverthe-less, efficient algorithms optimally solve MAPF for many agents (Zhang et al. 2020; Li et al. 2021; Boyarski et al. 2022; Lam et al. 2022). A prominent optimal MAPF algorithm is Conflict-Based Search (CBS) (Sharon et al. 2015). CBS plans a path for each agent separately. Then, repeatedly, it resolves conflicts between the paths by imposing constraints and replanning new paths, until conflict-free paths are found. 
+
+Copyright © 2027, Association for the Advancement of Artificial Intelligence (www.aaai.org). All rights reserved. 
+
+Besides MAPF, we define eight additional MAPP variants (nine, including MAPF) studied in the literature. For most of them, a specialized algorithm was designed, often by adapt-ing CBS or another MAPF technique to the specific variant. This paper presents a different view on MAPP problems: instead of proposing another dedicated solver, we show that many MAPP variants can be expressed modularly in the tem-poral logic HyperLTL (Clarkson et al. 2014) and its omega-regular counterpart HyperQPTL (Rabe 2016). HyperLTL is an extension of the prominent logic LTL - Linear Temporal Logic (Pnueli 1977a), that can express the behavior of an agent over time, thus allowing us to express properties such as an agent starts in vertex s and eventually reaches ver-tex g, but also much more elaborate properties, as we show later in the paper. While LTL can reason about one path at a time, HyperLTL reasons about the relations between differ-ent paths, thus, it serves as a natural specification language for MAPP problems. Moreover, it allows us to express not only the requirements posed in the various MAPP instances described below, but we also show that HyperLTL can ex-press additional constraints and behaviors that are not easily captured by CBS (see Section 3.1). In Section 5, we cover the related work regarding other connections between planning and temporal (hyper)properties. 
+
+Contributions (1) We present a modular translation of MAPP problems in HyperLTL or HyperQPTL (Section 3.3), including examples of cross-agent constraints that are cum-bersome to express in decoupled path-planning formalisms (Section 3.1); (2) We show how to express cost functions, and in particular makespan, as hyperproperties (Section 4.1); (3) We reduce finding an optimal solution for the modeled MAPP variants to HyperQPTL (or HyperLTL) model check-ing (Section 4.3); (4) We clarify the intended role of the reduction: it is a solver-independent specification and reason-ing layer, not an empirical claim that current hyperproperty tools outperform mature MAPP solvers. 
+
+## 2 Preliminaries 
+
+2.1 Planning 
+
+Given an undirected graph G = ( V, E ), a path π for agent 
+
+a is a list of vertices, where π(t) is the vertex at timestep 
+
+t. Between t and t + 1 , agent a either moves to an adjacent arXiv:2610.35964v1 [cs.MA] 25 Oct 2026 (1) MAPF / (2) AMAPF                                        
+
+> Input
+> Output
+> (1) MAPF (2) AMAPF
+> 𝜋 1=𝑠 1, 𝑔 1, 𝐴, 𝑔 1
+> 𝜋 2= (𝑠 2, 𝑠 2, 𝑔 1, 𝑠 1, 𝑔 2)
+> 𝜋 1=𝑠 1, 𝑔 2
+> 𝜋 2= (𝑠 2, 𝑔 1)
+> (3) MCPF (4) TAPF
+> Input
+> Output 𝜋 1=𝑠 1, 𝑔 2, 𝑔 3
+> 𝜋 2= (𝑠 2, 𝑔 1)
+> 𝜋 1=𝑠 1, 𝑔 11
+> 𝜋 2= (𝑠 2, 𝑔 12, 𝑔 21)
+> (5) MAPD (6) MAPF-PC
+> Input
+> Output 𝜋 1=𝑠 1, 𝑝 2, 𝑑 2
+> 𝜋 2= (𝑠 2, 𝑝 1, 𝑠 2, 𝑑 1)
+> 𝜋 1=𝑠 1, 𝑔 11, 𝑠 1, 𝑔 12
+> 𝜋 2= (𝑠 2, 𝑠 2, 𝑔 21, 𝑔 22)
+> (7) RMAPF / (8) MTPF
+> Input
+> Output
+> (7) RMAPF (8) MTPF
+> 𝜋 1=𝑠 1, 𝑠 1, 𝑠 2, 𝑔 1
+> 𝜋 2= (𝑠 2, 𝐹, 𝐹, 𝐹, 𝑠 2, 𝑠 1, 𝑔 2)
+> 𝜋 1=𝑠 1, 𝑠 1, 𝑠 2, 𝑔 1
+> 𝜋 2= (𝑠 2, 𝑔 1, 𝐷, 𝐶, 𝐵, 𝐴, 𝐸, 𝑔 2)
+> (9) MAM
+> Input
+> Output 𝜋 1=𝑠 1, 𝐴, 𝐵 𝜋 2=𝑠 2, 𝑠 2, 𝐴, 𝐵
+> 𝜋 3=𝑠 3, 𝐶, 𝐵 𝜋 4=𝑠 4, 𝑠 4, 𝐶, 𝐵
+
+𝑠 1 𝑔 2
+
+𝑔 1
+
+𝑔 3
+
+𝐴 𝑠 2
+
+𝑠 1
+
+𝑔 2
+
+> 2
+
+𝑔 11
+
+𝑔 21 𝑔 12
+
+𝑠 2
+
+𝑠 1
+
+𝑝 1
+
+𝑑 1
+
+𝑑 2𝑝 2
+
+𝑠 2
+
+𝑠 1
+
+𝑔 11
+
+𝑔 12
+
+𝑔 22 𝑔 21
+
+𝑠 2 
+
+> 𝑃𝐶 = { 𝑔 11, 𝑔 21}
+
+𝐵  𝐶 
+
+𝑔 2 𝑠 1 𝑠 2
+
+𝐷 
+
+> 𝑘 = 1
+
+𝐹 
+
+𝐴 
+
+𝐸 
+
+𝑔 1
+
+𝑠 2
+
+𝐴  𝐵  𝐶 
+
+𝑠 3
+
+𝑠 4𝑠 1
+
+𝑠 1 𝑔 1
+
+𝐴 𝑔 2
+
+𝑠 2Figure 1: Nine MAPP variants/problems. vertex ( (π(t), π (t+1)) ∈ E) or waits ( π(t) = π(t+1) ). The path cost is the number of actions in the path: c(π) = |π| − 1.For n agents A = ( a1, . . . , a n) and start vertices S =(s1, . . . , s n), a plan P = ( π1, . . . , π n) has πi(0) = si for each agent ai, and each agent waits at its last vertex forever. Paths πi and πj conflict at timestep t if πi(t) = πj (t) (a 
+
+vertex conflict ) or between t and t + 1 if (πi(t), π i(t + 1)) = (πj (t + 1) , π j (t)) (an edge conflict ). A MAPP solution is a conflict-free plan. An optimal MAPP solution minimizes a chosen objective. The standard MAPP objectives are sum-of-costs (SOC), which equals the sum of paths’ costs: C(P ) = P 
+
+> i
+
+c(πi), and makespan , which equals the maximum cost among them: C(P ) = max i c(πi). All nine MAPP variants below use G, A, S and add specific input. Figure 1 shows representative instances and optimal outputs. 
+
+(1) Multi-Agent Path Finding (MAPF) (Stern et al. 2019) receives goals G = ( g1, . . . , g n) and requires each agent ai to end at its corresponding goal gi: πi(|πi|− 1) = gi.
+
+(2) Anonymous MAPF (AMAPF) (Kloder and Hutchin-son 2006) has the MAPF input but does not pre-assign goals to agents. Each agent reaches some gj ∈ G: πi(|πi|− 1) = gj .
+
+(3) Multi-Agent Combinatorial Path Finding (MCPF) 
+
+(Ren, Rathinam, and Choset 2023) extends AMAPF to m
+
+goals G = ( g1, . . . , g m), where agents may satisfy multiple goals or none. A solution requires every goal gj ∈ G to appear on some path πi: gj ∈ πi.
+
+(4) Combined Target-Assignment and Path Finding (TAPF) (Hönig et al. 2018) gives each agent a goal set. For GSET = ( gset 1, . . . , gset n), each agent ai reaches one vertex in gset i = {g1 
+
+> i
+
+, g 2 
+
+> i
+
+, . . . }: πi(|πi| − 1) ∈ gset i.
+
+(5) Multi-Agent Pickup and Delivery (MAPD) (Ma et al. 2017) requires fulfilling tasks, each with a pickup and deliv-ery vertex. Here, T asks = ( task 1, . . . , task m) and task j =
+
+⟨pj , d j ⟩.1 Each task is fulfilled by some agent reaching pj at 
+
+t1 and dj at t2 > t 1: πi(t1) = pj ∧ πi(t2) = dj ∧ t1 < t 2.
+
+(6) MAPF for Precedence-Constrained Goal Sequences (MAPF-PC) (Zhang et al. 2022) receives goal sequences 
+
+GSEQ = ( gseq 1, . . . , gseq n) and precedence constraints 
+
+P C = {pc xy ij , . . . }. Let txi be the timestep in which the agent 
+
+ai visits the goal gxi in a given solution. Each goal sequence 
+
+gseq i = ( g1 
+
+> i
+
+, g 2 
+
+> i
+
+, . . . ) must be visited by agent ai in order; that is, for any two goals gxi , g yi ∈ gseq i such that x < y ,agent ai must visit goal gxi before goal gyi (txi < t yi ). Each precedence constraint pc xy ij = ( gxi , g yj ) requires agent ai to visit goal gxi before agent aj visits goal gyj (txi < t yj ). 
+
+(7) Robust MAPF (RMAPF) (Atzmon et al. 2020; Chen et al. 2021) adds a delay parameter k ≥ 0 to MAPF. A solution reaches the usual MAPF goals and satisfies πi(t1)̸ =
+
+πj (t2) for all i̸ = j whenever |t1 − t2| ≤ k.
+
+(8) Multi-Train Path Finding (MTPF) (Atzmon, Diei, and Rave 2019; Chen et al. 2022) uses the RMAPF input, but each agent occupies its current vertex (head) and the previous k vertices (tail). Agents must avoid conflicts with both heads and tails; hence, a RMAPF solution may fail for MTPF (Figure 1). 
+
+(9) Multi-Agent Meeting (MAM) (Atzmon et al. 2023) has no goals; all agents must end at some meeting vertex vm:
+
+πi(|πi| − 1) = vm. The agents do not conflict at vertex vm.AMAPF and MAM can be optimally solved in polynomial time. All other above variants are NP-hard to solve optimally. 
+
+> 1
+
+MAPD is often a lifelong problem. We consider the one-shot 
+
+version; new task arrivals can be handled by re-solving. 2.2 Logic 
+
+We use the notation [n] to denote the set {i | 1 ≤ i ≤ n}.
+
+Transition Systems and Traces Let AP be a finite set of atomic propositions (in our setting, the atomic propositions will denote the agents’ locations). A labeled transition system 
+
+(LTS) T = ( Q, Q 0, δ, L ) is a tuple where Q is a finite set of states, Q0 ⊆ Q is a set of initial states, δ ⊆ Q × Q is a transition relation, and L : Q → 2AP is a labeling function, that labels each state with a subset of atomic propositions. A trace L(q0)L(q1)L(q2) · · · ∈ (2 AP )ω of T is an infinite sequence with q0 ∈ Q0 and (qt, q t+1 ) ∈ δ for all t ≥ 0.2
+
+We denote the set of all traces of a transition system T as TRACES (T ).
+
+HyperLTL HyperLTL (Clarkson et al. 2014) extends LTL (Pnueli 1977a) with trace quantification, enabling rela-tional properties over executions. Given atomic propositions 
+
+AP and trace variables V, its syntax is as follows; q and ∃q
+
+are used only later for HyperQPTL: 
+
+ψ := pπ | ψ ∨ ψ | ¬ ψ | ψ | ψ U ψ | qφ := ∃π.φ | ∀ π.φ | ψ | ∃ q.φ (⋆)Here p ∈ AP ; π ∈ V ; and , U are the temporal operators 
+
+next and until ; we use the usual Boolean abbreviations, and the temporal derivations ψ = true U ψ (eventually ), and 
+
+ψ = ¬ ¬ψ (globally ). Intuitively, pπ refers to proposi-tion p on trace π, and ∃π/∀π quantify over system traces. 
+
+Example 1. In Problem (1) of Figure 1, trace π1 satisfies 
+
+s1 at time 0, so π1 ⊨ s1; also π1 ⊨ g1 ∧ A, since g1
+
+holds at the second timestep, and A eventually holds on π1.In addition, π2 ⊨ ¬A since A never occurs on π2.
+
+The semantics are given w.r.t. a trace-set T and an assign-ment Π : V → T . Let Π[ π 7 → τ ] update π to τ , and let 
+
+Π[ t, ∞) map every variable to the suffix of its trace from position t. Then: 
+
+Π, T ⊨ pπ iff p ∈ Π( π)(0) Π, T ⊨ ¬ψ iff Π, T ⊭ ψ
+
+Π, T ⊨ ψ1 ∨ ψ2 iff Π, T ⊨ ψ1 or Π, T ⊨ ψ2
+
+Π, T ⊨ ψ iff Π[1 , ∞), T ⊨ ψ
+
+Π, T ⊨ ψ1 U ψ2 iff ∃t2 ∈ N s.t. Π[ t2, ∞), T ⊨ ψ2
+
+and ∀t1 < t 2 : Π[ t1, ∞), T ⊨ ψ1
+
+Π, T ⊨ ∃π.φ iff there exists τ ∈ T s.t. Π[ π 7 → τ ], T ⊨ φ
+
+Π, T ⊨ ∀π.φ iff forall τ ∈ T : Π[ π 7 → τ ], T ⊨ φ
+
+We say that T satisfies ψ, denoted T ⊨ ψ, if Π∅, T ⊨ ψ
+
+where Π∅ : V → ∅ is the empty assignment, meaning that ψ
+
+contains no free trace variables that need to be assigned. We say that a transition system T satisfies a HyperLTL formula ψ
+
+if TRACES (T ) ⊨ ψ.
+
+> 2We use the standard infinite-word semantics, which coincide with finite-word semantics for the problems studied here.
+
+HyperQPTL HyperQPTL (Rabe 2016) extends Hyper-LTL with quantification over atomic propositions, to express 
+
+ω-regular hyperproperties, similar to the omega-regular ex-tension of QPTL (Sistla 1983) over LTL (Pnueli 1977b). Formulas are defined over AP ∪AP ′, where AP ′ contains quantified propositions disjoint from AP . We define the se-mantics of q and ∃q from (⋆), for q ∈ AP ′, using a fresh trace variable πf :
+
+Π, T ⊨ q iff q ∈ Π( πf )(0) Π, T ⊨ ∃q.φ iff exists τ ∈ (2 AP ′
+
+)ω s.t. Π[ πf 7 → τ ], T ⊨ φ
+
+Quantified propositions are global auxiliary labels; for ex-ample, they can mark the timestep at which an agent satisfies its goal. In Section 3, we use HyperLTL unless stated other-wise. 3
+
+Example 2. In Problem (1) of Figure 1, a1 visits g1 on the second timestep but satisfies it only on the fourth, after clearing it for a2. We mark this satisfying visit by a quantified proposition q1, enforced to occur once: 
+
+∃q1. ¬q1 U(q1 ∧ ¬q1) ∧ (q1 ∧ g1π1 )
+
+The first conjunct states that q1 appears exactly once; the second states that this unique mark coincides with g1 on π1.
+
+Syntactic Sugar We use π1 = π2 for V 
+
+> p∈AP
+
+(pπ1 ↔
+
+pπ2 ) and π1̸ = π2 for W 
+
+> p∈AP
+
+(pπ1 ↔ ¬ pπ2 ). We use i
+
+for i applications of the next operator. 
+
+## 3 Modeling MAPP in HyperLTL 
+
+In this section, we present simple and modular translations of the various MAPP problems into respective HyperLTL formulas. We separate between the core planning problem and optimality w.r.t. the cost function, allowing modularity both between different problems and different cost functions. We discuss translations of cost functions in Section 4. 
+
+3.1 Motivation 
+
+The main goal of this paper is to make the logical structure of MAPP variants explicit. A hyper-logical specification sepa-rates what is common across variants (start conditions, goal satisfaction, and collision avoidance) from what changes be-tween them. Thus, moving from one variant to another often amounts to replacing a local component of the specification rather than redesigning an algorithm from scratch. This is useful even before considering tool performance: it gives a concise way to compare variants, expose hidden assump-tions, identify redundant constraints, and state new require-ments without committing to a particular solver architecture. This scope also explains why a large empirical comparison is not the right central test for the present contribution. Cur-rent HyperLTL and HyperQPTL model checkers are general hyperproperty-verification tools, and their worst-case com-plexity is high (Mascle and Zimmermann 2020; Rabe 2016). We therefore do not claim that existing tools compete with 
+
+> 3HyperQPTL does not add computational complexity (Rabe 2016); Since HyperLTL is a more common formalism, we choose to use it when possible.
+
+mature MAPP solvers on standard benchmarks. Such an ex-periment would primarily measure the present maturity of hyperproperty model checking, rather than the value of the specification layer. The intended contribution is instead a for-mal bridge: once a MAPP variant is written as a decidable hyperproperty, existing and future verification procedures can be applied to it, and the formula itself can serve as a solver-independent reference specification. Another key point in our modeling is that HyperLTL di-rectly expresses relations between different paths. This obvi-ously allows us to express MAPP problems, which inherently require reasoning about the paths of all agents; but it also al-lows us to express additional requirements on the paths of the agents, which are usually not easy to express by decoupled MAPP algorithms, like CBS, which repeatedly plans paths for single agents. For example, we can specify that the path of agent a1 is always close to the path of agent a2, by defining a set of neighbor vertices N (v) = {v′ | (v, v ′) ∈ E}, and defining the following HyperLTL constraint, where πi is the path of agent ai for i = 1 , 2:
+
+^
+
+> v∈V
+
+(vπ1 → _ 
+
+> v′∈N(v)
+
+v′ 
+
+> π2
+
+) (1) Through its whole path, if agent a1 is in vertex v, agent a2
+
+has to be in one of its neighboring vertices. We can con-junct Equation (1) with any of the formulas in Section 3.3, to add this constraint to any of the problems. This is only one example of how the modeling as a formal specification allows us to easily add constraints that are not natural to solve otherwise. Similarly, reasoning patterns used inside MAPP algorithms, such as pairwise mutex reasoning or rectangle-style exclusions, can be described as relations among two or more traces under the constraints of a search node. The point is not that HyperLTL replaces these algorithmic ideas, but that it provides a common language in which pairwise and beyond-pairwise path relations can be stated, compared, and eventually verified. 
+
+3.2 Modeling the MAPP Instance as an LTS 
+
+Since we evaluate HyperLTL formulas over LTSs, we first transform the MAPP instance into an LTS. The transfor-mation is pretty straightforward, and we mention it here for completeness. Let G, A, S be a MAPP instance, with 
+
+G = ( V, E ), A = ( a1, . . . , a n) and S = ( s1, . . . , s n).We denote AP = V , that is, the set of location ver-tices, and we create an LTS TG = (V, V, δ E , L ) where 
+
+δE = {(v, v ′) | v = v′ ∨ (v, v ′) ∈ E ∨ (v′, v ) ∈ E}, and 
+
+L(v) = {v}. The disjunct v = v′ captures wait actions. The set TRACES (TG ) contains only traces over singleton sets, which denote the location in the graph at each time point. Therefore, for simplicity, from now on we refer to traces over 
+
+AP ω rather than (2 AP )ω .
+
+Observation 1. The set TRACES (TG ) is equal to the set of all possible paths in the MAPP instance. 
+
+3.3 Translation into HyperLTL 
+
+We now demonstrate how to translate different MAPP prob-lems into HyperLTL and its variants. We use the notation 
+
+φ(π) to denote a formula φ with free variables π1, . . . , π n
+
+(and similarly, φ(π′) if the free variables are π′
+
+> 1
+
+, . . . , π ′
+
+> n
+
+,etc.). For all of the following problems, we use the classical assumption that once an agent reaches its goal, it stays there forever. At the end of this section, we discuss how we can ex-press the problems under the assumption that after the agent reaches its goal, it clears it and can move freely. 
+
+(1) MAPF We start by modeling the basic MAPF problem with n agents, as presented in Section 2.1, as an HyperLTL formula: 4 We recall that the basic problem defines a start vertex and a goal vertex for each agent, and requires that each agent reaches from its start vertex to its goal, without conflicts on the paths of agents. Then, we define: 
+
+φMAPF (π) := φstart (π) ∧ φgoal (π) ∧ φno-conf (π)
+
+Where: 
+
+φstart (π) := ^
+
+> i∈[n]
+
+siπ i φgoal (π) := ^
+
+> i∈[n]
+
+giπ i
+
+φno-conf (π) := ^
+
+> i̸=j
+
+^
+
+> v∈AP
+
+¬(vπi ∧ vπj )
+
+Intuitively, φMAPF requires the existence of a path πi for each agent ai, that starts from ai’s start vertex (c.f. φstart ), ends at its goal vertex and stays there forever ( φgoal ), and such that all paths are non-conflicting ( φno-conf ). φMAPF refers to vertex conflict, but we can easily change it to express edge conflict by changing φno-conf to φ′ 
+
+> no-conf
+
+as follows: 
+
+φ′
+
+> no-conf
+
+(π) := ^
+
+> i̸=j
+
+^
+
+> v,v ′∈AP
+
+¬ (vπi ∧ v′ 
+
+> πj
+
+) ∧ (v′ 
+
+> πi
+
+∧ vπj )
+
+We use formulas φstart , φ goal , φ no-conf throughout the paper to model the various problems, demonstrating the modularity of using HyperLTL as an underlying specification language. 
+
+Theorem 1. Let π = (π1, . . . , π n), let ⟨G , A, S, G ⟩ be an MAPF instance, and let TG be a transition system as described in Section 3.2. Then, TG satisfies φMAPF (π), iff 
+
+π1, . . . , π n represent a solution to the MAPF problem. Proof. We use Observation 1: If φMAPF (π) holds in TG , we have, directly from the definition of φMAPF , that πi, i ∈ [n]
+
+is a valid path for agent ai: It starts from si and eventually arrives at gi (and from then, gi holds globally, that is, the agent stays at gi forever). Due to φno-conf , for i̸ = j, paths πi
+
+and πj cannot be at the same vertex v at the same time, i.e., all paths are conflict-free. To conclude, we have that π1, · · · , π n
+
+represent valid conflict-free paths for agents a1, · · · , a n.In the other direction, if there is a solution to the MAPF problem, then there are paths π1, · · · , π n satisfying the for-mulas φstart , φ goal , φ no-conf (again, due to Observation 1). In particular, we note that φgoal requires that the agents even-tually arrive at the goal and remain there, however, they are allowed to pass through it before, and continue to move around, to allow other agents to satisfy their goal. 
+
+> 4Proper HyperLTL formulas have no free variables, we address this in Section 4.3.
+
+(2) AMAPF In the AMAPF problem, we do not pre-assign goals to agents. Thus, we define: 
+
+φAMAPF (π) := ∃π′ 
+
+> 1
+
+. . . ∃π′
+
+> n
+
+. φ start (π) ∧ φgoal (π′) ∧ (2) 
+
+φno-conf (π)∧ (3) 
+
+∀τ. ∃τ ′. ^
+
+> i∈[n]
+
+
+
+(τ = πi) → (4) 
+
+_
+
+> j∈[n]
+
+ (τ ′ = π′ 
+
+> j
+
+) ∧ (τ = τ ′)
+
+(5) 
+
+Correctness. The traces πi start at the prescribed starts and are non-conflicting. The traces π′ 
+
+> j
+
+reach the goals, and Equa-tions (4)-(5) require every πi to equal some π′ 
+
+> j
+
+. Since the πi
+
+traces are distinct and there are n traces of each kind, this induces a bijective start-to-goal assignment. Thus, a sepa-rate φno-conf (π′) conjunct is redundant and is intentionally omitted. 
+
+(3) MCPF Here, we get a list of not pre-assigned goals to satisfy, where one agent can satisfy several goals, or no goals. Then, we define the formulas φgoal-MCPF and φMCPF :
+
+φgoal-MCPF (π) := ^
+
+> j∈[m]
+
+_
+
+> i∈[n]
+
+gj πi
+
+φMCPF (π) := φstart (π) ∧ φgoal-MCPF (π) ∧ φno-conf (π)
+
+Correctness. φgoal-MCPF states that each goal is eventually reached by some agent; the usual start and no-conflict con-juncts give the remaining requirements. 
+
+(4) TAPF Here, each agent has several goals, and it must reach one of them. We define φTAPF and φgoal-TAPF :
+
+φgoal-TAPF (π) := ^
+
+> i∈[n]
+
+_
+
+> g∈gset i
+
+gπi
+
+φTAPF (π) := φstart (π) ∧ φgoal-TAPF (π) ∧ φno-conf (π)
+
+Correctness. φgoal-TAPF states that each agent reaches and remains at one of its allowed goals; the usual start and no-conflict conjuncts complete the encoding. AMAPF can also be encoded through the TAPF pattern by taking gset i = G
+
+for every agent ai (under the standard assumption that agents remain at their assigned goals, no-conflict forces different agents to settle at different goals). We keep the separate AMAPF encoding because it makes the anonymous assign-ment explicit through equality of start-side and goal-side traces. This illustrates a modeling choice rather than a differ-ent computational assumption. 
+
+(5) MAPD Here, we have a set of pickup-delivery assign-ments, each should be performed by some agent. Then, simi-larly to MCPF, we define the formulas φgoal-MAPD and φMAPD :
+
+φgoal-MAPD (π) := ^
+
+> j∈[m]
+
+_
+
+> i∈[n]
+
+(pj πi ∧ dj πi )
+
+φMAPD (π) := φstart (π) ∧ φgoal-MAPD (π) ∧ φno-conf (π)
+
+Correctness. φgoal-MAPD requires each task ⟨pj , d j ⟩ to be as-signed to some agent that eventually reaches pj and later dj ;
+
+φstart and φno-conf provide the standard path constraints. 
+
+(6) MAPF-PC To express the precedence constraints, we need to use HyperQPTL (Section 2.2). Let AP ′ = {qi | i ∈
+
+[n]}, i.e., we add a quantified proposition for each agent. Let 
+
+gseq i = ( g1 
+
+> i
+
+, · · · , g mi 
+
+> i
+
+). For each i we define the formula ψi,that states that qi occurs exactly mi times on a trace: 
+
+ψi :=      
+
+> ¬qiUqiappears mitimes
+
+z }| {
+
+¬qi U(qi ∧ (¬qi U(qi ∧ (· · · ∧ (¬qi U(qi (6) 
+
+∧ ¬qi) · · · ) (7) Next, for each agent ai, we define the formula φgseq (πi),stating that goals are reached in the order specified by gseq i.Since generally, an agent is allowed to visit some vertex gj
+
+on its way to satisfy a goal gi for i < j , we use the quantified proposition qi to indicate the timestep in which the agent visits the vertex when satisfying the goal. Due to ψi, an agent can satisfy exactly mi = |gseq i| goals. Thus we define: 
+
+φgseq (πi) := siπ i ∧ (( g1 
+
+> i π i
+
+∧ qi)∧
+
+(( g2 
+
+> i π i
+
+∧ qi) ∧ (· · · ∧ (gmi  
+
+> iπi
+
+∧ qi)) · · · )
+
+For each constraint (gxi , g yj ) we define the formula: 
+
+φ(gxi ,g yj )(πi, π j ) :=  (gxi π i ∧ qi) ∧ (gyj πj
+
+∧ qj )
+
+which states the precedence between two satisfied (expressed by the qi, q j propositions) goals. We are now ready to define a HyperQPTL formula to capture the whole problem, as follows: 
+
+φMAPF-PC (π) := ∃q1 . . . ∃qn. ^
+
+> i∈[n]
+
+ψi ∧ φno-conf (π) ∧
+
+^
+
+> i∈[n]
+
+φgseq (πi) ∧ ^  
+
+> (gxi,g yj)∈P C
+
+φ(gxi ,g yj )(πi, π j )
+
+Correctness. φgseq (πi) enforces the order of the goals in 
+
+gseq i, while qi marks the timesteps at which goals are sat-isfied rather than merely visited. The formulas φ(gxi ,g yj ) then compare these marked timesteps across agents, so a satis-fying assignment to the qi propositions is exactly a choice of goal-satisfaction times that respects all precedence con-straints. 
+
+(7) RMAPF Here, we add to the standard MAPF problem the constraint that the paths of two agents cannot collide over k timesteps (and not only the current timestep). Thus, to express the RMAPF problem, we only need to redefine the formula expressing (vertex) conflict, as follows: 
+
+φR-no-conf (π) := ^
+
+> i̸=j
+
+^
+
+> v∈AP
+
+¬ vπi ∧ ( _ 
+
+> t≤kt
+
+vπj )
+
+We use the formulas for start and goal vertex as in the MAPF problem, and thus we can express RMAPF as: 
+
+φRMAPF (π) := φstart (π) ∧ φgoal (π) ∧ φR-no-conf (π)
+
+Correctness. φR-no-conf forbids every other agent from occu-pying the same vertex within the next k timesteps; start and goal satisfaction are unchanged from MAPF. (8) MTPF Here, each agent occupies k + 1 vertices (their head, and k vertices of tail). Therefore, to avoid conflicts, two agents cannot share their last k + 1 vertices. To express this, we need to reason not only about the change over time, but also the change in locations over time. We therefore modify the definition of conflict as follows: 
+
+φMTPF-no-conf (π) := φno-conf (π) ∧ (8) 
+
+^
+
+> i∈[n]
+
+^ 
+
+> v1,...,v k+1 ∈AP
+> ∀i∈[k]: vi̸=vi+1
+
+
+
+v1πi U  v2πi U(· · · (9) 
+
+U(vkπ i U vk+1 πi ) · · · )
+
+→ (10) 
+
+
+
+v1πi U  (v2πi
+
+^ 
+
+> j̸=i
+
+^
+
+> t< 2
+
+¬vtπ j )) U(· · · (11) 
+
+U(( vkπ i ∧ ^ 
+
+> j̸=i
+
+^
+
+> t<k
+
+¬vtπ j )) U vk+1 πi ) · · · )
+
+(12) Again, the start and goal formulas are as before, and we can express the whole problem as: 
+
+φMTPF (π) := φstart (π) ∧ φgoal (π) ∧ φMTPF-no-conf (π)
+
+Correctness. Equation (8) gives ordinary no-conflict. The remaining conjunct specifies that any sequence of k vertices occupied by some agent (Equations (9)-(10)) cannot conflict, at any point in the sequence, with any other agent (Equa-tions (11)-(12)). The operator U, appearing k times, tracks the change in locations , rather than time (to track k timesteps, it would have been sufficient to use the operator). 
+
+(9) MAM Here, we need to find a meeting point for all agents. Thus, we define: 
+
+φMAM (π) := φstart (π) ∧ (13) 
+
+_
+
+> v∈AP
+
+  ^
+
+> i∈[n]
+
+vπi
+
+ ∧ (14) 
+
+  ^ 
+
+> i̸=j
+
+^ 
+
+> v′∈AP v′̸=v
+
+¬(v′ 
+
+> πi
+
+∧ v′ 
+
+> πj
+
+)
+
+(15) 
+
+Correctness. Equation (14) chooses a vertex where all agents eventually meet, while Equation (15) forbids collisions at every other vertex. 
+
+Other Assumptions on Reaching the Goal Above, we have assumed that once an agent reaches its goal, it stays there, as stated in Section 2.1 (hence, we used g for the goal formulas). However, this can be easily changed to express other assumptions on reaching the goal. For example, if we assume that agent ai clears the goal vertex and continues to move in the plan, we simply change gπi in φgoal to 
+
+gπi . This can be modified to other assumptions as well, demonstrating the usefulness of this modular modeling. 
+
+## 4 Cost Functions as Hyperproperties 
+
+Computing the cost of a solution is orthogonal to finding the solution itself. We focus on makespan , as the sum-of-costs 
+
+(SOC) requires asynchronous reasoning which is out of the scope of this paper. We discuss SOC shortly in Section 4.2. 
+
+4.1 Makespan 
+
+A solution π = ( π1, · · · , π n) is more optimal than a so-lution π′ = ( π′
+
+> 1
+
+, · · · , π ′
+
+> n
+
+) w.r.t. the makespan function, if the longest path in π, denoted by πmax , is shorter than the longest path in π′, denoted by π′
+
+> max
+
+. Therefore, we have that 
+
+∀i ∈ [n] : |πi| ≤ | πmax | ≤ | π′
+
+> max
+
+|. That is: π is an opti-mal solution iff in all other solutions π′, there exists a path 
+
+π′ 
+
+> max
+
+that is longer than all paths πi, i ∈ [n]. We can eas-ily express this constraint in HyperLTL. For example, the following formula states that π is an optimal solution for the standard MAPF problem (the supplementary appendix provides similar translations for all variants discussed in the paper): 
+
+φMAPF-makespan (π) := φMAPF (π)∧ (16) 
+
+∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ MAPF (π′) → (17) 
+
+_
+
+> i∈[n]
+
+^
+
+> j∈[n]
+
+(¬ giπ ′ 
+
+> i
+
+) U( gj πj ) (18) 
+
+Correctness. Equation (16) states that π is a solution. Equa-tions (17)-(18) state that in every other solution, some agent reaches its goal no earlier than all agents in π, which is exactly makespan optimality. 
+
+Using Quantified Propositions The direct formula above compares goal satisfaction times using the concrete MAPF goal predicate. A more uniform HyperQPTL encoding la-bels, for each agent, the unique timestep at which its goal is satisfied, and then compares these labels across candidate so-lutions. This turns the makespan comparison into a problem-independent suffix of the formula; only the local definition of “goal satisfaction” changes between MAPP variants. The supplementary appendix gives the full labeled translations, including the MAPF-PC case where the last occurrence of the sequence marker qi is used instead of the goal label. 
+
+4.2 Sum-of-Costs 
+
+SOC requires accumulating all path lengths rather than com-paring the latest goal-satisfaction time. Although the labels used for makespan can identify each individual path length, their sum requires asynchronous temporal reasoning over positions of different traces. This is beyond synchronous Hy-perLTL/HyperQPTL, but can be expressed in asynchronous temporal hyperlogics, e.g. (Bombardelli et al. 2025), by con-structing and comparing a trace that represents the accumu-lated path lengths. 
+
+4.3 Optimal MAPP via HyperQPTL Model Checking 
+
+We now combine Section 3.3 and Section 4.1 to express the fact that an optimal solution exists. Again, we use the basic MAPF as an example, but we can instantiate the following formula with any problem of Section 3.3. In addition, we can use any cost function that we are able to define in a decidable hyperlogic (e.g., SOC), instead of makespan. We define: 
+
+ψopt := ∃π1 . . . ∃πn.φ MAPF-makespan Theorem 2. Let TG be a transition system as described in Section 3.2. Then: TG |= ψopt if and only if there is an op-timal solution to the given MAPP problem. In particular, if 
+
+π1, . . . , π n are witnesses to the outermost existential quanti-fiers in ψopt , then π1, . . . , π n form such an optimal solution. 
+
+The proof of Theorem 2 is straightforward given Theo-rem 1 and the correctness of the corresponding formulas. 
+
+Quantifier Alternation An important measure for the complexity of a HyperLTL or HyperQPTL formula is in the number of path-quantifier alternations: from existential to universal and vice versa. Each such alternation adds one exponent to the worst-case complexity of the model-checking problem. For example, the worst-case complexity of formu-las of the type ∃π∀π′.φ where φ is quantifier free, is ex-ponentially harder than the worst case complexity of ∀π′.φ 
+
+formulas. Thus, we will always aim at formulas with mini-mal number of quantifier alternations. We observe that the modeling of almost all problems contains no path quanti-fiers within the formula, thus the only path quantification we introduce is the universal quantification in Section 4.1 and the existential quantification of Theorem 2, resulting in an ∃∗∀∗ formula, which is needed already for simpler prob-lems than the ones we study here (Beutner and Finkbeiner 2025). We emphasize that reducing MAPP to HyperQPTL model checking is not an efficient solution given the current tools for hyperproperty verification, such as AutoHyper and related model checkers (Beutner and Finkbeiner 2023a,c; Hsu, Sánchez, and Bonakdarpour 2021; Hsu et al. 2023). This limitation is orthogonal to the modeling contribution: the formulas identify the exact hyperproperty that a solution must satisfy, while specialized MAPP algorithms remain the right baseline for large-scale performance. At the same time, the formulas isolate where complexity enters (for example, through quantifier alternation), which can guide future tool development for the reachability-heavy fragment used here. 
+
+## 5 Related Work 
+
+We consider a set of one-shot MAPP variants, which end when the given tasks are fulfilled. However, online (Švancara et al. 2019) and lifelong (Wan et al. 2018) variants introduce, arguably, the more realistic cases where new agents or tasks arrive over time, and a new solution must be computed. Our modeling can also be generalized for these cases by considering a sequence of one-shot problems. In addition to search-based approaches, like CBS, there ex-ist reduction-based approaches for optimally solving MAPP. These include reducing MAPP to Integer-Linear Program (ILP) (Yu and LaValle 2013a), Answer Set Programming (ASP) (Erdem et al. 2013), and SAT (Surynek et al. 2016; Barták and Svancara 2019). Reducing MAPP to either of these problems, requires encoding temporal constraints, e.g., by adding many auxiliary variables. In contrast, HyperLTL and HyperQPTL offer a higher abstraction level, and natively express paths and the temporal constraints. Many works have studied the relation between planning and temporal properties. (Pontiggia et al. 2025) study the connection between probabilistic hyperproperties and de-centralized planning. While their work is concerned with undecidable problems in the probabilistic setting, we focus on the Boolean setting, and put more emphasis on modeling concrete MAPP problems, and, on studying a wider variety of problems. We show that we can express most problems in a modular way, as a conjunction of formulas, thus one can easily adjust only the relevant part(s) when introducing new problems. (Wang, Nalluri, and Pajic 2020) study the con-nection between HyperLTL and robotics, and (Beutner and Finkbeiner 2025) study the connection between hyperprop-erties and conformant planning. While they discuss hyper-properties and planning, our work studies multi-agent path planning. (Beutner and Finkbeiner 2021, 2023b) present a hyperlogic to reason about multi-agent systems, in which they express properties such as information-flow and secu-rity properties, over multi-agent systems. However, they do not address real-life planning problems as we study here. In contrast to all of the above, in this work, we study a different aspect of the relation between hyperlogics and multi-agent systems. We are interested in modeling existing problems from the planning community , in an existing hyper-logic, thus establishing the tight connection between the two communities. We stress that all of the above works do not ap-ply their results on actual planning problems, that are widely studied in the planning community. In addition, none of the above works concern cost functions and optimality of the solutions, as we discuss in Section 4. This distinguishes our work from empirical MAPP papers: our comparison point is not the runtime of a new solver, but the expressive match between MAPP variants and temporal hyperproperties. 
+
+## 6 Conclusion and Future Work 
+
+In this paper, we have established the fundamental connec-tion between Multi-Agent Path Planning (MAPP) problems and hyperlogics. Modeling the different problems in a formal language helps expose the subtleties of the variants, remove accidental differences between formulations, and specify fu-ture problems using a clean and unambiguous formalism. The value of this view is therefore conceptual and method-ological: it gives MAPP researchers a common specifica-tion language and gives the hyperproperties community a family of concrete planning problems with rich cross-trace structure. A specific domain in which our study can be ap-plicable is explainability and causality, where we plan to apply explainability techniques for hyperproperties (Horak et al. 2022; Coenen et al. 2022) to the setting of MAPP. A MAPP solution is naturally represented by several witness traces, and the formulas in this paper state which relations among those traces make the plan valid. This creates a direct interface to formal explanations: one can ask which trace re-lations caused a conflict to be avoided, a goal to be delayed, or a group constraint to hold. In addition, we plan to study further constraints on the planning problems (as mentioned briefly in Section 3.1), and combine them with verification tasks, to use the full power of hyper-temporal specifications. 
+
+## References 
+
+Atzmon, D.; Diei, A.; and Rave, D. 2019. Multi-Train Path Finding. In the International Symposium on Combinatorial Search (SoCS) , 125–129. Atzmon, D.; Felner, A.; Li, J.; Shperberg, S.; Sturtevant, N.; and Koenig, S. 2023. Conflict-tolerant and conflict-free multi-agent meeting. Artificial Intelligence , 322: 103950. Atzmon, D.; Stern, R.; Felner, A.; Wagner, G.; Barták, R.; and Zhou, N.-F. 2020. Robust multi-agent path finding and executing. Journal of Artificial Intelligence Research (JAIR) ,67: 549–579. Barták, R.; and Svancara, J. 2019. On SAT-Based Ap-proaches for Multi-Agent Path Finding with the Sum-of-Costs Objective. In the International Symposium on Combi-natorial Search (SoCS) , 10–17. Beutner, R.; and Finkbeiner, B. 2021. A Temporal Logic for Strategic Hyperproperties. In Haddad, S.; and Varacca, D., eds., 32nd International Conference on Concurrency The-ory, CONCUR 2021, August 24-27, 2021, Virtual Confer-ence , volume 203 of LIPIcs , 24:1–24:19. Schloss Dagstuhl -Leibniz-Zentrum für Informatik. Beutner, R.; and Finkbeiner, B. 2023a. AutoHyper: Explicit-State Model Checking for HyperLTL. In Sankaranarayanan, S.; and Sharygina, N., eds., Tools and Algorithms for the Construction and Analysis of Systems - 29th International Conference, TACAS 2023, Held as Part of the European Joint Conferences on Theory and Practice of Software, ETAPS 2022, Paris, France, April 22-27, 2023, Proceedings, Part I ,volume 13993 of Lecture Notes in Computer Science , 145– 163. Springer. Beutner, R.; and Finkbeiner, B. 2023b. HyperATL*: A Logic for Hyperproperties in Multi-Agent Systems. Log. Methods Comput. Sci. , 19(2). Beutner, R.; and Finkbeiner, B. 2023c. Model Check-ing Omega-Regular Hyperproperties with AutoHyperQ. In Piskac, R.; and Voronkov, A., eds., LPAR 2023: Proceedings of 24th International Conference on Logic for Programming, Artificial Intelligence and Reasoning, Manizales, Colombia, 4-9th June 2023 , volume 94 of EPiC Series in Computing ,23–35. EasyChair. Beutner, R.; and Finkbeiner, B. 2025. On Conformant Plan-ning and Model-Checking of Exists Forall Hyperproperties. In the European Conference on Artificial Intelligence (ECAI) .Bombardelli, A.; Bozzelli, L.; Sánchez, C.; and Tonetta, S. 2025. (Asynchronous) Temporal Logics for Hyperproperties on Finite Traces. In Ernst, G.; and Rozier, K. Y., eds., Model Checking Software - 31st International Symposium, SPIN 2025, Hamilton, ON, Canada, May 7-8, 2025, Proceedings ,volume 15945 of Lecture Notes in Computer Science , 25–43. Springer. Boyarski, E.; Chan, S.-H.; Atzmon, D.; Felner, A.; and Koenig, S. 2022. On merging agents in multi-agent pathfind-ing algorithms. In the International Symposium on Combi-natorial Search (SoCS) , 11–19. Chen, Z.; Harabor, D. D.; Li, J.; and Stuckey, P. J. 2021. Symmetry breaking for k-robust multi-agent path finding. In the AAAI Conference on Artificial Intelligence (AAAI) ,volume 35, 12267–12274. Chen, Z.; Li, J.; Harabor, D.; Stuckey, P. J.; and Koenig, S. 2022. Multi-train path finding revisited. In the International Symposium on Combinatorial Search (SoCS) , 38–46. Clarkson, M. R.; Finkbeiner, B.; Koleini, M.; Micinski, K. K.; Rabe, M. N.; and Sánchez, C. 2014. Temporal Logics for Hy-perproperties. In Abadi, M.; and Kremer, S., eds., Principles of Security and Trust - Third International Conference, POST 2014, Grenoble, France, April 5-13, 2014, Proceedings , vol-ume 8414 of Lecture Notes in Computer Science , 265–284. Springer. Coenen, N.; Dachselt, R.; Finkbeiner, B.; Frenkel, H.; Hahn, C.; Horak, T.; Metzger, N.; and Siber, J. 2022. Explaining Hyperproperty Violations. In 34th International Conference on Computer Aided Verification (CAV 2022) , volume 13371 of Lecture Notes in Computer Science . Springer. Erdem, E.; Kisa, D. G.; Oztok, U.; and Schueller, P. 2013. A general formal framework for pathfinding problems with multiple agents. In the AAAI Conference on Artificial Intel-ligence (AAAI) , 290–296. Hönig, W.; Kiesel, S.; Tinka, A.; Durham, J.; and Ayanian, N. 2018. Conflict-based search with optimal task assign-ment. In Proceedings of the International Joint Conference on Autonomous Agents and Multiagent Systems .Horak, T.; Coenen, N.; Metzger, N.; Hahn, C.; Flemisch, T.; Méndez, J.; Dimov, D.; Finkbeiner, B.; and Dachselt, R. 2022. Visual Analysis of Hyperproperties for Understanding Model Checking Results. IEEE Transactions on Visualiza-tion and Computer Graphics , 28(1): 357–367. Hsu, T.; Sánchez, C.; and Bonakdarpour, B. 2021. Bounded Model Checking for Hyperproperties. In Groote, J. F.; and Larsen, K. G., eds., Tools and Algorithms for the Construc-tion and Analysis of Systems - 27th International Conference, TACAS 2021, Held as Part of the European Joint Confer-ences on Theory and Practice of Software, ETAPS 2021, Luxembourg City, Luxembourg, March 27 - April 1, 2021, Proceedings, Part I , volume 12651 of Lecture Notes in Com-puter Science , 94–112. Springer. Hsu, T.; Sánchez, C.; Sheinvald, S.; and Bonakdarpour, B. 2023. Efficient Loop Conditions for Bounded Model Check-ing Hyperproperties. In Sankaranarayanan, S.; and Shary-gina, N., eds., Tools and Algorithms for the Construction and Analysis of Systems - 29th International Conference, TACAS 2023, Held as Part of the European Joint Confer-ences on Theory and Practice of Software, ETAPS 2022, Paris, France, April 22-27, 2023, Proceedings, Part I , vol-ume 13993 of Lecture Notes in Computer Science , 66–84. Springer. Hönig, W.; Kiesel, S.; Tinka, A.; Durham, J. W.; and Aya-nian, N. 2019. Persistent and Robust Execution of MAPF Schedules in Warehouses. IEEE Robotics and Automation Letters , 4(2): 1125–1131. Kloder, S.; and Hutchinson, S. 2006. Path planning for permutation-invariant multirobot formations. IEEE Trans-actions on Robotics , 22(4): 650–665. Lam, E.; Le Bodic, P.; Harabor, D.; and Stuckey, P. J. 2022. Branch-and-cut-and-price for multi-agent path finding. COR ,144: 105809. Li, H.; Long, T.; Xu, G.; and Wang, Y. 2019. Coupling-Degree-Based Heuristic Prioritized Planning Method for UAV Swarm Path Generation. In the Chinese Automation Congress (CAC) , 3636–3641. Li, J.; Harabor, D.; Stuckey, P. J.; Ma, H.; Gange, G.; and Koenig, S. 2021. Pairwise symmetry reasoning for multi-agent path finding search. AIJ , 301: 103574. Li, J.; Tinka, A.; Kiesel, S.; Durham, J. W.; Kumar, T. K. S.; and Koenig, S. 2020. Lifelong Multi-Agent Path Finding in Large-Scale Warehouses. In the AAAI Conference on Artificial Intelligence (AAAI) , 11272–11281. Ma, H.; Li, J.; Kumar, T. S.; and Koenig, S. 2017. Lifelong Multi-Agent Path Finding for Online Pickup and Delivery Tasks. In Proceedings of the Conference on Autonomous Agents and MultiAgent Systems , 837—-845. Mascle, C.; and Zimmermann, M. 2020. The Keys to Decid-able HyperLTL Satisfiability: Small Models or Very Simple Formulas. In Fernández, M.; and Muscholl, A., eds., 28th EACSL Annual Conference on Computer Science Logic (CSL 2020) , volume 152 of Leibniz International Proceedings in Informatics (LIPIcs) , 29:1–29:16. Dagstuhl, Germany: Schloss Dagstuhl – Leibniz-Zentrum für Informatik. ISBN 978-3-95977-132-0. Pnueli, A. 1977a. The Temporal Logic of Programs. In 18th Annual Symposium on Foundations of Computer Science, Providence, Rhode Island, USA, 31 October - 1 November 1977 , 46–57. IEEE Computer Society. Pnueli, A. 1977b. The temporal logic of programs. In 18th Annual Symposium on Foundations of Computer Science (sfcs 1977) , 46–57. Pontiggia, F.; Macák, F.; Andriushchenko, R.; Chiari, M.; and Ceska, M. 2025. Decentralized Planning Using Probabilistic Hyperproperties. In Das, S.; Nowé, A.; and Vorobeychik, Y., eds., Proceedings of the 24th International Conference on Autonomous Agents and Multiagent Systems, AAMAS 2025, Detroit, MI, USA, May 19-23, 2025 , 1688–1697. Interna-tional Foundation for Autonomous Agents and Multiagent Systems / ACM. Rabe, M. N. 2016. A temporal logic approach to iInformation-flow control . Ph.D. thesis, Saarland University. Ren, Z.; Rathinam, S.; and Choset, H. 2023. CBSS: A new approach for multiagent combinatorial path finding. IEEE Transactions on Robotics , 39(4): 2669–2683. Sharon, G.; Stern, R.; Felner, A.; and Sturtevant, N. R. 2015. Conflict-based search for optimal multi-agent pathfinding. 
+
+Artificial Intelligence , 219: 40–66. Sistla, A. P. 1983. Theoretical issues in the design and verification of distributed systems . Ph.D. thesis, USA. AAI8403047. Stern, R.; Sturtevant, N. R.; Felner, A.; Koenig, S.; Ma, H.; Walker, T. T.; Li, J.; Atzmon, D.; Cohen, L.; Kumar, T. K. S.; Barták, R.; and Boyarski, E. 2019. Multi-Agent Pathfinding: Definitions, Variants, and Benchmarks. In SoCS , 151–159. Surynek, P. 2010. An Optimization Variant of Multi-Robot Path Planning Is Intractable. In AAAI , 1261–1263. Surynek, P.; Felner, A.; Stern, R.; and Boyarski, E. 2016. Efficient SAT Approach to Multi-Agent Path Finding Under the Sum of Costs Objective. In the European Conference on Artificial Intelligence (ECAI) , 810––818. Švancara, J.; Vlk, M.; Stern, R.; Atzmon, D.; and Barták, R. 2019. Online multi-agent pathfinding. In AAAI , 7732–7739. Wan, Q.; Gu, C.; Sun, S.; Chen, M.; Huang, H.; and Jia, X. 2018. Lifelong Multi-Agent Path Finding in A Dynamic Environment. In ICARCV , 875–882. Wang, Y.; Nalluri, S.; and Pajic, M. 2020. Hyperproperties for Robotics: Planning via HyperLTL. In 2020 IEEE In-ternational Conference on Robotics and Automation, ICRA 2020, Paris, France, May 31 - August 31, 2020 , 8462–8468. IEEE. Yu, J.; and LaValle, S. M. 2013a. Multi-agent path planning and network flow. In Algorithmic foundations of robotics X ,157–173. Springer. Yu, J.; and LaValle, S. M. 2013b. Structure and Intractability of Optimal Multi-Robot Path Planning on Graphs. In the AAAI Conference on Artificial Intelligence (AAAI) , 1444– 149. Zhang, H.; Chen, J.; Li, J.; Williams, B.; and Koenig, S. 2022. Multi-agent path finding for precedence-constrained goal se-quences. In International Joint Conference on Autonomous Agents and Multiagent Systems (AAMAS) .Zhang, H.; Li, J.; Surynek, P.; Koenig, S.; and Kumar, T. K. S. 2020. Multi-Agent Path Finding with Mutex Propagation. In 
+
+ICAPS , 323–332. Appendix A Full Translations for the Makespan Cost Function 
+
+In this appendix, we provide the encoding of the makespan function to all variants we consider in the paper. We begin with the version that does not use quantified propositions, and then address the version with quantified propositions. 
+
+A.1 Direct Translation Using HyperLTL 
+
+In this section, we cannot use the goal formula as a black-box, as we explain in Section 4.1. The translations that use quantified propositions can use the goal function (and the whole formula describing the problem) as a black box, with a minor modification to the original formulas. In the formulas we present here, we often need to reason about the goal formula, and to define optimality with explicit reasoning over goal formulas. 
+
+(1) MAPF We have shown the modeling of makespan for the MAPF problem in the body of the paper (Section 4.1), but we provide it here again for completeness. 
+
+φMAPF-makespan (π) := φMAPF (π)∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ MAPF (π′) →
+
+_
+
+> i∈[n]
+
+^
+
+> j∈[n]
+
+(¬ giπ ′ 
+
+> i
+
+) U( gj πj )
+
+(2) AMAPF Recall that: 
+
+φAMAPF (π) := ∃π′ 
+
+> 1
+
+. . . ∃π′
+
+> n
+
+. φ start (π) ∧ φgoal (π′) ∧
+
+φno-conf (π) ∧ φno-conf (π′) ∧∀τ. ∃τ ′. ^
+
+> i∈[n]
+
+
+
+(τ = πi) →
+
+_
+
+> j∈[n]
+
+ (τ ′ = π′ 
+
+> j
+
+) ∧ (τ = τ ′)
+
+Here, we need to explicitly reason about the existentially quantified traces π′ in φAMAPF (π), and where they reach their goal vertices, and not only the π paths. We use τ to denote non-optimal solutions (and respectively, let τ ′ be the existentially quantified paths in φAMAPF (τ )). 
+
+φAMAPF-makespan := φAMAPF (π)∧ (19) 
+
+∀τ1 . . . ∀τn.φ AMAPF (τ ) → (20) 
+
+_
+
+> i∈[n]
+
+^
+
+> j∈[n]
+
+(¬ giτ ′ 
+
+> i
+
+) U( gj π′
+
+> j
+
+) (21) In Equation (21) we compare the quantified path τ ′ 
+
+> i
+
+to all quantified paths π′ 
+
+> j
+
+, since we use these quantified paths in 
+
+φAMAPF in the goal formula, and thus we want to make sure that there is a path τ ′ 
+
+> i
+
+that is longer than all paths π′ 
+
+> j
+
+.
+
+(3) MCPF We recall the goal formula for MCPF, where the goals are not preassigned. 
+
+φgoal-MCPF (π) := ^
+
+> j∈[m]
+
+_
+
+> i∈[n]
+
+gj πi
+
+Then, in a non-optimal solution π′ there exists a goal vertex 
+
+gl such that for every agent ak, either ak does not reach gl, or it reaches it after some agent has reached it in the solution π.Therefore: 
+
+φMCPF-makespan (π) := φMCPF (π)∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ MAPF (π′) →
+
+_
+
+> l∈[m]
+
+^
+
+> k∈[n]
+
+(¬glπ ′ 
+
+> k
+
+) U( ^
+
+> j∈[m]
+
+_
+
+> i∈[n]
+
+gj πi )
+
+(4) TAPF Here, each agent has several goals, and it must reach one of them. Then, in a non-optimal solution, there is an agent ak that does not reach any of its goals until all agents in the optimal solution have reached some goal. Recall that: 
+
+φgoal-TAPF (π) := ^
+
+> i∈[n]
+
+_
+
+> g∈gset i
+
+gπi
+
+Then, we define: 
+
+φTAPF-makespan (π) := φstart (π) ∧ φno-conf (π)∧
+
+^
+
+> i∈[n]
+
+_
+
+> g∈gset i
+
+
+
+gπi ∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ MAPF (π′) →
+
+_
+
+> k∈[n]
+
+^
+
+> g′∈gset k
+
+(¬ glπ ′ 
+
+> k
+
+) U( gπi )
+
+
+
+The formula φTAPF-makespan is not in proper HyperLTL syntax, but we can bring it to proper syntax by moving the universal quantifiers outside (this does not affect the π traces as they are not under the scope of this quantification). 
+
+(5) MAPD In MAPD, we have a set of pickup-delivery assignments, each should be performed by some agent. Then, similarly to the MCPF, we have defined the goal formulas 
+
+φgoal-MAPD := ^
+
+> j∈[m]
+
+_
+
+> i∈[n]
+
+(pj πi ∧ dj πi )
+
+In particular, in a solution π′ which is not optimal, there is a delivery vertex dl and an agent ak that reaches dl after all delivery vertices have been reached in π. Thus, it is enough to reason about the delivery points, and we get a formula very similar to this of the MCPF problem: 
+
+φMAPD-makespan (π) := φMAPD (π)∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ MAPF (π′) →
+
+_
+
+> l∈[m]
+
+^
+
+> k∈[n]
+
+(¬dlπ ′ 
+
+> k
+
+) U( ^
+
+> j∈[m]
+
+_
+
+> i∈[n]
+
+dj πi )
+
+(6) MAPF-PC If π′ is a solution to the MAPF-PC, but it is not optimal, then we have that some agent ak in π′ satisfies its last goal gmk 
+
+> k
+
+after all other agents have satisfied their last goal. Recall that we have also used the proposition qk to mark the timesteps on which the agents visit a vertex to satisfy a goal. Then, while the definition of MAPF-PC in Section 3.3 is quiet elaborated, to reason about optimality we only need to reason about the last goal vertex gmk 
+
+> k
+
+and the proposition qk, and we get a formula very similar to this of the MAPF problem: 
+
+φMAPF-PC-makespan (π) := φMAPF (π)∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ MAPF-PC (π′) →
+
+_
+
+> k∈[n]
+
+^
+
+> j∈[n]
+
+(¬(gmk 
+
+> kπ′
+> k
+
+∧ qk)) U(gmj 
+
+> jπj
+
+∧ qj )
+
+(7) RMAPF Here, the goal formula remains the same as in the MAPF problem, thus we have the same cost function as for the MAPF problem, when changing φMAPF to φRMAPF :
+
+φRMAPF-makespan (π) := φRMAPF (π)∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ RMAPF (π′) →
+
+_
+
+> i∈[n]
+
+^
+
+> j∈[n]
+
+(¬ giπ ′ 
+
+> i
+
+) U( gj πj )
+
+(8) MTPF For the multi-train path finding problem, we again use the simple goal formula, and simply define: 
+
+φMTPF-makespan (π) := φMTPF (π)∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ MTPF (π′) →
+
+_
+
+> i∈[n]
+
+^
+
+> j∈[n]
+
+(¬ giπ ′ 
+
+> i
+
+) U( gj πj )
+
+This demonstrates the modularity of the HyperLTL model-ing: We can add many additional constraints to the problem, but as long as we keep the goal characterization relatively similar to previous problems, we can use the similar cost function. 
+
+(9) MAM Recall that 
+
+φMAM (π) := φstart (π) ∧
+
+_
+
+> v∈AP
+
+  ^
+
+> i∈[n]
+
+vπi
+
+ ∧
+
+  ^ 
+
+> i̸=j
+
+^ 
+
+> v′∈AP v′̸=v
+
+¬(v′ 
+
+> πi
+
+∧ v′ 
+
+> πj
+
+)
+
+That is, there exists a vertex v which is the meeting point of all agents. Thus, in a non-optimal solution π′, for every possible meeting vertex v′, it cannot be that all agents are in 
+
+v′ using the solution π′, until all of them meet in v using the optimal solution π. We explicitly reason about the meeting vertex v:
+
+φMAM-makespan (π) := φMAM (π)∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+. φ MAM (π′) →
+
+^
+
+> v′∈AP
+
+(¬ ^
+
+> i∈[n]
+
+v′ 
+
+> π′
+> i
+
+) U( ^
+
+> i∈[n]
+
+vπi )
+
+A.2 Translation Using HyperQPTL and Quantified Propositions 
+
+The use of HyperQPTL is much cleaner than the use of HyperLTL for cost functions. Here, we do not need to reason about the goal, nor understand it. We simply add quantified propositions that mark the point in time in which an agent has reached its goal. We use the formula φonce i , that states that the (quantified) proposition li holds exactly once. φonce i will be used in the translation throughout this section. 
+
+φonce i := ( ¬li) U(li ∧ ¬li)
+
+In the following, we only need to show how we modify the goal formula for each problem (except for MAPF-PC that does not have a clear goal formula), to include the quanti-fied propositions. For MAPF-PC, we label the last goal, as discussed in Section 4.1. 
+
+(1) MAPF We define the labeled goal formula as: 
+
+φL-goal (π) := ∃l1 · · · ∃ ln. ^
+
+> i∈[n]
+
+ ( giπ i ) ∧ liπ i
+
+ ∧ ^
+
+> i∈[n]
+
+φonce i
+
+We then use the labeled formula φL-goal instead of the original 
+
+φgoal formula in Section 3.3, resulting in the labeled formula 
+
+φL-MAPF for the MAPF problem: 
+
+φL-MAPF (π) := φstart (π) ∧ φL-goal (π) ∧ φno-conf (π)
+
+The only change is in using φL-goal instead of φgoal . We use 
+
+φL-goal in all formulas in which we have used φgoal , as we show in the following. 
+
+(2) AMAPF Since φAMAPF uses φgoal , we can simply de-fine φL-AMAPF by using φL-goal . We note the equality over traces implies equality over both quantified and not quanti-fied propositions. 
+
+φL-AMAPF (π) := ∃π′ 
+
+> 1
+
+. . . ∃π′
+
+> n
+
+. φ start (π) ∧ φL-goal (π′) ∧
+
+φno-conf (π) ∧ φno-conf (π′) ∧∀τ. ∃τ ′. ^
+
+> i∈[n]
+
+
+
+(τ = πi) →
+
+_
+
+> j∈[n]
+
+ (τ ′ = π′ 
+
+> j
+
+) ∧ (τ = τ ′)
+
+(3) MCPF Here, we need to add quantified propositions for the satisfaction of each goal, and not necessarily for each agent. In fact, we do not need to do this at all, as we can directly use the goal vertices (as, once an agent has reached the vertex, it has satisfied the goal), but we use the quantified propositions for consistency. Since in the formula 
+
+φL-MAPF-makespan we reason about quantified propositions re-lated to the agents, and not the goals, we manipulate the formula a little bit, such that a label li holds for an agent ai
+
+at the last timestep in which the agent has satisfied a goal. Note that an agent can satisfy multiple goals, and then li will label the last one; and it can satisfy no goals, and then li will hold at the first timestep. 
+
+φL-goal-MCPF (π) := ∃l1 · · · ∃ ln. ^
+
+> i∈[n]
+
+φonce i ∧ (22) 
+
+^
+
+> j∈[m]
+
+_
+
+> i∈[n]
+
+(gj πi ∧ li) ∧ (23) 
+
+ ^ 
+
+> i∈[n]
+
+^
+
+> j∈[m]
+
+ (gj πi ∧ li) → ¬ _
+
+> l∈[m]
+
+glπ i
+
+
+
+∧ (24) 
+
+^
+
+> i∈[n]
+
+ ( ^
+
+> j∈[m]
+
+¬gj πi ) → li
+
+ (25) Equation (24) states that for an agent ai, if the label li holds when some goal gj is reached, then it is the last goal of agent 
+
+ai: There is no other goal vertex gl that is reached later on the trace πi of agent ai. Equation (25) states, for every agent ai,that if no goal it ever satisfied on πi, that is, agent ai satisfies no goal, then li holds at the first position (under the scope of no temporal operators). Then, we define: 
+
+φL-MCPF (π) := φstart (π) ∧ φL-goal-MCPF (π) ∧ φno-conf (π)
+
+(4) TAPF Here, each agent has several goals, and it must reach one of them, to which we add the label li:
+
+φL-goal-TAPF (π) := ∃l1 · · · ∃ ln. ^
+
+> i∈[n]
+
+φonce i ∧
+
+^
+
+> i∈[n]
+
+_
+
+> g∈gset i
+
+(( gπi ) ∧ li)
+
+And then: 
+
+φL-TAPF (π) := φstart (π) ∧ φL-goal-TAPF (π) ∧ φno-conf (π)
+
+(5) MAPD In MAPD, we have a set of pickup-delivery as-signments, each should be performed by some agent. Again, an agent can preform no assignment, or several assignments. Thus, we use the same reasoning as in the MCPF problem, with the modification of taking dj instead of gj :
+
+φL-goal-MAPD (π) := ∃l1 · · · ∃ ln. ^
+
+> i∈[n]
+
+φonce i ∧
+
+^
+
+> j∈[m]
+
+_
+
+> i∈[n]
+
+(pj πi ∧ (dj πi ∧ li)) 
+
+ ^ 
+
+> i∈[n]
+
+^
+
+> j∈[m]
+
+ (dj πi ∧ li) → ¬ _
+
+> l∈[m]
+
+dlπ i
+
+
+
+∧
+
+^
+
+> i∈[n]
+
+ ( ^
+
+> j∈[m]
+
+¬dj πi ) → li
+
+
+
+Then, we define: 
+
+φL-MAPD (π) := φstart (π) ∧ φL-goal-MAPD (π) ∧ φno-conf (π)
+
+(6) MAPF-PC Recall that for the MAPF-PC problem, we have already used quantified propositions, to label the mi
+
+positions in which an agent satisfies a goal, using the formula 
+
+ψi. Thus, we can simply label the last such position, by slightly modifying ψi, and adding a conjunct with li at the last appearance of qi (end of Equation (27)): 
+
+ψL,i := φonce i ∧ (26)      
+
+> ¬qiUqiappears mitimes
+
+z }| {
+
+¬qi U(qi ∧ (¬qi U(qi ∧ (· · · ∧ (¬qi U(( qi ∧ li) (27) 
+
+∧ ¬qi) · · · ) (28) For the complete φL-MAPF-PC (π) formula, we use the formulas 
+
+ψL,i for i ∈ [n], and the formulas φgseq and φ(gxi ,g yj ) as defined in Section 3.3: 
+
+φL-MAPF-PC (π) := ∃q1 . . . ∃qn.∃l1 . . . ∃ln. ^
+
+> i∈[n]
+
+ψL,i ∧
+
+φno-conf (π) ∧ ^
+
+> i∈[n]
+
+φgseq (πi) ∧ ^  
+
+> (gxi,g yj)∈P C
+
+φ(gxi ,g yj )(πi, π j )
+
+(7) RMAPF The formula for the robust MAPF uses the same goal formula as the MAPF problem, thus we can simply use φL-goal instead: 
+
+φL-RMAPF (π) := φstart (π) ∧ φL-goal (π) ∧ φrobust-no-conf (π)
+
+(8) MTPF Similarly, the multi-train path finding problem also uses the same goal formula, thus: 
+
+φL-MTPF (π) := φstart (π) ∧ φL-goal (π) ∧ φMTPF-no-conf (π)
+
+(9) MAM In the meeting variant, we actually need only one proposition, that marks the point in time in which all agents arrive at the meeting vertex v. Again, for consistency, and for easier definition of the makespan formula, we use a quantified proposition li for each agent ai, and require that they all hold only once (Equation (29)), and at the same time (Equation (31)). Here we do not have a goal formula, so we modify the whole formula φMAM :
+
+φL-MAM (π) := ∃l1 · · · ∃ ln. ^
+
+> i∈[n]
+
+φonce i ∧ (29) 
+
+φstart (π) ∧ (30) 
+
+_
+
+> v∈AP
+
+   ^ 
+
+> i∈[n]
+
+vπi ∧ ^
+
+> i∈[n]
+
+li
+
+ ∧ (31) 
+
+  ^ 
+
+> i̸=j
+
+^ 
+
+> v′∈AP v′̸=v
+
+¬(v′ 
+
+> πi
+
+∧ v′ 
+
+> πj
+
+)
+
+(32) 
+
+SUMMARY: Expressing the Makespan Cost Function Using HyperQPTL and Quantified Propositions In the above, we have defined new labeled formulas for each of the nine variants, such that the label li holds at timestep t iff agent ai satisfied (all of) its goal(s) at timestep t. That is, the timestep in which li holds in a solution π = ( π1, · · · , π n) is exactly the length (and cost) of the path πi. Thus, to make sure that π is more optimal than π′, we need the check whether there is an agent ak for which lk holds in π′ after all li’s occurred in π. Here, we can use a generic formula φL that can be instantiated with any of the nine formulas above, that is: 
+
+φL ∈ { φL-MAPF , φ L-AMAPF , φ L-MCPF , φ L-TAPF , φ L-MAPD ,φL-MAPF-PC , φ L-RMAPF , φ L-MTPF , φ L-MAM }For a (non-optimal) solution π′, we denote its quantified propositions by l′
+
+> i
+
+, i ∈ [n]. We then define optimality with respect to the makespan function as follows: 
+
+φL-makespan (π) := φL(π)∧∀π′ 
+
+> 1
+
+. . . ∀π′
+
+> n
+
+.φ L(π′) → _
+
+> i∈[n]
+
+^
+
+> j∈[n]
+
+(¬l′
+
+> iπ ′
+> i
+
+) U lj πj
