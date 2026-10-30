@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-10-29</span>
+      <span class="dpr-home-dashboard-kicker">2026-10-30</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 0 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 8 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>2</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>6</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-10-29 23:47:20 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-10-30 22:53:13 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日无新推荐，系统未产出可展示论文。</p>
+<p>今天筛完 8 篇机器人协同方向论文，精读 2 篇、速读 6 篇，主题集中在多机探索与任务分配。</p>
+<p>最值得看的是两篇 8.0 分精读：EARS-Info 用信息量驱动多机器人探索的再分配，另一篇给出独立行为树机器人团队的“最小充分通信”，共同指向少通信、按信息价值调度的思路。</p>
+<p>普通读者建议先读这两篇精读打底，再扫仓储数字孪生、海上集群任务分配、异构 UAV/UGV 协同三篇速读看落地场景。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="EARS-Info: Information-Aware Event-Driven Reallocation for Multi-Robot Exploration">EARS-Info: Information-Aware Event-Driven Reallocation for Multi-Robot Exploration</span></li><li><span class="dpr-home-dashboard-paper-title" title="Minimum Sufficient Communication for Independent Behaviour Tree Robot Teams">Minimum Sufficient Communication for Independent Behaviour Tree Robot Teams</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>2</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AI-Driven Digital Twin Framework for Warehouse Logistics Automation Optimization">AI-Driven Digital Twin Framework for Warehouse Logistics Automation Optimization</span></li><li><span class="dpr-home-dashboard-paper-title" title="Tunable Spatial Task Allocation with Application to Maritime Swarms">Tunable Spatial Task Allocation with Application to Maritime Swarms</span></li><li><span class="dpr-home-dashboard-paper-title" title="Information-Driven Collaborative Autonomy for Heterogeneous UAV/UGV Teams">Information-Driven Collaborative Autonomy for Heterogeneous UAV/UGV Teams</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>6</strong></span></div>
 </section>
 </div>
 

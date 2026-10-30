@@ -1,0 +1,4586 @@
+Title: Information-Driven Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+URL Source: https://arxiv.org/pdf/2610.39379v1
+
+Published Time: Fri, 30 Oct 2026 02:49:44 GMT
+
+Number of Pages: 61
+
+Markdown Content:
+> Proceedings of Machine Learning Research [vol] (2026) 1-61 Submitted xx/26; Revised xx/xx; Published xx/xx
+
+# Information-Driven Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+Joshua Y. Pilipovsky joshua.y.pilipovsky@rtx.com 
+
+Senior Research Engineer RTX Technology Research Center (RTRC) East Hartford, CT 06108, USA 
+
+Editor: xxx 
+
+Abstract 
+
+This paper considers the problem of coordinating a heterogeneous team of unmanned aerial vehicles (UAVs) and unmanned ground vehicles (UGVs), where the ground vehicles must traverse a domain containing an unknown number of potentially hazardous targets. The UAVs provide aerial sensing using onboard optical cameras, and their trajectories must adapt to both the ground routes and the information collected about the targets. We for-mulate the aerial search problem using ergodic control, which distributes sensing effort ac-cording to a spatial information density to balance exploration and target localization. The formulation incorporates dynamic camera field-of-view sensor footprints and probabilistic detection models that depend on vehicle position and attitude. Angles-only measurements are processed through Bayesian inference and marginalization over data-association hy-potheses to obtain a Poisson multi-Bernoulli (PMB) approximation of the target posterior, representing both detected and undetected targets. This belief directs aerial sensing toward unexplored regions along the ground routes and viewpoints that improve target localiza-tion. Ground planning combines chance-constrained target avoidance, enforced through confidence sets, with a void-probability objective that favors routes unlikely to contain threats. We solve each team’s optimization problem in a fully decentralized manner using a nested SCvx*–C-ADMM scheme, with outer sequential convex programming iterations and inner distributed consensus optimization, accounting for nonlinearities, nonseparable objectives, and continuous-time inter-agent separation constraints. A closed-loop scheme updates both fleets’ trajectories as information becomes available and permits ground mo-tion when the remaining route risk falls below a prescribed threshold. Numerical case studies examine the effects of sensing geometry and target uncertainty, compare decen-tralized and centralized solvers, and demonstrate full closed-loop collaboration between multiple UAVs and UGVs. 
+
+Keywords: Ergodic control, trajectory optimization, sequential convex programming, distributed optimization, optical sensor modeling, risk-sensitive control, random finite set theory, multi-target tracking 
+
+1 Introduction 
+
+Collaborative autonomy deals with the problem of coordinating multiple autonomous vehi-cles to accomplish a common objective. In a homogeneous team, the vehicles typically share similar motion and sensing capabilities, allowing coordination to be formulated around a common vehicle and sensor model. Heterogeneous teams introduce an additional level of arXiv:2610.39379v1 [cs.RO] 29 Oct 2026 Joshua Pilipovsky 
+
+coupling, since the capabilities of one vehicle class may be needed for another to complete its task. For example, unmanned aerial vehicles (UAVs) can observe regions that are inaccessi-ble to unmanned ground vehicles (UGVs), while the ground vehicles can carry the payloads needed to execute a mission. This complementary use of aerial and ground platforms has been studied in coordinated exploration and mapping (Dewan et al., 2013), collaborative localization (Butzke et al., 2016), and persistent sensing with mobile recharging (Naveed et al., 2025). In this work, we consider a UAV/UGV team in which the ground vehicles must traverse a bounded domain containing an unknown number of potentially hazardous targets. The UAVs provide aerial overwatch, using onboard optical cameras to discover, localize, and track these targets before the UGVs encounter them. The difficulty is that neither fleet can plan effectively in isolation. The value of a UAV observation depends on its relevance to the ground routes, while the admissibility of those routes depends on what the UAVs have observed. Moreover, failing to detect a target does not imply that a region is empty, since the camera has a limited field of view and a non-unit probability of detection. The planning problem must therefore account for both uncertainty in detected targets and the possibility of targets that have not yet been observed. A natural approach to the aerial search problem is ergodic control, which seeks tra-jectories whose time-averaged spatial statistics match a prescribed distribution over the search domain. Regions assigned greater probability mass receive proportionally more sens-ing effort, allowing a single objective to express both broad exploration and concentrated information gathering. The work of Mathew and Mezi´ c (2011) introduced multiscale met-rics for measuring deviations from ergodicity and designing multi-agent coverage dynam-ics. Subsequent works formulated continuous-time ergodic trajectory optimization (Miller and Murphey, 2013) and used expected information densities to guide active sensing with nonlinear measurement models (Miller et al., 2016). The commonly used spectral metric compares weighted Fourier coefficients of the trajectory occupation measure with those of the desired spatial distribution. Alternatively, Hughes et al. (2025) formulate ergodic tra-jectory optimization using maximum mean discrepancy between kernel mean embeddings in a reproducing kernel Hilbert space, allowing coverage objectives to be specified from samples on more general domains. For a fleet of UAVs, the ergodic objective depends on the aggregate coverage of all agents and thus couples their trajectories through the team Fourier coefficients. Abraham and Murphey (2018) address this coupling through consensus on the coverage statistics, obtaining decentralized ergodic control for agents with nonlinear dynamics. The sensing model introduces a second difficulty: the point occupation measure of a vehicle does not describe the ground area observed by a camera whose footprint changes with altitude and attitude. Finite sensor footprints and obstacle constraints have been incorporated into ergodic coverage by Ayvali et al. (2017). Here, we derive the elliptical ground footprint from the position and attitude of the camera and construct a smooth, normalized sensing kernel from this geometry. Integrating this kernel along a trajectory gives an occupation measure that describes the spatial distribution of camera coverage and depends on both the translational and rotational motion of the UAV. Its spectral coefficients enter the fleet ergodic objective, so that the trajectories are optimized with respect to the area observed by the cameras. The same camera geometry also enters a spatially varying detection probability 
+
+> 2Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+and an angles-only measurement model with pose-dependent covariance. This connects the coverage model used in trajectory planning with the missed detections and measurement uncertainty accounted for in Bayesian inference. The search distribution must, in turn, reflect the information collected by the UAVs. Random finite set (RFS) theory provides a natural Bayesian description of this informa-tion, since both the number of targets and their states are uncertain (Mahler, 2007). The measurements are also a finite set, containing an unknown combination of target detec-tions and clutter, with some targets producing no measurement. Poisson multi-Bernoulli mixture (PMBM) filtering represents undetected targets by a Poisson point process and detected targets by Bernoulli components conditioned on global data-association hypothe-ses (Garc´ ıa-Fern´ andez et al., 2018). Marginalizing the association uncertainty provides tractable multi-Bernoulli approximations (Williams, 2015). These ideas have also been used for multi-agent planning that balances the discovery of new objects with the track-ing of existing ones (Nguyen et al., 2020). Here, we specialize the measurement update to camera-based, angles-only observations with pose-dependent detection and measurement quality, and maintain a Poisson multi-Bernoulli (PMB) approximation of the target pos-terior. This distinction between detected and undetected targets is particularly useful for ground planning, since avoiding known tracks alone does not account for threats in regions that have not been sufficiently explored. Planning around the estimated target positions alone neglects this uncertainty. Chance-constrained trajectory optimization instead limits the probability of violating a safety re-quirement (Blackmore et al., 2011), and confidence sets provide a geometric means of ac-counting for uncertain target locations. For a multi-object belief, the corresponding question is whether an entire region contains any targets. The RFS void probability, namely, the probability that a set contains no objects, has been used to impose safety constraints in sensor control (Beard et al., 2017); more recently, Han et al. (2026) have developed belief control barrier functions from a Poisson representation of multi-object uncertainty. We use the PMB void probability over the corridor swept by a candidate UGV route, which accounts for both the residual undetected-target intensity and the existence and location uncertainty of detected tracks. Its negative logarithm supplies a route-risk cost, while a separate threshold on the remaining fleet corridor determines when the UGVs may proceed under the current belief. As sensing reduces uncertainty or reveals a threat, the ground routes and the aerial search distribution are updated accordingly. Solving the resulting fleet trajectory problems at a centralized ground station requires aggregating all vehicle decision variables and constraints. A decentralized formulation in-stead allows each vehicle to solve a local problem and exchange the quantities needed to coordinate with its neighbors. Consensus alternating direction method of multipliers (C-ADMM) provides an established framework for this purpose when the local problems are convex (Boyd et al., 2011). For trajectory planning, Rey et al. (2018) combine decentralized ADMM with adaptive linearization of collision constraints for agents with linear dynamics. For nonlinear model predictive control, Stomberg et al. (2026) develop a closely related nested scheme in which decentralized sequential quadratic programming uses ADMM to solve the coupled quadratic subproblems. In our setting, nonlinear vehicle dynamics, cam-era footprints, and collision constraints likewise require an outer approximation method before the fleet problem can be distributed into convex local solves. 
+
+> 3Joshua Pilipovsky
+
+To this end, we use successive convexification (SCvx), which replaces the nonlinear op-timal control problem by a sequence of convex subproblems, with virtual controls and trust regions to handle infeasible linearizations and control the approximation error (Mao et al., 2016). The SCvx* extension embeds these iterations in an augmented Lagrangian frame-work to address feasibility of the original nonlinear problem (Oguri, 2023). We also adopt the continuous-time constraint formulation of Elango et al. (2024), in which integrated constraint violations are represented by auxiliary dynamics, to account for inter-agent sep-aration between discretization nodes. Within each SCvx* iteration, local copies and graph flows separate the shared collision constraints and the global ergodic coefficient sum, allow-ing the convex subproblem to be solved using neighbor-to-neighbor C-ADMM updates. The main contributions of this work are as follows: 1. We formulate multi-UAV ergodic trajectory optimization with optical sensor foot-prints that depend on the full camera pose. Starting from a conic field of view, we derive the position, orientation, and extent of the ground footprint and construct a smooth footprint kernel that defines the team occupation measure and its Fourier coefficients. The resulting ergodic objective measures coverage of the ground area observed by the cameras throughout their motion. 2. We connect Bayesian inference from UAV angles-only measurements to both aerial and ground planning through a shared PMB target belief. The resulting formulations direct aerial sensing toward unexplored regions along the ground routes and informa-tive views of detected targets. The same belief accounts for detected and undetected threats in ground planning through confidence-set avoidance and a route-risk cost based on the PMB void probability. 3. We develop a novel decentralized method for non-convex fleet trajectory optimiza-tion problems by combining outer SCvx iterations with inner C-ADMM solves. The method accommodates nonlinear dynamics, continuous-time inter-agent collision avoidance, and nonseparable team objectives. For the UAV problem, we addition-ally introduce a new graph-flow formulation of C-ADMM that replaces the global coefficient-sum constraint with local balance equations and neighbor agreement. We establish its equivalence at consensus to the centralized convex subproblem, en-abling decentralized optimization of the coupled ergodic objective without a central coefficient aggregator. 4. We construct a closed-loop coordination scheme that updates aerial sensing plans as the target belief evolves, replans ground routes when newly confirmed threats affect them, and authorizes ground motion according to the remaining route risk. Numerical case studies assess UAV search through spatial coverage and ergodic mismatch, and UGV planning through route risk, control effort, and progress toward the goals. We also evaluate solver convergence, computational scaling, and solution quality relative to centralized optimization. The paper is organized as follows. Sections 2 and 3 introduce the notation and math-ematical preliminaries. Section 4 formulates the UAV sensing and trajectory optimization problem and its decentralized solution. Section 5 derives the RFS measurement update 
+
+> 4Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+and PMB posterior approximation. Section 6 presents the UGV risk-aware trajectory op-timization problem. Section 7 describes the feedback between the two fleets, followed by numerical case studies in Section 8 and concluding remarks in Section 9. 
+
+2 Notation 
+
+Real-valued vectors are lowercase x ∈ Rd and matrices are uppercase X ∈ Rc×d. The operator col( B1, . . . , B q) ≜ [B⊺ 
+
+> 1
+
+, . . . , B ⊺ 
+
+> q
+
+]⊺ denotes vertical stacking of vectors or matrix blocks with the same number of columns. Indexed families are stacked in a fixed order. For vector-valued functions, the operator acts pointwise. Random vectors are denoted by boldface x. The notation N (m, P ) denotes a Gaussian distribution with mean m and covariance P . For P ≻ 0, N (x; m, P ) denotes its probability density evaluated at x. Denote by M+(Ω) the cone of non-negative Borel measures over the support Ω ⊂ Rd and P(Ω) = 
+
+{μ ∈ M +(Ω) : μ(Ω) = 1 } the space of all probability measures. We denote by δx the Dirac delta distribution concentrating unit mass at the atom x ∈ Rd. The disjoint union of two sets A, B ⊆ Rd is denoted by A ⊔ B . Given a set X ⊆ Rd, we denote by 2 X = {S : S ⊆ X } 
+
+the power set of X . The set F(X ) represents the space of all finite subsets of X . More explicitly, F(X ) = {S ⊆ X : |S| < ∞} , or, equivalently, F(X ) = ⊔∞
+
+> n=0
+
+Fn(X ), where 
+
+Fn(X ) = {S ⊆ X : |S| = n}. Given an absolutely continuous probability distribution P
+
+supported on a set X , its density is denoted by ρ(x) for x ∈ X . For a nonnegative function g
+
+with 0 < R 
+
+> Ω
+
+g(z) d z < ∞, define the normalization operator Norm Ω[g]( ξ) ≜ g(ξ)/ R 
+
+> Ω
+
+g(z) d z.A Bernoulli random variable, denoted by E ∼ Bernoulli( p), satisfies P(E = 1) = p and 
+
+P(E = 0) = 1 − p. A Poisson random variable, denoted by E ∼ Poisson(Λ), satisfies 
+
+P(E = n) = e−ΛΛn/n !. Given a domain Ω ⊂ Rd and time horizon [0 , T ] ⊂ R+, denote by Lp([0 , T ]; Ω) the (signal) space of functions with finite Lp norm R T 
+
+> 0
+
+|f (τ )|p dτ < ∞.For an integer s ≥ 0, W s,p denotes the usual weak-derivative Sobolev space; fractional and negative orders below are understood through the standard spectral/interpolation definition and duality. For a scalar a ∈ R, define its positive part by [ a]+ ≜ max {0, a }. For a vector 
+
+x ∈ Rd, [ x]+ ≜ max {0, x } ∈ Rd applies this operation componentwise. An undirected communication graph is denoted by G = ( V, E), where V = {1, . . . , M } denotes the set of agents and E ⊆ {{ i, j } ∈ V : i̸ = j} denotes the set of undirected communication links. The characteristic function of a set A ⊂ Rd is 1A(a) = 1 if a ∈ A and 0 otherwise. Its extended-valued constraint indicator is IA(a) = 0 if a ∈ A and + ∞ otherwise. For r > 0, 
+
+B(0 , r ) ≜ {x : ∥x∥ < r } is the open Euclidean ball; A ⊕ B ≜ {a + b : a ∈ A , b ∈ B} 
+
+is the Minkowski sum, and A ⊖ B ≜ {x : x + B ⊆ A} is the Pontryagin difference. The cardinality of any finite set Π is denoted by |Π|. For a nonempty set A ⊆ Rd, the distance from x ∈ Rd to A is dist( x, A) ≜ inf a∈A ∥x − a∥2. When A is also closed and convex, ΠA(x) ≜ argmin a∈A ∥x − a∥2 denotes its unique Euclidean projection. For any positive integer d, Id and 0 d denote the d×d identity and zero matrices, respectively. More generally, 0r×c is the r × c zero matrix; in particular, 0 d×1 and 1 d×1 denote the zero and one column vectors of length d.
+
+> 5Joshua Pilipovsky
+
+3 Preliminaries 
+
+This section introduces random finite set models for target inference in Section 5 and the spectral ergodic metric for UAV coverage in Section 4. Sequential convex programming addresses the nonlinear UAV and UGV trajectory problems, an isoperimetric reformula-tion enforces continuous-time pairwise separation, and consensus ADMM distributes the resulting convex subproblems across each fleet. 
+
+3.1 Random Finite Set Theory 
+
+When detecting objects 1 in an unknown environment, there are often two sources of am-biguity regarding the objects, namely, both the estimated states of detected targets and the number (or cardinality) of the targets themselves. Indeed, it is rare that one would ever know the true number of targets in a domain, aside from some exceptional prior re-connaissance or intelligence. In this context, a Random Finite Set (RFS) is precisely the mathematical tool that can model uncertainty in both the cardinality of a set and the el-ements making up that set (Mahler, 2007). Below we give an overview of two classes of RFS which will be used in the sequel, namely the i) Multi-Bernoulli (MB) RFS, and the ii) Poisson Point Process (PPP). 
+
+Multi-Bernoulli RFS First, we start with a Bernoulli RFS which is a generalization of a standard Bernoulli random variable. 
+
+Definition 1 (Bernoulli RFS) . Let X ⊂ Rd be the state space and let Υ be the sample space. An RFS X : Υ → F (X ) is a Bernoulli RFS with parameters (p, ρ ), where p ∈ [0 , 1] 
+
+is the existence probability and ρ is a probability density on X , if X has the structure 
+
+X =
+
+(
+
+∅, w.p. 1 − p, 
+
+{x}, x ∼ ρ, w.p. p. (1) For brevity, we will often use the shorthand X ∼ BernoulliRFS( p, ρ ). In essence, a Bernoulli RFS generalizes a Bernoulli random variable by replacing the positive binary outcome (1 or true) with a random singleton {x}, thereby jointly modeling uncertainty in both existence and state. As a result, the cardinality always satisfies |X| ∈ { 0, 1} and we can write the properties P(|X| = 1) = p and x | | X| = 1 ∼ ρ. Furthermore, the complete density of the Bernoulli RFS is given by 
+
+ρ(X) = 
+
+
+
+1 − p, X = ∅,pρ (x), X = {x},
+
+0, |X| ≥ 2,
+
+(2) where, in this context, a random finite set density ρ(·) is defined such that the set integral 
+
+Z
+
+ρ(X)δX = ρ(∅) + 
+
+> ∞
+
+X
+
+> n=1
+
+1
+
+n!
+
+Z 
+
+> Xn
+
+ρ({x1, . . . , x n}) d x1 · · · dxn = 1 .
+
+> 1. We will use the words ‘objects’ and ‘targets’ interchangeably throughout the text.
+> 6Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+This would suffice to characterize a single target in the domain. However, to account for multiple detected targets, we generalize the Bernoulli construction to multiple independent Bernoulli events. 
+
+Definition 2 (Multi-Bernoulli RFS) . Let the single-object state space be X and consider M
+
+independent Bernoulli RFSs X(i) ∼ BernoulliRFS( ri, ρ i) for i = 1 , . . . , M , where ri ∈ [0 , 1] 
+
+and ρi is a probability density on X . The random finite set 
+
+X =
+
+> M
+
+[
+
+> i=1
+
+X(i) (3) 
+
+is a multi-Bernoulli (MB) RFS with parameters {(ri, ρ i)}Mi=1 .
+
+Thus, it follows that the cardinality |X| ∈ { 0, . . . , M } may be at most M and the discrete cardinality distribution is 
+
+P(|X| = n) = X 
+
+> I⊆{ 1,...,M }:|I| =n
+
+Y
+
+> i∈I
+
+ri
+
+Y
+
+> j / ∈I
+
+(1 − rj )
+
+ . (4) Importantly, we have to sum over all index subsets of cardinality n in the above expression. The corresponding density is given by 
+
+ρ(X) = X 
+
+> FMi=1 X(i)=XM
+
+Y
+
+> i=1
+
+ρi
+
+ X(i), (5) where ρi(·) represent the individual Bernoulli RFS densities. In the sequel, the MB RFS will be used to represent the distribution of detected targets in the domain and will be updated whenever a probabilistic positive-detection event takes place. 
+
+Poisson Point Process A Poisson Point Process (PPP) is an RFS in which the number of objects is Poisson distributed, and conditional on that cardinality, the object states are i.i.d. according to a density obtained by normalizing an intensity function. In particular, we first consider the general Poisson RFS below. 
+
+Definition 3. Let X ⊂ Rd be the state space and let Υ be the sample space. An RFS 
+
+X : Υ → F (X ) is a Poisson RFS with parameters (Λ , P), where Λ ≥ 0 is an intensity parameter and P is a probability distribution on X , if X satisfies the following properties: 
+
+• The cardinality follows the discrete Poisson distribution |X| ∼ Poisson(Λ) .
+
+• Conditional on a cardinality N = n, the individual elements are distributed according to x1, . . . , xn i.i.d. 
+
+∼ P.
+
+Thus, the number of elements in the set is governed by the rate parameter intensity Λ, from which it follows that E[|X|] = Λ; and each individual element is distributed ac-cording to P. The PPP specializes the above definition to a structure where Λ and P are fundamentally related by a rate parameter as shown below. 
+
+> 7Joshua Pilipovsky
+
+Table 1: Common random finite set models on a state space X .
+
+RFS Model Cardinality Distribution Spatial Distribution 
+
+Bernoulli N ∼ Bernoulli( p) x | N = 1 ∼ ρ(x)Multi-Bernoulli N =
+
+> M
+
+X
+
+> i=1
+
+Ei, Ei ∼ Bernoulli( ri) xi | Ei = 1 ∼ ρi(x)Poisson N ∼ Poisson(Λ) x1, . . . , xN | N i.i.d.
+
+∼ ρ(x) = λ(x)Λ
+
+Definition 4. Let λ : X → R+ denote the Poisson rate parameter. If Λ ≜ R 
+
+> X
+
+λ(x) d x > 0,a Poisson Point Process is a Poisson RFS with intensity and conditional distributions given by 
+
+Λ = 
+
+Z
+
+> X
+
+λ(x) d x, ρ(x) = λ(x)Λ . (6) As a shorthand, we write X ∼ PPP( λ); if Λ = 0, then X = ∅ almost surely. It follows that, given a subset A ⊆ X , the number of targets in that domain is given by 
+
+|X ∩ A| ∼ Poisson  Λ( A), where Λ( A) ≜ R 
+
+> A
+
+λ(x) d x. The density of a PPP is given by 
+
+ρ(X) = exp( −Λ) Y
+
+> x∈X
+
+λ(x). (7) In the sequel, the PPP will be used to represent the distribution of unknown targets in the domain and will be updated at every planning stage according to the previous stage’s aerial sensing of the domain. In summary, Table 1 illustrates the three RFS objects used in this work in terms of their number, or cardinality, distribution, and individual (conditional) component distributions. 
+
+3.2 Spectral Ergodic Control 
+
+Ergodic control refers to the formulation and solution of optimization problems that drive a dynamical system towards ergodicity. In the context of multi-agent collaborative search, there will be one shared base distribution over the domain which the UAVs will jointly cover. Asymptotically, the fleet should spend more time in regions of higher (prescribed) probability density than in regions of lower density. Having a perfect balance between the time-varying statistics of the trajectory distribution, and the underlying spatial distribution of which to search, is in essence an ergodic system. Below we formalize this intuition. 
+
+Definition 5 (Empirical Trajectory Distribution) . Let the state space be X ⊂ Rn, let 
+
+Ω ⊂ Rd be compact, and let g : X → Ω be the sensing-location map. For an admissible input set U ⊂ Rm, a dynamical system defined by the trajectory manifold 
+
+T =
+
+
+
+(x, u ) ∈ W 1,p ([0 , T ]; Rn) × Lp([0 , T ]; Rm) : x(t) ∈ X , u (t) ∈ U a.e. ,
+
+˙x(t) = f  x(t), u (t) a.e. on [0 , T ]
+
+
+
+(8) 
+
+> 8
+
+Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+admits the time-averaged, empirical occupation (trajectory) measure 
+
+μT 
+
+> T
+
+= 1
+
+T
+
+Z T
+
+> 0
+
+δg(x(τ )) dτ ∈ P (Ω) . (9) 
+
+For multiple independent dynamical systems Ti over i = 1 , . . . , M , the occupation measure is 
+
+μT 
+
+> T
+
+= 1
+
+M T 
+
+> M
+
+X
+
+> i=1
+
+Z T
+
+> 0
+
+δg(xi(τ )) dτ, (10) 
+
+where T ≜ T1 × · · · × T M is the multi-agent trajectory manifold. 
+
+Definition 6. Let Ω ⊂ Rd be compact. Let ˆμ ∈ P (Ω) define a spatial measure on Ω. For 
+
+M > 0 trajectories xi : [0 , T ] → X , let μT 
+
+> T
+
+denote the joint occupation measure on Ω. Then, the multi-agent dynamical system is ergodic with respect to ˆμ if the occupation measure converges weakly to ˆμ, that is, 
+
+μT 
+
+> T
+
+⇀ ˆμ as T → ∞ . (11) To quantify a “distance” to ergodicity in the form of an objective function to minimize, it is natural to consider ergodic metrics of the form 
+
+Eˆμ = ψ[μT 
+
+> T
+
+] − ψ[ˆ μ] ψ , (12) where ψ represents a measure transform, and ∥ · ∥ ψ an associated norm in the transformed space. In this work, we utilize the spectral , or Fourier, ergodic metric; for other formulations and their benefits and drawbacks, we refer the interested reader to (Mathew and Mezi´ c, 2011; Miller and Murphey, 2013; Abraham and Murphey, 2018). The spectral ergodic metric takes the squared norm between the trajectory measure and the spatial measure in the dual Sobolev space H−s ≡ W −s, 2 of fractional order s = ( d + 1) /2, and is given by 
+
+Eˆμ = ∥μT 
+
+> T
+
+− ˆμ∥2 
+
+> H−s
+
+= X
+
+> k∈Nd
+> 0
+
+Λk(ck − ϕk)2, Λk ≜ (1 + λk)−s, λk ≜
+
+> d
+
+X
+
+> i=1
+
+ kiπLi
+
+2
+
+, (13) where 
+
+ck = EμT 
+
+> T
+
+[Fk] = 1
+
+M T 
+
+> M
+
+X
+
+> i=1
+
+Z T
+
+> 0
+
+Fk
+
+
+
+g xi(τ )
+
+dτ, ϕk = Eˆμ[Fk] = 
+
+Z
+
+> Ω
+
+Fk(ξ) ˆ μ(d ξ). (14) are the Fourier coefficients corresponding to μT 
+
+> T
+
+and ˆ μ, respectively, and Fk are the corre-sponding Fourier basis functions on the domain Ω. Over general manifolds Ω ⊂ Rd, it is a non-trivial task to determine the basis functions Fk, which are generally eigenfunctions of the negative Laplace–Beltrami operator (Chavel, 1984) and satisfy −∆Fk = λkFk with 
+
+λk ≥ 0. In our context, we assume a rectangular domain of the form Ω = [0 , L 1]×· · ·× [0 , L d], where each Li > 0. In this Euclidean space, the eigenfunctions correspond to the standard Laplacian, and the Fourier basis functions are exactly represented as the orthonormal set 
+
+Fk(x) = 1
+
+hkdY
+
+> i=1
+
+cos 
+
+ kiπx i
+
+Li
+
+
+
+, k ∈ Nd
+
+> 0
+
+, h2 
+
+> k
+
+=
+
+> d
+
+Y
+
+> i=1
+
+(
+
+Li, ki = 0 ,Li/2, ki > 0 . (15) 
+
+9Joshua Pilipovsky 
+
+Intuitively, the space H−s represents generalized spatial distributions whose high-frequency Fourier content is increasingly discounted. As evidenced by the form of Λ k, higher fre-quencies have less associated weight. In turn, minimizing the spectral ergodic metric will prioritize driving the large-scale, low-frequency structure of the two distributions together, which results in smoother and more global coverage. 
+
+3.3 Sequential Convex Programming 
+
+Successive convexification, or sequential convex programming (SCP), refers to an optimiza-tion method to find local minima of nonlinear and non-convex programs, by iteratively lin-earizing the problem around a given reference, solving the linearized (convex) sub-problem, using that solution as the next reference, and iterating until convergence. SCP is a rich and well-studied topic and has been successfully applied to numerous problems in guid-ance and control. For a good overview, we refer the reader to (Mao et al., 2016; Oguri, 2023). In this particular work, we use a variant of SCP, called SCvx*, to solve the non-linear UAV and UGV optimization problems. Under the regularity, penalty-update, and subproblem-accuracy assumptions stated in (Oguri, 2023), SCvx* provides feasibility and local convergence guarantees; whether those assumptions hold for each specialized team problem must be verified separately, and a finite numerical run yields only a candidate so-lution subject to the chosen stopping tolerances. Below we outline the high-level elements of the algorithm, and defer the full treatment of SCvx* to (Oguri, 2023). Consider the general nonlinear program min  
+
+> z
+
+J(z),
+
+s.t. gi(z) = 0 , i = 1 , . . . , p, hj (z) ≤ 0, j = 1 , . . . , q, gaff (z) = 0 , hcvx (z) ≤ 0.
+
+(16) where J ∈ C1 is assumed convex, gaff and gi denote the affine and non-convex equality constraints, and hcvx and hj denote the convex and non-convex inequality constraints. The Lagrangian associated with the optimization problem (above) is 
+
+L(z, λ, μ ) = J(z) + λ⊺g(z) + μ⊺h(z). (17) Furthermore, the augmented Lagrangian additionally adds the terms 
+
+Lw(z, λ, μ ) = J(z) + λ⊺g(z) + w
+
+2 ∥g(z)∥2 + μ⊺[h(z)] + + w
+
+2 ∥[h(z)] +∥2, (18) Here μ ≥ 0. By defining the total penalty function as 
+
+P (·) = λ⊺g + w
+
+2 ∥g∥2 + μ⊺ max {0, h } + w
+
+2 ∥ max {0, h }∥ 2, (19) the (non-convex) penalty problem that SCvx* repeatedly solves is given by min  
+
+> z
+
+J(z) + P  g(z), h (z); w, λ, μ ),
+
+s.t. gaff (z) = 0 , hcvx (z) ≤ 0. (20) 
+
+> 10 Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+Each iteration linearizes the non-convex equality and inequality constraints around a refer-ence ˆ z as ˜g(z) = g(ˆ z) + ∇g(ˆ z)⊺(z − ˆz),
+
+˜h(z) = h(ˆ z) + ∇h(ˆ z)⊺(z − ˆz).
+
+One common defect of SCP methods is that their convex sub-problems suffer from artificial 
+
+infeasibility and unboundedness due to the linearizations (and in the latter case, constraint relaxations). To this end, instead of imposing ˜ g = 0 and ˜h ≤ 0, we relax the convex constraints to ˜ g(z) = ξ and ˜h(z) ≤ ζ for some slack variables, ξ ∈ Rp, ζ ∈ Rq
+
+> +
+
+, and penalize these in the objective function. Furthermore, we bound the deviation of the decision variable 
+
+z from its reference through the trust region ∥z − ˆz∥∞ ≤ ∆, for some trust region size ∆ > 0. In total, at iteration ℓ, the convex sub-problem that is solved is given by min  
+
+> z,ξ,ζ
+
+L(z, ξ, ζ ) ≜ J(z) + ( λℓ)⊺ξ + wℓ
+
+2 ∥ξ∥2 + ( μℓ)⊺ζ + wℓ
+
+2 ∥ζ∥2,
+
+s.t. gaff (z) = 0 , hcvx (z) ≤ 0,
+
+˜g(z) = ξ, ˜h(z) ≤ ζ, ζ ≥ 0, ∥z − ˆz∥∞ ≤ ∆.
+
+(21) Solutions are accepted according to the ratio between their nonlinear-to-linear cost improve-ments, and the Lagrange multipliers ( λ, μ ), trust region radius ∆, and penalty parameter 
+
+w are updated according to SCvx*. For details on how these parameters are updated and the resulting convergence guarantees, please see (Oguri, 2023); also see (Mao et al., 2016; Elango et al., 2024) for related SCvx methods. 
+
+3.4 Continuous-Time Pairwise Separation 
+
+Consider a pair of agents with continuous position trajectories si(t) and sj (t) and required separation dij > 0. The geometric path constraint and its equivalent normalized residual are 
+
+∥si(t) − sj (t)∥2 ≥ dij ⇐⇒ gij (t) ≜ 1 − ∥si(t) − sj (t)∥22
+
+d2
+
+> ij
+
+≤ 0, t ∈ [0 , T ]. (22) Following the isoperimetric reformulation of Elango et al. (2024), introduce the scalar vio-lation accumulator ˙yij (t) = [ gij (t)] 2+, yij (0) = 0 , yij (T ) = 0 , (23) Integrating the auxiliary dynamics and using both endpoint conditions gives 0 = yij (T ) − yij (0) = 
+
+Z T
+
+> 0
+
+[gij (t)] 2+ dt. 
+
+The integrand [ gij (t)] 2+ is nonnegative and continuous; if it were positive at any time, continuity would make its integral positive over a neighboring interval, contradicting the zero integral. The integral therefore vanishes if and only if gij (t) ≤ 0 throughout the horizon. Thus, it follows that (23) is equivalent to (22), and allows for continuous-time constraint satisfaction through enforcement of a corresponding (boundary-constrained) ODE. 
+
+> 11 Joshua Pilipovsky
+
+3.5 Decentralized Consensus-ADMM 
+
+In this work, we consider trajectory optimization problems over teams , or fleets, of agents within a particular class (e.g., UAV or UGV). The resulting discretized mathematical pro-grams will necessarily involve the joint decision variables of all agents, say z ≜ [z⊺ 
+
+> 1
+
+, . . . , z ⊺ 
+
+> M
+
+]⊺
+
+for M total agents in the fleet. Furthermore, there may be equality, or inequality, con-straints linking the decision variables of the agents together; for example, as in the context of inter-agent collision avoidance, or in the formulation of the ergodic metric. As such, it is not possible to independently solve for each agent’s decision vector, and hence one must either choose an architecture which uses a centralized node to solve the entire program, or otherwise distribute the optimization problem so that each agent solves its own decentral-ized local problem, and communicates with its neighbors in order to reach consensus over successive iterations. We will explore this latter method presently, and use the consensus ADMM algorithm for efficient and convergent distributed optimization at each outer SCvx* iteration. Below we give an overview of the method, and defer readers to a more thorough treatment in (Boyd et al., 2011). 
+
+General C-ADMM The Alternating Direction Method of Multipliers (ADMM) is a first-order optimization method for solving linearly constrained problems of the form min  
+
+> z,w
+
+f (z) + g(w) s.t. Az + Bw = c, (24) where z and w are blocks of decision variables, often introduced so that the terms f and g
+
+can be treated separately. ADMM solves (24) by seeking a saddle point of the augmented Lagrangian (AL) 
+
+Lρ(z, w, λ ) = f (z) + g(w) + λ⊺(Az + Bw − c) + ρ
+
+2 ∥Az + Bw − c∥22, (25) where λ has the same dimension as the residual Az + Bw − c, and ρ > 0 is a user-chosen penalty parameter. In the consensus form considered here, the constraint is simply z−w = 0, which corresponds to the special case A = I, B = −I, and c = 0 in (24). Defining the scaled dual variable u ≜ ρ−1λ, the AL becomes 
+
+Lρ(z, w, u ) = f (z) + g(w) + ρ
+
+2 ∥z − w + u∥22 − ρ
+
+2 ∥u∥22. (26) This scaled form yields particularly simple ADMM iterations, since the quadratic penalty acts directly on the disagreement between the local variable z and the consensus/copy variable w (Boyd et al., 2011). 
+
+> 12
+
+Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+Algorithm 1 Consensus ADMM  
+
+> 1:
+
+Input: ϵp, ϵ d, ρ, k max , z (0) , w (0) , u (0)  
+
+> 2:
+
+Output: z⋆ 
+
+> 3:
+
+k ← 0, z⋆ ← z(0)  
+
+> 4:
+
+while k < k max do  
+
+> 5:
+
+Primal update: 
+
+z(k+1) ← arg min 
+
+> z
+
+n
+
+f (z)+ ρ
+
+2 ∥z − w(k) + u(k)∥22
+
+o (27)  
+
+> 6:
+
+Consensus update: 
+
+w(k+1) ← arg min 
+
+> w
+
+n
+
+g(w)+ ρ
+
+2 ∥z(k+1) − w + u(k)∥22
+
+o (28)  
+
+> 7:
+
+Dual update: 
+
+u(k+1) ← u(k) + z(k+1) − w(k+1) (29)  
+
+> 8:
+
+Compute primal and dual residuals: 
+
+r(k+1) ← z(k+1) − w(k+1) ,s(k+1) ← ρ w(k+1) − w(k). (30)  
+
+> 9:
+
+if ∥r(k+1) ∥2 ≤ ϵp and ∥s(k+1) ∥2 ≤ ϵd
+
+then  
+
+> 10:
+
+z⋆ ← z(k+1)  
+
+> 11:
+
+break  
+
+> 12:
+
+end if  
+
+> 13:
+
+z⋆ ← z(k+1)  
+
+> 14:
+
+k ← k + 1  
+
+> 15:
+
+end while 
+
+As shown in Algorithm 1, ADMM proceeds by alternating minimization of the AL (26) with respect to z and w, followed by an ascent step on the dual variable. In the consensus setting, the primal residual 
+
+r(k+1) = z(k+1) − w(k+1) , (31) measures violation of the agreement constraint 
+
+z = w, while the dual residual 
+
+s(k+1) = ρ w(k+1) − w(k), (32) measures the change in the consensus variable between successive iterations. Thus, r(k+1) 
+
+quantifies primal infeasibility, whereas s(k+1) 
+
+quantifies whether the dual iterates have stabi-lized. For convex programs, ADMM enjoys strong convergence guarantees under mild assumptions. In particular, if f and g are closed, proper, and convex, and if a saddle point exists for (24), then the ADMM iterates generated by Algorithm 1 satisfy r(k) → 0 and s(k) → 0 as k → ∞ (Boyd et al., 2011). 
+
+Graph C-ADMM Now we specialize the pre-ceding C-ADMM algorithm to the context of a distributed multi-agent convex optimization. To this end, let us fix a connected, undirected communication graph G = ( V, E), where V =
+
+{1, . . . , M } denotes the set of agents and E ⊆ {{ i, j } ∈ V : i̸ = j} denotes the set of undirected communication links. The neighbor set of agent i ∈ V is defined 2 as Ni ≜ {j ∈ V \ { i} : {i, j } ∈ E} . Consider the generic coupled (and centralized) convex program of the form min 
+
+> ∀i:θi
+> M
+
+X
+
+> i=1
+
+Ji(θi),
+
+s.t. θi ∈ Θi,
+
+ˆhij (θi, θ j ) = 0 ,
+
+∀i = 1 , . . . , M, ∀j ∈ N i.
+
+(33) where Ji(·) is a convex function, Θ i is a convex set, for all i = 1 , . . . , M , and ˆhij is affine, for all {i, j } ∈ E . The main difficulty in distributing the program (33) is in the constraints       
+
+> 2. The assumption of an undirected graph implies that j∈ N i⇐⇒ i∈ N j.
+
+13 Joshua Pilipovsky 
+
+ˆhij coupling agent i’s decision vector to agent j’s decision vector. To circumvent this, we introduce the consensus variables wi and wij to obtain the equivalent program min 
+
+> ∀i, ∀j∈N i:θi,w i,w ij
+> M
+
+X
+
+> i=1
+
+Ji(θi),
+
+s.t. θi ∈ Θi, i = 1 , . . . , M, 
+
+ˆhij (wi, w ij ) = 0 , ∀j ∈ N i, ∀i = 1 , . . . , M, θi = wi, θj = wij , ∀j ∈ N i, ∀i = 1 , . . . , M. 
+
+(34) The variables wi can be interpreted as a copy of the local decision variables corresponding to agent i and the variables wij as agent i’s belief , or guess, of what agent j’s local decision variables are. By stacking the variables {θi}Mi=1 into the earlier decision vector z and the local and incident copies {wi, w ji }Mi=1 ,j ∈N i into w, the consensus equations take the general form Dz − w = 0, where D is the appropriate duplication/incidence operator. This gives the form needed for C-ADMM, with the added benefit that the primal and dual updates can be solved in parallel among the fleet. To see this, construct the AL over all nodes V in the graph as 
+
+Lρ =
+
+> M
+
+X
+
+> i=1
+
+
+
+Ji(θi) + η⊺ 
+
+> i
+
+(θi − wi) + ρ
+
+2 ∥θi − wi∥22
+
+| {z }
+
+> Lρ,i (θi,w i,η i)
+
++ X
+
+> j∈N i
+
+  η⊺ 
+
+> ij
+
+(θj − wij ) + ρ
+
+2 ∥θj − wij ∥22
+
+| {z }    
+
+> Lρ,ij (θj,w ij ,η ij )
+
+
+
+,
+
+(35) where we identify Lρ,i as the per-agent contribution to the AL and Lρ,ij as the neighboring contribution to the AL. The resulting C-ADMM algorithm follows the same flow as in Algorithm 1, so it is not repeated for brevity. Instead, we walk through the high-level sequential updates: first, and in parallel, the agents solve the primal minimization problem 
+
+θk+1  
+
+> i
+
+= arg min 
+
+> θi
+
+Lρ,i (θi, w ki , η ki ) + X
+
+> j∈N i
+
+Lρ,ji (θi, w kji , η kji ) s.t. θi ∈ Θi. (36) After this step, agent i communicates its decision variables θ⋆i = θ(k+1)  
+
+> i
+
+to its neighbors Ni,and the neighbors communicate their decision variables {θ⋆j }j∈N i back to agent i. The next step is for the agents to solve, in parallel, the consensus minimization problem 
+
+"
+
+wk+1 
+
+> i
+
+{wk+1  
+
+> ij
+
+}j∈N i
+
+#
+
+= argmin  
+
+> wi,{wij }j∈N i
+
+Lρ,i (θk+1  
+
+> i
+
+, w i, η ki ) + X
+
+> j∈N i
+
+Lρ,ij (θk+1  
+
+> j
+
+, w ij , η kij )s.t. ˆhij (wi, w ij ) = 0 , ∀j ∈ N i. (37) Finally, the agents perform the dual ascent step, which is given by 
+
+ηk+1  
+
+> i
+
+= ηki + ρ(θk+1  
+
+> i
+
+− wk+1  
+
+> i
+
+),ηk+1  
+
+> ij
+
+= ηkij + ρ(θk+1  
+
+> j
+
+− wk+1  
+
+> ij
+
+), ∀j ∈ N i. (38) At the end of this step, the agents perform one last round of communication, where agent 
+
+i communicates to its neighbors its consensus and dual variables ( wij , η ij ) and receives from its neighbors the variables {wji , η ji }j∈N i . This completes one full decentralized graph C-ADMM iteration. The process is then repeated until convergence. 
+
+14 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+4 UAV Ergodic Search 
+
+At each planning instant, the aerial fleet is tasked with covering a prescribed base distribu-tion and performing vision-based sensing to detect new targets and localize existing targets. To rigorously formulate and solve this collaborative search and sensing problem, we proceed in three steps. First, we present a probabilistic model for the vision-based sensors respon-sible for target detections, and the corresponding RFS-based measurement models used for data collection and Bayesian inference. Then, we incorporate the resulting sensor footprints into the ergodic metric and formulate the joint centralized trajectory optimization problem, taking into account inter-agent collision avoidance. Finally, we present a fully decentral-ized optimization method based on SCP and C-ADMM to seek candidate local solutions. Figure 1 summarizes the complete sequential architecture and the information exchanged between the UAV and UGV fleets. UAV sensing                         
+
+> Ergodic planning
+> SCvx* +C-ADMM
+> PMB state estimation
+> PPP: undetected MB: detected
+> λk(ξ){rj, μ j, P j}
+> Base-density update
+> ΦkUkTkˆρk
+> ++
+> UGV risk-aware planning
+> SCvx* +C-ADMM
+> Hk=−log P0,k
+> P0,k (p⋆i)≥1−ϵgo
+
+✓     
+
+> Motion gate & execution
+> x⋆ax⋆g
+> ZkBk
+> prem
+> g,k ˆρk
+> λk,{Bk,j }
+
+Figure 1: High-level UAV–UGV collaborative autonomy architecture. UAV measurements update the PMB posterior, which informs risk-aware UGV planning, while the committed UGV routes and posterior components update the UAV search density; the PMB void probability gates UGV execution. 
+
+4.1 Sensor and Observation Modeling 
+
+For each UAV i = 1 , . . . , N a, we define its state by xi = [ r⊺ 
+
+> i
+
+, v ⊺ 
+
+> i
+
+, q ⊺ 
+
+> i
+
+]⊺ ∈ R9 and control input by ui ≜ [Ti, ω ⊺ 
+
+> i
+
+]⊺ ∈ R4. Here ri ∈ R3 is the position, vi ∈ R3 is the inertial velocity, 
+
+qi = [ ϕi, θ i, ψ i]⊺ ∈ R3 is the Euler-angle parameterized (XYZ) attitude, Ti ≥ 0 is the total thrust, and ωi ∈ R3 is the body angular rate. In this setup, we assume that the total thrust and angular commands can be sufficiently tracked by a lower-level flight controller. Denoting by R(qi) the body-to-world frame rotation, by S(qi) the matrix transforming body 
+
+15 Joshua Pilipovsky 
+
+angular rate to Euler angle rates, and e3 = [0 , 0, 1] ⊺, the quadrotor dynamics are given by ˙ri = vi,
+
+˙vi = −ge 3 + Ti
+
+mi
+
+R(qi)e3,
+
+˙qi = S(qi)ωi.
+
+(39) Let fi : Rn × Rm → Rn denote the UAV dynamics in (39) and define ( Xi, Ui) ⊂ Rn × Rm as the admissible convex state and input sets chosen to enforce actuator and flight-envelope limits. 
+
+Figure 2: Geometry of quadrotor body-mounted optical sensor field of view, and its intersection with the target plane. When performing collaborative sensing and tar-get detection, we assume the targets are distributed on a two-dimensional domain Ω = [0 , L 1]×[0 , L 2] ⊂
+
+R2 for some L1, L 2 > 0, and are located on the plane z = 0 for simplicity. Furthermore, we assume optical-based measurements in the form of a body-fixed camera looking along −e3. Let Cwb (qi) ≜
+
+R(qi) map body-frame coordinates to world-frame coordinates, and let the fixed camera-to-body rota-tion be Cbc = Rx(π). Then Cwc (qi) = Cwb (qi)Cbc and 
+
+oi ≜ Cwc (qi)e3 = −R(qi)e3 is the associated unit optical axis of UAV agent i, expressed in world co-ordinates; let αi denote its half-angle. Write pi ≜ [rx,i , r y,i ]⊺ for the UAV’s planar po-sition and hi ≜ rz,i > 0 for its altitude. Similarly, decompose the sensor optical axis as bi ≜ [ox,i , o y,i ]⊺
+
+so that oi = [ b⊺ 
+
+> i
+
+, o z,i ]⊺, o z,i < 0, and ∥bi∥2 +o2 
+
+> z,i
+
+= 1. At a given position and attitude ( ri, q i), the pose-aware sensor Field-of-View (FoV) cone is defined as the set 
+
+Ci ≜
+
+
+
+y ∈ R3 \ { ri} : o⊺ 
+
+> i
+
+(y − ri)
+
+∥y − ri∥ ≥ cos αi, o⊺ 
+
+> i
+
+(y − ri) > 0
+
+
+
+. (40) Geometrically, when the sensor is nadir pointed, the FoV cone intersects the target plane to form a circle. In general, given some attitude qi, the sensor FoV cone intersects the target plane to form an elliptical cross-section; see Figure 2 for a geometric illustration. The next result formalizes this notion. 
+
+Proposition 1. Let o ∈ R3 denote the UAVs sensor optical axis with half-angle α ∈
+
+(0 , π/ 2) , and let r ∈ R3 denote its current position. Assume oz < − sin α, or equivalently, that the downward-facing cone has a bounded intersection with the target plane, and define 
+
+D ≜ o2 
+
+> z
+
+− sin 2 α > 0. The target-plane intersection traced out by the FoV cone is an ellipse; its restriction to the search domain is the footprint 
+
+Ef (x) = 
+
+(
+
+ξ ∈ Ω : 
+
+ u⊺ 
+
+> f
+
+(ξ − pell )2
+
+ℓ2
+
+> ∥
+
++
+
+ v⊺ 
+
+> f
+
+(ξ − pell )2
+
+ℓ2
+
+> ⊥
+
+≤ 1
+
+)
+
+, (41) 
+
+> 16 Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+where 
+
+uf ≜ b
+
+∥b∥ , vf ≜
+
+0 −11 0
+
+
+
+uf ,
+
+denote the principal sensor directions, and 
+
+D = o2 
+
+> z
+
+− sin 2 α, pell = p − oz hD b, ℓ∥ = h sin(2 α)2D , ℓ⊥ = h sin α
+
+√D .
+
+At exact nadir ( b = 0 ), any orthonormal planar basis may be used and the footprint is the circle of radius h tan α centered at p.
+
+Proof See Appendix A. Thus, at every observation instant, the target-plane intersection traces out a finite el-lipse, whose restriction to Ω is the sensor footprint (assuming a sufficiently downward-facing camera). The next layer to detecting an object on that target plane is the quality of the sensor, which is in general a function of both its altitude and its attitude. In particular, for UAV i at measurement time tk, we define the dimensionless pointwise sensing-quality field, and its value with respect to target ℓ at position pℓ, by 
+
+χi,k (ξ) ≜ βs(xi(tk)) Gi(ξ; xi(tk)) , χiℓ (xi(tk)) ≜ χi,k (pℓ), (42) where 
+
+Gi(p; xi) ≜ exp 
+
+
+
+− 12 (p − pell ,i )⊺Σ−1f,i (p − pell ,i )
+
+
+
+, (43) is an ellipse-associated Gaussian, with regularized covariance Σ f,i ≜ κ2f Qi +εΣI2, given some 
+
+κf > 0, ε Σ > 0, and geometric shape matrix Qi ≜ ℓ2
+
+> ∥,i
+
+uf,i u⊺ 
+
+> f,i
+
++ ℓ2
+
+> ⊥,i
+
+vf,i v⊺
+
+> f,i
+
+. The second factor 
+
+βs(x) = (−oz )γ
+
+1 + ( h/ ¯h)2 ∈ [0 , 1] , (44) represents altitude and off-nadir sensing quality, where γ > 0 and ¯h > 0 are design pa-rameters. Here, the Gaussian spread G(p, x ) models the proportional quality drop-off from the sensor’s elliptical center, where targets in the center of the frame are more likely to be detected than those at the boundary of the frame; and the factor βs(x) models quality drop-off in altitude due to the target occupying fewer image pixels, as well as off-nadir degradation; c.f. Figure 3 for representative examples of these quality factors. In total, at any given measurement time tk with UAV state xi, the probability of detection field is given by 
+
+pDi,k (ξ) = 1Ef (xi)(ξ) χi,k (ξ), 0 ≤ χi,k (ξ) ≤ 1. (45) Conditional on a positive measurement, we assume a camera-frame angles-only obser-vation model given by 
+
+y = h(ξ; xi) + ν(ξ, x i) = 
+
+atan2( ℓ1, ℓ 3)atan2( ℓ2, ℓ 3)
+
+
+
++ ν(ξ, x i),ℓ =  Cwc (qi)⊺
+
+ ξ
+
+0
+
+
+
+− ri
+
+
+
+, ν ∼ N  0, R (xi | ξ).
+
+(46) 
+
+> 17 Joshua Pilipovsky
+
+Figure 3: Pose-dependent sensing quality examples: (left) Gaussian spread factor G(p; x)with respect to footprint center; (middle) altitude/attitude trade-off βs(x) for a 2x2 sweep of representative heights and angles; (right) the combined field 
+
+χ(p; x) = βs(x)G(p; x) for a fixed vehicle pose. We use the heteroscedastic model R(xi | ξ) = σ2(χi,k (ξ)) I2, with 
+
+σ(χ) = Π [σmin ,σ max ]
+
+
+
+kσ(χ−1/2 − 1) 
+
+
+
+, χ > 0, (47) where kσ > 0, 0 < σ min ≤ σmax , and σ(0) ≜ σmax . The measurement covariance captures the dependence of (angular) localization accuracy on viewing quality. Namely, when χ(ξ)is large, the target is observed under favorable sensing conditions and the corresponding measurement has smaller (angular) uncertainty. Conversely, as χ(ξ) decreases, the target becomes more difficult to resolve and the uncertainty increases. For the linearized Gaussian measurement model with covariance R held fixed, the Fisher information is I = H⊺R−1H,where H = ∂h/∂ξ (Wilson et al., 2014). This inverse-covariance weighting motivates the 
+
+χ−1/2 dependence in σ(χ). 
+
+4.2 Kernelized Ergodic Coverage 
+
+The starting point of the UAV fleet optimization problem is that of the spatial distribution, 
+
+P, which is sought to track. Details on the construction and update of this base distribution, or base density, as we will refer to it henceforth, will be presented in Section 7. In general, it will be a mixture of a UGV-path centered density along with a Gaussian mixture density with respect to existing target tracks, along with a residual undetected PPP density from the previous sensing. In any case, suppose the base distribution P is prescribed to the UAV fleet over the planar rectangular domain Ω = [0 , L 1] × [0 , L 2], and let ϕk denote the corresponding spatial Fourier coefficients. 
+
+> 18 Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+In the traditional setup, over a horizon T > 0, the ordinary empirical occupation measure (cf. (9)) is given by 
+
+μpt  
+
+> T
+
+= 1
+
+T
+
+Z T
+
+> 0
+
+δg
+
+ x(τ )
+
+ dτ ⇐⇒ μpt  
+
+> T
+
+(A) = 1
+
+T
+
+Z T
+
+> 0
+
+1A
+
+
+
+g x(τ )
+
+dτ, (48) where x : [0 , T ] → X is the UAV trajectory, g : X → Ω extracts the planar sensor location from the state, and the right-hand side equivalently shows the action of the trajectory distribution on any measurable set A ⊆ Ω. Thus, μT (A) tells us exactly what fraction of time the sensor point lies in the set A. In the present context, however, we have shown in Section 4.1 that the UAV state x induces the finite sensor footprint Ef (x) ⊆ Ω from (41). Thus, we generalize the point sensor map x 7 → g(x) ∈ Ω to a finite sensor map 
+
+x 7 → νx ∈ P (Ω), where νx can be thought of as the instantaneous spatial sensing measure induced by state x.For the simplest hard, uniformly sensitive footprint, define the sensor footprint distri-bution as 
+
+νx(d ξ) = 1Ef (x)(ξ)
+
+|E f (x)| dξ ⇐⇒ νx(A) = |A ∩ E f (x)||E f (x)| , (49) which is just a uniform distribution over the closed, convex footprint. Now we simply average these instantaneous measures over time to obtain the finite-time occupation measure 
+
+μfT = 1
+
+T
+
+Z T
+
+> 0
+
+νx(τ ) dτ ⇐⇒ μfT (A) = 1
+
+T
+
+Z T
+
+> 0
+
+|A ∩ E f
+
+ x(τ )||E f
+
+ x(τ )| dτ. (50) Although the above construction is a natural generalization of the point-mass sensor foot-print to a pose-aware, spatially varying FoV sensor, it is rather cumbersome to work with in the overall optimization problem due to the discontinuity of the distribution at the footprint boundary ∂Ef . In the most general case, we can abstract away the sensor footprint measure entirely by defining a state-dependent spatial kernel 
+
+K(·; x) ∈ P (Ω) , K(ξ; x) ≥ 0, ∀ξ ∈ Ω,
+
+Z
+
+> Ω
+
+K(ξ; x) d ξ = 1 . (51) Then, define the associated time-averaged sensor occupancy measure as 
+
+μKT = 1
+
+T
+
+Z T
+
+> 0
+
+K ·; x(τ ) dτ ⇐⇒ μKT (A) = 1
+
+T
+
+Z T
+
+> 0
+
+Z
+
+> A
+
+K ξ; x(τ ) dξ dτ. (52) Given the orthonormal Fourier basis functions {Fk} over the rectangular domain Ω as defined in (15), the corresponding coefficients of the generalized occupation measure imme-diately follow as 
+
+ck = 1
+
+T
+
+Z T
+
+> 0
+
+Ψk
+
+ x(τ ) dτ, Ψk(x) ≜
+
+Z
+
+> Ω
+
+K(ξ; x)Fk(ξ) d ξ, (53) where we regard Ψ k as the spectral response corresponding to mode k. To aid in tractability when computing derivatives for SCP (as discussed in Section 3.3), we therefore relax the hard sensor footprint to the Gaussian-smoothed kernel 
+
+K(ξ; xi) = Gi(ξ; xi)
+
+R 
+
+> Ω
+
+Gi(σ; xi) d σ , (54) 
+
+> 19
+
+Joshua Pilipovsky 
+
+Table 2: Comparison of sensor models used to construct the ergodic occupation measure on the search domain Ω. 
+
+Sensor Model Instantaneous Sensing Measure νx Spectral Response Ψk(x)Point Mass νx = δg(x) Ψk(x) = Fk(g(x)) Hard FoV νx(d ξ) = 1Ef (x)(ξ)
+
+|E f (x)| dξ Ψk(x) = 1
+
+|E f (x)|
+
+Z 
+
+> Ef(x)
+
+Fk(ξ) d ξ
+
+Smooth FoV νx(d ξ) = K(ξ; x) d ξ, 
+
+Z
+
+> Ω
+
+K(ξ; x) d ξ = 1 Ψk(x) = 
+
+Z
+
+> Ω
+
+K(ξ; x)Fk(ξ) d ξ
+
+with Gi(·; xi) as defined in (43). Table 2 summarizes the preceding discussion on the various sensor models and shows the progression from the canonical point-mass model to the proposed Gaussian kernel model, i.e., 
+
+δg(x) −→ 1Ef (x)
+
+|E f (x)| −→ G(·; x)
+
+R 
+
+> Ω
+
+G .
+
+4.3 UAV Problem Formulation 
+
+Let Na denote the number of UAVs, indexed by i = 1 , . . . , N a. The sensor footprint occu-pancy Fourier coefficients as defined in (53) can be readily extended to the entire multi-agent UAV fleet by averaging over the set of agents, giving the global occupancy coefficients 
+
+Ck(x) ≜ 1
+
+NaNaX
+
+> i=1
+
+ck,i = 1
+
+NaNaX
+
+> i=1
+
+1
+
+T
+
+Z T
+
+> 0
+
+Ψk
+
+ xi(τ ) dτ. (55) The resulting fleet-level ergodic metric is then given by 
+
+Eˆμ = X
+
+> k∈N20
+
+Λk
+
+ Ck(x) − ϕk
+
+2 ≈ X
+
+> k∈K
+
+Λk
+
+ Ck(x) − ϕk
+
+2, (56) where in practice, we truncate to some maximum number of modes, over the set K ≜
+
+{(k1, k 2) ∈ N20 : 0 ≤ ki ≤ Ki, i = 1 , 2} for some K1, K 2 ∈ N. Since Ck(x) involves the integral of each UAV state over time through the individual coefficients ck,i , it is a bit cumbersome to work with. Instead, we can define the Fourier coefficient accumulator state by ˙ak,i (t) = 1
+
+T Ψk
+
+ xi(t), ak,i (0) = 0 , t ∈ [0 , T ] = ⇒ ck,i = ak,i (T ). (57) This state augmentation follows the auxiliary-state construction in De La Torre et al. (2016) and the extended-state formulation used in RAnGE (Berger and Abraham, 2024). As a result, by stacking the mode-indexed accumulator states as ai ≜ [ak,i ]k∈K ∈ R|K| and defining the fleet-average terminal accumulator τ ≜ Na−1 PNa 
+
+> i=1
+
+ai(T ), the ergodic metric 
+
+20 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+can be equivalently written as the Mayer cost 
+
+Eˆμ(τ ) = ∥τ − ϕ∥2Λ , ˙ai(t) ≜ ga
+
+ xi(t) = 1
+
+T
+
+
+
+Ψ1
+
+ xi(t),
+
+...Ψ|K| 
+
+ xi(t) , t ∈ [0 , T ], (58) with initial conditions ai(0) = 0 |K|× 1. As a result, notice that the objective function has been reformulated as a convex function of the decision variables {ai}Na 
+
+> i=1
+
+and the nonlinearities are relegated into the accumulator dynamics through ga(·). In addition to minimizing the fleet-level ergodic metric as in (56), it is also necessary to maintain safety between neighboring pairs of UAVs. To this end, at each planning instant, we assume an undirected, connected graph G = ( V, E), where two agents {i, j } ∈ E are connected if they are within each other’s communication radius 3, that is, ∥ri − rj ∥ ≤ Dcom ,for some Dcom > 0. We impose geometric separation between UAV pairs as 
+
+∥ri(t) − rj (t)∥2 ≥ dij , {i, j } ∈ E , t ∈ [0 , T ], (59) where dij = Rai + Raj + ∆ > 0, Rai is UAV i’s physical safety radius, and ∆ > 0 is an additional margin. Using the normalized residual in Section 3.4, define 
+
+gij (xi, x j ) ≜ 1 − ∥ri − rj ∥22
+
+d2
+
+> ij
+
+, gc,ij (xi, x j ) ≜ [gij (xi, x j )] 2+.
+
+The pairwise accumulator satisfies ˙ yij = gc,ij with yij (0) = yij (T ) = 0. Define the aug-mented agent state, dynamics, and initial condition by 
+
+zi ≜
+
+xi
+
+ai
+
+
+
+, ˜fi(zi, u i) ≜
+
+fi(Π xzi, u i)
+
+ga(Π xzi)
+
+
+
+, z0,i ≜
+
+ x0,i 
+
+0|K|× 1
+
+
+
+,
+
+where Π x = [ In 0n×|K| ] and Π a = [0 |K|× n I|K| ] select the physical and ergodic states. Let 
+
+ℓai (xi, u i) denote the UAV running cost. The control-effort choice used in the transcription below is ℓai = β 
+
+> 2
+
+u⊺ 
+
+> i
+
+Riui, with β > 0 and Ri ≻ 0; Section 8.1 specifies the hover reference and state regularization used in the simulations. With V = {1, . . . , N a}, the centralized problem is min  
+
+> τ,z,u,y
+
+Ja(z, u, τ ) = 
+
+> Na
+
+X
+
+> i=1
+
+Z T
+
+> 0
+
+ℓai (xi, u i) d t + Eˆμ(τ ),
+
+s.t. ˙zi = ˜fi(zi, u i), zi(0) = z0,i , ∀i ∈ V , ∀t ∈ [0 , T ],
+
+˙yij = gc,ij (Π xzi, Πxzj ), yij (0) = yij (T ) = 0 , ∀{ i, j } ∈ E , ∀t ∈ [0 , T ],
+
+(Π xzi, u i) ∈ X i × U i, ∀i ∈ V , ∀t ∈ [0 , T ],τ = 1
+
+NaNaX
+
+> i=1
+
+Πazi(T ).
+
+(60a) (60b) (60c) (60d) (60e) Here z, u, and y collect the agent and pair trajectories. 
+
+> 3. We assume that the communication radius is large enough so that the resulting graph is connected, and that agents can detect each other well before they need to coordinate.
+
+21 Joshua Pilipovsky 
+
+4.4 UAV Problem Solution 
+
+The objective in (60) is convex in the controls and terminal ergodic accumulators. The nonlinear agent dynamics and pairwise separation dynamics require convexification, while separation and the fleet-average constraint couple the agents. We first transcribe the prob-lem, then identify its local and coupled terms. Fix N ≥ 1, ∆ t = T /N , and the partition tn = n∆t, so that 0 = t0 < · · · < t N = T . On each interval [ tn, t n+1 ), use zero-order-held controls ui(t) = ui,n , with ui(T ) = ui,N −1, and let un = col( {ui,n }i∈V ). Stack the agent and pair states as 
+
+za = col( {zi}i∈V , {yij }{i,j }∈E ), faug (za, u ) = col( { ˜fi(zi, u i)}i, {gc,ij (Π xzi, Πxzj )}{i,j }∈E ).
+
+Assume the augmented dynamics have a unique solution on each interval for the chosen initial state and constant control. The exact flow map gives the state at the end of the interval as 
+
+F an (zan, u n) ≜ ζn(tn+1 ), ˙ζn(t) = faug (ζn(t), u n), ζn(tn) = zan.
+
+We use multiple shooting (Bock and Plitt, 1984) to transcribe the dynamics, treating the node states as independent variables and linking adjacent intervals through the matching equations zan+1 = F an (zan, u n). In practice, we approximate the flow by numerical integration (e.g. RK45). Following Elango et al. (2024, Section 3.1), we allow each accumulator increment to be at most a prescribed tolerance εij,n > 0. These interval bounds replace yij (T ) = 0 and limit the integrated squared separation violation on each interval. Positive tolerances therefore permit residual violation between nodes. The resulting finite-dimensional program is min  
+
+> τ,z a,u
+
+Jd 
+
+> a
+
+(u, τ ) = β∆t
+
+2
+
+> Na
+
+X 
+
+> i=1
+> N−1
+
+X
+
+> n=0
+
+u⊺
+
+> i,n
+
+Riui,n + Eˆμ(τ ),
+
+s.t. zan+1 = F an (zan, u n), ∀n ∈ { 0, . . . , N − 1},zi, 0 = z0,i , ∀i ∈ V , yij, 0 = 0 , ∀{ i, j } ∈ E ,
+
+Πxzi,n ∈ X i, ∀i ∈ V , ∀n ∈ { 0, . . . , N },ui,n ∈ U i, ∀i ∈ V , ∀n ∈ { 0, . . . , N − 1},yij,n +1 − yij,n ≤ εij,n , ∀{ i, j } ∈ E , ∀n ∈ { 0, . . . , N − 1},τ = 1
+
+NaNaX
+
+> i=1
+
+Πazi,N .
+
+(61a) (61b) (61c) (61d) (61e) (61f) (61g) To expose the structure of (61) symmetrically, introduce two copies of each pair’s accu-mulator sequence, that is, 
+
+Y iij ≜ (yiij, 0, . . . , y iij,N ), Y jij ≜ (yjij, 0, . . . , y jij,N ), Y iij = Y jij , ∀{ i, j } ∈ E .
+
+As a result, agent i’s decision vector stacks its state and control nodes and its pair-accumulator copies as 
+
+ϑi ≜ col  zi, 0, . . . , z i,N , u i, 0, . . . , u i,N −1, {Y iij }j∈N i
+
+ ∈ Rdϑ,i ,
+
+22 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+where dϑ,i = ( N + 1)( n + |K| + |N i|) + N m .Define the full decision vector θ = col( τ, ϑ 1, . . . , ϑ Na ), the convex local cost Ji(ϑi) = 
+
+> β∆t
+> 2
+
+PN −1 
+
+> n=0
+
+u⊺
+
+> i,n
+
+Riui,n , and the terminal selector Aiϑi = Π azi,N . Let Π( ϑi) stack the local physical and ergodic shooting defects, and let the convex set Θ i collect the node bounds and initial conditions, including yiij, 0 = 0 and yiij,n +1 − yiij,n ≤ εij,n for every j ∈ N i and 
+
+n = 0 , . . . , N − 1. To define one shared shooting defect per pair, set ¯ yij,n = ( yiij,n + yjij,n )/2and let ¯ zan stack the agent states and these averages. Then 
+
+πij,n (ϑi, ϑ j ) = ¯ yij,n +1 − [F an (¯ zan, u n)] yij , n = 0 , . . . , N − 1,
+
+which depends only on the two agents and their accumulator copies. When the copies agree, their average equals the original accumulator, so the shared defect recovers the shooting equation in (61). Stacking these defects into πij gives the equivalent program min 
+
+> θNa
+
+X
+
+> i=1
+
+Ji(ϑi) + Eˆμ(τ ), (62a) s.t. Π( ϑi) = 0 , ϑi ∈ Θi, i ∈ V , (62b) 
+
+πij (ϑi, ϑ j ) = 0 , {i, j } ∈ E , (62c) 
+
+Y iij = Y jij , ∀{ i, j } ∈ E , (62d) 
+
+τ = 1
+
+NaNaX
+
+> i=1
+
+Aiϑi. (62e) SCvx* linearizes the nonlinear local and pairwise shooting defects while retaining the convex costs, node sets, and copy-agreement constraints. We obtain the required flow Jacobians by integrating the state and control variational equations alongside the reference trajectory on each interval and evaluating them at its endpoint (see Appendix D). Let ˆϑ denote the current reference decision vector. We introduce virtual controls for artificial infeasibility and trust regions for artificial unboundedness, and minimize the augmented Lagrangian as in Section 3.3 to obtain the convex subproblem min 
+
+> τ, ∀i∈V :ϑi,ξ i
+> ∀{ i,j }∈E :ζij
+> Na
+
+X
+
+> i=1
+
+Ji(ϑi) + Eˆμ(τ )+
+
+> Na
+
+X
+
+> i=1
+
+
+
+λ⊺ 
+
+> i
+
+ξi + w
+
+2 ∥ξi∥2
+
++ X
+
+> {i,j }∈E
+
+
+
+μ⊺ 
+
+> ij
+
+ζij + w
+
+2 ∥ζij ∥2
+
+(63a) s.t. Πcvx (ϑi) = ξi, ϑi ∈ Θi, i ∈ V , (63b) 
+
+πcvx  
+
+> ij
+
+(ϑi, ϑ j ) = ζij , {i, j } ∈ E , (63c) 
+
+Y iij = Y jij , ∀{ i, j } ∈ E , (63d) 
+
+∥ϑi − ˆϑi∥∞ ≤ ∆tr , i ∈ V , (63e) 
+
+τ = 1
+
+NaNaX
+
+> i=1
+
+Aiϑi, (63f) 
+
+23 Joshua Pilipovsky 
+
+Here λi and μij are the unrestricted multipliers for the local and pairwise shooting equalities, respectively, and ξi and ζij are their signed virtual controls. Each endpoint copy retains its initial condition and affine increment bounds in Θ i, while copy agreement is enforced explicitly. The shared defect has one virtual control ζij per pair. The objective in (63) depends on the global variable τ , while (63f) couples all agents through a sum of their terminal ergodic accumulators. To distribute the objective, introduce a local copy τi ∈ R|K| 
+
+for each agent i ∈ V and assign it the cost N −1 
+
+> a
+
+Eˆμ(τi), with the copies constrained to agree. To distribute the global sum constraint, introduce directed flows fi→j ∈ R|K| for each j ∈ N i
+
+on G. These flows replace the global sum with local balance equations and antisymmetry between neighbors, through the following constraints 
+
+fi→j + fj→i = 0 , ∀{ i, j } ∈ E (64a) 
+
+X
+
+> j∈N i
+
+fi→j = 1
+
+Na
+
+(Aiϑi − τi), ∀i ∈ V , (64b) 
+
+τi = τj , ∀{ i, j } ∈ E . (64c) For each pair {i, j } ∈ E , also introduce endpoint copies ζiij and ζjij of the shared virtual con-trol ζij , with the same multiplier μij at both endpoints. The local objective and constraints for agent i ∈ V are thus min  
+
+> ϑi,ξ i,τ i
+> ∀j∈N i:fi→j, ζ iij
+
+Ji(ϑi) + 1
+
+Na
+
+Eˆμ(τi) + λ⊺ 
+
+> i
+
+ξi + w
+
+2 ∥ξi∥2 + 12
+
+X
+
+> j∈N i
+
+
+
+μ⊺ 
+
+> ij
+
+ζiij + w
+
+2 ∥ζiij ∥2
+
+(65a) s.t. Πcvx (ϑi) = ξi, ϑi ∈ Θi, (65b) 
+
+πcvx  
+
+> ij
+
+(ϑi, ϑ j ) = ζiij , ∀j ∈ N i, (65c) 
+
+∥ϑi − ˆϑi∥∞ ≤ ∆tr , (65d) 
+
+ζiij − ζjij = 0 , ∀j ∈ N i, (65e) 
+
+Y iij − Y jij = 0 , ∀j ∈ N i, (65f) 
+
+fi→j + fj→i = 0 , ∀j ∈ N i, (65g) 
+
+τi − τj = 0 , ∀j ∈ N i, (65h) 
+
+X
+
+> j∈N i
+
+fi→j − 1
+
+Na
+
+(Aiϑi − τi) = 0 . (65i) 
+
+Proposition 2 (Equivalence at consensus) . On a connected graph, minimizing the sum of the local objectives in (65) subject to all agent constraints is equivalent to (63) . At consensus, identifying the shared copies and eliminating the flows recovers the original problem, with the same optimal value and corresponding minimizers. 
+
+Proof Take a point satisfying (65) for every agent. The coefficient agreement in (64c), together with connectedness of G, gives τi = τ for all i ∈ V . Summing the local balance equations (64b) over all agents therefore gives 
+
+X
+
+> i∈V
+
+X
+
+> j∈N i
+
+fi→j = 1
+
+Na
+
+X
+
+> i∈V
+
+(Aiϑi − τi) = 1
+
+Na
+
+X
+
+> i∈V
+
+Aiϑi − τ. 
+
+24 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+Each unordered edge contributes both directed flows to the left-hand side. Grouping these terms by edge and applying antisymmetry (64a) yields 
+
+X
+
+> i∈V
+
+X
+
+> j∈N i
+
+fi→j = X
+
+> {i,j }∈E
+
+(fi→j + fj→i) = 0 .
+
+Combining the two identities gives τ = N −1
+
+> a
+
+P 
+
+> i∈V
+
+Aiϑi, which is exactly (63f). The virtual-control agreement in (65e) identifies a single ζij for each pair, so (65c) becomes (63c). The local constraints (65b), trust regions (65d), and accumulator agreement (65f) reproduce (63b), (63e), and (63d), respectively. Thus all constraints of (63) are recovered. For the objective, coefficient consensus gives 
+
+X
+
+> i∈V
+
+1
+
+Na
+
+Eˆμ(τi) = Eˆμ(τ ).
+
+Each unordered edge appears twice in the neighbor sums in (65a). At virtual-control con-sensus, its two identical half-weighted terms sum to the single pair penalty in (63a). The local costs Ji and penalties on ξi each appear once, so the sum of the objectives in (65a) equals (63a). The remaining neighbor coupling lies in the pairwise shooting constraint (65c) and the agreement and antisymmetry constraints (65e)–(65h). To separate these constraints, first collect agent i’s decision variables as 
+
+νi ≜ col  ϑi, ξ i, τ i, {fi→j }j∈N i , {ζiij }j∈N i
+
+ ∈ Rdν,i , ∀i ∈ V ,
+
+where dν,i = dϑ,i + N (n + |K| ) + |K| + |N i|(N + |K| ). Let Ji(νi) denote the local objective in (65a). The local constraints (65b), (65d), and (65i) define the convex set 
+
+Ni ≜
+
+νi :Πcvx (ϑi) = ξi, ϑi ∈ Θi, ∥ϑi − ˆϑi∥∞ ≤ ∆tr ,
+
+X
+
+> j∈N i
+
+fi→j = 1
+
+Na
+
+(Aiϑi − τi)
+
+ , ∀i ∈ V . (66) Collect all pairwise equality constraints (65c) and (65e)–(65h) in a single affine map as 
+
+bHij (νi, ν j ) ≜
+
+
+
+πcvx  
+
+> ij
+
+(ϑi, ϑ j ) − ζiij 
+
+Y iij − Y jij 
+
+ζiij − ζjij 
+
+fi→j + fj→i
+
+τi − τj
+
+
+
+, ∀i ∈ V , ∀j ∈ N i. (67) Summing the local objectives and imposing all agent constraints gives min 
+
+> {νi}i∈V
+
+X
+
+> i∈V
+
+Ji(νi),
+
+s.t. νi ∈ Ni, ∀i ∈ V ,
+
+bHij (νi, ν j ) = 0 , ∀i ∈ V , ∀j ∈ N i.
+
+(68) 
+
+25 Joshua Pilipovsky 
+
+To apply graph C-ADMM from Section 3.5, introduce at agent i a copy wi ∈ Rdν,i of its own vector νi and a copy wij ∈ Rdν,j of each neighbor’s vector νj . Evaluate the coupling map on these copies and enforce agreement with the agent vectors: min  
+
+> {νi,w i}i∈V
+> {wij }i∈V , j ∈N i
+
+X
+
+> i∈V
+
+Ji(νi),
+
+s.t. νi ∈ Ni, ∀i ∈ V ,
+
+bHij (wi, w ij ) = 0 , ∀i ∈ V , ∀j ∈ N i,νi = wi, νj = wij , ∀i ∈ V , ∀j ∈ N i.
+
+(69a) (69b) (69c) (69d) At copy agreement, substitution of wi = νi and wij = νj recovers (68). Within each outer SCvx* iteration, graph C-ADMM updates the agent vectors, the local copies, and the dual variables through neighbor communication, as described in Section 3.5. The resulting agent vectors supply the candidate update for the outer SCvx* reference. 
+
+Remark 1 (Computational complexity) . For fixed state and control dimensions and a fixed number of spectral modes, agent i’s primal vector has dν,i = O(N (1 + |N i|)) entries. Thus, with a uniformly bounded number of neighbors, the local primal problem size grows linearly with the horizon and is independent of the total fleet size. Total runtime also depends on the solver and ADMM iteration counts, the consensus updates, and communication. Runtime can be improved by exploiting temporal sparsity and warm-starting successive solves (Wang and Boyd, 2010), while graph-based decomposition enables parallel local computations (Boyd et al., 2011). 
+
+5 RFS Bayesian Inference 
+
+At any given time tk, we use a Poisson multi-Bernoulli (PMB) RFS to approximate the posterior distribution of targets in the domain (Garc´ ıa-Fern´ andez et al., 2018; Williams, 2015). In particular, the PPP RFS is used to capture undetected objects in the domain and is given by Xu ∼ PPP( λ). Repeated sensing of a particular area without any evidence of a target would naturally decay the posterior PPP field and encourage the UGV to plan its resulting trajectory in those areas. Similarly, the MB RFS is used to capture already detected 
+
+targets, and each detected track ℓ admits the Bernoulli RFS Bℓ ∼ BernoulliRFS( rℓ, ρ ℓ). Here, we take the single-target state space to be Xt = R2 and specialize the conditional target belief to a full-space Gaussian, i.e., xℓ | | Bℓ| = 1 ∼ N (μℓ, P ℓ). The initial PPP intensity is supported on Ω, and pD is extended by zero outside Ω. The existence probability 
+
+rℓ quantifies whether the current hypothesis corresponds to a real target, while N (μℓ, P ℓ)quantifies where that target is, if it exists. Hence, at time step k, the posterior RFS is approximated by 
+
+Xk = Xuk ⊔
+
+> Lk
+
+G
+
+> ℓ=1
+
+Bk,ℓ , (70) where Lk ≥ 0 denotes the number of detected (potential) target tracks. 
+
+> 26
+
+Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+Given this ansatz of the PMB posterior form, let us walk through a cycle of the RFS filter, consisting of both a time update and measurement update, just as with a traditional Kalman filter. Starting at sensing epoch k, the UAVs have access to the belief snapshot 
+
+Bk =
+
+
+
+λk, {rk,ℓ , μ k,ℓ , P k,ℓ }Lk
+
+> ℓ=1
+
+
+
+. (71) For prediction, assume independent target motion, unit survival probability, and no births. Let ptr  
+
+> k
+
+(ξ | ξ′) denote the transition density from position ξ′ at tk−1 to position ξ at tk. We assume this motion model applies to both detected and undetected targets. The Bernoulli existence parameters remain r− 
+
+> k,ℓ
+
+= r+
+
+> k−1,ℓ
+
+, while the target densities and undetected-target intensity propagate as (Garc´ ıa-Fern´ andez et al., 2018) 
+
+ρ−
+
+> k,ℓ
+
+(ξ) = 
+
+Z
+
+> Xt
+
+ptr  
+
+> k
+
+(ξ | ξ′)ρ+
+
+> k−1,ℓ
+
+(ξ′) d ξ′, ∀ℓ ∈ { 1, . . . , L k−1},λ− 
+
+> k
+
+(ξ) = 
+
+Z
+
+> Xt
+
+ptr  
+
+> k
+
+(ξ | ξ′)λ+
+
+> k−1
+
+(ξ′) d ξ′, ∀ξ ∈ X t.
+
+Let xk,ℓ ∈ R2 denote the random position of target ℓ at tk, conditional on its existence. For an affine Gaussian motion model, take 
+
+xk,ℓ = F t 
+
+> k
+
+xk−1,ℓ + bt 
+
+> k
+
++ ηk,ℓ , ηk,ℓ ∼ N (0 , Q k),
+
+where F t 
+
+> k
+
+∈ R2×2 is the transition matrix, bt 
+
+> k
+
+∈ R2 is a known displacement, and the process noise is independent of the preceding target state, with Qk ⪰ 0. For Qk ≻ 0, this model gives the transition density 
+
+ptr  
+
+> k
+
+(ξ | ξ′) = N  ξ; F t 
+
+> k
+
+ξ′ + bt
+
+> k
+
+, Q k
+
+ , ξ, ξ ′ ∈ X t.
+
+Substituting this transition density into the target-density prediction gives 
+
+μ− 
+
+> k,ℓ
+
+= F t 
+
+> k
+
+μ+ 
+
+> k−1,ℓ
+
++ bt
+
+> k
+
+,P − 
+
+> k,ℓ
+
+= F t 
+
+> k
+
+P +
+
+> k−1,ℓ
+
+(F t 
+
+> k
+
+)⊺ + Qk, ∀ℓ ∈ { 1, . . . , L k−1}. (72) 
+
+Remark 2 (Special cases of target motion) . Setting F t 
+
+> k
+
+= I2 and bt 
+
+> k
+
+= 0 gives the random-walk model with covariance inflation Qk. If also Qk = 0 , the targets are static, the transition is a point mass at ξ′, and both ρ− 
+
+> k,ℓ
+
+= ρ+ 
+
+> k−1,ℓ
+
+and λ− 
+
+> k
+
+= λ+
+
+> k−1
+
+. For nonlinear motion, the same prediction integrals apply, but retaining Gaussian target beliefs generally requires a moment approximation. 
+
+Given the sensor probability of detection along with its measurement model from Sec-tion 4.1, we can naturally encompass both these aspects into a unified observation RFS. To see this, note that an object measurement only happens conditional on its detection. Hence, this phenomenon is precisely described by a Bernoulli RFS; letting Yi,k (ξ) denote the target-generated measurement RFS for a target at position ξ ∈ X t (with pDi,k (ξ) = 0 outside Ω), we have 
+
+Yi,k (ξ) = 
+
+(
+
+∅, w.p. 1 − pDi,k (ξ),
+
+{Z}, Z ∼ gi,k (· | ξ) w.p. p Di,k (ξ), (73) 
+
+27 Joshua Pilipovsky 
+
+Here gi,k (z | ξ) is the measurement density conditional on detecting a target at ξ. From the angles-only model (46), it is 
+
+gi,k (z | ξ) = N (z; h(ξ; xi(tk)) , R (xi(tk) | ξ)) , z ∈ R2.
+
+The detection probability pDi,k (ξ) is accounted for separately in the Bernoulli observation model above. In vision-based sensors, it is also possible to obtain spurious measure-ments (e.g., false positives), which we call clutter, and we model this phenomenon as 
+
+Ci,k ∼ PPP( κi,k ) in measurement space, with a finite intensity function κi,k . Assuming independent clutter and target-generated measurement RFSs, the complete sensor set at sensing epoch k is their RFS superposition 
+
+Zi,k = Ci,k ⊔ G
+
+> ξ∈X−
+> k
+
+Yi,k (ξ). (74) Notice that due to this construction, (74) is necessarily a random union; conditioned on one target-set realization X = {x1, . . . , x n}, the random union contains exactly n target-generated Bernoulli RFSs. For clarity, the update below is written for one sensor and suppresses the indices ( i, k ), so pD ≡ pDi,k , g ≡ gi,k , and κ ≡ κi,k ; multiple conditionally independent sensors may be incorporated through sequential updates or an equivalent joint likelihood. Let the corresponding observed measurement set be Zk = {z1, . . . , z m}, write 
+
+m = mk, and let L denote the number of predicted existing tracks at this update. The local update construction consists of three ingredients, followed by association and marginaliza-tion. 
+
+5.1 Posterior component updates 
+
+First, we have to update the existing parameters of the PPP and MB RFSs with the informa-tion of the new measurement Zk. For the PPP, we perform an operation called “thinning”, whereby we subtract intensity from the PPP in exactly the places where detections did not occur. Explicitly, define qD(ξ) ≜ 1 − pD(ξ) as the probability of not detecting a target at 
+
+ξ ∈ X t. A target remains in the never-detected population only if it is missed, hence the identity 
+
+λ+ 
+
+> k
+
+(ξ) = qD(ξ)λ− 
+
+> k
+
+(ξ). (75) This is the independent-thinning property of a PPP (Last and Penrose, 2017), and an example is illustrated in Figure 4 for a simple lawnmower sweep pattern over a uniform prior intensity λ− ∼ U (Ω). 
+
+> 28 Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+Figure 4: Undetected target intensity λ+(ξ) Poisson point process thinning during UAV execution and sensing. For each existing track ℓ, let Eℓ be the event that the target exists and Dℓ the event that it is detected by the current sensor. Conditional on Eℓ, its position has density ρ− 
+
+> ℓ
+
+, and 
+
+P(Eℓ) = r− 
+
+> ℓ
+
+. The detection model gives P(Dℓ | Eℓ, xℓ = ξ) = pD(ξ). All branch probabilities below are conditioned on the prior information available before this measurement update. The local hypothesis Aℓ, 0 assigns no measurement to track ℓ. It is the disjoint union 
+
+Aℓ, 0 = Ecℓ ⊔ (Eℓ ∩ Dcℓ ),
+
+because the target is either absent or present but missed. 
+
+> 29
+
+Joshua Pilipovsky 
+
+For j ∈ {1, . . . , m }, the local hypothesis Aℓ,j assigns measure-ment zj to track ℓ. Let Zℓ de-note the target-generated mea-surement vector, defined when 
+
+Eℓ ∩ Dℓ occurs. In differential event notation, this hypothesis is 
+
+Aℓ,j = Eℓ ∩ Dℓ ∩ { Zℓ ∈ dzj }.
+
+The notation Zℓ ∈ dzj represents a measurement in an infinitesi-mal neighborhood of zj , so its ev-idence is a density with respect to d zj . For an observed mea-surement zj , let Uj be the hy-pothesis that no existing track generated it. Let Anew 
+
+j denote the hypothesis that it is the first detection of a previously unde-tected target, and let Acl 
+
+j denote the hypothesis that it is clutter. These source hypotheses distin-guish the two ways an unassigned measurement can arise. Fig-ure 5 summarizes the local event decompositions, global associa-tion, and posterior marginaliza-tion. We next compute the ev-idence for each local hypothesis and apply Bayes’ rule to obtain its posterior parameters. 1 Local branch updates                                 
+
+> PPP thinning
+> λ−(ξ)qD(ξ) = 1 −pD(ξ)λ+(ξ) = qD(ξ)λ−(ξ)
+> existing-track branches, ℓ= 1 , . . . , L
+> (r−
+> ℓ, ρ −
+> ℓ)
+> no assignment
+> Aℓ, 0
+> assign zj
+> Aℓ,j
+> Ecℓ
+> Eℓ∩Dcℓ
+> ⊔(r0
+> ℓ, ρ 0
+> ℓ)
+> Eℓ∩Dℓ∩ { Zℓ∈dzj}(rjℓ= 1 , ρ jℓ)
+> new-target / clutter alternatives, j= 1 , . . . , m
+> zjUj=
+
+⋂Lℓ=1 Acℓ,j       
+
+> Anew
+> j
+> evidence ej
+> Acl
+> j
+> evidence κ(zj)
+> ⊔(rnew
+> j, ρ new
+> j)
+
+2 Global hypotheses            
+
+> Θinj :θ:{1, . . . , L } −→ { 0, . . . , m }
+> gate Θgate ⊆Θinj
+> predicted measurements and gates Gℓ
+> retained hypotheses
+> H=|Θret |
+> PMB θ1PMB θ2PMB θH· · ·
+
+∑       
+
+> θ∈Θret
+> WθPMB θ
+> joint posterior PMBM
+> Wθ1Wθ2WθH
+
+3 Posterior marginalization    
+
+> marginalize
+> βℓ,j , γ j
+> B+=
+
+(λ+, {r+    
+
+> ℓ, ρ +
+> ℓ},
+> {rnew ,+
+> j, ρ new ,+
+> j}
+
+)
+
+> prune low-existence components Gaussian moment matching
+
+Figure 5: RFS measurement update for one sensor. The conditional probability of a missed detection is ¯qDℓ = P(Dcℓ | Eℓ)=
+
+Z
+
+Xt
+
+qD(ξ)ρ−
+
+ℓ (ξ) d ξ. (76) Adding the probabilities of the two disjoint events gives the branch evidence 
+
+aℓ, 0 = P(Aℓ, 0)= P(Ecℓ ) + P(Eℓ ∩ Dcℓ )= (1 − r−
+
+ℓ ) + r−
+
+ℓ ¯qDℓ .
+
+(77) 
+
+30 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+Since Eℓ ∩ A ℓ, 0 = Eℓ ∩ Dcℓ , the joint contribution from a present but missed target is 
+
+P(xℓ ∈ dξ, D cℓ | Eℓ) = qD(ξ)ρ− 
+
+> ℓ
+
+(ξ) d ξ. 
+
+Bayes’ rule then gives 
+
+r0 
+
+> ℓ
+
+= P(Eℓ | A ℓ, 0) = r− 
+
+> ℓ
+
+¯qDℓ
+
+aℓ, 0
+
+, ρ0 
+
+> ℓ
+
+(ξ) = qD(ξ)ρ− 
+
+> ℓ
+
+(ξ)¯qDℓ
+
+. (78) Here ρ0 
+
+> ℓ
+
+is the position density conditional on Eℓ ∩ A ℓ, 0. Branches with zero evidence are omitted. If ¯ qDℓ = 0 < a ℓ, 0, the branch has zero existence probability and does not require a conditional position density. For the assignment hypothesis Aℓ,j , the joint state and measurement contribution is 
+
+P(xℓ ∈ dξ, Aℓ,j ) = r− 
+
+> ℓ
+
+ρ− 
+
+> ℓ
+
+(ξ)pD(ξ)g(zj | ξ) d ξ dzj .
+
+Integrating out the target position gives P(Aℓ,j ) = aℓ,j dzj , where 
+
+Lℓj =
+
+Z
+
+> Xt
+
+pD(ξ)g(zj | ξ)ρ− 
+
+> ℓ
+
+(ξ) d ξ, aℓ,j = r− 
+
+> ℓ
+
+Lℓj . (79) Since Aℓ,j ⊆ Eℓ, the target exists under this hypothesis. Dividing the joint contribution by the branch evidence gives 
+
+rjℓ = P(Eℓ | A ℓ,j ) = 1 , ρjℓ (ξ) = pD(ξ)g(zj | ξ)ρ− 
+
+> ℓ
+
+(ξ)
+
+Lℓj 
+
+. (80) Thus, the posterior accounts for the intersection of target existence, detection, and the observed measurement. The new-target and clutter hypotheses are disjoint and exhaust Uj , so 
+
+Uj =
+
+> L
+
+\
+
+> ℓ=1
+
+Acℓ,j = Anew  
+
+> j
+
+⊔ A cl  
+
+> j
+
+, Anew  
+
+> j
+
+∩ A cl  
+
+> j
+
+= ∅.
+
+The undetected-target intensity λ− 
+
+> k
+
+(ξ), detection probability pD(ξ), and measurement den-sity g(zj | ξ) give the joint new-target evidence density 
+
+pD(ξ)g(zj | ξ)λ− 
+
+> k
+
+(ξ).
+
+Integrating over the possible target positions gives the evidence for Anew  
+
+> j
+
+,
+
+ej =
+
+Z
+
+> Xt
+
+pD(ξ)g(zj | ξ)λ− 
+
+> k
+
+(ξ) d ξ. (81) The evidence for Acl  
+
+> j
+
+is κ(zj ). By Poisson superposition, these source intensities add to give the local evidence ej + κ(zj ) for an unassigned measurement (Garc´ ıa-Fern´ andez et al., 2018). Bayes’ rule therefore gives the source probabilities 
+
+P(Anew  
+
+> j
+
+| U j , z j ) = ej
+
+ej + κ(zj ) , P(Acl  
+
+> j
+
+| U j , z j ) = κ(zj )
+
+ej + κ(zj ) .
+
+31 Joshua Pilipovsky 
+
+A new target exists only under Anew  
+
+> j
+
+. Its Bernoulli existence probability and its position density conditional on that hypothesis are therefore 
+
+rnew  
+
+> j
+
+= ej
+
+ej + κ(zj ) , ρnew  
+
+> j
+
+(ξ) = pD(ξ)g(zj | ξ)λ− 
+
+> k
+
+(ξ)
+
+ej
+
+. (82) If ej = 0 < κ (zj ), only the clutter hypothesis remains and the conditional target density is immaterial. If ej + κ(zj ) = 0, the unassigned-measurement branch is omitted. Each measurement defines a candidate new Bernoulli component whose final existence probability also depends on whether the global association leaves it unassigned. Before constructing global hypotheses, we discard track–measurement pairs that fail a statistical gate. For a Gaussian track ℓ, define the predicted measurement ˆ zℓ, measurement Jacobian Hℓ, and innovation covariance Sℓ by ˆzℓ = h(μ− 
+
+> ℓ
+
+), Hℓ = ∂h ∂ξ μ−
+
+> ℓ
+
+, Sℓ = HℓP − 
+
+> ℓ
+
+H⊺ 
+
+> ℓ
+
++ R. 
+
+Here the sensor pose is fixed, and R is evaluated at the predicted target position μ− 
+
+> ℓ
+
+. Under the local Gaussian approximation, the squared normalized innovation 
+
+d2 
+
+> ℓj
+
+≜ (zj − ˆzℓ)⊺S−1 
+
+> ℓ
+
+(zj − ˆzℓ)is approximately χ2 
+
+> nz
+
+distributed when zj is generated by track ℓ, with nz = 2 for the two-angle measurement (Bar-Shalom et al., 2001). For a gate probability 1 − αgate , retain the measurement indices 
+
+Gℓ ≜ j ∈ { 1, . . . , m } : d2 
+
+> ℓj
+
+≤ χ2 
+
+> nz
+
+(1 − αgate ) .
+
+The threshold χ2 
+
+> nz
+
+(1 − αgate ) is the corresponding chi-square quantile. Each track retains 
+
+Aℓ, 0 and the assignment hypotheses Aℓ,j with j ∈ G ℓ.
+
+5.2 Global Association Hypotheses 
+
+A global hypothesis is a map 
+
+θ : {1, . . . , L } → { 0, 1, . . . , m },
+
+which selects Aℓ, 0 when θ(ℓ) = 0 and Aℓ,j when θ(ℓ) = j. A structurally admissible map has positive assignments that are injective 4, meaning a measurement zj cannot be assigned to two existing tracks simultaneously. Let Θ inj denote the set of all such positive-injective maps and define its statistically gated subset as Θgate ≜ θ ∈ Θinj : θ(ℓ) ∈ { 0} ∪ G ℓ, ∀ℓ ∈ { 1, . . . , L } .
+
+If computational truncation is required, let Θ ret ⊆ Θgate be the retained bounded set of high-weight hypotheses; otherwise, set Θ ret = Θ gate . Define U (θ) ≜ {1, . . . , m }\{ θ(ℓ) : θ(ℓ) > 0}
+
+as the subset of measurements unassigned to existing tracks. For a fixed association θ,          
+
+> 4. Formally, if ℓ1̸=ℓ2and θ(ℓ1), θ (ℓ2)>0, then θ(ℓ1)̸=θ(ℓ2).
+
+32 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+independence of the prior components gives the product of the selected local evidences. The common Poisson factor cancels when these weights are normalized, giving ˜W θ =
+
+> L
+
+Y
+
+> ℓ=1
+
+aℓ,θ (ℓ)
+
+Y 
+
+> j∈U(θ)
+
+ ej + κ(zj ),W θ = ˜W θ
+
+P
+
+> θ′∈Θret
+
+˜W θ′ , θ ∈ Θret .
+
+(83) When Θ ret ⊊ Θgate , the normalized weights are conditional on the retained set. Each retained association hypothesis θ defines one PMB posterior RFS; their weighted sum is generally a PMB mixture (PMBM). The final step marginalizes this retained PMBM to obtain the PMB posterior approximation. 
+
+5.3 Marginalization 
+
+For each existing track ℓ = 1 , . . . , L , define the weights 
+
+βℓ, 0 = X 
+
+> θ∈Θret :θ(ℓ)=0
+
+W θ, βℓ,j = X 
+
+> θ∈Θret :θ(ℓ)= j
+
+W θ,
+
+as the aggregate weights corresponding to no measurement associations, and measurement-
+
+j associations. For each existing track, βℓ, 0 +Pmj=1 βℓ,j = 1. Likewise, for each measurement 
+
+j = 1 , . . . , m , define 
+
+γj = X  
+
+> θ∈Θret :j∈U(θ)
+
+W θ,
+
+as the probability that it is unused by all existing tracks. The next result gives the posterior marginalized PMB approximation of the resulting PMBM. 
+
+Proposition 3. The marginalized posterior MB RFS of existing and new tracks is 
+
+r+ 
+
+> ℓ
+
+= βℓ, 0r0 
+
+> ℓ
+
++
+
+> m
+
+X
+
+> j=1
+
+βℓ,j , rnew ,+ 
+
+> j
+
+= γj
+
+ej
+
+ej + κ(zj ) , (84) 
+
+ρ+ 
+
+> ℓ
+
+(ξ) = βℓ, 0r0 
+
+> ℓ
+
+ρ0 
+
+> ℓ
+
+(ξ) + Pmj=1 βℓ,j ρjℓ (ξ)
+
+r+
+
+> ℓ
+
+, ρnew ,+ 
+
+> j
+
+= ρnew  
+
+> j
+
+. (85) 
+
+Proof All probabilities in this proof refer to the posterior mixture over the retained hypotheses, whose weights satisfy P 
+
+> θ∈Θret
+
+W θ = 1. Under a fixed hypothesis θ, existing track ℓ has the Bernoulli parameters ( rθ(ℓ) 
+
+> ℓ
+
+, ρ θ(ℓ) 
+
+> ℓ
+
+). The law of total probability therefore gives 
+
+r+ 
+
+> ℓ
+
+= X
+
+> θ∈Θret
+
+W θrθ(ℓ) 
+
+> ℓ
+
+= βℓ, 0r0 
+
+> ℓ
+
++
+
+> m
+
+X
+
+> j=1
+
+βℓ,j ,
+
+where we grouped hypotheses by θ(ℓ) and used rjℓ = 1 from (80) for every retained assign-ment branch. This proves the existing-track existence formula in (84). 
+
+33 Joshua Pilipovsky 
+
+For a Bernoulli component, rρ (ξ) d ξ is the joint probability that the target exists and lies in d ξ. A branch with zero existence probability contributes zero to this joint density. Averaging this joint probability over the same hypotheses gives 
+
+r+ 
+
+> ℓ
+
+ρ+ 
+
+> ℓ
+
+(ξ) = X
+
+> θ∈Θret
+
+W θrθ(ℓ) 
+
+> ℓ
+
+ρθ(ℓ) 
+
+> ℓ
+
+(ξ)= βℓ, 0r0 
+
+> ℓ
+
+ρ0 
+
+> ℓ
+
+(ξ) + 
+
+> m
+
+X
+
+> j=1
+
+βℓ,j ρjℓ (ξ).
+
+When r+ 
+
+> ℓ
+
+> 0, division by r+ 
+
+> ℓ
+
+gives the existing-track density in (85). The remaining probability is 1 − r+ 
+
+> ℓ
+
+and corresponds to the empty set, so this marginal is a Bernoulli RFS. Consider a candidate new component with ej + κ(zj ) > 0; candidates with zero local evidence are omitted as specified in the local update. The component associated with zj
+
+is present only in hypotheses with j ∈ U (θ). In each such hypothesis it has the same parameters ( rnew  
+
+> j
+
+, ρ new  
+
+> j
+
+), and in every other hypothesis it is empty. Consequently, 
+
+rnew ,+ 
+
+> j
+
+= X  
+
+> θ∈Θret :j∈U(θ)
+
+W θrnew  
+
+> j
+
+= γj rnew  
+
+> j
+
+,rnew ,+ 
+
+> j
+
+ρnew ,+ 
+
+> j
+
+(ξ) = γj rnew  
+
+> j
+
+ρnew  
+
+> j
+
+(ξ).
+
+Substituting rnew  
+
+> j
+
+= ej /(ej + κ(zj )) proves the new-track existence formula in (84). For 
+
+rnew ,+ 
+
+> j
+
+> 0, division in the second identity gives ρnew ,+ 
+
+> j
+
+= ρnew  
+
+> j
+
+, as stated in (85). Com-ponents with zero existence probability are empty almost surely and need no conditional position density. Taking the resulting Bernoulli marginals to be independent gives the stated MB approximation, preserving the individual component marginals while discarding their association dependence. If r+ 
+
+> ℓ
+
+= 0, the corresponding Bernoulli component is omitted and its conditional density need not be defined. 
+
+Corollary 1. Assume r+ 
+
+> ℓ
+
+> 0. Approximate each retained local branch with a Gaussian 
+
+(μℓ,b , P ℓ,b ), set the weights of branches absent from the retained hypotheses to zero, and define the existence-conditioned branch weights 
+
+αℓ, 0 = βℓ, 0r0
+
+> ℓ
+
+r+
+
+> ℓ
+
+, αℓ,j = βℓ,j 
+
+r+
+
+> ℓ
+
+, j = 1 , . . . , m. 
+
+The posterior Gaussian belief state under moment matching is 
+
+μ+ 
+
+> ℓ
+
+= X
+
+> b∈{ 0,1,...,m }
+
+αℓ,b μℓ,b , (86) 
+
+P + 
+
+> ℓ
+
+= X
+
+> b∈{ 0,1,...,m }
+
+αℓ,b 
+
+Pℓ,b + ( μℓ,b − μ+ 
+
+> ℓ
+
+)( μℓ,b − μ+ 
+
+> ℓ
+
+)⊺ . (87) 
+
+Proof Conditioning the branch probabilities on target existence gives the weights αℓ,b by Bayes’ rule. They are nonnegative, and (84) gives 
+
+> m
+
+X
+
+> b=0
+
+αℓ,b = βℓ, 0r0 
+
+> ℓ
+
++ Pmj=1 βℓ,j 
+
+r+
+
+> ℓ
+
+= 1 .
+
+34 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+Terms with zero weight are omitted from the following sums, so those branches require no moments. Substituting the Gaussian branch approximations into (85) therefore gives the conditional Gaussian mixture 
+
+ρ+ 
+
+> ℓ
+
+(ξ) ≈
+
+> m
+
+X
+
+> b=0
+
+αℓ,b N (ξ; μℓ,b , P ℓ,b ).
+
+Integrating ξ against this mixture gives 
+
+μ+ 
+
+> ℓ
+
+=
+
+> m
+
+X
+
+> b=0
+
+αℓ,b 
+
+Z
+
+> Xt
+
+ξ N (ξ; μℓ,b , P ℓ,b ) d ξ =
+
+> m
+
+X
+
+> b=0
+
+αℓ,b μℓ,b ,
+
+which is (86). Within branch b, write xℓ − μ+ 
+
+> ℓ
+
+= ( xℓ − μℓ,b ) + ( μℓ,b − μ+ 
+
+> ℓ
+
+). The first term has zero conditional mean, so the cross terms vanish when the centered outer product is averaged within that branch. Thus its contribution to the covariance about μ+ 
+
+> ℓ
+
+is 
+
+Z
+
+> Xt
+
+(ξ − μ+ 
+
+> ℓ
+
+)( ξ − μ+ 
+
+> ℓ
+
+)⊺N (ξ; μℓ,b , P ℓ,b ) d ξ = Pℓ,b + ( μℓ,b − μ+ 
+
+> ℓ
+
+)( μℓ,b − μ+ 
+
+> ℓ
+
+)⊺.
+
+Averaging these contributions with weights αℓ,b gives (87). The Gaussian N (μ+ 
+
+> ℓ
+
+, P + 
+
+> ℓ
+
+) there-fore matches the first two moments of the branch mixture. In practice, a small rnew ,+ 
+
+> j
+
+indicates clutter or a measurement likely used by an existing track, and such components are pruned and discarded from the set. Similarly, a decaying 
+
+r+ 
+
+> ℓ
+
+indicates a confirmed track that most likely does not exist, and is also pruned below a configurable threshold. In summary, the output target distribution arising from each measurement event is a new PMB posterior given by 
+
+X+ 
+
+> k
+
+= Xu, + 
+
+> k
+
+⊔
+
+> L+
+> k
+
+G
+
+> ℓ=1
+
+ˆB+ 
+
+> k,ℓ
+
+⊔
+
+> m+
+> k
+
+G
+
+> j=1
+
+ˆBnew ,+ 
+
+> k,j
+
+, (88) where L+ 
+
+> k
+
+≤ Lk−1 denotes the remaining existing Bernoulli tracks, and m+ 
+
+> k
+
+≤ mk denotes the retained new Bernoulli tracks. The above approximation preserves each Bernoulli first-order marginal of the retained PMBM approximation but replaces the global association dependence with independence among the output Bernoulli RFSs (Williams, 2015). 
+
+6 UGV Risk-Aware Planning 
+
+The ground vehicles are tasked with safely navigating an unknown planar environment filled with targets. At each planning instant, the UGV fleet receives the latest poste-rior RFS Xk, containing the distribution of the already-detected target tracks, in the form of an MB RFS ⊔Lk
+
+> j=1
+
+Bk,j , Bk,j ∼ BernoulliRFS( rk,j , ρ k,j ) with Gaussian belief states 
+
+ρk,j (ξ) = N (ξ; μk,j , P k,j ), along with the posterior distribution of undetected targets, in the form of a PPP Xuk ∼ PPP( λk) with associated intensity function λk(ξ), ξ ∈ Ω. Given this 
+
+35 Joshua Pilipovsky 
+
+information, the UGV team’s responsibilities are three-fold: (i) to safely plan around the detected threats; (ii) to enforce inter-agent collision avoidance constraints with neighbors, and (iii) to navigate through regions of the domain with low residual threat of unknown targets. In the following, we rigorously formulate this risk-sensitive joint trajectory opti-mization problem and subsequently present a fully decentralized method akin to that of the UAV team in Section 4, based on SCP and C-ADMM, to seek candidate local solutions. 
+
+6.1 UGV Problem Formulation 
+
+At each planning epoch, consider the graph G = ( V, E) composed of UGV nodes and connected by edges if agent i and agent j can communicate with each other. As before, we assume G is connected, and that the communication radius ∆ com > 0 is large enough so that agents detect each other well before the need for coordination. For each UGV j = 1 , . . . , N g,we use an acceleration-unicycle model, defined by the state xj ≜ [p⊺ 
+
+> j
+
+, ψ j , v j ]⊺ ∈ R4, control input uj = [ aj , ω j ]⊺ ∈ R2, and dynamics ˙xj = f gj (xj , u j ) ≜
+
+
+
+vj cos ψj
+
+vj sin ψj
+
+ωj
+
+aj
+
+ , j ∈ V , (89) over a planning horizon t ∈ [0 , T ]. Here pj ∈ R2 is position, ψj is heading, vj is speed, and 
+
+aj and ωj are the commanded acceleration and turn rate. We constrain the velocities and accelerations of the vehicle within some maximum bounds, and further define an equivalent physical UGV radius Rgj > 0 for all j = 1 , . . . , N g, which must stay in the search domain Ω. Assuming Ω is convex, aggregating all of these convex constraints gives the constraint set Ξj ≜
+
+(
+
+(x, u ) ∈ R4 × R2 : 0 ≤ v ≤ vj, max , |a| ≤ aj, max ,
+
+|ω| ≤ ωj, max , p ∈ Ω ⊖ B(0 , R gj )
+
+)
+
+. (90) For brevity, we will also sometimes use the shorthand Ω j ≜ Ω ⊖ B(0 , R gj ) as the domain containment set for the UGV’s position, and write Ξ xj ≜ proj x Ξj for the admissible-state projection. 
+
+Threat avoidance Since each detected target track is a Gaussian belief, we can consider the associated confidence set as in the following proposition; confidence-set approximations of this kind are standard in chance constrained obstacle avoidance (Blackmore et al., 2011). 
+
+Proposition 4. Given ξ ∼ N (μ, Σ) with mean μ ∈ Rd, covariance matrix Σ ≻ 0, and 
+
+δ ∈ (0 , 1) , let χ2
+
+> d
+
+(1 − δ) denote the (1 − δ) quantile of a chi-squared random variable with d
+
+degrees of freedom. The associated uncertainty set 
+
+Cδ ≜
+
+n
+
+ξ ∈ Rd : ( ξ − μ)⊺Σ−1(ξ − μ) ≤ χ2
+
+> d
+
+(1 − δ)
+
+o
+
+, (91) 
+
+contains exactly probability 1 − δ, that is, P(ξ ∈ C δ) = 1 − δ. We refer to Cδ as the 1 − δ
+
+confidence set of N (μ, Σ) .
+
+> 36
+
+Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+For each threat ℓ = 1 , . . . , L k, conditional on its existence, we construct the associated confidence set Cδℓ . Let dclr  
+
+> jℓ
+
+= Rgj + Rt 
+
+> ℓ
+
++ ∆ t 
+
+> jℓ
+
+> 0, where Rt 
+
+> ℓ
+
+≥ 0 is the target radius and ∆t 
+
+> jℓ
+
+≥ 0 is an additional clearance margin. We then aim to enforce the continuous-time constraints 
+
+pj (t) /∈
+
+> Lk
+
+[
+
+> ℓ=1
+
+
+
+Cδℓ ⊕ B(0 , d clr  
+
+> jℓ
+
+)
+
+
+
+, j ∈ V , t ∈ [0 , T ]. (92) A simultaneous confidence budget ϵth ∈ (0 , 1) can be allocated by requiring PLk 
+
+> ℓ=1
+
+rk,ℓ δℓ ≤
+
+ϵth . By the union bound, the probability that any existing track lies outside its confidence set is then at most ϵth .
+
+Collision avoidance As for the UAVs, we impose geometric separation between UGV pairs: 
+
+∥pi(t) − pj (t)∥2 ≥ dij , {i, j } ∈ E , t ∈ [0 , T ],
+
+where dij = Rgi + Rgj + ∆ > 0 includes the UGV safety radii and an additional margin. The planning graph must again include every pair that could violate separation during the horizon. We use the shared isoperimetric construction in Section 3.4 with si = pi. With Πp = [ I2 02×2], define 
+
+ggij (xi, x j ) ≜ 1 − ∥Πpxi − Πpxj ∥22
+
+d2
+
+> ij
+
+, ggc,ij (xi, x j ) ≜ [ggij (xi, x j )] 2+.
+
+The separation constraints are equivalently represented by ˙yij = ggc,ij (xi, x j ), yij (0) = yij (T ) = 0 , ∀{ i, j } ∈ E . (93) Stacking the physical states and pair accumulators gives 
+
+zg ≜ col( {xi}i∈V , {yij }{i,j }∈E ) ∈ Rdg , dg = 4 Ng + |E| .
+
+For u = col( {ui}i) ∈ R2Ng , define the augmented vector field and initial state by 
+
+f g
+
+> aug
+
+(zg, u ) ≜ col( {f gi (xi, u i)}i∈V , {ggc,ij (xi, x j )}{i,j }∈E ),zg 
+
+> 0
+
+≜ col( {x0,i }i∈V , 0|E|× 1).
+
+Void Probability For a given UGV path p(t), t ∈ [0 , T ], let Γ( p) ≜ {p(t) ∈ R2 : t ∈
+
+[0 , T ]} be its geometric trace. Consider the swept corridor around the path, defined as 
+
+Cρ(p) = {ξ ∈ Ω : dist  ξ, Γ( p) ≤ ρ}, (94) where ρ > 0 is the corridor radius. Given the posterior PPP intensity λk at time step k,the expected PPP count in the corridor is Λk(p) = 
+
+Z
+
+> Cρ(p)
+
+λk(ξ) d ξ. (95) 
+
+37 Joshua Pilipovsky 
+
+Similarly, for posterior Bernoulli component j, define 
+
+qk,j (p) = 
+
+Z
+
+> Cρ(p)
+
+ρk,j (ξ) d ξ, (96) from which it follows that rk,j qk,j (p) is the probability that track j exists and lies in the corridor. Under the assumed PMB independence approximation, the probability that the corridor contains no targets is 
+
+P0,k (p) = exp   − Λk(p) LkY
+
+> j=1
+
+ 1 − rk,j qk,j (p). (97) We call the probability in (97) the void probability , as it represents the probability that there are no targets in the corridor under the current target belief Bk. As a result, it is natural to want the UGV path to maximize this void probability, so that it navigates through well-explored areas of the domain that have a low likelihood of containing targets. For optimization, however, it is more convenient to use the negative log-void form, that is, 
+
+Hk(p) = − log P0,k (p) = Λ k(p) − X
+
+> j
+
+log  1 − rk,j qk,j (p), (98) which is additive in all the individual component terms and is understood as + ∞ if any factor 1 − rk,j qk,j (p) vanishes. We may choose to either minimize Hk(p) in the objective function (as a soft constraint) or alternatively enforce the chance constraint 
+
+P(|Xk ∩ C ρ(p)| = 0) ≥ 1 − ϵ ⇐⇒ H k(p) ≤ − log(1 − ϵ), (99) with respect to a risk level ϵ ∈ (0 , 0.5]. In this work, we choose the soft constraint version to avoid issues of infeasibility for a given risk level ϵ. For agent i, let Hk,i (pi) denote (98) evaluated on its corridor Cρi (pi). Let X goal  
+
+> i,T
+
+denote a prescribed nonempty closed convex terminal mission set, which may encode a goal region, progress condition, or terminal state, and assume the given initial states satisfy the threat and inter-agent safe sets. Let 
+
+β > 0 and Ri ∈ R2×2, Ri ≻ 0, weight the control effort. Define the UGV running cost 
+
+ℓgi (ui) ≜ β 
+
+> 2
+
+u⊺ 
+
+> i
+
+Riui. In total, the multi-agent UGV trajectory optimization problem becomes min   
+
+> zg,u
+
+Jg(zg, u ) = 
+
+> Ng
+
+X
+
+> i=1
+
+Z T
+
+> 0
+
+ℓgi (ui) d t + Hk,i (pi)
+
+
+
+,
+
+s.t. ˙zg = f g
+
+> aug
+
+(zg, u ), zg(0) = zg 
+
+> 0
+
+, ∀t ∈ [0 , T ],yij (T ) = 0 , ∀{ i, j } ∈ E ,
+
+(xi(t), u i(t)) ∈ Ξi, ∀i ∈ V , ∀t ∈ [0 , T ],pi(t) /∈
+
+> Lk
+
+[
+
+> ℓ=1
+
+
+
+Cδℓ ⊕ B(0 , d clr  
+
+> iℓ
+
+)
+
+
+
+, ∀i ∈ V , ∀t ∈ [0 , T ],xi(T ) ∈ X goal  
+
+> i,T
+
+, ∀i ∈ V .
+
+(100a) (100b) (100c) (100d) (100e) (100f) 
+
+38 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+6.2 UGV Problem Solution 
+
+To solve the nonlinear, coupled optimization problem (100), we proceed exactly as in Sec-tion 4.4 by (i) performing a direct transcription to obtain a finite-dimensional discrete-time program, (ii) using SCvx* to linearize the non-convex program to obtain a convex sub-problem around a current reference {ˆxi, ˆui}Ng
+
+> i=1
+
+, and (iii) reformulating the convex program into a form amenable to distributed optimization through C-ADMM. First, introduce epigraph variables κi ∈ R for the individual void costs. Fix N ≥ 1, ∆t = T /N , and tn = n∆t, and hold ui(t) = ui,n on each interval [ tn, t n+1 ). Assume the augmented dynamics have a unique solution on each interval for the chosen initial state and held control. Their exact flow is 
+
+F gn (zgn, u n) ≜ ζgn(tn+1 ), ˙ζgn(t) = f g
+
+> aug
+
+(ζgn(t), u n), ζgn(tn) = zgn.
+
+Multiple shooting treats the node states as independent variables and imposes the match-ing equations zgn+1 = F gn (zgn, u n). We approximate the flow by numerical integration and compute its Jacobians through the variational equations in Appendix D. The corridor Cρ
+
+in the void cost Hk,i is parameterized by Pi ≜ col( pi, 0, . . . , p i,N ) ∈ R2( N +1) , which gives the interpolated continuous path pPi (t) = PNn=0 Bn(t)pi,n , where Bn : [0 , T ] → R are scalar, piecewise-linear hat basis functions. Multiple shooting and the relaxed increment bounds (61f), with εij,n > 0, give the NLP min  
+
+> x,u,y,κ
+
+Jg(x, u, κ ) = 
+
+> Ng
+
+X
+
+> i=1
+
+"
+
+β∆t
+
+2 
+
+> N−1
+
+X
+
+> n=0
+
+u⊺
+
+> i,n
+
+Riui,n + κi
+
+#
+
+(101a) s.t. zgn+1 = F gn (zgn, u n), n = 0 , . . . , N − 1, (101b) 
+
+xi, 0 given , i ∈ V , yij, 0 = 0 , {i, j } ∈ E , (101c) (xi,n , u i,n ) ∈ Ξi, xi,N ∈ Ξxi , i ∈ V , n = 0 , . . . , N − 1, (101d) dist ( pi,n , Cδℓ ) ≥ dclr  
+
+> iℓ
+
+, i ∈ V , ℓ = 1 , . . . , L k, n = 1 , . . . , N, (101e) 
+
+yij,n +1 − yij,n ≤ εij,n , {i, j } ∈ E , n = 0 , . . . , N − 1, (101f) 
+
+Hk,i (Pi) ≤ κi, i ∈ V , (101g) 
+
+xi,N ∈ X goal  
+
+> i,T
+
+, i ∈ V , (101h) Here x, u, and y collect the physical-state, control, and separation-accumulator shoot-ing sequences. The fixed initial states satisfy the geometric threat and inter-agent sep-aration constraints. Pairwise separation is enforced through the relaxed CTCS formula-tion, while threat-distance and admissibility constraints remain imposed at nodes. We have decomposed avoidance of the union of all threat confidence sets into individual con-straints with respect to each threat itself 5. Let Xi ≜ col( xi, 0, . . . , x i,N ) ∈ R4( N +1) and 
+
+Ui ≜ col( ui, 0, . . . , u i,N −1) ∈ R2N . As in the UAV decomposition, introduce symmetric endpoint copies 
+
+Y iij = col( yiij, 0, . . . , y iij,N ), Y jij = col( yjij, 0, . . . , y jij,N ), Y iij = Y jij , ∀{ i, j } ∈ E .          
+
+> 5. Avoiding S
+> ℓ(Cδℓ⊕B(0 , d clr
+> iℓ )) is equivalent to imposing dist( p, Cδℓ)≥dclr
+> iℓ for every ℓ.
+
+39 Joshua Pilipovsky 
+
+Define agent i’s decision vector by 
+
+ϑi ≜ col( Xi, U i, {Y iij }j∈N i , κ i) ∈ Rdϑ,i , dϑ,i = 4( N + 1) + 2 N + ( N + 1) |N i| + 1 ,
+
+and let Ji(ϑi) ≜ β∆t
+
+> 2
+
+PN −1 
+
+> n=0
+
+u⊺
+
+> i,n
+
+Riui,n + κi. Let Θ i collect the convex state, input, domain, and terminal constraints, the prescribed initial conditions, and the affine accumulator incre-ment bounds for each endpoint copy at agent i. The epigraph constraint in (101g) relegates each non-convex individual void probability surrogate to a local inequality. Together with the local threat-distance constraints, these inequalities form 
+
+γi(ϑi) ≜ col 
+
+
+
+Hk,i (Pi) − κi, {dclr  
+
+> iℓ
+
+− dist( pi,n , Cδℓ )}ℓ=1 ,...,L k ; n=1 ,...,N 
+
+
+
+∈ R1+ N L k .
+
+Let γcvx  
+
+> i
+
+denote their affine approximation at the current reference. For the pairwise shoot-ing defects, set ¯ yij,n = ( yiij,n +yjij,n )/2 and let ¯ zgn stack the physical states and these averages. Define 
+
+πij,n (ϑi, ϑ j ) ≜ ¯yij,n +1 − [F gn (¯ zgn, u n)] yij , n = 0 , . . . , N − 1,
+
+and stack the interval defects into πij ∈ RN . Let F gi,n denote the physical-state component of the flow for agent i, and define its local shooting defects by Πi(ϑi) ≜ col( {xi,n +1 − F gi,n (xi,n , u i,n )}N −1 
+
+> n=0
+
+) ∈ R4N .
+
+Their affine approximations πcvx  
+
+> ij
+
+and Π cvx  
+
+> i
+
+follow from the augmented variational equations in Appendix D, composed with the averaging map for the pairwise defects. With virtual controls ξi ∈ R4N , ζij ∈ RN , and inequality slacks si ∈ R1+ N L k 
+
+> +
+
+, performing the steps for SCvx* results in the convex sub-problem min 
+
+> ∀i∈V :ϑi,ξ i, s i
+> ∀{ i,j }∈E :ζij
+> Ng
+
+X
+
+> i=1
+
+Ji(ϑi) + 
+
+> Ng
+
+X
+
+> i=1
+
+
+
+λ⊺ 
+
+> i
+
+ξi + w
+
+2 ∥ξi∥2 + μ⊺ 
+
+> i
+
+si + w
+
+2 ∥si∥2
+
++ X
+
+> {i,j }∈E
+
+
+
+μ⊺ 
+
+> ij
+
+ζij + w
+
+2 ∥ζij ∥2
+
+(102a) s.t. Πcvx  
+
+> i
+
+(ϑi) = ξi, i ∈ V , (102b) 
+
+γcvx  
+
+> i
+
+(ϑi) ≤ si, si ≥ 0, ϑi ∈ Θi, i ∈ V , (102c) 
+
+πcvx  
+
+> ij
+
+(ϑi, ϑ j ) = ζij , {i, j } ∈ E , (102d) 
+
+Y iij = Y jij , {i, j } ∈ E , (102e) 
+
+∥ϑi − ˆϑi∥∞ ≤ ∆tr , i ∈ V . (102f) The shooting virtual controls ξi and ζij and their multipliers λi and μij are unrestricted in sign; si and its multiplier μi are nonnegative because they correspond to local inequalities. Expressions for the distance function in (101e) and negative log void probability linearization in (98) are given in Appendices C and B, respectively, for completeness. In particular, the distance function gradient ∇p dist( p, Cδ) is the unit normal vector from the projection Π Cδ (p)for p / ∈ C δ, and the void probability gradient ∇Pi Hk,i (Pi) comes from using shape calculus to analyze variations of the set Cρ(p). Only (102d) and (102e) couple neighboring agents. 
+
+40 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+As in Section 4.4, introduce endpoint copies of ζij , split its penalty equally between the endpoints, and include the pairwise shooting and copy-agreement constraints in the unified coupling map bHij . The UGV objective is already separable, so no global coefficient copies or flow variables are needed. The remaining steps needed to turn the convex program (102) into a fully separable form amenable to C-ADMM are largely the same as those in Section 4.4, so they are omitted here for brevity. Thus, as for the UAV team, every outer SCvx* iteration produces a coupled convex subproblem that is solved by the inner graph C-ADMM iterations before the outer reference is updated. 
+
+7 Vehicle Coordination and Re-Planning 
+
+It would not be prudent for the ground vehicle fleet to start moving before the aerial vehicles have sufficiently searched the corridors Cρi for all i = 1 , . . . , N g. The void probability construction above gives the probability that there are no represented threats in the union of the remaining UGV corridors. At planning epoch k, let prem  
+
+> i,k
+
+denote the unexecuted portion of the route committed to UGV i. We define Cg 
+
+> k
+
+as the remaining fleet corridor and qg 
+
+> k,j
+
+as the conditional probability mass of Bernoulli track j inside that corridor. 
+
+Cg 
+
+> k
+
+≜
+
+> Ng
+
+[
+
+> i=1
+
+Cρi
+
+ prem 
+
+> i,k
+
+ , qg 
+
+> k,j
+
+≜
+
+Z
+
+> Cg
+> k
+
+ρk,j (y) d y. (103) In particular, applying (97) to this union gives the joint void probability P g0,k = exp( −H g
+
+> k
+
+), where 
+
+Hg 
+
+> k
+
+=
+
+Z
+
+> Cg
+> k
+
+λk(y) d y −
+
+> Lk
+
+X
+
+> j=1
+
+log  1 − rk,j qg
+
+> k,j
+
+. (104) A simple yet effective motion gate is to allow the fleet to move only when 
+
+P g0,k ≥ 1 − ϵgo ⇐⇒ Hg 
+
+> k
+
+≤ − log(1 − ϵgo ), ϵgo ∈ (0 , 0.5] . (105) This is one joint fleet gate evaluated under the current PMB belief. All UGVs begin each committed plan together and execute on the common time base used by the joint optimiza-tion and its inter-agent collision-avoidance constraints. The motion gate is evaluated on the currently committed routes and is distinct from the event that requests a new UGV trajectory optimization. A newly formed Bernoulli component is declared confirmed once its existence probability satisfies rk,j ≥ rconf , where rconf ∈ (0 , 1) is a configurable confirmation threshold. The UGV fleet requests a new trajectory solve when there exists a newly confirmed track j such that 
+
+rk,j ≥ rconf , rk,j qg 
+
+> k,j
+
+> ϵ trigger , (106) where ϵtrigger ∈ (0 , 1) specifies the minimum existence-weighted route-overlap probability considered operationally significant. A confirmed track with negligible probability mass inside the remaining corridor therefore does not cause a route change, whereas a spatially uncertain track may trigger re-planning even when its posterior mean lies outside the cor-ridor. 
+
+> 41
+
+Joshua Pilipovsky 
+
+Upon a trigger, the UGV trajectory optimization problem is re-solved from the cur-rent UGV states using the latest PMB posterior. The candidate routes replace only the unexecuted portions of the previously committed routes after the SCvx*–C-ADMM itera-tions return a candidate satisfying the required dynamics, terminal, threat-clearance, and inter-agent safety conditions. Following commitment, the remaining-route map, posterior-dependent base density, and UAV trajectories are updated, while UGV execution remains governed by the joint motion gate (105). Figure 6 summarizes this trigger, route-update, and execution sequence. Bernoulli route trigger               
+
+> successful target detection
+> rk,j ≥rconf ,rk,j qg
+> k,j > ϵ trigger
+> UGV route re-plan
+> Bk,j
+> SCvx* +C-ADMM
+> Density & UAV re-plan
+> ˆρk+1
+> SCvx* +C-ADMM
+> Joint gate & execution
+> Pg0,k +1 ≥1−ϵgo
+
+✓    
+
+> closed: hold +search
+> trigger ✓commit
+
+Figure 6: Closed-loop Bernoulli-triggered re-planning flow: route-overlap evaluation, UGV route re-optimization, UAV search-density and trajectory updates, and joint PMB-gated UGV execution. Next, we describe how we construct and update the core base distribution ˆ μ that drives the UAV fleet ergodic search. We begin with the UGV route: let p(t), t ∈ [0 , T ] denote the most recently committed UGV route, or only its unexecuted suffix if the UGV has already begun moving. Define the un-normalized Gaussian tube ˜Φ( ξ) = 
+
+Z T
+
+> 0
+
+wk(t) exp 
+
+
+
+− ∥ξ − p(t)∥2
+
+2σ2
+
+> r
+
+
+
+dt, (107) where σr > 0 is the tube width and wk(t) ≥ 0 is a temporal weighting function (e.g., 
+
+wk(t) = e−λr t with λr > 0 biasing the density towards the beginning of the UGV path). Assume 0 < R T 
+
+> 0
+
+wk(t) d t < ∞. Aggregating each UGV’s route, we obtain the normalized route map Φ = Norm Ω[PNg 
+
+> i=1
+
+˜Φi]. Concentrating the base density along the UGV routes alone may waste sensing effort in portions of the routes that have already been sufficiently explored. In particular, the route map depends only on geometry and does not incorporate the current posterior probability of an undetected target. To emphasize its dependence on the route available at planning epoch k, we henceforth denote the normalized route map by Φk. We define the route-conditioned PPP map as 
+
+Uk(ξ) ≜ Norm Ω[Φ k(·)λk(·)] ( ξ) = Φk(ξ)λk(ξ)
+
+Z
+
+> Ω
+
+Φk(z)λk(z) d z. (108) 
+
+42 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+This map assigns sensing effort to locations that are simultaneously relevant to the cur-rent UGV routes and likely, according to the residual PPP intensity, to contain an as-yet-undetected target. Note that if the denominator in (108) is zero, this component is omitted and the remaining mixture weights are renormalized. It remains to incorporate targets that have already generated Bernoulli components in the PMB posterior. Simply using Tk,j (ξ) = Norm Ω[ρk,j ]( ξ) is generally undesirable. First, this is merely the in-domain normalization of the conditional track density and hence does not account for the existence probability rk,j . Second, every track would contribute unit mass after normalization, irrespective of its localization uncertainty. Thus, a highly uncer-tain track and an accurately localized track could receive the same total sensing attention. Finally, ρk,j (ξ) describes where the target is believed to be, whereas the desired base density must describe where the UAV sensor should be placed. For an angles-only sensor, these locations need not coincide because informative viewpoints depend on the sensor-to-target geometry. We therefore construct a Bayesian expected information density over the planar search domain, building on information-driven ergodic exploration (Miller et al., 2016; Mavrom-mati et al., 2018; Abraham et al., 2018). Let s ∈ Ω denote a candidate planar sensor coordinate, which we take to be the center of the UAV ground footprint. Importantly, s is not the complete UAV state. Let x = c(s, ζ ) denote a full sensing configuration whose foot-print center is s, where the set Z is the admissible nuisance-configuration space and ζ ∈ Z 
+
+collects the remaining sensing variables, including altitude and attitude. At planning epoch 
+
+k, let ϖk(d ζ | s) denote a prescribed conditional probability measure over these nuisance variables. For example, the simplest construction fixes a nominal altitude and a nominal downward-looking attitude, 
+
+ϖk(d ζ | s) = δ¯ζk (s)(d ζ). (109) Alternatively, ϖk may represent the distribution of altitude and attitude induced by the current reference UAV trajectories. In either case, ϖk is frozen while solving the UAV trajectory optimization problem at epoch k.Suppose that the angles-only measurement generated by a target at y ∈ Ω from sensing configuration c(s, ζ ) follows the model in (46), written here as 
+
+z = h y; c(s, ζ ) + v, v ∼ N  0, R  y; s, ζ  , (110) where R(y; s, ζ ) ≜ R(c(s, ζ ) | y) ≻ 0 is the covariance from (46). Define the measurement Jacobian with respect to the planar target position as 
+
+Hy(y; s, ζ ) ≜ ∂h  y; c(s, ζ )
+
+∂y ∈ R2×2. (111) Let pDk (y | c(s, ζ )) denote the detection probability from Section 5, evaluated at this sensing configuration. The detection-weighted information surrogate associated with this potential measurement is defined as 
+
+I(y; s, ζ ) ≜ pDk
+
+ y | c(s, ζ )H⊺ 
+
+> y
+
+(y; s, ζ )R−1(y; s, ζ )Hy(y; s, ζ ). (112) The expected information surrogate for Bernoulli component j, conditional on that target existing, is then 
+
+Ik,j (s) ≜
+
+Z
+
+> Z
+
+Z
+
+> Ω
+
+I(y; s, ζ )ρk,j (y) d y ϖ k(d ζ | s). (113) 
+
+> 43 Joshua Pilipovsky
+
+Consequently, Ik,j : Ω → S2+ is a matrix-valued field indexed by the planar footprint center 
+
+s. When R depends on y, (112) omits covariance derivative and detection event infor-mation terms and is therefore an information surrogate rather than the complete Fisher information (Wilson et al., 2014; Chaloner and Verdinelli, 1995). The determinant is taken after computing the expectation in (113). The classical expected information density (EID) construction would use 
+
+EFIM  
+
+> k,j
+
+(s) = det  Ik,j (s) . (114) D-optimality maximizes the determinant, or equivalently the log-determinant, of the infor-mation matrix. Under a Gaussian approximation, this minimizes the volume of the cor-responding confidence ellipsoid (Boyd and Vandenberghe, 2004; Chaloner and Verdinelli, 1995). For the present application, we instead use the Bayesian incremental D-optimal surrogate 
+
+Ek,j (s) ≜ log det 
+
+
+
+P −1 
+
+> k,j
+
++ Ik,j (s)
+
+
+
+− log det 
+
+
+
+P −1
+
+> k,j
+
+
+
+= log det 
+
+
+
+I2 + P 1/2 
+
+> k,j
+
+Ik,j (s)P 1/2
+
+> k,j
+
+
+
+, (115) where Pk,j ≻ 0 is the covariance of the planar position density ρk,j , or the planar position marginal if the Bernoulli state contains additional variables. The second equality follows by factoring P −1/2 
+
+> k,j
+
+from both sides of P −1 
+
+> k,j
+
++ Ik,j (s) and taking determinants. The quantity in (115) approximates the improvement in the log-determinant of the track information matrix produced by a measurement from footprint center s. In particular, Ek,j (s) ≥ 0 and tends to zero as Pk,j → 0 provided Ik,j (s) remains bounded. Thus, unlike a separately normalized copy of ρk,j , an accurately localized track naturally receives less sensing attention under this bounded information condition. The conditional information density in (115) does not, by itself, account for whether track j exists or whether it is relevant to a UGV route. Recall from (103) that Cg 
+
+> k
+
+is the union of the remaining UGV-route corridors and qg 
+
+> k,j
+
+is the conditional probability mass of track j inside that union. The corresponding Bernoulli route-risk weight is 
+
+aB 
+
+> k,j
+
+≜ − log 
+
+
+
+1 − rk,j qg
+
+> k,j
+
+
+
+. (116) This is precisely the contribution of track j to the negative log-void probability of the remaining fleet corridor. It is small when the track has low existence probability or negligible probability mass inside the relevant corridors, and becomes large when an existing track is likely to lie along a UGV route. For the density construction, assume rk,j qg 
+
+> k,j
+
+< 1 and finite, integrable information fields so the weights and normalization below are well defined. The aggregate, unnormalized Bernoulli information map is therefore 
+
+eTk(s) ≜
+
+> Lk
+
+X
+
+> j=1
+
+aB 
+
+> k,j
+
+Ek,j (s), ZB 
+
+> k
+
+≜
+
+Z
+
+> Ω
+
+eTk(s) d s. (117) When ZB 
+
+> k
+
+> 0, we define 
+
+Tk(s) ≜ Norm Ω[ eTk]( s). (118) 
+
+> 44 Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+If ZB 
+
+> k
+
+= 0, this component is omitted, its mixture weight is set to zero, and the remaining weights are renormalized. Notice that the individual fields Ek,j are not normalized before being combined. Consequently, both the weight aB 
+
+> k,j
+
+and the magnitude of the available localization information affect the relative contribution of track j.Writing ˆ μk(d ξ) = ˆ ρk(ξ) d ξ, the updated base density is finally constructed as the convex mixture ˆρk(ξ) = ωr
+
+> k
+
+Φk(ξ) + ωu 
+
+> k
+
+Uk(ξ) + ωB 
+
+> k
+
+Tk(ξ), (119) where ωr
+
+> k
+
+, ω u 
+
+> k
+
+, ω B 
+
+> k
+
+≥ 0, ω r 
+
+> k
+
++ ωu 
+
+> k
+
++ ωB 
+
+> k
+
+= 1 . Because each active component is a probability density on Ω, (119) defines a valid probability measure ˆ μk on Ω. The mixture weights may be fixed design parameters. Alternatively, they may be adapted using the current posterior RFS. One possible construction is to define Λg 
+
+> k
+
+≜
+
+Z
+
+> Cg
+> k
+
+λk(y) d y, ηu 
+
+> k
+
+≜ Λg
+
+> k
+
+Λg 
+
+> k
+
++ Λ ref 
+
+, ηB 
+
+> k
+
+≜ ZB
+
+> k
+
+ZB 
+
+> k
+
++ Zref 
+
+, (120) where Λ ref > 0 and Zref > 0 are reference scales. Given nominal preferences ¯ ωr > 0, ¯ ωu ≥ 0, and ¯ ωB ≥ 0, let 
+
+sr 
+
+> k
+
+= ¯ ωr, su 
+
+> k
+
+= ¯ ωuηu 
+
+> k
+
+, sB 
+
+> k
+
+= ¯ ωBηB 
+
+> k
+
+, (121) and set 
+
+ωmk = smk
+
+sr 
+
+> k
+
++ su 
+
+> k
+
++ sB
+
+> k
+
+, m ∈ { r, u, B}. (122) This rule retains a baseline emphasis on the committed UGV routes, increases the residual-PPP contribution when appreciable undetected target intensity remains inside the corridors, and decreases the track contribution when the route-relevant tracks are either unlikely or already accurately localized. At every planning epoch, the PMB posterior, remaining UGV routes, nuisance-state distribution ϖk, and all component maps are updated once and then held fixed while the ensuing UAV trajectory optimization problem is solved. 
+
+8 Case Studies 
+
+The case studies evaluate aerial coverage, risk-sensitive ground planning, and closed-loop collaboration. After specifying the simulation settings, we examine multi-UAV ergodic search and solver performance, followed by the UGV risk–effort tradeoff. Missions with one and two UGVs then demonstrate how aerial sensing, ground replanning, and risk-gated motion interact during execution. 
+
+8.1 Simulation Setup 
+
+The simulations are run on an Intel Core Ultra 9 275HX processor (24 cores). The examples use the workspace Ω = [0 , 1] 2 and the quadrotor and accelerated-unicycle models in (39) and (89), respectively. Distances are in normalized workspace units, time is in seconds, and angles are in radians unless degrees are indicated. Tables 3–6 list the sensor, vehicle, boundary, and numerical parameters. The sensing mission uses three UAVs, one UGV, and 
+
+> 45
+
+Joshua Pilipovsky 
+
+three stationary targets. The initial belief is a uniform PPP with intensity λ− 
+
+> 0
+
+(ξ) = 3 /|Ω|
+
+and no Bernoulli tracks. 
+
+Table 4: Vehicle models and limits. 
+
+Parameter Value 
+
+UAVs: thrust and body-rate control 
+
+Mass, mi 1 kg Altitude range [0 .15 , 1.0] Initial altitude 0.45 Velocity bound, ∥vi∥∞ 1.25 Roll / pitch bound 0.42 rad Yaw bound 0.75 rad Thrust range [7 , 13 .5] Body-rate bound, ∥ωi∥∞ 1.0 rad/s Inter-UAV separation 0.22 
+
+UGV: acceleration and turn-rate control 
+
+Speed range [0 , 0.50] Acceleration limit 0.80 Turn-rate limit 1.5 rad/s UGV / target radius 0.035 , 0.015 Additional safety margin, ∆ 0.010 Swept-corridor radius, ρ 0.060 Terminal speed, vf 0
+
+Table 6: Discretization and cost weights. 
+
+Parameter Value 
+
+Horizon and sensing-density parameters 
+
+Planning horizon 10 s UAV / UGV, N : ∆ t 20 /40 : 0 .5/0.25 s Maximum Fourier index, K 3Route-tube width, σr 0.08 
+
+Objective and risk weights 
+
+UAV input, Ra 0.015 I4
+
+UAV velocity / attitude, Qa 0.0025 I6
+
+UGV input, Rg I2
+
+Full-PMB objective, wH 10 Motion-gate budget, ϵgo 0.05 Track confirmation, rconf 0.80 Replan trigger, ϵtrigger 0.05 
+
+Table 3: Sensor model. 
+
+Parameter Value 
+
+Footprint and sensing quality 
+
+FoV half-angle, α 15 ◦
+
+Attitude exponent, γ 2.2Altitude scale, ¯h 0.42 Footprint scale, κf 0.50 Covariance floor, εΣ 10 −6
+
+Angular observations 
+
+Noise floor, σmin 0.8◦
+
+Noise gain, kσ 2◦
+
+Noise ceiling, σmax 4◦
+
+Sensor update rate 5 Hz Mean clutter count, ¯ κ 0.01/scan 
+
+Table 5: Initial positions and goals. 
+
+Parameter Value UAV 1 position, r1,0 (0 .1, 0.9, 0.45) UAV 2 position, r2,0 (0 .9, 0.9, 0.45) UAV 3 position, r3,0 (0 .5, 0.5, 0.45) Ground-route start, p0 (0 .1, 0.1) Ground-route goal, pf (0 .9, 0.9) 
+
+Table 4 lists the vehicle parameters and bounds. The Fourier indices satisfy 
+
+k1, k 2 ∈ { 0, . . . , K }. The ground objec-tive is Eu + wH H, where Eu = R T 
+
+> 0
+
+ℓgi dt
+
+and wH ≥ 0 weights the PMB negative log-void cost in (98). The hover input is ¯ui = ( mig, 0, 0, 0) ⊺.The simulation running costs use the matrices in Table 6 and are given by the quadratic functions ℓai = ( ui − ¯ui)⊺Ra(ui − ¯ui) + [ v⊺ 
+
+> i
+
+q⊺ 
+
+> i
+
+]Qa[v⊺ 
+
+> i
+
+q⊺ 
+
+> i
+
+]⊺,ℓgi = [ ai ωi]Rg[ai ωi]⊺.
+
+46 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+We assume two disparate UAV graph topologies for the Fourier coefficient consensus and the collision avoidance consensus rounds. At each planning epoch, a minimum-length spanning tree is constructed from the current UAV positions for coefficient consensus and held fixed during that solve. Collision avoidance, on the other hand, assumes a complete graph so that constraints are imposed for every UAV pair. We use the quality and detection functions βs and Gi as defined in Section 4.1, and the angles-only measurement model (46) with angular measurement covariance R(xi | ξ) = 
+
+σ2(χi,k (ξ)) I2, with the clipped noise law from (47) and the values in Table 3. Measurements are fused (sequentially) in UAV-index order, with one prediction step per fleet scan. Clutter is uniform on the angular image window [ −α, α ]2.
+
+8.2 Multi-UAV Ergodic Trajectory Optimization 
+
+The UAVs start from the positions in Table 5 and optimize coverage of a Gaussian tube around the ground route from p0 to pf . This initial base density appears in Figure 12(a); its later updates are discussed in Section 8.4. Figure 7 shows how the team distributes its footprints along that tube through both horizontal motion and altitude changes. The vehicles cover different portions of the route while maintaining separation; the minimum inter-agent distance during execution is 0 .2216, above the required 0 .22. For each executed prefix, we average the footprint coefficients over its elapsed duration and evaluate the ergodic mismatch against the fixed desired density (Figure 7(d)), reaching 2 .16 × 10 −3 at 10 s. 0.0 0.5 1.0                 
+
+> x
+> 0.00.51.0
+> y
+> (a) Desired coverage
+> 0.00.51.0
+> x
+> 0.00.51.0
+> y
+> (b) Achieved coverage
+> 0510 15 20 25
+> Density
+> 01
+> x01
+> y
+> 0.20.6
+> h
+> (c) Spatial trajectories
+> 0.02.55.07.510 .0
+> Time (s)
+> 10 −2
+> 10 −1
+> Ergodic mismatch  E(t)
+> (d) Accumulated coverage
+> 0.02.55.07.510 .0
+> Time (s)
+> 0.20.30.40.50.60.70.80.9
+> Distance
+> (e) UAV separation
+> 1–2 1–3 2–3 0.02.55.07.510 .0
+> Time (s)
+> 0.20.30.40.50.60.7
+> Height
+> (f) Altitude
+> UAV 1 UAV 2 UAV 3
+> 1
+
+Figure 7: Three-UAV coverage and trajectories. Circles, squares, and triangles mark 0, 5, and 10 s; translucent cones show the FoV, and dotted lines mark bounds. 
+
+The SCvx*–C-ADMM solve takes 64 outer attempts, with 46 accepted updates, as shown in Figure 8. The improvement plots record the magnitude of the nonlinear penalty function 
+
+47 Joshua Pilipovsky 
+
+and nonlinear infeasibility changes, including rejected trials. The first inner C-ADMM solve converges after 56 iterations. 0 20 40 60        
+
+> Outer attempt
+> 10 −4
+> 10 −3
+> 10 −2
+> χ
+> (a) SCvx* feasibility
+> 020 40 60
+> Outer attempt
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> |∆J|
+> (b) SCvx* improvement
+> 020 40
+> Inner iteration
+> 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Residual norm
+> (c) C-ADMM primal
+> Statistic Flow Safety
+> 020 40
+> Inner iteration
+> 10 −7
+> 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> Residual norm
+> (d) C-ADMM dual
+> 1
+
+Figure 8: UAV solver convergence. Panels (c)–(d) show the C-ADMM primal and dual residuals through convergence for the first outer attempt of the same solve. Dots mark accepted steps. 20 40 60 80 
+
+> C-ADMM inner iteration
+> 10 20 30 40 50 60
+> SCvx* outer attempt
+> Accepted Rejected
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Maximum residual / threshold 1
+
+Figure 9: Nested SCvx*–C-ADMM convergence for the UAV fleet problem. Colors show the largest residual-to-tolerance ratio; row-end markers show inner termination and outer acceptance. 
+
+Figure 9 shows the inner C-ADMM solves across the outer SCvx* attempts for the same three-UAV, one-route planning instance. Each row records one outer attempt, includ-ing rejected trials. Next, we compare complete plan-ning times for centralized IPOPT and the proposed decentralized SCvx*–C-ADMM framework. For each fleet size and horizon, the initial states, desired density, and initial control trajecto-ries are fixed across methods. Ta-ble 7 gives the solver settings for the computational comparison. The C-ADMM penalties act on the statis-tic, flow, and affine safety residuals, respectively. Figure 10 reports the comparison for 2, 3, 5, and 8 UAVs at 2.5, 5, and 10 s horizons, with ∆t = 0 .5 s. The centralized solves use IPOPT (W¨ achter and Biegler, 2006), and local C-ADMM QPs use concurrent PIQP (Schwan et al., 2023) processes. The con-sensus tolerances follow ϵmin max {1, c 0dn} at outer attempt n = 0 , 1, . . . , so that earlier iterations can converge quicker as they are less accurate, and we only need tighter toler-ances near outer convergence. The repeated trials in Figure 10 run sequentially on identical inputs, so the error bars measure runtime variability rather than variation across randomized scenarios. Elapsed time includes model construction, solver setup, nonlinear evaluations, and distributed coordination. 
+
+48 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+Table 7: UAV solver settings for the centralized versus decentralized computational comparisons. 
+
+Parameter Value 
+
+Inner C-ADMM 
+
+Initial penalties, ( ρτ , ρ f , ρ p) (0 .04 , 0.05 , 0.02) Minimum tolerances, ϵmin 10 −5
+
+Timing schedule, ( c0, d ) (100 , 0.8) 
+
+Outer SCvx* 
+
+Initial AL penalty, w 25 Feasibility / optimality tolerance 10 −4, 3 × 10 −3
+
+C-ADMM replaces each fleet-wide QP with smaller local QPs solved in parallel, but requires many consensus rounds. For example, for eight UAVs and a 10 s horizon, the slowest local QP av-erages 35 ms per round. The additional rounds and coordination yield compa-rable total planning times in this case: 242 .6 s distributed and 238 .0 s central-ized. Thus, the proposed decentralized framework achieves comparable planning time to a centralized solver in this case. 2 3 5 8                   
+
+> Number of UAVs
+> 010 20 30 40 50 60 70
+> Planning time (s)
+> (a) T= 2 .5 s, N= 5
+> 2358
+> Number of UAVs
+> 020 40 60 80 100 120
+> (b) T= 5 s, N= 10
+> 2358
+> Number of UAVs
+> 050 100 150 200 250
+> (c) T= 10 s, N= 20
+> Centralized SCvx*–C-ADMM
+> 1
+
+Figure 10: Comparison of centralized and decentralized SCvx*–C-ADMM planning times: mean ±
+
+one standard deviation over three cold solves per configuration. 
+
+Remark 3 (Planning under a time budget) . The results above use convergence-based ter-mination. For online execution, each cycle can be warm-started and both iteration counts capped to fit the available time. For example, Stomberg et al. (2026) demonstrate a decen-tralized SQP–ADMM scheme with one outer SQP step and six inner ADMM iterations per sampling instant. 
+
+8.3 Risk-Sensitive UGV Trajectory Optimization 
+
+Table 8: Target belief used by UGV planner comparisons. 
+
+Parameter Value 
+
+One Bernoulli track 
+
+Track existence probability, rℓ 0.95 Track mean, μℓ (0 .54 , 0.48) Principal std., σ1, σ 2 0.10 , 0.03 Ellipse orientation 135 ◦
+
+Confidence level, 1 − δℓ 95% 
+
+For the UGV trajectory optimization, we com-pare three ground planners between the end-points in Table 5. The planners share the fixed Gaussian Bernoulli belief in Table 8. Here 
+
+σ1, σ 2 describe the major and minor axes, the orientation is measured counterclockwise from the positive horizontal axis. 
+
+49 Joshua Pilipovsky 
+
+The undetected-target PPP intensity is 0 .70 in the left half of the workspace ( ξ1 ≤ 0.5) and 0 .03 in the right half, in expected targets per unit area. Figure 11 shows the resulting optimal position trajectories of the UGV for various problem configurations. The first planner avoids the track mean, the second avoids its confidence set, and the third retains that constraint while adding PMB risk (i.e., the void probability) to the objective. All three selected solutions converge and satisfy the terminal constraints. 0.0 0.5 1.0    
+
+> x
+> 0.00.51.0
+> y
+> (a) Mean avoidance
+> 0.00.51.0
+> x
+> 0.00.51.0
+> y
+> (b) Confidence-set avoidance
+> 0.00.51.0
+> x
+> 0.00.51.0
+> y
+> (c) Full-PMB objective
+> 0.00.10.20.30.40.50.60.7
+> Residual PPP intensity 1
+
+Figure 11: UGV planner comparison. The ellipse shows track uncertainty; thin outlines show swept corridors, and circles/stars mark start/goal. 
+
+From Figure 11(a), we see that naive mean avoidance passes through appreciable track probability mass. Confidence-set avoidance in Figure 11(b) takes the upper detour but remains longer in the region of high undetected-target intensity, which is undesirable. The full-PMB objective used in Figure 11(c) instead selects the lower detour and enters the lower-intensity region earlier. Table 9 quantifies the resulting risk–effort tradeoff, namely, optimizing the fully risk-aware cost yields the lowest threat probability, at the expense of slightly more control effort. 
+
+Table 9: Risk and control effort for the routes in Figure 11. 
+
+Planner PMB corridor probability Control effort Eu
+
+Mean avoidance 37 .99% 0.0214 Confidence-set avoidance 7.27% 0.4516 Full-PMB objective 3.64% 0.7366 
+
+8.4 Closed-Loop Collaboration with One UGV 
+
+We now combine multi-UAV trajectory optimization, PMB inference, and risk-aware UGV planning in a closed-loop mission. Figure 12 shows the UAV base density updates, and Figure 13 shows the PMB intensity and ground execution during the closed-loop mission. Initially, the UAVs search along the straight ground route while the UGV waits. Every initial plan, ground replan, and UAV horizon refresh uses the three-component mixture in (119), evaluated from the current posterior and remaining UGV route. The posterior mixture changes as sensing reduces uncertainty along the remaining ground corridor. 
+
+50 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+We use equal nominal weights for route coverage, undetected-target search, and track in-formation, renormalized over the nonzero components. Thus, the weights are (1 /3, 1/3, 1/3) when all three components are active, and (1 /2, 1/2, 0) when the track-information compo-nent is absent. The Bayesian track-information maps in (115) use a point-mass nuisance-state distribution concentrated at altitude 0 .45 and zero attitude angles. With the uni-form initial PPP and no tracks, U0 = Φ 0, so the initial mixture is the Gaussian tube in Figure 12(a). At 3 .0 s, a confirmed target triggers a ground replan and a new posterior-dependent UAV plan (Figure 12(b)). Ground planning minimizes Eu + wH H subject to track-avoidance constraints, using the current PPP intensity and Bernoulli tracks. Finally, the PMB motion gate governs permission for the UGV to move and the UGV is released when the corridor risk bound falls below the motion-gate budget ϵgo = 0 .05, in accordance with the motion gate in (105). Here, we observe that continued sensing opens the gate at 31 .0 s, after which the UGV traverses the route and reaches its stopped goal at 41 .0 s. The mission uses five UAV planning episodes and one ground replan. Reported times are simulated execution times and exclude optimization wall time. Figure 13(a) shows the posterior and vehicle configurations at the principal mission events. Panel (b) shows how the undetected-target and track contributions determine the motion gate, while panel (c) shows the UGV waiting and then progressing to its goal. The first track-risk spike, at 1 .4 s, follows a clutter-generated tentative track, whereas the spike at 2 .2 s follows a true-target detection. The route update at 3 s produces the sharp risk reduction. The later gradual increase reflects growing track uncertainty between informative observations; renewed target observations and the rejection of an unsupported tentative track subsequently reduce the corridor risk without triggering another ground replan. 0.0 0.5 1.0                  
+
+> x
+> 0.00.51.0
+> y
+> Initial UAV plan (a) t= 0 s
+> 0.00.51.0
+> x
+> 0.00.51.0UGV replan + UAV plan (b) t= 3 s
+> 0.00.51.0
+> x
+> 0.00.51.0UAV refresh (c) t= 13 s
+> 0.00.51.0
+> x
+> 0.00.51.0UAV refresh (d) t= 23 s
+> 0.00.51.0
+> x
+> 0.00.51.0UAV refresh (e) t= 33 s
+> −3
+> −2
+> −101
+> Base density log 10  ˆρ
+> 1
+
+Figure 12: UAV base density updates. Dashed lines show the remaining ground routes. 51 Joshua Pilipovsky 0.0 0.5 1.0
+
+x
+
+> 0.00.51.0
+> y
+
+(a) Closed-loop mission 
+
+Initial search 
+
+t = 0 s   
+
+> 0.00.51.0
+
+x
+
+> 0.00.51.0
+
+Route updated 
+
+t = 3 s   
+
+> 0.00.51.0
+
+x
+
+> 0.00.51.0
+
+Ground motion released 
+
+t = 31 s   
+
+> 0.00.51.0
+
+x
+
+> 0.00.51.0
+
+Goal reached 
+
+t = 41 s         
+
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> PMB intensity
+> 0510 15 20 25 30 35 40
+
+Time (s) 
+
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Expected-count bound
+
+(b) Risk along the remaining route           
+
+> Undetected Tracks Total 0510 15 20 25 30 35 40
+
+Time (s) 
+
+> 0.00.20.40.60.81.0
+> Distance to goal
+
+(c) Ground progress 
+
+1
+
+Figure 13: Closed-loop mission execution: (a) PMB intensity and vehicle configurations; (b) corridor risk bounds; (c) UGV progress. Crosses mark targets; the vertical dashed line marks replanning, and shading marks authorized motion. 
+
+8.5 Full-System Collaboration with Two UGVs 
+
+Finally, we consider three UAVs supporting two UGVs whose initial routes intersect. This example combines posterior-dependent aerial sensing with coupled ground trajectory op-timization, inter-UGV separation constraints, and a joint motion gate evaluated over the union of the remaining ground corridors. The UGVs start at (0 .1, 0.1) and (0 .1, 0.9) and have goals (0 .9, 0.9) and (0 .9, 0.1), respectively. 5 10 
+
+Outer attempt 
+
+> 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> χ
+
+(a) SCvx* feasibility  
+
+> 510
+
+Outer attempt 
+
+> 10 −6
+> 10 −4
+> 10 −2
+> 10 0
+> |∆J|
+
+(b) SCvx* improvement    
+
+> 025 50 75
+
+Inner iteration 
+
+> 10 −7
+> 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> Residual norm
+
+(c) C-ADMM primal    
+
+> 025 50 75
+
+Inner iteration 
+
+> 10 −8
+> 10 −7
+> 10 −6
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> Residual norm
+
+(d) C-ADMM dual 
+
+1
+
+Figure 14: Two-UGV SCvx*–C-ADMM solver convergence. Inner residuals correspond to the first outer subproblem and terminate at convergence. 52 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 10 20 30 40 50 60 70 
+
+C-ADMM inner iteration 
+
+> 246810 12
+> SCvx* outer attempt
+> Accepted Rejected
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> 10 4
+> 10 5
+> 10 6
+> Maximum residual / threshold
+
+1
+
+Figure 15: Nested SCvx*–C-ADMM convergence for the UGV fleet problem. Colors show the largest residual-to-tolerance ratio; row-end markers show inner termination and outer acceptance. 
+
+First, we illustrate two-UGV SCvx*–C-ADMM convergence using the control-effort objective ( wH = 0). The solver converges in 12 outer iter-ations and Figure 14 shows the SCvx* feasibility and merit improvement, to-gether with the standard C-ADMM residuals for the first convex subprob-lem. Figure 15 shows the nested iter-ation history with the same stopping tolerances. The ground fleet replans at 2, 22, 42 s as new route-relevant tracks are con-firmed. The joint gate releases both UGVs at 57 .6 s, and both reach their stopped goals at 67 .6 s (Figure 16). The mission uses 8 UAV planning episodes and 3 joint ground replans. The minimum inter-UGV separation during execution is 0 .0995, above the required 0 .08. 0.0 0.5 1.0
+
+> x
+> 0.00.51.0
+> y
+
+(a) Closed-loop mission                 
+
+> Initial search
+> t= 0 s
+> 0.00.51.0
+> x
+> 0.00.51.0Final routes planned
+> t= 42 s
+> 0.00.51.0
+> x
+> 0.00.51.0Ground motion released
+> t= 57 .6 s
+> 0.00.51.0
+> x
+> 0.00.51.0Goals reached
+> t= 67 .6 s
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> PMB intensity
+> 010 20 30 40 50 60
+> Time (s)
+> 10 −5
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Expected-count bound
+
+(b) Risk along the remaining routes         
+
+> Undetected Tracks Total 010 20 30 40 50 60
+> Time (s)
+> 0.00.20.40.60.81.0
+> Distance to goal
+
+(c) Ground progress 
+
+> UGV 1 UGV 2
+> 1
+
+Figure 16: Closed-loop collaboration with two UGVs: (a) PMB intensity and vehicle configurations; (b) risk along the union of the remaining ground corridors; (c) ground progress. Vertical dashed lines mark ground replans, and shading marks authorized motion. 53 Joshua Pilipovsky 
+
+9 Conclusion 
+
+In this work, we have developed a framework for information-driven collaboration between UAV and UGV fleets in a domain containing an unknown number of targets. We formulated aerial search using an ergodic objective whose occupation measure accounts for the ground area observed by pose-dependent camera footprints. Bayesian inference from angles-only measurements provides a PMB belief over detected and undetected targets, linking aerial search priorities to ground-route risk. The resulting coordination scheme updates both fleets’ plans as information becomes available and permits ground motion once the remaining route risk satisfies a prescribed threshold. We developed a nested SCvx*–C-ADMM method for the nonconvex fleet trajectory problems, accounting for nonlinear dynamics, nonseparable objectives, and continuous-time inter-agent separation. For the UAV problem, the graph-flow formulation replaces the global coefficient-sum constraint with local balance equations and neighbor agreement. Its equivalence at consensus to the centralized convex subproblem allows the coupled ergodic objective to be optimized without a central coefficient aggregator. The numerical studies demonstrate how the UAVs distribute camera coverage along the ground routes and how accounting for undetected threats changes the UGV risk–effort tradeoff. The solver comparisons assess convergence, solution quality, and computational scaling relative to centralized optimization. Closed-loop missions with one and two UGVs further demonstrate the interaction between aerial sensing, target confirmation, ground replanning, and motion authorization as the ground vehicles progress to their goals. Future work will consider UGVs with onboard sensing and decentralized RFS fusion, allowing both fleets to contribute observations through local belief updates and inter-agent communication. Further investigation of the nested optimization structure may improve convergence and reduce the computation and communication required by the consensus iterations. Lastly, control-barrier-function safety filters adapted to the relative degree of the vehicle dynamics could address execution errors and disturbances (Ames et al., 2017; Xiao and Belta, 2022). 
+
+> 54 Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+Appendix A. Proof of Proposition 1 
+
+A point s = [ ξ⊺, 0] ⊺ ∈ R3 lies in the sensor FoV cone exactly when 
+
+o⊺(s − r) > 0, o⊺(s − r)
+
+∥s − r∥ ≥ cos α. (123) Letting d = ξ − p be the planar relative position vector, the boundary of the cone-plane intersection satisfies (b⊺d − oz h)2 = cos 2 α(∥d∥2 + h2). (124) Together with the forward-cone condition in (123), the downward-facing intersection whose boundary satisfies (124) is a bounded ellipse precisely when D = o2 
+
+> z
+
+− sin 2 α > 0 and 
+
+oz < − sin α. At the limiting and opposite cases the plane-cone intersection may instead be parabolic, hyperbolic, or lie on the opposite cone nappe. For b̸ = 0, use the principal directions ( u, v ), write ζ = u⊺d and η = v⊺d, expand (124), and complete the square to obtain 
+
+D(ζ − ζc)2 + cos 2 αη 2 = h2 sin 2 α cos 2 αD , ζc = − oz h∥b∥
+
+D . (125) Consequently, transforming back to the original variable ξ and collecting terms yields the desired result. If b = 0, (124) reduces directly to the stated circular nadir footprint. 
+
+Appendix B. Void Probability Linearization 
+
+To compute the derivative of the negative log void probability, we need to compute the variation in the integration domain Cρ(p). We assume locally that the swept corridor is compactly contained in the interior of Ω, has a sufficiently regular boundary, has a unique closest path point almost everywhere on that boundary, and undergoes no topology change under the perturbation; under these assumptions the following is a local shape derivative. If the corridor meets ∂Ω, the fixed part of the clipped boundary must instead be excluded from the moving-boundary integral. We fix one agent throughout this appendix and suppress its index. Let ˆP be the current SCvx reference and perturb it in the direction ∆ P , i.e., 
+
+P ε = ˆP + ε∆P , which implies the position variation δp (t) = PNn=0 Bn(t)∆ pn. Denote the reference corridor by ˆC = Cρ( ˆP ). Define the generic spatial integral over the corridor Cρ(P )with respect to a sufficiently regular function f : Ω → R+ as 
+
+If (P ) ≜
+
+Z 
+
+> Cρ(P)
+
+f (ξ) d ξ, 
+
+which implies H(P ) = Iλ(P )−P 
+
+> j
+
+log  1−rj Iρj (P ). Thus, it suffices to compute ∇pn If ( ˆP )to perform the objective linearization. Consider a point ξ ∈ ∂ ˆC and the closest point on the corresponding path p τ ⋆(ξ), where τ ⋆(ξ) ≜ argmin t∈[0 ,T ] ∥p(t) − ξ∥ is the corresponding time. It follows that ∥ξ − p(τ ⋆(ξ)) ∥ = ρ and that the normal vector at ξ is ν(ξ) =  ξ −
+
+p(τ ⋆(ξ)) /ρ . Next, consider the corridor Cερ induced by the perturbed path P ε. Similarly, take a point on the boundary ξε with normal vector νε(ξε). The velocity field on the boundary ∂ ˆC is then given by 
+
+V (ξ)⊺ν(ξ) = δp  τ ⋆(ξ)⊺ν(ξ), (126) 
+
+> 55
+
+Joshua Pilipovsky 
+
+See Figure 17 for an illustration of the various deformations and vectors used throughout the analysis. Suppose that the perturbation of the path induces a boundary velocity field 
+
+V (ξ) on ∂ ˆC. It follows that 
+
+DIf ( ˆP )[∆ P ] ≜ ddε If (P ε) ε=0 
+
+= ddε
+
+Z 
+
+> Cρ(Pε)
+
+f (ξ) d ξ ε=0 
+
+=
+
+Z 
+
+> ∂ˆC
+
+f (ξ)V ⊺(ξ)ν(ξ) d s
+
+=
+
+Z 
+
+> ∂ˆC
+
+f (ξ)δp ⊺ τ ⋆(ξ)ν(ξ) d s, 
+
+where the second equality follows from the Hadamard formula (Hiptmair and Li, 2013), and the third follows from (126). Substituting the piecewise-linear path expression into the 
+
+Figure 17: Illustration of various geometric objects, properties, and deformation of path-centered corridor in shape calculus. shape derivative yields 
+
+DIf ( ˆP )[∆ P ] = 
+
+Z 
+
+> ∂ˆC
+
+f (ξ)
+
+" NX
+
+> n=0
+
+Bn
+
+ τ ⋆(ξ)∆pn
+
+#⊺
+
+ν(ξ) d s
+
+=
+
+> N
+
+X
+
+> n=0
+
+∆p⊺
+
+> n
+
+Z 
+
+> ∂ˆC
+
+f (ξ)Bn
+
+ τ ⋆(ξ)ν(ξ) d s. 
+
+Define the integral 
+
+σf,n ( ˆP ) ≜
+
+Z 
+
+> ∂ˆC
+
+f (ξ)Bn
+
+ τ ⋆(ξ)ν(ξ) d s ∈ R2, (127) from which it follows that ∇pn If ( ˆP ) = σf,n ( ˆP ). Consequently, provided 1 − rj Iρj ( ˆP ) > 0for every j, the void-probability linearization becomes 
+
+H(P ) ≈ H ( ˆP ) + 
+
+> N
+
+X
+
+> n=0
+
+σλ,n ( ˆP ) + 
+
+> L
+
+X
+
+> j=1
+
+rj σρj ,n ( ˆP )1 − rj Iρj ( ˆP )
+
+
+
+> ⊺
+
+(pn − ˆpn). (128) 
+
+56 Collaborative Autonomy for Heterogeneous UAV/UGV Teams 
+
+Appendix C. Distance Function Linearization 
+
+Let dA(p) ≜ dist( p, A) denote the minimum distance from point p to the nonempty, closed, convex set A ⊆ Ω. Let ˆ p / ∈ A be the reference point and compute the projection ˆq ≜ ΠA(ˆ p) = argmin 
+
+> q∈A
+
+∥ˆp − q∥. (129) Then it follows that dA(ˆ p) = ∥ˆp − ˆq∥. Define the outward unit vector ˆ n = (ˆ p − ˆq)/∥ˆp − ˆq∥.The distance function then has the gradient (Bauschke and Combettes, 2017) 
+
+∇dA(p) = p − ΠA(p)
+
+∥p − ΠA(p)∥ , p / ∈ A . (130) Since dA is a convex function, we have the global lower bound 
+
+dA(p) ≥ dA(ˆ p) + ∇d⊺
+
+> A
+
+(ˆ p)( p − ˆp), (131) thus the linearized constraint is a conservative inner approximation of the feasible set, that is, 
+
+{p : dA(ˆ p) + ˆ n⊺(p − ˆp) ≥ ρ} ⊆ { p : dA(p) ≥ ρ} .
+
+Appendix D. Flow Sensitivities and Shooting Linearization 
+
+For a reference shooting state ˆ zan and held control ˆ un, let ˆζn(t) solve ˙ˆζn(t) = faug (ˆζn(t), ˆun), ˆζn(tn) = ˆ zan, t ∈ [tn, t n+1 ].
+
+Where faug is continuously differentiable along this rollout, define 
+
+An(t) = Dza faug (ˆζn(t), ˆun), Bn(t) = Dufaug (ˆζn(t), ˆun).
+
+The sensitivities to the initial state and held control satisfy the variational equations ˙Φz,n (t) = An(t)Φ z,n (t), Φz,n (tn) = Ida ,
+
+˙Φu,n (t) = An(t)Φ u,n (t) + Bn(t), Φu,n (tn) = 0 da×ma , (132) where da = dim za and ma = dim un. Their endpoint values give the flow Jacobians 
+
+An = Φ z,n (tn+1 ) = Dza F an (ˆ zan, ˆun), Bn = Φ u,n (tn+1 ) = DuF an (ˆ zan, ˆun).
+
+Thus, with cn = F an (ˆ zan, ˆun) − An ˆzan − Bn ˆun, the linearized shooting equation is 
+
+zan+1 = Anzan + Bnun + cn. (133) We integrate the reference trajectory and variational equations together to obtain numerical approximations of the flow and its Jacobians. For the symmetric accumulator representa-tion, the shared pair defect uses ¯ zan, formed from the agent states and the averages of the endpoint copies. Its derivatives follow by composing the flow Jacobians with this linear averaging map. The copy-agreement constraints are already affine. For the UGV formula-tion, the same equations apply with zan, F an , and faug replaced by zgn, F gn , and f g
+
+> aug
+
+. The augmented state and held-control dimensions are then dg = 4 Ng +|E| and 2 Ng, respectively. 
+
+57 Joshua Pilipovsky 
+
+References 
+
+Ian Abraham and Todd D. Murphey. Decentralized ergodic control: Distribution-driven sensing and exploration for multiagent systems. IEEE Robotics and Automation Letters ,3(4):2987–2994, 2018. doi: 10.1109/LRA.2018.2849588. Ian Abraham, Anastasia Mavrommati, and Todd D. Murphey. Data-driven measurement models for active localization in sparse environments. In Proceedings of Robotics: Science and Systems , Pittsburgh, Pennsylvania, 2018. doi: 10.15607/RSS.2018.XIV.045. Aaron D. Ames, Xiangru Xu, Jessy W. Grizzle, and Paulo Tabuada. Control barrier function based quadratic programs for safety critical systems. IEEE Transactions on Automatic Control , 62(8):3861–3876, 2017. doi: 10.1109/TAC.2016.2638961. Elif Ayvali, Hadi Salman, and Howie Choset. Ergodic coverage in constrained environments using stochastic trajectory optimization. In Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 5204–5210, 2017. doi: 10.1109/ IROS.2017.8206410. Yaakov Bar-Shalom, X. Rong Li, and Thiagalingam Kirubarajan. Estimation with Appli-cations to Tracking and Navigation: Theory, Algorithms, and Software . John Wiley & Sons, New York, 2001. ISBN 978-0-471-41655-5. doi: 10.1002/0471221279. Heinz H. Bauschke and Patrick L. Combettes. Convex Analysis and Monotone Opera-tor Theory in Hilbert Spaces . Springer, Cham, second edition, 2017. doi: 10.1007/ 978-3-319-48311-5. Michael Beard, Ba-Tuong Vo, Ba-Ngu Vo, and Sanjeev Arulampalam. Void probabilities and Cauchy–Schwarz divergence for generalized labeled multi-Bernoulli models. IEEE Trans-actions on Signal Processing , 65(19):5047–5061, 2017. doi: 10.1109/TSP.2017.2723355. Henry Berger and Ian Abraham. RAnGE: Reachability analysis for guaranteed ergodicity. arXiv:2404.03186, 2024. Lars Blackmore, Masahiro Ono, and Brian C. Williams. Chance-constrained optimal path planning with obstacles. IEEE Transactions on Robotics , 27(6):1080–1094, 2011. doi: 10.1109/TRO.2011.2161160. Hans Georg Bock and Karl-Josef Plitt. A multiple shooting algorithm for direct solution of optimal control problems. In Proceedings of the 9th IFAC World Congress , pages 1603–1608, 1984. doi: 10.1016/S1474-6670(17)61205-9. Stephen Boyd and Lieven Vandenberghe. Convex Optimization . Cambridge University Press, 2004. doi: 10.1017/CBO9780511804441. Stephen Boyd, Neal Parikh, Eric Chu, Borja Peleato, and Jonathan Eckstein. Dis-tributed optimization and statistical learning via the alternating direction method of multipliers. Foundations and Trends in Machine Learning , 3(1):1–122, 2011. doi: 10.1561/2200000016. 
+
+> 58 Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+Jonathan Butzke, Kalin Gochev, Benjamin Holden, Eui jung Jung, and Maxim Likhachev. Planning for a ground-air robotic system with collaborative localization. In Proceedings of the IEEE International Conference on Robotics and Automation , pages 284–291, 2016. doi: 10.1109/ICRA.2016.7487146. Kathryn Chaloner and Isabella Verdinelli. Bayesian experimental design: A review. Statis-tical Science , 10(3):273–304, 1995. doi: 10.1214/ss/1177009939. Isaac Chavel. Eigenvalues in Riemannian Geometry . Academic Press, Orlando, Florida, 1984. ISBN 978-0-12-170640-1. Gerardo De La Torre, Kathrin Flaßkamp, Ahalya Prabhakar, and Todd D. Murphey. Er-godic exploration with stochastic sensor dynamics. In Proceedings of the American Con-trol Conference , pages 2971–2976, 2016. doi: 10.1109/ACC.2016.7525371. Ayush Dewan, Aravindh Mahendran, Nikhil Soni, and K. Madhava Krishna. Optimiza-tion based coordinated UGV-MAV exploration for 2D augmented mapping. In Pro-ceedings of the International Conference on Autonomous Agents and Multiagent Sys-tems , pages 1125–1126, 2013. URL https://aamas.csc.liv.ac.uk/Proceedings/ aamas2013/docs/p1125.pdf . Extended abstract. Purnanand Elango, Dayou Luo, Abhinav G. Kamath, Samet Uzun, Taewan Kim, and Beh¸ cet A¸ cıkme¸ se. Successive convexification for trajectory optimization with continuous-time constraint satisfaction. arXiv:2404.16826, 2024. URL https://arxiv.org/abs/ 2404.16826 .´Angel F. Garc´ ıa-Fern´ andez, Jason L. Williams, Karl Granstr¨ om, and Lennart Svens-son. Poisson multi-Bernoulli mixture filter: Direct derivation and implementation. 
+
+IEEE Transactions on Aerospace and Electronic Systems , 54(4):1883–1901, 2018. doi: 10.1109/TAES.2018.2805153. Shaohang Han, Gang Chen, Yixi Cai, Ignacio Torroba, Ivan Stenius, Patric Jensfelt, Javier Alonso-Mora, and Jana Tumova. Risk-aware belief control barrier functions over random finite sets. arXiv:2607.15016, 2026. URL https://arxiv.org/abs/2607.15016 .Ralf Hiptmair and Jingzhi Li. Shape derivatives in differential forms I: An intrinsic perspective. Annali di Matematica Pura ed Applicata , 192(6):1077–1098, 2013. doi: 10.1007/s10231-012-0259-9. Christian Hughes, Houston Warren, Darrick Lee, Fabio Ramos, and Ian Abraham. Ergodic trajectory optimization on generalized domains using maximum mean discrepancy. In 
+
+Proceedings of the IEEE International Conference on Robotics and Automation , pages 1–7, 2025. doi: 10.1109/ICRA55743.2025.11127573. G¨ unter Last and Mathew Penrose. Lectures on the Poisson Process . Cambridge University Press, Cambridge, 2017. ISBN 978-1-107-45843-7. doi: 10.1017/9781316104477. Ronald P. S. Mahler. Statistical Multisource-Multitarget Information Fusion . Artech House, Norwood, Massachusetts, 2007. ISBN 978-1-59693-092-6. 
+
+> 59 Joshua Pilipovsky
+
+Yuanqi Mao, Michael Szmuk, and Beh¸ cet A¸ cıkme¸ se. Successive convexification of non-convex optimal control problems and its convergence properties. In Proceedings of the IEEE Conference on Decision and Control , pages 3636–3641, 2016. doi: 10.1109/CDC. 2016.7798816. George Mathew and Igor Mezi´ c. Metrics for ergodicity and design of ergodic dynamics for multi-agent systems. Physica D: Nonlinear Phenomena , 240(4–5):432–442, 2011. doi: 10.1016/j.physd.2010.10.010. Anastasia Mavrommati, Emmanouil Tzorakoleftherakis, Ian Abraham, and Todd D. Mur-phey. Real-time area coverage and target localization using receding-horizon ergodic exploration. IEEE Transactions on Robotics , 34(1):62–80, 2018. doi: 10.1109/TRO.2017. 2766265. Lauren M. Miller and Todd D. Murphey. Trajectory optimization for continuous ergodic exploration. In Proceedings of the American Control Conference , pages 4196–4201, 2013. doi: 10.1109/ACC.2013.6580484. Lauren M. Miller, Yonatan Silverman, Malcolm A. MacIver, and Todd D. Murphey. Ergodic exploration of distributed information. IEEE Transactions on Robotics , 32(1):36–52, 2016. doi: 10.1109/TRO.2015.2500441. Kaleb Ben Naveed, Devansh R. Agrawal, Rahul Kumar, and Dimitra Panagou. Adaptive ergodic search with energy-aware scheduling for persistent multi-robot missions. Au-tonomous Robots , 49(4):27, 2025. doi: 10.1007/s10514-025-10215-6. Hoa Van Nguyen, Hamid Rezatofighi, Ba-Ngu Vo, and Damith C. Ranasinghe. Multi-objective multi-agent planning for jointly discovering and tracking mobile objects. Pro-ceedings of the AAAI Conference on Artificial Intelligence , 34(5):7227–7235, 2020. doi: 10.1609/aaai.v34i05.6213. Kenshiro Oguri. Successive convexification with feasibility guarantee via Augmented La-grangian for non-convex optimal control problems. In Proceedings of the IEEE Conference on Decision and Control , pages 3296–3302, 2023. doi: 10.1109/CDC49753.2023.10383462. Felix Rey, Zhoudan Pan, Adrian Hauswirth, and John Lygeros. Fully decentralized ADMM for coordination and collision avoidance. In Proceedings of the European Control Confer-ence , pages 825–830, 2018. doi: 10.23919/ECC.2018.8550245. Roland Schwan, Yuning Jiang, Daniel Kuhn, and Colin N. Jones. PIQP: A proximal interior-point quadratic programming solver. arXiv preprint arXiv:2304.00290 , 2023. G¨ osta Stomberg, Alexander Engelmann, Moritz Diehl, and Timm Faulwasser. Decentralized real-time iterations for distributed NMPC. IEEE Transactions on Automatic Control , 71 (3):1584–1599, 2026. doi: 10.1109/TAC.2025.3622000. Andreas W¨ achter and Lorenz T. Biegler. On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming. Mathematical Programming ,106(1):25–57, 2006. doi: 10.1007/s10107-004-0559-y. 
+
+> 60 Collaborative Autonomy for Heterogeneous UAV/UGV Teams
+
+Yang Wang and Stephen Boyd. Fast model predictive control using online optimization. 
+
+IEEE Transactions on Control Systems Technology , 18(2):267–278, 2010. doi: 10.1109/ TCST.2009.2017934. Jason L. Williams. Marginal multi-bernoulli filters: RFS derivation of MHT, JIPDA, and association-based MeMBer. IEEE Transactions on Aerospace and Electronic Systems , 51 (3):1664–1687, 2015. doi: 10.1109/TAES.2015.130550. Andrew D. Wilson, Jarvis A. Schultz, and Todd D. Murphey. Trajectory synthesis for Fisher information maximization. IEEE Transactions on Robotics , 30(6):1358–1370, 2014. doi: 10.1109/TRO.2014.2345918. Wei Xiao and Calin Belta. High-order control barrier functions. IEEE Transactions on Automatic Control , 67(7):3655–3662, 2022. doi: 10.1109/TAC.2021.3105491.

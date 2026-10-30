@@ -1,0 +1,405 @@
+Title: EARS-Info: Information-Aware Event-Driven Reallocation for Multi-Robot Exploration
+
+URL Source: https://arxiv.org/pdf/2610.38040v1
+
+Published Time: Fri, 30 Oct 2026 00:36:38 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# EARS-Info: Information-Aware Event-Driven Reallocation for Multi-Robot Exploration 
+
+## Kabeh Mohsenzadegan 1, Vahid Tavakkoli 1, and Kyandoghere Kyamakya 1,2
+
+> 1
+
+Department of Smart Systems Technologies, University of Klagenfurt, Austria 
+
+> 2
+
+Faculté Polytechnique, Université de Kinshasa, Democratic Republic of the Congo Corresponding author: kabeh.mohsenzadegan@aau.at Preprint — October 27, 2026 
+
+Abstract. We introduce EARS-Info, an information-aware extension of Event-Driven Ant Reallocation Search for multi-robot exploration on OpenStreetMap-derived grids. It combines marginal sensing gain, feasible relocation, return-aware routing, sensing reservations, and cached shortest paths. Across 168,000 episodes comparing 30 implementations on eight city maps, EARS-Info achieves the highest mean operational score in every evaluation panel. With eight robots and 3% communication dropout, it improves the score over EARS-Safe by 5.43%, increases weighted discovery from 88.88% to 98.46%, and reduces mean energy use by 2.62%. Score differences are positive in all eight cities ( p = 0.0078125; descriptive 95% city-bootstrap interval [0.0159 , 0.0694 ]), with no simulated incidents across 5,600 EARS-Info episodes. These results support the complete controller; individual component advantages remain uncertain. Generalization is limited by reused geography, one training replicate, coarse maps, and adapted comparison methods. 
+
+Keywords: Multi-robot exploration; event-driven reallocation; information gain; ant-inspired search; runtime safety; OpenStreetMap; swarm robotics. 
+
+# 1 Introduction 
+
+Multi-robot exploration distributes spatial search across a team, but additional robots also create overlapping sensing, conges-tion, and avoidable movement. The useful objective is there-fore not simply to move faster or visit more cells. A controller must direct the team toward new information while preserving enough energy to return and limiting coordination overhead. Recent exploration research studies asynchronous decisions, macro actions, reinforcement learning, and frontier-led swarm-ing [1–6]. Our starting point is Event-Driven Ant Reallocation Search (EARS). Its original local-to-global structure uses an ant-inspired local rule most of the time and invokes relocation when observable search degradation occurs. This structure is interpretable, but a local score can revisit already sensed neighborhoods, a relocation goal can duplicate another robot’s sensing, and repeatedly rebuilding shortest-path fields can dominate runtime. Event triggering alone does not resolve these problems: the value and feasibility of the requested route must also be considered. We develop EARS-Info to address this complete decision process. The method scores newly sensed area using the simu-lator’s sensing footprint, compares feasible distant information gain with the best local opportunity, accounts for return travel before accepting relocation, and reserves sensing footprints across robot decisions. It maintains topology-dependent graph fields across steps rather than treating unchanged geography as a new planning problem. The design reads observable un-certainty and visit information; unsensed mission labels are excluded from policy inputs. This paper makes four contributions. First, it specifies EARS-Info as a new member of our EARS controller family, including the preceding EARS-Safe, negative-pheromone EARS-NP, and hierarchical H-MAPPO-EARS variants. Second, it defines matched local-only, periodic-request, and sensing-reservation controls that clarify what the complete-controller comparison can and cannot identify. Third, it reports a single frozen comparison of all 30 implementations on identical map snapshots, start zones, and step-indexed communication schedules, comprising 168,000 episodes. Fourth, it provides city-level inference, all-method rankings, raw task metrics, and artifact checks rather than relying solely on an aggregate rank. The main question is whether the complete information-aware controller improves our preceding EARS-Safe imple-mentation. Additional questions concern team-size/dropout behavior, alternate target realizations, and the evidence for indi-vidual design choices. The eight evaluation cities are excluded from the current training and checkpoint selection, but their identities have appeared in earlier development. Accordingly, this is an exploratory evaluation on reused geography, condi-tional on the frozen models. It is not a claim of untouched geographic confirmation or of reproducing every named exter-nal MARL algorithm. 
+
+# 2 Related Work 
+
+## 2.1 Cooperative Exploration and Bio-Inspired Search 
+
+Recent multi-robot exploration methods include macro-action deep reinforcement learning under communication dropouts [1], asynchronous MARL for real-time cooperative explo-ration [2], reinforcement-learning-based coordination [3], and frontier-led swarming for unknown environments [5]. Dynamic frontier-led swarming extends these ideas to repeated coverage 1arXiv:2610.38040v1 [cs.RO] 27 Oct 2026 in changing environments [6]. Classical swarm intelligence also remains active in task allocation, including multi-objective ant-colony systems [7], event-triggered adaptive allocation [8], learned intention-aware allocation [9], and reactive multicon-straint assignment in uncertain semantic environments [10]. These studies motivate our use of a local swarm controller as a serious algorithmic baseline rather than a weak heuristic. Our AntSwarmSafe differs from generic ant-colony opti-mization in that pheromone is only one observable term in an online cell-level action score. The controller explicitly rewards novelty and uncertainty, suppresses repeat visits, discourages clustering, and passes actions through a safety monitor. EARS asks a narrower question: can global coordination be applied sparsely, only when local search is measurably degrading? Event-triggered mechanisms are not new in themselves; they have been studied for multi-robot allocation [8] and bandwidth-aware MARL communication [11]. The contribution here is the Ant-based architecture, degradation-triggered relocation mechanism, information-aware route selection and caching, persistent sensing reservations, and matched multi-city evalua-tion. 
+
+## 2.2 MARL and Robotic Benchmarks 
+
+Multi-agent PPO (MAPPO) and related PPO-family methods are strong cooperative MARL references [12], while trust-region formulations provide another principled family [13]. Surveys highlight exploration and scalability as persistent MARL challenges [14, 15]. MultiRoboLearn [16], MAR-BLER [17], and NeuronsMAE [18] emphasize that robot-oriented evaluation must represent dynamics, embodiment, transfer, and reproducibility rather than only abstract multi-agent games. Heterogeneous cooperation further stresses gen-eralization [4]. SafeSwarm-CityTwin complements these plat-forms by concentrating on urban map abstractions, explicit runtime checks, interpretable swarm methods, and geographi-cally resolved comparisons. 
+
+## 2.3 Safety, Energy, Mapping, and Digital Twins 
+
+Filtered reinforcement learning and dynamic shielding demonstrate how runtime constraints can be enforced around multi-agent decision policies [19–21]. Energy-aware coverage planning shows that distance alone can be a poor proxy for battery demand [22]. Distributed mapping frameworks such as Swarm-SLAM and DCL-SLAM address the mapping side of robot-team operation [23, 24]; recent work also combines collaborative SLAM with lightweight frontier exploration [25]. Broader coverage-planning surveys continue to document the tradeoff between completeness, motion cost, and environmen-tal dynamics [26]. Digital-twin research increasingly targets safety-critical robotics and smart-city integration [27–29]. SafeSwarm-CityTwin uses this perspective pragmatically: cached map-derived obstacles, restricted areas, bases, target fields, uncertainty, and communication conditions define reproducible city instances. Here, the term city twin denotes a static map-derived abstraction. The system has no live synchronization, calibrated vehicle dynamics, or physical field validation. 
+
+# 3 Problem Formulation and Runtime Constraints 
+
+## 3.1 Partially Observable Search With Shared State 
+
+Let N robots move on an L × L grid, with traversable cells G ,obstacle cells, restricted cells, and a set of bases B. Robot 
+
+i has position xi(t) and battery bi(t). Each action moves one cell north, south, east, or west, or remains stationary. The geometry is known; mission locations and priorities are hidden until sensed. Consequently, this is mission exploration on a known grid, rather than simultaneous localization and mapping in unknown geometry. Policies access a shared observation field o(c), uncertainty 
+
+u(c), pheromone h(c), visit counts v(c), robot positions, batter-ies, and communication status. Only the evaluator and sensing model read unsensed target coordinates and priorities. Per-robot action scoring does not imply a fully distributed imple-mentation: shared fields and team positions are directly acces-sible in the simulator. Communication dropouts update status counters but do not implement bandwidth limits or delayed map exchange. 
+
+## 3.2 Metrics and Operational Score 
+
+For mission cells M , discovered cells D ⊆ M , and priority weights wc, weighted discovery is Dw = ∑c∈D wc/ ∑c∈M wc.Mission discovery without weights is |D|/|M |; the exported field mission_success_rate denotes this fraction, not the probability of completing an entire mission. Coverage C is the fraction of traversable cells visited, and redundancy R is the fraction of visited cells whose visit count exceeds one. Distance is measured in grid-cell moves. Energy U is the sum of depleted battery units, with 100 initial units per robot. Communication availability Q is the fraction of active robot-time samples marked online; it is not message efficiency. The hardware-independent operational score is 
+
+J = 0.35 Dw + 0.20 C + 0.20 S + 0.10 E + 0.10 (1 − R) + 0.05 Q,
+
+(1) where S = 1 − min {1, I/(NT )}, E = 1 − min {1,U/(100 N)},
+
+T is the executed episode length, and I counts simulator col-lisions, restricted-zone entries, and battery failures. This inci-dent metric does not count every rule checked by the monitor. Safety interventions and rejected proposals are distinct from ex-ecuted incidents. Early mission completion shortens episodes, so energy, distance, coverage, and runtime describe a complete rollout under its stopping rule, not an equal-duration compari-son. All score components lie in [0, 1]; raw metrics accompany 
+
+J to expose tradeoffs. 23.3 Runtime Safety Checks and Their Scope 
+
+The monitor checks grid boundaries, obstacles, restricted cells, occupied and sequentially reserved robot positions, a battery-return estimate, and a communication-loss counter (maximum five consecutive steps). For candidate cell c, the battery check uses bi ≥ 0.55 d1(c, B) + 5, where d1 is nearest-base Manhat-tan distance; arrival at a base has a separate positive-battery exception. A proactive guard activates before the hard reserve threshold and favors base progress. Invalid proposals are re-placed by an admissible alternative when one exists. These rules are not a formal safe-set invariance guarantee. Manhattan distance can underestimate an obstacle-avoiding return route, the reserve expression does not explicitly deduct the pending action cost, and an empty admissible set falls back to S TAY , which need not satisfy every rule. Communication status also changes during the simulator step. The reported zero-incident result is therefore empirical and specific to the implemented incident metric and tested scenarios. The suf-fix Safe identifies a filtered benchmark policy, not certified deployment safety. 
+
+# 4 Proposed Methods 
+
+## 4.1 AntSwarmSafe 
+
+AntSwarmSafe is the interpretable local reference from which the EARS family develops. For a candidate cell c, let v(c) be the visit count, n(c) = 1/(1 + v(c)) novelty, u(c) uncertainty, 
+
+p(c) sensed priority evidence, h(c) pheromone, gi(c) swarm congestion relative to robot i, and do(c) distance to an ob-servable target/evidence proxy. The implemented local score is 
+
+Ai(c) = 1.00 n(c) + 0.55 u(c)n(c) − 0.55 v(c) + 1.40 p(c)+ 0.45 h(c)n(c) − 0.85 gi(c) − 0.025 do(c)
+
+− 8 Irestricted (c).
+
+(2) AntSwarmSafe scores non-obstacle neighbors, including the current cell, proposes the highest-scoring cell, and then applies sequential runtime filtering. Ties retain the first candidate in action order. Novelty and uncertainty drive coverage, the re-visit term discourages cycling, sensed priority and pheromone exploit evidence, and congestion suppression distributes the team. Here p(c) = o(c) clip (1 − u(c), 0, 1), multiplied by 0.15 for an already discovered mission. Congestion sums inverse Euclidean distances to other robots (with contribution 2 for coincident positions). The proxy distance do is the nearest Euclidean distance to at most 32 cells ranked by observable priority, frontier value, and pheromone; it is zero if that set is empty. Thus, the controller does not read unsensed mission coordinates. 
+
+## 4.2 EARS-Safe: Event-Driven Ant Reallocation Search 
+
+EARS-Safe (Event-Driven Ant Reallocation Search) uses the coefficients in Eq. (2) for local search. It maintains up to 12 positions sampled when event detection is eligible; this is not necessarily a consecutive 12-step trajectory. Event checks begin at simulator step seven and pause during an active relo-cation or cooldown. Stagnation requires at least nine stored positions and a unique-cell ratio at most 0.46. Otherwise, a trigger occurs if the fraction of neighboring cells with v(c) > 1reaches 0.54, or congestion reaches 1.15. The checks have priority stagnation, revisit, then congestion, so trigger counts record the first satisfied condition. At trigger time t0, the implementation sets the relocation deadline to t0 + 9 and accepts steps through that deadline inclu-sively: the option can therefore execute for up to ten decisions, unless the goal is reached or return behavior takes precedence. New triggering is blocked until t0 + 16. These details distin-guish the configured duration parameter from the executed option length. For relocation, define n(c) = 1/(1 + v(c)) , r(c) = v(c)/(1 +
+
+v(c)) , e(c) = clip (o(c)( 1 − u(c)) , 0, 1), ¯ u(c) = clip (u(c), 0, 1),and ¯ h(c) = clip (h(c)/2, 0, 1). The frontier value f (c) is the fraction of four-connected neighbors with uncertainty below 0.99, multiplied by n(c) and by the indicator that c itself is unobserved. The global field is 
+
+F(c) = 1.35 f (c) + 1.10 e(c) + 0.45 ¯ u(c)n(c)+ 0.72 n(c) + 0.18¯ h(c)n(c) − 0.95 r(c). (3) Obstacle and restricted cells are excluded. Newly triggered robots are processed in ascending battery level, then identifier. For robot i, let di(c) = ∥xi −c∥1, bUi(c) = 0.55 di(c), and si(c) = 
+
+max {0, 5 − min g∈C ∥c − g∥1}, where C contains goals already selected in this allocation batch; si = 0 if it is empty. The relocation score is 
+
+Ri(c) = F(c) − 0.16 di(c)/L − 0.22 bUi(c)/100 
+
+− 0.70 gi(c) − 0.20 si(c) − 10 Iinf (c), (4) where infeasibility denotes bUi(c) + 0.55 d1(c, B) + 12 > bi.The distance divisor is grid side length L, not the number of traversable cells. The infeasibility term is a soft goal penalty; hard action checks remain separate. Goal following uses breadth-first graph distances around obstacles and restricted cells, rewarding progress and penalizing revisits. The EARS return option takes priority when bi ≤ 0.55 d1(xi, B) + 16. 
+
+Relationship to the Ant reference. EARS maximizes its local score over the sequentially admissible action set and resolves ties by novelty and action label. AntSwarmSafe in-stead proposes before filtering. EARS also has an explicit return option. The two methods therefore share a local scor-ing rule but are not behaviorally identical outside relocation. Their paired comparison estimates the effect of the complete EARS implementation; it does not isolate event triggering. The information-policy controls below instead preserve the v9 ac-tion and return logic to examine relocation within that newer implementation. 3Algorithm 1 EARS-Safe joint decision at simulator step t 
+
+> 1:
+
+Read shared observable fields and current robot state  
+
+> 2:
+
+T ← ∅; P ← ∅ (planned positions)  
+
+> 3:
+
+for each active robot i not requiring return do  
+
+> 4:
+
+if no unfinished relocation and cooldown has expired then  
+
+> 5:
+
+Append position to eligible-check history  
+
+> 6:
+
+Evaluate stagnation, revisit, congestion in that order  
+
+> 7:
+
+if a condition triggers then  
+
+> 8:
+
+Add i to T 
+
+> 9:
+
+end if  
+
+> 10:
+
+end if  
+
+> 11:
+
+end for  
+
+> 12:
+
+Allocate goals to T by battery order using Eq. (4)  
+
+> 13:
+
+for each robot i in identifier order do  
+
+> 14:
+
+Obtain admissible actions using the monitor and P 
+
+> 15:
+
+if robot is inactive or no admissible action exists then  
+
+> 16:
+
+ai ← STAY  
+
+> 17:
+
+else if return option is active then  
+
+> 18:
+
+Choose graph-progress action toward a base  
+
+> 19:
+
+else if relocation option is active then  
+
+> 20:
+
+Choose graph-progress action toward its goal  
+
+> 21:
+
+else  
+
+> 22:
+
+Maximize Eq. (2) over admissible actions  
+
+> 23:
+
+end if  
+
+> 24:
+
+Add the selected next position to P 
+
+> 25:
+
+end for  
+
+> 26:
+
+Execute the joint action and advance the simulator 
+
+Table 1: EARS parameters reported with the supplied results and matching the inspected implementation defaults. Values are verified against the selected EARS checkpoint archived with the latest study.              
+
+> Parameter Value Eligible-check history capacity 12 positions First eligible simulator step 7Stagnation unique-cell ratio ≤0.46 Repeated-visit ratio ≥0.54 Congestion threshold ≥1.15 Relocation deadline offset 9 steps (inclusive) Cooldown deadline offset 9+7 steps
+
+## 4.3 EARS Family and Scope of Comparison 
+
+EARS-Safe, EARS-NP-Safe, H-MAPPO-EARS-Safe, and EARS-Info-v9 are members of our proposed method family. EARS-NP adds a decaying, diffusing repulsive pheromone field to discourage revisits and congestion. H-MAPPO-EARS uses a repository-trained MAPPO local option within a hierarchy of return, relocation, escape, and exploitation behaviors. It is a hybrid controller rather than a new MAPPO training algorithm. These earlier family members measure the development of the proposed approach and are not independent external competitors. The three additional v9 variants are diagnostic controls of our information controller. EARS-Info-Local-v9 disables relocation while retaining the information-based local rule, graph return logic, monitor, and action ordering. EARS-Info-Periodic16 changes only the event-request schedule to a fixed period of 16 steps after initial eligibility, preserving routing and feasibility checks; accepted intervention counts are measured rather than assumed to match. EARS-Info-NoSensingReservations removes sensing-footprint overlap reservations while preserving collision-related position reservations. All four v9 variants use the same newly selected EARS-Safe checkpoint and the same routing configuration except for the specified intervention. 
+
+## 4.4 Marginal Sensing Gain and Local Action Selection 
+
+Let F (c) contain non-obstacle cells within Manhattan sensor radius r of cell c, and let R denote already reserved sensing cells. The information field is 
+
+GR (c) = ∑q∈F (c)\R I[u(q) ≥ 0.99 ]
+
+1 + 2r(r + 1) . (5) This is a normalized count of unobserved cells, not an entropy estimate or access to hidden mission priorities. The fixed denominator is the full sensor footprint, including at boundaries where fewer cells can be sensed. The field is computed by summing shifted uncertainty arrays over the sensor diamond. For an admissible action with destination c, v9 uses 
+
+Ainfo  
+
+> i
+
+(c) = 2GR (c) + 0.35 1 + v(c) − 0.10 min (v(c), 5)
+
+− 0.15 κi(c) − 0.02 I[ai = STAY ],
+
+(6) where κi sums inverse Manhattan distances to at most the three nearest other robots within four cells, using a minimum denom-inator of 0.5. Safe actions are evaluated directly and ties follow the action label. After each robot’s decision, its intended next sensing footprint enters R. Collision reservations remain a sep-arate part of the monitor. Thus, v9 changes local information collection as well as relocation and should not be interpreted as an event-only modification of EARS-Safe. 
+
+## 4.5 Event Requests and Feasible Information Routing 
+
+V9 records positions once per simulator step. Once the 12-position history is full, a unique-position fraction at most 0.46 requests reallocation. A second request condition is exhausted local information: the maximum unreserved G(c) over the current cell and graph neighbors is zero. Requests begin at step seven, require online status, and respect retry and cooldown intervals. Robots returning to base or already following a route do not issue new requests. Let di(c) be shortest-path distance from robot i to c on the traversable grid, and dB(c) the graph distance to a reachable base. A candidate satisfies 2 ≤ di(c) ≤ min (32 , Tmax − t),
+
+0.55 [di(c) + dB(c)] + 18 ≤ bi(t). (7) Its utility is 
+
+Vi(c) = 2GR (c) + 0.35 /(1 + v(c)) 
+
+1 + 0.15 di(c) . (8) 4Algorithm 2 EARS-Info-v9 decision at step t                       
+
+> 1: Verify cached topology; update gain field and position histories
+> 2: Cancel finished, stale, exhausted, or return-preempted routes
+> 3: for each active robot eligible to request relocation do
+> 4: Test stagnation and local information exhaustion
+> 5: end for
+> 6: Reserve sensing around active goals
+> 7: for requesting robots in battery/identifier order do
+> 8: Build/reuse graph distances and apply Eq. (7)
+> 9: Accept best Eq. (8) only above the local margin
+> 10: Reserve accepted goal footprint; set retry/deadline
+> 11: end for
+> 12: for robots in identifier order do
+> 13: Form admissible actions using planned-position reservations
+> 14: Select inactive stay, return, route progress, or Eq. (6)
+> 15: Reserve selected position and sensing footprint
+> 16: end for
+> 17: Execute the joint action
+
+Candidates with zero gain or failed feasibility are discarded. The best candidate is accepted only if Vi(c) exceeds the best cur-rent/neighbor numerator by at least 0.08. Otherwise, the robot keeps its local information policy. This compares discounted distant opportunity with immediately accessible information; the threshold is fixed rather than selected on test outcomes. Robots requesting routes are considered in ascending bat-tery and identifier order. Existing active goals reserve their sensing footprints before new goals are allocated. An accepted route receives a deadline based on its graph distance plus four slack steps, capped by the remaining horizon. Arrival, expiry, exhausted goal information, inactivity, or return necessity can-cels it. Accepted and rejected requests receive a five-step retry backoff; arrival/cancellation also starts a five-step cooldown. During route following, graph progress has priority over infor-mation gain and visit-count tie breakers, preventing accumu-lated visits from reversing the path objective. Return behavior activates when bi ≤ 0.55 (dB(xi) + 1) + 18. V9 uses a multi-source base-distance field, although the sur-rounding runtime monitor retains its native checks. The graph-based reserve improves route screening but is not a proof of recursive feasibility. 
+
+## 4.6 Caching and Computational Cost 
+
+For M = L2 cells, the traversable graph has O(M) vertices and edges. A breadth-first distance field costs O(M); a multi-source traversal supplies base distances. Topology is keyed by environment identity, grid size, obstacles, restricted cells, and bases. An ordered cache retains at most 96 goal-distance fields across steps and is invalidated on topology changes. Its worst-case storage is O(96 M). Information-field convolution costs 
+
+O(Mr 2) for fixed sensor radius. Each relocation request still scans grid candidates and may build a distance field. Caching reduces repeated graph work; it does not imply constant-time planning or a general asymptotic speedup. Reported wall-clock gains below are empirical on the recorded platform. Table 2: Frozen test-map abstraction. Reachability is from the north-east start; Tokyo reaches 100% of targets from the south-west start. 
+
+## City Targets Obstacles Reachable (%) San Francisco 879 241 99.20 Paris 236 2 100.00 Barcelona 476 30 100.00 Rome 531 139 99.81 New York 153 4 100.00 Chicago 1 0 100.00 Tokyo 509 118 99.61 Melbourne 313 46 100.00 
+
+> The grid has 1,600 cells. Counts reflect merged representative-point labels, not building footprints. Chicago has two restricted cells despite having no obstacle cells.
+
+# 5 Experimental Methodology 
+
+## 5.1 Geography, Observation, and Map Prove-nance 
+
+Training uses Vienna, London, and Berlin; validation uses Amsterdam and Prague. Evaluation uses San Francisco, Paris, Barcelona, Rome, Manhattan/New York, Chicago, Tokyo, and Melbourne. Training start zones are north-west, south-east, and center; validation uses west, east, north, and south; evalua-tion alternates north-east and south-west. The current training and checkpoint selection do not consume evaluation metrics. Because city identities were used in earlier studies, these splits do not erase development exposure to the geography. Each snapshot queries OpenStreetMap around a geocoded center with radius parameter 1.4 km and maps returned features to a 40 ×40 grid [30]. Points or representative points are scaled by the returned feature bounds. Buildings mark obstacles; industrial/railway land use and water/wetland mark restrictions. Mission priorities are 1.00 for emergency/clinical facilities, 0.85 for schools/care/community facilities, 0.75 for transport, 0.65 for tourism, 0.55 for recreation, and 0.45 for shops/offices. Co-located targets retain the maximum weight; mission and base cells override blocked labels. Start preprocessing selects traversable bases near the assigned zone. Geometry and mission provenance must both be OpenStreetMap-derived. Invalid legacy caches are re-freshed; synthetic fallback, empty missions, invalid priorities, out-of-grid cells, and target/blocked overlap are rejected. All methods then use identical frozen snapshots. These checks establish provenance and internal consistency, not fidelity to building footprints or physical mobility. Table 2 reports actual grid complexity. Chicago is particularly sparse; it remains in the original eight-map descriptive panel, with exclusion sensitivity reported separately. No map was dropped after seeing method scores. 5Shared observable inputs 
+
+Uncertainty map, visit counts, robot state, and known geometry 
+
+Graph-aware return 
+
+Shortest path to a base Battery reserve check 
+
+Local information policy 
+
+Marginal sensing gain Novelty and congestion 
+
+Relocation request 
+
+Stagnation or exhausted local sensing gain 
+
+Feasible information route 
+
+Gain–travel utility Route and return feasibility Cached BFS distance fields Goal-footprint reservations 
+
+Select admissible actions in priority order 
+
+Return > active relocation > local information action Runtime checks and sequential collision reservations 
+
+Reserve next sensing footprints and execute joint action 
+
+Update shared observations and robot state for the next step Figure 1: The proposed information controller. Both local exploration and relocation use observable sensing gain. Graph return and runtime action filtering remain part of execution. 
+
+## 5.2 Training, Selection, and Method Ownership 
+
+The learned GRPO, IPPO, MAPPO, and HAPPO implemen-tations are trained on the development cities, followed by the existing teacher-assisted coordination upgrade. PRISM config-urations and the EARS family are selected using training and validation performance. The initial learning command requests 108 episodes per learned policy, 12 validation episodes and two validation repeats; coordination uses two rounds; PRISM uses eight rounds; EARS shortlisting uses six training episodes and eight validation episodes with two repeats. Commands, selection histories, checkpoint hashes, and elapsed times are archived. These budgets describe the pipeline rather than a claim of equal optimizer steps across methods. One training replicate is available. The comparison includes 26 preceding implementations and four v9 implementations. The earlier EARS methods, the pro-posed v9 controller, and its controls are our family of methods; their progression is shown explicitly. Other implementations provide comparison context. QMIX-Safe, MADDPG-Safe, and MAT-Safe are lightweight policy-style adaptations, not complete published QMIX, MADDPG, or MAT reproductions. Repository PPO-family policies use trained linear/residual models. The comparison therefore concerns the frozen im-plementations, not a general ranking of published MARL al-gorithms. RandomAgent and GreedyAgent are unfiltered ref-erence controls. Heuristics have no learned weights; GRPO ablations share the corresponding trained checkpoint. Native filter and return implementations differ. 
+
+## 5.3 Evaluation Grid and Paired Execution 
+
+Both mission-stop and fixed-budget panels evaluate N ∈{4, 8, 16 , 32 } robots and dropout pd ∈ { 0, 0.03 , 0.15 , 0.30 },with 20 episodes per city/setting/method. Each panel contains 8 × 16 × 20 × 30 = 76 , 800 episodes. Mission-stop ends at complete discovery, all-agent termination, or step 160. Fixed-budget disables mission-completion stopping, but all-agent termination can still shorten a rollout. Consequently, it is a horizon-controlled rather than guaranteed equal-duration comparison. The SWAP panel uses eight robots, 3% dropout, three target seeds (2042, 3051, 4060), and 20 episodes per city/seed/method, giving 14,400 episodes. Total evaluation 6size is 168,000. The primary setting is mission-stop with eight robots and 3% dropout, giving 160 episodes per method and 4,800 episodes across methods. Each episode starts robots with 100 battery units, uses movement cost 0.55, idle cost 0.10, Manhattan sensing radius one, sensed uncertainty factor 0.25, and pheromone decay 0.96. All methods share frozen maps, starts, episode seeds, and communication draws indexed by simulator step and robot. Draw hashes agree within every one of the 5,600 matched scenarios. Method execution is serial with rotated method or-der. An observed-only environment interface hides unsensed mission labels; this is verified through action-parity fixtures. Shared map access nevertheless persists during disconnec-tion, so dropout is not a realistic delayed decentralized map-exchange model. 
+
+## 5.4 Primary Inference and Secondary Analyses 
+
+The frozen primary contrast is EARS-Info-v9 minus EARS-Safe in operational score at the primary setting. For city c, aver-age paired episode differences to obtain ∆c; report ¯ ∆ = 18 ∑c ∆c.The exact two-sided sign-flip test enumerates all 2 8 assign-ments of city signs and compares absolute means. Its interpre-tation depends on the symmetry/exchangeability assumption for city contrasts. It does not make eight reused cities a random representative sample of all environments. A descriptive city-bootstrap interval resamples the eight city means 20,000 times with replacement (seed 91827). It mea-sures between-city variation conditional on the frozen check-points, not training-seed variability. Equal-city aggregation is retained for all panel means. The 1,739 secondary comparisons cover metrics, comparators, and panels, and use one conser-vative Holm family. They are exploratory; the primary test is reported separately. At eight cities, the minimum two-sided sign-flip p is 0.0078125, so the broad correction also limits power for component-level conclusions. The family is not narrowed retrospectively to obtain significance. SWAP changes hidden mission subsets on fixed geome-try. Seven cities have distinct changed views for all three seeds. Chicago’s one-target view is unchanged and repeated; it remains in the descriptive all-city SWAP panel but is ex-cluded from changed-view inference. We additionally examine a Chicago-exclusion primary effect and score-weight sensi-tivity using the same frozen episode data. These are post hoc robustness descriptions, not additional independent experi-ments. 
+
+# 6 Results 
+
+## 6.1 Complete-Controller Improvement at the Primary Setting 
+
+Table 3 reports every implementation, with the authors’ EARS family and its controls marked explicitly. EARS-Info-v9 ranks first at J = 0.814958, compared with 0 .772998 for EARS-Safe: an absolute improvement of 0 .041960, or 5.43% relative. The exact city sign-flip test gives p = 0.0078125 and the descrip-tive 95% city-bootstrap interval is [0.015908 , 0.069364 ]. All eight city contrasts are positive. This supports the complete v9 implementation over the preceding EARS-Safe controller under the evaluated conditions. Weighted discovery rises from 0.888788 to 0.984619, an improvement of 9.583 percentage points. Coverage changes from 0.538550 to 0.542286, a smaller 0.374-point increase. Mean energy falls from 574.3625 to 559.3222 units (2.62%), and complete-target episodes increase from 31.25% to 35.625%. Mean capped completion steps decrease from 138.6875 to 134.0875. These are mission-stop rollout outcomes, not matched-duration energy savings. Runtime is reported separately from J and cannot account mechanically for the score increase. 
+
+## 6.2 Performance Across Evaluation Panels 
+
+EARS-Info-v9 has the highest equal-city mean score in the full mission-stop, fixed-budget, all-city SWAP, and changed-view SWAP panels (Table 4). The overall mission-stop mean averages all 16 team/dropout settings and differs from the primary-setting mean. Comparisons between stopping rules remain separate; pooling their episodes would obscure the operational meaning of energy and completion. Figure 2 displays the measured score across team sizes and dropout settings. These are evaluations of one fixed configu-ration, without retuning for individual test cities or settings. Higher dropout does not amount to full communication isola-tion because shared observations remain accessible. The results characterize robustness to this simulator’s dropout process. 
+
+## 6.3 Geographic Heterogeneity and Sparse-Map Sensitivity 
+
+The primary city contrasts range from +0.000373 in Chicago and +0.000649 in New York to +0.094265 in Rome and +0.092255 in Barcelona (Fig. 3). Tokyo improves by +0.080779, San Francisco by +0.042886, Paris by 
+
++0.014024, and Melbourne by +0.010451. Thus, the improvement is directionally consistent but varies substantially in magnitude. Excluding Chicago gives a mean score improvement of 
+
++0.047901 across seven cities. This post hoc sensitivity shows that the primary gain is not created by the sparse Chicago in-stance; it does not justify deleting the city from the original analysis. The small Manhattan effect and near-empty obstacle grids in some snapshots also caution against equating a city label with equivalent geometric difficulty. Comparisons are paired within the exact abstraction rather than across suppos-edly standardized physical urban environments. 
+
+## 6.4 Matched Controls and Limits of Mechanism Evidence 
+
+Disabling relocation gives J = 0.618154, versus 0.814958 for the complete v9 controller; the city contrast is +0.196804 with nominal p = 0.015625. This sizeable difference is compatible 7Table 3: All 30 implementations at eight robots, 3% dropout, mission stopping. Equal-city means over 160 episodes per method. 
+
+Method J Discovery (%) Coverage (%) Energy Time (s) Complete (%) 
+
+EARS-Info-v9 † 0.8150 98.46 54.23 559.32 0.420 35.62 
+
+EARS-Info-NoSensingReservations † 0.8117 97.71 54.54 566.77 0.418 31.87 EARS-Info-Periodic16 † 0.8021 94.38 55.08 565.89 0.436 33.12 H-MAPPO-EARS-Safe † 0.7843 91.24 56.44 597.57 5.983 25.00 PRISM-Plus-Safe 0.7789 92.37 53.98 605.73 4.581 25.00 EARS-NP-Safe † 0.7785 89.87 57.03 607.59 3.295 18.75 AntSwarmSafe 0.7760 90.14 54.68 588.26 2.125 12.50 EARS-Safe † 0.7730 88.88 53.85 574.36 3.089 31.25 PRISM-X-Safe 0.7546 87.83 51.78 604.24 4.513 18.75 PRISM-Ant-Safe 0.7533 86.73 53.55 620.18 5.161 18.75 PRISM-Safe 0.7479 84.67 53.65 617.70 4.685 18.75 PRISM-Star-Safe 0.7479 84.67 53.65 617.70 4.700 18.75 MAPPO-Safe 0.7189 82.91 44.93 583.35 3.905 18.75 IPPO-Safe 0.7048 77.75 46.04 586.35 3.888 12.50 HAPPO-Safe 0.6512 60.59 43.07 527.94 4.064 6.25 BeeSwarmSafe 0.6274 52.98 27.00 330.67 2.201 12.50 EARS-Info-Local-v9 † 0.6182 53.31 46.42 592.62 0.192 12.50 UA-HBAS-Safe 0.6045 42.37 27.66 324.04 2.438 0.00 GRPO-Safe-Ablation-NoPropagation 0.5936 48.56 35.26 499.77 4.378 12.50 PSOSwarmSafe 0.5914 44.27 26.69 361.71 0.265 12.50 GRPO-Safe-Ablation-NoMemory 0.5815 44.20 35.60 494.19 4.329 12.50 SafeSwarmAgent 0.5811 43.75 31.50 420.12 2.072 12.50 GRPO-Safe 0.5493 39.27 33.26 508.22 4.711 5.62 SafetyFilteredGreedy 0.5263 32.86 25.60 404.22 2.154 6.25 GRPO-Safe-Ablation-NoLearnedBehavior 0.5168 29.76 30.92 470.42 4.656 6.25 MADDPG-Safe 0.4689 31.14 27.98 584.69 2.747 1.25 GreedyAgent 0.4492 32.04 25.64 474.47 2.035 6.25 MAT-Safe 0.4391 24.92 25.02 584.77 2.855 0.62 QMIX-Safe 0.4186 20.85 22.56 575.53 2.799 0.00 RandomAgent 0.3536 9.41 14.58 559.86 0.034 0.00 
+
+> †: authors' EARS family or matched v9 control. Other rows include repository heuristics, hybrids, trained policies, and adaptations; they are not all external reproductions. All filtered methods have zero mean actual incidents at this setting. RandomAgent and GreedyAgent have 28.4813 and 388.5625, respectively. Complete is the fraction of episodes discovering all targets; discovery is weighted target discovery.
+
+Table 4: Selected family and reference scores across panels. All 30 methods are retained in the accompanying CSV. 
+
+Method Mission Fixed SWAP Changed EARS-Info-v9 0.7963 0.7846 0.8154 0.8161 EARS-Safe 0.7711 0.7607 0.7818 0.7777 AntSwarmSafe 0.7716 0.7633 0.7738 0.7685 H-MAPPO-EARS 0.7757 0.7673 0.7735 0.7670 Periodic16 0.7816 0.7723 0.8023 0.8010 No sensing reservations 0.7930 0.7821 0.8126 0.8129 
+
+> Mission/fixed average 16 settings; SWAP uses eight robots and 3% dropout. Changed excludes the unchanged Chicago target views.
+
+with a useful role for relocation in the information-policy ar-chitecture. However, its adjusted secondary p is 1.0, so it is not an adjusted confirmatory claim. Periodic relocation yields J = 0.802061 and the no-sensing-reservation variant yields 0 .811736. Full v9 exceeds them by 0 .012897 and 0 .003222, with nominal city p = 0.125 and 0.25, respectively (Table 5). Neither difference establishes that event timing or sensing reservations independently im-prove generalization. Periodic and event-driven methods do not have identical accepted intervention budgets. No secondary comparison survives the specified Holm family. The complete-controller result and component-level uncertainty can coexist: the primary improvement is a joint effect of local scoring, Table 5: Primary-setting EARS-Info-v9 score contrasts. The EARS-Safe contrast is primary; all others are secondary. 
+
+## Comparator ∆J Nominal p Holm p
+
+## EARS-Safe +0.0420 0.0078 –AntSwarmSafe +0.0390 0.0156 1.00 H-MAPPO-EARS +0.0307 0.0234 1.00 Periodic16 +0.0129 0.1250 1.00 No reservations +0.0032 0.2500 1.00 Local only +0.1968 0.0156 1.00 
+
+routing, return behavior, caching, and coordination. 
+
+## 6.5 Runtime and Simulated Incidents 
+
+At the primary setting, EARS-Info-v9 requires 0.419947 s per episode on average, compared with 3.089217 s for EARS-Safe, a measured ratio of 7.36. Policy time changes from 3.064597 to 0.399838 s. The comparison is conditional on the recorded hardware, serial execution, and stopping rule. Caching provides a plausible implementation-level explanation, but a matched cache-disabled experiment would be needed to attribute this ratio to caching alone. EARS-Info-v9 records zero collisions, restricted-zone en-80 0.03 0.15 0.30 Dropout probability 4816 32 Robots 0.679 0.677 0.669 0.660 0.817 0.815 0.809 0.800 0.855 0.854 0.848 0.840 0.861 0.860 0.853 0.844                
+
+> Mission-stop
+> 00.03 0.15 0.30 Dropout probability 4816 32 Robots 0.678 0.675 0.667 0.658 0.815 0.813 0.807 0.799 0.843 0.841 0.834 0.827 0.830 0.829 0.822 0.814
+> Fixed-budget
+> 0.65 0.70 0.75 0.80 0.85 0.90 Operational score
+
+Figure 2: EARS-Info-v9 operational score across all tested team/dropout settings. Each cell is the equal-city mean over 20 episodes per city. Mission-stop and fixed-budget results are kept separate. 0.00 0.02 0.04 0.06 0.08 0.10 Operational-score difference Chicago New York Melbourne Paris San Francisco Tokyo Barcelona Rome 
+
+> +0.0004 +0.0006 +0.0105 +0.0140 +0.0429 +0.0808 +0.0923 +0.0943
+
+Figure 3: Primary-setting city mean score differences, EARS-Info-v9 minus EARS-Safe. All eight are positive; magnitudes vary considerably. tries, battery failures, and combined actual incidents across its 5,600 evaluations. The filtered competitors also record zero combined incidents, whereas unfiltered controls do not. This establishes successful simulated execution in the evalu-ated episodes; it does not demonstrate superior safety over the filtered methods or guarantee physical safety. 
+
+## 6.6 Score Dependence 
+
+The composite score is fixed before evaluation and excludes runtime. Raw discovery, coverage, energy, completion, and incident metrics accompany it. The principal improvement is not merely a runtime-weight artifact: runtime has zero weight, weighted discovery increases markedly, energy decreases, and coverage increases slightly. Nevertheless, the ordering depends on chosen operational preferences. We drew 2,000 independent weight vectors by multiplying each original score coefficient by a uniform factor in [0.75 , 1.25 ] and renormalizing the six coeffi-cients (seed 91827). EARS-Info-v9 remains above EARS-Safe and ranks first among all 30 implementations for every tested vector. Its mean-score margin over EARS-Safe ranges from 0.03333 to 0 .05073. These are fixed-data preference sensitivi-ties, not independent samples, additional simulation episodes, or new significance tests. 
+
+# 7 Discussion 
+
+## 7.1 What Changes Relative to Earlier EARS 
+
+The central finding is an improvement of the complete information-aware controller over the preceding EARS-Safe implementation, with positive score differences in each of the eight evaluated abstractions. Earlier EARS uses observable evidence, novelty, and event-triggered global relocation. V9 directly values newly sensed cells, screens routes using graph travel and return distances, coordinates marginal sensing, and reuses graph structure. The large discovery improvement with a small coverage change suggests that where sensing occurs matters beyond the count of visited cells. This interpretation is consistent with the design but is not an independently identified causal decomposition. The comparison among our EARS family members is de-liberately distinct from the comparison with other implemen-tations. H-MAPPO-EARS and EARS-NP represent alterna-tive extensions, not external claims against which novelty is manufactured. The matched v9 controls ask narrower design questions. Other swarm, PRISM, and learned-policy imple-mentations establish broader benchmark context, while adapted QMIX/MADDPG/MAT labels must not be read as full external algorithm reproductions. 
+
+## 7.2 Practical Interpretation 
+
+Within this static, known-geometry benchmark, EARS-Info-v9 offers a favorable measured combination of discovery, energy, and runtime. It is appropriate when the decision system has 9access to shared uncertainty/visit fields and a traversable graph. The reported benefit does not directly transfer to unknown geometry, delayed map exchange, uncertain localization, con-tinuous dynamics, or real battery discharge. Those settings require an observation/communication model and an execution layer beyond this study. 
+
+# 8 Limitations 
+
+The study is exploratory because evaluation cities were previ-ously used during development. Coarse rasterization produces sparse maps, including Chicago’s single-target instance. One training replicate and unequal model capacity and training re-sources limit generalization and external MARL comparisons. Joint design changes prevent isolated causal attribution, and no secondary test survives multiplicity correction. Shared state persists during dropout, execution safeguards differ, and early termination limits energy comparisons. Runtime is platform-specific; zero simulated incidents do not guarantee physical safety. 
+
+# 9 Reproducibility and Artifact Avail-ability 
+
+Code is available at https://github.com/vtavakkol i/SafeSwarm-CityTwin . The frozen eight-city-pub lication-v3 study contains 168,000 episode records cov-ering 30 methods, maps, checkpoints, source snapshots, and training/runtime manifests. All 227 checked hashes matched; independent recalculation reproduced the scores, panel means, and primary p-value. The runtime manifest records software versions, hardware, and single-thread settings; no immutable image digest was supplied. The CSV supports the reported analyses, but the omitted SQLite journal and full diagnostics are required for the original journal-based reporting workflow. Analysis scripts and an artifact inventory accompany the manuscript materi-als. OpenStreetMap data retain their separate attribution and licensing requirements [30]. 
+
+# 10 Conclusion 
+
+EARS-Info extends our EARS method family with marginal sensing gain, graph-feasible event-driven relocation, sensing reservations, and reusable path fields. In 168,000 matched evaluations of 30 implementations across eight OSM-derived city maps, EARS-Info-v9 achieves the highest mean opera-tional score in every reported panel. At the primary setting, its score improves by 5.43% over EARS-Safe, weighted dis-covery increases by 9.58 percentage points, and mean rollout energy decreases by 2.62%. All eight city score contrasts are positive, with exact p = 0.0078125. These findings support the complete-controller improvement in the tested benchmark. Component-level superiority, independent geographic gener-alization, and physical safety remain outside the established evidence. The result is an interpretable and auditable improve-ment with explicit implementation, statistical, and environmen-tal scope. 
+
+# References 
+
+[1] A. H. Tan, F. P. Bejarano, Y. Zhu, R. Ren, and G. Nejat, “Deep Reinforcement Learning for Decentralized Multi-Robot Explo-ration With Macro Actions,” IEEE Robotics and Automation Letters , vol. 8, no. 1, pp. 272–279, 2023. [2] C. Yu, X. Yang, J. Gao, J. Chen, Y. Li, J. Liu, Y. Xiang, R. Huang, H. Yang, Y. Wu, and Y. Wang, “Asynchronous Multi-Agent Reinforcement Learning for Efficient Real-Time Multi-Robot Cooperative Exploration,” in Proc. 22nd International Confer-ence on Autonomous Agents and Multiagent Systems , 2023, pp. 1108–1116. [3] A. Mete, M. Mouhoub, and A. M. Farid, “Coordinated Multi-Robot Exploration Using Reinforcement Learning,” in 2023 In-ternational Conference on Unmanned Aircraft Systems (ICUAS) ,2023, pp. 265–272. [4] H. Zhang, X. Zhang, Z. Feng, and X. Xiao, “Heterogeneous Multi-Robot Cooperation With Asynchronous Multi-Agent Re-inforcement Learning,” IEEE Robotics and Automation Letters ,vol. 9, no. 1, pp. 159–166, 2024. [5] V. P. Tran, M. A. Garratt, K. Kasmarik, S. G. Anavatti, and S. Abpeikar, “Frontier-Led Swarming: Robust Multi-Robot Coverage of Unknown Environments,” Swarm and Evolutionary Computation , vol. 75, p. 101171, 2022. [6] V. P. Tran, M. A. Garratt, K. Kasmarik, and S. G. Anavatti, “Dy-namic Frontier-Led Swarming: Multi-Robot Repeated Coverage in Dynamic Environments,” IEEE/CAA Journal of Automatica Sinica , vol. 10, no. 3, pp. 646–661, 2023. [7] S. Wang, Y. Liu, Y. Qiu, Q. Zhang, F. Huo, Y. Huangfu, C. Yang, and J. Zhou, “Cooperative Task Allocation for Multi-Robot Systems Based on Multi-Objective Ant Colony System,” IEEE Access , vol. 10, pp. 56 375–56 387, 2022. [8] F. Aznar, M. Pujol, and Á. Díez, “Event-Triggered Adaptive Consensus for Multi-Robot Task Allocation,” Computer Com-munications , vol. 251, p. 108499, 2026. [9] Q. Long and L. Liang, “IAOM: An Intention-Aware Optimiza-tion Model With GNN-Based Policy Learning for Dynamic Multi-Robot Cooperative Task Allocation,” IEEE Robotics and Automation Letters , vol. 11, no. 8, pp. 9120–9127, 2026. [10] L. Li, Z. Zhou, Z. Chen, H. Wang, Z. Kan, and J. Qin, “A Formal Framework for Reactive Heterogeneous Multirobot Task Alloca-tion in Uncertain Semantic Environments,” IEEE Transactions on Cybernetics , vol. 56, no. 8, pp. 4336–4349, 2026. [11] G. Hu, Y. Zhu, D. Zhao, M. Zhao, and J. Hao, “Event-Triggered Communication Network With Limited-Bandwidth Constraint for Multi-Agent Reinforcement Learning,” IEEE Transactions on Neural Networks and Learning Systems , vol. 34, no. 8, pp. 3966–3978, 2023. [12] C. Yu, A. Velu, E. Vinitsky, J. Gao, Y. Wang, A. Bayen, and Y. Wu, “The Surprising Effectiveness of PPO in Cooperative Multi-Agent Games,” in Advances in Neural Information Pro-cessing Systems , vol. 35, 2022, pp. 24 611–24 624. 
+
+10 [13] J. G. Kuba, R. Chen, M. Wen, Y. Wen, F. Sun, J. Wang, and Y. Yang, “Trust Region Policy Optimisation in Multi-Agent Re-inforcement Learning,” in International Conference on Learning Representations , 2022. [14] J. Hao, T. Yang, H. Tang, C. Bai, J. Liu, Z. Meng, P. Liu, and Z. Wang, “Exploration in Deep Reinforcement Learning: From Single-Agent to Multiagent Domain,” IEEE Transactions on Neural Networks and Learning Systems , vol. 35, no. 7, pp. 8762– 8782, 2024. [15] D. Liu, F. Ren, J. Yan, G. Su, W. Gu, and S. Kato, “Scaling Up Multi-Agent Reinforcement Learning: An Extensive Survey on Scalability Issues,” IEEE Access , vol. 12, pp. 94 610–94 631, 2024. [16] J. Chen, F. Deng, Y. Gao, J. Hu, X. Guo, G. Liang, and T. L. Lam, “MultiRoboLearn: An Open-Source Framework for Multi-Robot Deep Reinforcement Learning,” in 2023 IEEE International Conference on Robotics and Biomimetics (ROBIO) , 2023, pp. 1–6. [17] R. J. Torbati, S. Lohiya, S. Singh, M. S. Nigam, and H. Ravichan-dar, “MARBLER: An Open Platform for Standardized Evalu-ation of Multi-Robot Reinforcement Learning Algorithms,” in 
+
+2023 International Symposium on Multi-Robot and Multi-Agent Systems (MRS) , 2023, pp. 57–63. [18] G. Hu, H. Li, S. Liu, Y. Zhu, and D. Zhao, “NeuronsMAE: A Novel Multi-Agent Reinforcement Learning Environment for Cooperative and Competitive Multi-Robot Tasks,” in 2023 International Joint Conference on Neural Networks (IJCNN) ,2023, pp. 1–8. [19] A. P. Vinod, S. Safaoui, A. Chakrabarty, R. Quirynen, N. Yoshikawa, and S. Di Cairano, “Safe Multi-Agent Motion Planning via Filtered Reinforcement Learning,” in 2022 IEEE International Conference on Robotics and Automation (ICRA) ,2022, pp. 7270–7276. [20] W. Xiao, Y. Lyu, and J. M. Dolan, “Model-Based Dynamic Shielding for Safe and Efficient Multi-Agent Reinforcement Learning,” in Proc. 22nd International Conference on Au-tonomous Agents and Multiagent Systems , 2023, pp. 1587–1596. [21] Y. Qiu, Y. Jin, L. Yu, J. Wang, and X. Zhang, “Safe Multi-Agent Reinforcement Learning via Dynamic Shielding,” in 2024 IEEE Conference on Artificial Intelligence (CAI) , 2024, pp. 1254– 1257. [22] D. Datsko, F. Nekovar, R. Penicka, and M. Saska, “Energy-Aware Multi-UAV Coverage Mission Planning With Optimal Speed of Flight,” IEEE Robotics and Automation Letters , vol. 9, no. 3, pp. 2893–2900, 2024. [23] P.-Y. Lajoie and G. Beltrame, “Swarm-SLAM: Sparse Decen-tralized Collaborative Simultaneous Localization and Mapping Framework for Multi-Robot Systems,” IEEE Robotics and Au-tomation Letters , vol. 9, no. 1, pp. 475–482, 2024. [24] S. Zhong, Y. Qi, Z. Chen, J. Wu, H. Chen, and M. Liu, “DCL-SLAM: A Distributed Collaborative LiDAR SLAM Framework for a Robotic Swarm,” IEEE Sensors Journal , vol. 24, no. 4, pp. 4786–4797, 2024. [25] A. Athukorala, B. P. L. Lau, K. Pongsirijinda, C. Yuen, and U.-X. Tan, “Multi-Robot Collaborative SLAM (Multi-SLAM) With Distributed Lightweight Predictive Frontier Exploration (LPFE),” IEEE Robotics and Automation Letters , vol. 11, no. 2, pp. 2274–2281, 2026. [26] K. P. Jayalakshmi, V. G. Nair, and D. Sathish, “A Compre-hensive Survey on Coverage Path Planning for Mobile Robots in Dynamic Environments,” IEEE Access , vol. 13, pp. 60 158– 60 185, 2025. [27] S. Baidya, S. K. Das, M. H. Uddin, C. Kosek, and C. Summers, “Digital Twin in Safety-Critical Robotics Applications: Opportu-nities and Challenges,” in 2022 IEEE 41st International Perfor-mance Computing and Communications Conference (IPCCC) ,2022, pp. 101–107. [28] M. Jafari, A. Kavousi-Fard, T. Chen, and M. Karimi, “A Re-view on Digital Twin Technology in Smart Grid, Transportation System and Smart City: Challenges and Future,” IEEE Access ,vol. 11, pp. 17 471–17 484, 2023. [29] L. Adreani, P. Bellini, M. Fanfani, P. Nesi, and G. Pantaleo, “Smart City Digital Twin Framework for Real-Time Multi-Data Integration and Wide Public Distribution,” IEEE Access , vol. 12, pp. 76 277–76 303, 2024. [30] OpenStreetMap contributors, “OpenStreetMap: Copyright and License,” https://www.openstreetmap.org/copyright, accessed: Oct. 8, 2026. 
+
+11
