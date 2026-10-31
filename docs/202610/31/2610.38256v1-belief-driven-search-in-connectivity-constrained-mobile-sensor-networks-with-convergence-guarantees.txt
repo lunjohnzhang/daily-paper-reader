@@ -1,0 +1,932 @@
+Belief-Driven Search in Connectivity-Constrained Mobile Sensor
+Networks with Convergence Guarantees
+George J. Ziavras, Ziqiao Zhang, Shreyas Sundaram and Christopher G. Brinton
+Abstract— Multi-agent search and coverage is critical to
+autonomous exploration, search-and-rescue, and defense appli-
+cations. This paper investigates settings where a mobile sensor
+network is tasked with coordinating to discover the position
+of a stationary target within a bounded region. We develop a
+Bayesian update scheme where agents iteratively combine local
+uncertainties derived from their sensor measurements through
+inverse variance weighting to get a better global understanding
+of where the target may be located given some prior belief.
+Network agents’ trajectories are governed by a primal-dual
+gradient update rule that simultaneously minimizes the ex-
+pected sensing uncertainty and enforces network connectivity
+among the agents. We prove that the belief converges to
+the target under mild, planner-agnostic conditions, with an
+explicit exponential rate of false-hypothesis rejection and a
+bound on expected search time. Simulation results show that
+we can successfully find the target and collapse belief to the
+ground truth target location while ensuring connectivity of our
+sensor network. They also empirically confirm our theoretical
+bounds and revisiting assumption. Finally, we compare against
+a lawnmower sweep, showing that our method locates the target
+more quickly when the prior is informative.
+I. INTRODUCTION
+Autonomous multi-agent systems are increasingly vital for
+operations in high-stakes, uncertain environments, ranging
+from autonomous scientific exploration and environmental
+monitoring to search-and-rescue and defense applications.
+A common objective in these settings is to locate a target
+of interest whose position within some region is uncertain.
+We build on related coverage control to establish an active
+search algorithm that performs this task. Coverage control
+often seeks to distribute stationary agents based on a fixed
+importance map to optimize some cost or objective. In
+contrast, active search benefits from agents actively learning,
+adjusting their beliefs of the environment based on their
+sensor feedback, to approach a target’s localization. Fig. 1
+illustrates one such use case.
+Key Challenges. Multi-robot search under communication
+constraints poses two core difficulties:
+1. Information gain versus network connectivity. To max-
+imize the rate of information gain, uncertainty minimization
+incentivizes agents to spread out and cover unvisited re-
+gions. Fusing measurements and maintaining a shared belief,
+however, requires a connected communication network. 2.
+The need for tractable, differentiable constraints. We seek
+G. Ziavras, Z. Zhang, S. Sundaram, and C. Brinton are with the Elmore
+Family School of Electrical and Computer Engineering, Purdue University,
+West Lafayette, IN 47906, USA. Email: {gziavras, zhan5780, sundara2,
+cgb}@purdue.edu.
+This work was supported by Saab Inc. and Saab AB.
+Fig. 1: A visual overview of a possible use-case where a
+coordinated Unmanned Underwater Vehicle swarm performs
+an optimized search to locate a target wreckage site based on
+some initial belief projected across the ocean floor (graphic
+developed with the help of Google’s Gemini).
+to incorporate connectivity constraints as a functional re-
+quirement for information exchange. We express connectivity
+as differentiable constraints, so that a primal-dual gradient
+method can update agent trajectories continuously while
+preserving connectivity.
+Main Contributions. Our contributions are as follows.
+• Inverse-Variance Sensor Fusion: We develop a sensing
+model that replaces Voronoi partitioning with a smoother
+global measurement uncertainty, enabling more flexible
+gradient-based control. This uncertainty also defines detec-
+tion probabilities given some fixed false-alarm rate, driving
+an exact Bayesian update of the belief.
+• Connectivity-Constrained Planning: We encode network
+connectivity as a differentiable constraint, solving the
+resulting planning problem with a primal-dual gradient
+method, showing empirically in simulation that a team
+starting connected remains connected.
+• Convergence Analysis: We prove that, for any planner that
+does not anticipate future measurements, the probability
+of ever confirming a wrong location is explicitly bounded.
+We introduce Aggregated Global Identifiability (AGI), a
+weaker revisiting condition than full coverage (cells with
+non-negligible belief, or the target cell, must be sensed
+within each finite window). Under this condition, the belief
+concentrates on the target. Belief in false locations decays
+exponentially at a rate determined by the sensor’s false-
+alarm probabilities and missed-detection threshold, and we
+bound the expected search time.
+arXiv:2610.38256v1  [eess.SY]  28 Oct 2026
+
+
+II. RELATED WORKS
+Distributed search & coverage control has traditionally
+used Voronoi partitions to tessellate the search space [1]–
+[4]. Density-Driven Optimal Control (D2OC) instead ap-
+plies optimal transport to match agent distributions to non-
+uniform priority maps [5], but assumes these maps are static
+or prescribed. AI-augmented extensions update them under
+uncertain priors [6] at the cost of added computation and
+training. Effective coverage control [7] guarantees that every
+point is sensed above a capacity threshold, using a strict
+maximum sensing radius and a measurement-driven penalty
+over a fixed underlying belief distribution. None of these
+models the cumulative information gain from sensor overlap
+or how that gain alters the localization belief.
+We fuse measurements from connected sensors into a
+global uncertainty estimate and use Bayesian updates to
+model how sensing changes the belief. Close to this, [8]
+applies inverse-covariance fusion for decentralized state and
+target estimation. We trade fully decentralized covariance
+fusion in favor of a simpler differentiable objective built on
+a distance-coupled local uncertainty function. This physics-
+informed model sums inverse-variances (i.e. Fisher informa-
+tion) across overlapping sensors, as is standard for indepen-
+dent Gaussian measurements [9], an assumption we make
+for our sensing model. Weighted variants of this method
+can be used to accommodate heterogeneous sensors, as in
+[10]. Bayesian belief updates also drive information-theoretic
+search [11], [12]. Unlike these, we model sensor-overlap gain
+in closed form and enforce multi-agent connectivity.
+Finally, online sampling-based informative path planners
+like IA-TIGRIS build candidate trajectory trees through
+informed sampling and select trajectories by scoring metrics
+like cumulative information gain [13]. They offer strong
+global exploration in non-convex environments and resist lo-
+cal minima, but scale poorly to joint multi-agent, constraint-
+aware state spaces. Our gradient-based planner avoids this
+but can stall at saddle points and in flat, low-belief regions,
+which we mitigate with perturbed gradients and an adaptively
+varied gradient pull region (Algorithm 1).
+III. PROBLEM FORMULATION
+A. Search Space and Sensing Model
+We consider n sensors (agents) in a convex, compact
+search space X ⊂Rd, and its discretized mesh Xh of spacing
+h with c = |Xh| cells. A single stationary target occupies an
+unknown cell p ∈Xh. Time is discrete, t ∈{0,1,2,...}, and
+x(t) = [x1(t)⊺,x2(t)⊺,...,xn(t)⊺]⊺∈(X)n collects the sensor
+positions, with xi(t) ∈X the position of sensor i. Sensing
+uncertainty is modeled by a continuously differentiable, non-
+decreasing function fi : R+ →R+, where fi(||q −xi(t)||)
+is the variance of sensor i’s measurement at cell q and
+∥· ∥is the Euclidean norm. Individual measurement noise
+is independent across sensors, cells, and time.
+The belief φ(q,t) is a probability mass function on Xh
+giving the probability that the target is at q at time t,
+starting from a prior φ(·,0). Our goal is to update φ and
+the trajectories xi(t) jointly so that φ(·,t) converges to the
+point mass φ ∗(q) = 1{q = p} at the target.
+B. Global Uncertainty and Search Objective
+1) Inverse Variance Weighting: Unlike coverage control
+that relies on Voronoi partitions to assign each cell q to
+its nearest sensor, we fuse all sensors’ measurements under
+f(q,x(t)). Specifically, we employ Inverse Variance Weight-
+ing [10] (under our assumption of each agent being equipped
+with identical sensors) on the individual sensor variances to
+obtain the combined unbiased minimum-variance,
+f(q,x(t)) =
+ 
+n
+∑
+i=1
+1
+fi(||q−xi(t)||)
+!−1
+.
+(1)
+Since f ≤mini fi, a group of agents measures every cell at
+least as well as its best member. The search objective is the
+expected fused uncertainty under the current belief,
+Ht(x) = ∑
+q∈Xh
+f(q,x)φ(q,t).
+(2)
+2) Network Connectivity: Our other key objective is to
+maintain network connectivity, for which we employ results
+in [1], [14], [15]. Letting L(G (t)) = ∆(x) −A(x) be the
+weighted Laplacian of the communication graph, where the
+weights aij(x) of the adjacency matrix A(x) are a sigmoid
+aij(x) =
+ 1 + e−s(rc−∥xi−xj∥)−1 with steepness s, which
+decays towards zero beyond the communication range rc,
+and ∆(x) is the diagonal degree matrix. Let P ∈Rn×(n−1)
+have orthonormal columns orthogonal to 1n. Projecting onto
+this subspace removes the Laplacian’s zero eigenvalue, so
+det(PTL(x)P) = λ2 ···λn, which by the matrix-tree theorem
+equals n times the weighted number of spanning trees. It is
+therefore positive if and only if the graph is connected, so
+we impose
+gconn(x(t)) = ζ −det(PTL(G (t))P)
+(3)
+where ζ > 0 sets the required margin. The reason we
+utilize this constraint over other common methods such as
+maintaining λ2 above some threshold is due to its smoothness
+and ability to be differentiable in all graph configurations.
+Furthermore, counting spanning trees measures overall con-
+nectivity, not just the weakest cut, which rewards redundant
+paths and maintains a stronger network. The flip side is that
+a single weakening link in a large group changes gconn only
+slightly, which the safeguards in Algorithm 1 address.
+3) Collision Avoidance: To avoid collisions, every pair of
+sensors keeps a minimum separation dc > 0
+gij(x(t)) = dc −||xi(t)−xj(t)|| ≤0,
+i̸ = j.
+(4)
+C. Measurement and Belief Update
+At every timestep the team takes a fused measurement,
+where each cell q of a looked set Lt ⊆Xh returns a binary
+report yt(q) ∈{0,1} (1 = detection). The looked set deter-
+mines how a cell’s belief will be updated by Bayes’ rule (7).
+We define the set we use for Lt below.
+
+
+We model the detector as a Neyman-Pearson test for
+a known signal in white Gaussian noise with false-alarm
+probability Pfa and fused SNRlinear = γs/f(q,x), where γs > 0
+is a signal-strength scale. Under these assumptions, its miss
+and detection probabilities are respectively:
+Pe(SNR−1
+linear) = Q(
+p
+SNRlinear −Q−1(Pfa)),
+(5)
+Pd(SNR−1
+linear) = 1−Pe(SNR−1
+linear),
+(6)
+where Q(·) is the Gaussian tail function. Since Q is de-
+creasing, Pd > Pfa and far from every sensor, Pd →Pfa
+modeling how such reports carry no information. A cell
+q ∈Xh is sensed at t if q ∈Xh,t,active = {q : Pe(q,x(t)) ≤
+δ} ⊆Lt, i.e. it falls in the region where Pd ≥1 −δ. Our
+work sets Lt = Xh,t,active. The target cell p reports 1 with
+probability Pd(p,x(t)), and every other cell with probability
+Pfa, independently across cells. By Bayes’ rule:
+φ(q,t +1) = φ(q,t)ℓt(q)
+∑r φ(r,t)ℓt(r),
+ℓt(q) =
+
+
+
+
+
+Pd(q,x(t))/Pfa,
+q ∈Lt, yt(q) = 1,
+Pe(q,x(t))/(1−Pfa),
+q ∈Lt, yt(q) = 0,
+1,
+q /∈Lt.
+(7)
+A detection raises a cell’s belief, a miss lowers it, and
+unlooked cells change only through normalization. Updates
+of this form appear in [11], [12], [16], [17].
+D. Optimization Problem
+At each time t, the search problem is
+min
+x∈(X)n
+Ht(x)
+s.t.
+gconn(x) ≤0,
+gi j(x) ≤0,
+∀i̸ = j.
+(8)
+We turn to solving this problem in the next section.
+IV. ALGORITHM METHODOLOGY
+In this section, we detail our optimization algorithm used
+to solve (8). To handle the non-convex nature of the objective
+function H (x(t)) and the complex connectivity constraint
+gconn(x(t)), we adopt the Primal-Dual Proximal Augmented
+Lagrangian Algorithm (PPALA) developed in [1], [18]. We
+drop the index t when the context is clear. Unlike the static
+setting of [1], where PPALA converges to a KKT point of
+fixed sensor positions, our objective Ht changes at every step
+as the belief is updated, so we do not claim convergence
+of the positions. Instead, Section V shows that the belief
+concentrates on the target for any planner that satisfies AGI.
+A. The Augmented Lagrangian
+The augmented Lagrangian Lρ(x,uG,λG) takes the form
+Lρ(x,uG,λG) = J(x)+w
+ λG(gG(x)+uG)+ ρ
+2 (gG(x)+uG)2
+,
+(9)
+where we have gG(x) = gconn(x) (our connectivity con-
+straint), a slack uG ≥0 turning gG ≤0 into the equality
+gG +uG = 0, λG ≥0 is the Lagrange multiplier, ρ > 0 is the
+penalty parameter, and w > 0 is a weight balancing search
+against connectivity. Here J(x) = ∑q∈RG f(q,x)φ(q,t) is Ht
+restricted to the pull region RG ⊆Xh detailed in Algorithm
+1. Collisions are enforced directly, by projecting onto the
+minimum separation dc after each step. PPALA regularizes
+the dual variable toward a proximal center µG. The multiplier
+is λG = argmaxλ{λ(gG+uG)−1
+2ρ (λ −µG)2} = µG+ρ(gG+
+uG), and µG tracks λG as a moving average with rate
+σk ∈(0,1). Anchoring λG to the slowly moving µG damps
+oscillation between search and connectivity [18]. Algorithm
+1 lists the full procedure composed of a shared belief update,
+followed by a normalized primal step with noise and a
+connectivity safeguard, and a dual update.
+V. ANALYSIS
+The primal step of Algorithm 1 moves each agent toward
+the belief in RG(t), weighted by its share of the fused
+sensing at each cell. On this nonconvex, time-varying ob-
+jective, the descent can (i) stall at critical points where the
+weighted belief balances about an agent, (ii) lose direction
+once nearby belief is depleted, while (iii) the connectivity
+metric reacts slowly to a single weakening link in a large
+group. Algorithm 1 mitigates these with gradient noise, a
+pull region that widens when nearby belief is depleted, and
+a step-size safeguard with a connectivity radius below the
+true communication range. These measures make recurrent
+sensing plausible but not provable. We therefore treat the
+planner as a black box, state our results under explicit
+assumptions on which cells it senses (Assumption V.2), and
+verify these assumptions empirically in Section VI.
+A. Gradient Analysis
+We adopt the quadratic sensing cost flocal(∥q−xi(t)∥) =
+1
+2∥q −xi(t)∥2 + ε, standard in coverage control [2], [19],
+where ε > 0 enforces flocal > 0. With f(q,x(t)) =
+
+Ai +
+1/flocal(∥q −xi(t)∥)
+−1 and Ai = ∑j̸=i 1/flocal(∥q −x j(t)∥),
+differentiating gives
+∇xi(t) f(q,x(t)) =
+4(xi(t)−q)
+ Ai(∥q−xi(t)∥2 +2ε)+2
+2 = wq (xi(t)−q),
+(10)
+where wq = (f/flocal)2 ∈(0,1]. wq is the square of the ratio
+describing the sensor fusion contribution compared to just
+agent i. It is close to 1 when agent i dominates sensing at q.
+B. Trajectory Behavior and Suboptimal Solutions
+During a step, we hold the set of the pull region fixed and
+evaluate on mesh Xh of size h, with φ(·,t) a probability mass
+function on Xh. By (10) the descent direction is
+−∑
+q∈RG(t)
+φ(q,t)∇xi(t) f(q,x(t)) = ∑
+q∈RG(t)
+wq φ(q,t)(q−xi(t)).
+(11)
+This is a vector sum from xi(t) toward each cell in q,
+weighted by their belief (φ) and by agent i’s responsibility
+for them (wq), where RG(t) is the pull region described in
+Algorithm 1. For a lone agent (wq ≡1) it points at the
+centroid of belief on RG(t).
+
+
+Algorithm 1: Sensor Movement and Belief Update Algorithm based on PPALA
+1: Input: Initial positions x(0) forming one connected group, prior φ(·,0), and λG = µG = uG = 0. Sensing: Pfa, γs, δ. Connectivity:
+rc, s, ζ. Pull region: rs, γ, εg. Motion: dmin, dmax, dc, σ. PPALA: w, ρ, τ, σk. Horizon: Tmax.
+2: for t = 0,1,...,Tmax do
+3:
+Groups: Agents within range rc form connected groups G. Connected agents share xi(t), their beliefs and (λG,uG,µG).
+4:
+Sensing and belief: G senses Lt = Xh,t,active = {q ∈Xh : Pe(q,x(t)) ≤δ}. Each q returns yt(q) ∈{0,1} and φ is updated by (7).
+5:
+Pull region: RG = Xh,t,active if it contains q s.t. φ(q,t +1) > εg maxq′ φ(q′,t +1). Otherwise RG adds all cells within distance γkrs
+of G, for the smallest k ∈N that includes such a cell. (RG affects only the gradient, not the belief.)
+6:
+Primal update: With J(x) = ∑q∈RG f(q,x)φ(q,t +1) and gG(x) = ζ −det(P⊺LG(x)P), where LG is the weighted Laplacian of G
+and P has orthonormal columns orthogonal to 1,
+∇xiLρ = ∇xiJ +w
+ λG +ρ(gG +uG)
+
+∇xigG,
+ηx,i = clip
+
+dmax
+∥∇xiLρ∥
+maxj∈G∥∇x j Lρ∥, dmin, dmax
+
+,
+xi(t +1) = xi(t)−ηx,i
+ˆ∇xiLρ +ξi
+∥ˆ∇xiLρ +ξi∥
+,
+ˆ∇xiLρ =
+∇xiLρ
+∥∇xiLρ∥,
+ξi ∼N (0,σ2I),
+then enforce separation dc and project onto X. Safeguard: if x(t +1) would disconnect G, recompute it with w ←2mw,
+m = 1,2,..., until G stays connected or x(t +1) stops changing; then halve all steps in G (up to 10 times); then hold position.
+Hence a group that starts connected stays connected.
+7:
+Dual update: With gG = gG(x(t +1)):
+uG ←max{0, uG −τ(λG +ρ(gG +uG))},
+µG ←µG +σk(λG −µG),
+λG ←µG +ρ(gG +uG).
+8: end for
+Three suboptimal behaviors follow. (i) Critical points. (11)
+vanishes when the weighted mass φ wq balances about xi(t),
+and saddles points are also possible with multiple agents.
+Noise may help here, although perturbed-gradient guarantees
+[20] assume smoothness, which we cannot assume while
+RG(t) changes between steps. These call for an explicit
+escape mechanism. (ii) Dead regions. When sensing depletes
+nearby belief, the gradient carries no information about belief
+outside RG(t). Switching to a gradient over all of Xh would
+cause other stall issues, since by (11) a lone agent is drawn
+to the centroid of belief, which may be empty. In Algorithm
+1, we exploit the discontinuous property by varying radii
+for RG(t) when stuck, which showed empirical promise in
+treating (i) and (ii) in simulation. (iii) Slow connectivity
+response. The det(PTLP) constraint reacts slowly to a single
+weakening link within large groups. A safeguard in step-
+size that rejects disconnecting moves, and a constraint radius
+below the true communication range, avoid this in Algorithm
+1. These make recurrent sensing plausible but not provable
+which is why we treat the trajectory planner as a black box
+moving forward, under certain reasonable assumptions.
+C. Proof of Single-Target Convergence
+a) Model: The target is in a fixed, unknown cell p ∈
+Xh, with c = |Xh|. Note from (7) ℓt ∈(0,∞), so φ(·,0) >
+0 implies φ(·,t) > 0 for all t. Let Ft denote the history
+up to step t, such as the reports y0,...,yt−1 together with
+any randomness used by the planner before t. For q̸ = p, let
+Rt(q) = φ(q,t)/φ(p,t) and let Nt(r) = |{s < t : r ∈Xh,s,active}|
+count the sensed looks at r.
+Assumption V.1. (A1) Probabilities Pfa,Pd(q,x) satify 0 <
+Pfa ≤Pd(q,x) < 1. Given Ft, the reports {yt(q)}q∈Lt are
+independent with yt(p) ∼Bern(Pd(p,x(t))) and yt(q) ∼
+Bern(Pfa) for q̸ = p.
+(A2) State x(t) and set Lt are Ft-measurable (determined
+from the past information in Ft). All agents share
+belief (7), i.e., we assume information is pooled via
+connectivity.
+(A3) Prior φ(q,0) satisfies φ(q,0) > 0 for all q, and δ <
+1−Pfa.
+Two cells ph,qh ∈Xh are distinguishable over [t,t +T] if
+{ph,qh} ∩St+T
+τ=t Xh,τ,active̸ = /0, sensing either cell separates
+the two hypotheses. We relax global identifiability [16] to a
+windowed, belief-weighted form.
+Assumption V.2 (Aggregated Global Identifiability). There
+exist T < ∞and εth > 0 such that, almost surely, for every
+t and every q̸ = p with φ(q,t) ≥εth, the cells p and q are
+distinguishable over [t,t +T].
+Strong form: The strong form of Assumption V.2 is that
+every q, or p, is sensed infinitely often (periodic coverage).
+This is only used in Theorem V.4(i).
+b) Constants: With D(a∥b) = alog a
+b + (1 −a)log 1−a
+1−b
+(Bernoulli KL divergence) and hλ(a,b) = a1−λbλ + (1 −
+a)1−λ(1 −b)λ (Chernoff coefficient between Bernoulli dis-
+tributions), define κ0 = D(Pfa∥1 −δ), κ1 = D(1 −δ∥Pfa),
+β λ
+0 = −loghλ(Pfa,1 −δ), β λ
+1 = −loghλ(1 −δ,Pfa) and
+βδ = β 1/2
+0
+= β 1/2
+1
+(Bhattacharyya distance).
+Lemma V.1 (Martingales). Under (A1)–(A3): (i) Rt+1(q) =
+Rt(q)Zt with Zt = ℓt(q)/ℓt(p). For λ ∈(0,1], E[Zλ
+t |Ft] =
+hλ(Pfa,πt(q))hλ(πt(p),Pfa), where πt(r) = Pd(r,x(t)) if r ∈
+Lt and Pfa otherwise. (ii) With Bλ
+t = −∑s<t logE[Zλ
+s |Fs],
+where E denotes expectation, the process Gλ
+t = Rt(q)λeBλt is
+a nonnegative martingale. For λ = 1 this is Rt(q) itself.
+Proof. (i) Normalizations cancel in the ratio. By (A1), ℓt(q)
+and ℓt(p) are independent given Ft, with E[ℓt(q)λ|Ft] =
+Pfa(πt(q)/Pfa)λ + (1 −Pfa)((1 −πt(q))/(1 −Pfa))λ =
+hλ(Pfa,πt(q))
+and
+E[ℓt(p)−λ|Ft] = hλ(πt(p),Pfa).
+An
+unlooked cell has factor 1 = hλ(Pfa,Pfa), and h1 ≡1.
+(ii) By (i), E[Zλ
+t |Ft] depends only on x(t) which is Ft-
+measurable by (A2). Therefore, Bλ
+t+1 is Ft-measurable and
+
+
+E[Gλ
+t+1|Ft] = Rλ
+t eBλ
+t+1E[Zλ
+t |Ft] = Gλ
+t > 0 since Rt > 0, so
+Gλ
+t is a non-negative martingale.
+Lemma V.2 (Guaranteed Evidence per Look). Under (A1)–
+(A3) and for λ ∈(0,1): Bλ
+t ≥β λ
+0 Nt(q)+β λ
+1 Nt(p), β λ
+i > 0,
+and β λ
+i /λ ↑κi as λ ↓0.
+Proof. By H¨older, hλ(a,b) ≤1, with equality iff a = b. So
+each step adds ≥0 to Bλ
+t , and β λ
+i > 0 since 1−δ̸ = Pfa by
+(A3). Since ∂bhλ < 0 for b > a and ∂ahλ < 0 for a > b, at
+step s a sensed q (πs(q) ≥1−δ > Pfa) gives hλ(Pfa,πs(q)) ≤
+hλ(Pfa,1−δ), and a sensed p gives hλ(πs(p),Pfa) ≤hλ(1−
+δ,Pfa). Summing over s < t gives the bound on Bλ
+t . Finally,
+Λ(λ) = loghλ(a,b) is the (convex) cumulant generating
+function of the log-likelihood ratio of one report, with Λ(0) =
+Λ(1) = 0. The chord slope of a convex function from the
+origin is nondecreasing, therefore −Λ(λ)/λ is nonincreasing
+in λ, with limit −Λ′(0) = D(a∥b).
+Theorem V.3 (False confirmations). Under (A1) and (A3),
+for any planner satisfying (A2): (i) φ(·,t) →φ∞almost surely
+(a.s.); (ii) for η ∈(0,1), P
+ ∃t,∃q̸ = p : φ(q,t) ≥1 −η
+
+≤
+η
+1−η · 1−φ(p,0)
+φ(p,0) , where P denotes probability.
+Proof. (i) By the martingale convergence theorem, each mar-
+tingale Rt(q) ≥0 converges a.s. It can be seen that φ(p,t) =
+(1 + ∑q̸=p Rt(q))−1 and φ(q,t) = Rt(q)φ(p,t), therefore the
+beliefs converge as well. (ii) φ(q,t) ≥1−η forces Rt(q) ≥
+(1−η)/η. Ville’s Inequality ensures P[∃t : φ(q,t) ≥1−η] ≤
+R0(q)η/(1−η). Sum over q.
+Theorem V.4 (Convergence). Under (A1)–(A3): (i) on the
+event that p is sensed infinitely often, or under the strong
+form, φ(p,t) →1 a.s.; (ii) under Assumption V.2, a.s.
+limt φ(q,t) ≤εth for every q̸ = p. Hence limt φ(p,t) ≥1 −
+(c−1)εth, which is informative only when εth < 1/(c−1).
+Proof. Take λ = 1/2. By Lemma V.1 we can write √Rt =
+Gt · e−Bt and the martingale Gt = G1/2
+t
+converges a.s., so
+G∗= supt Gt < ∞. Therefore, by Lemma V.2, Rt(q) ≤
+(G∗)2e−2βδ [Nt(q)+Nt(p)], which vanishes if Nt(q)+Nt(p) →∞.
+(i) If Nt(p) →∞, or under the strong form, this holds for
+every q, giving φ(p,t) = (1+∑q Rt(q))−1 →1. (ii) Suppose
+φ∞(q) > εth (the limit exists by Theorem V.3), then for
+all sufficiently large t φ(q,t) ≥εth. By Assumption V.2,
+p or q is sensed in every window of finite length T, so
+Nt(q) + Nt(p) →∞which we showed gives φ∞(q) = 0.
+Contradiction. Therefore for any q̸ = p, limt φ(q,t) ≤εth
+which implies limt φ(p,t) ≥1−(c−1)εth.
+Theorem
+V.5
+(Exponential
+rejection).
+Under
+(A1)–
+(A3), for every q̸ = p, a.s. liminft→∞−1
+t logφ(q,t) ≥
+liminft→∞
+κ0Nt(q)+κ1Nt(p)
+t
+. If a stronger assumption is used,
+that p or q is sensed at least once in every window of length
+T, the right-hand side becomes at least min(κ0,κ1)/T.
+Proof. Again, for λ ∈(0,1), Gλ∗= supt Gλ
+t
+< ∞a.s.
+By Lemma V.1 Rλ
+t = Gλ
+t e−Bλt ≤Gλ∗e−Bλt . Taking logs,
+λ logRt(q) ≤logGλ∗−Bλ
+t . By Lemma V.2, we substitute
+Bλ
+t
+and divide by −λt, getting: −1
+t logRt(q) ≥−logGλ∗
+λt
++
+β λ
+0
+λ
+Nt(q)
+t
++ β λ
+1
+λ
+Nt(p)
+t
+. Define It = 1
+t (κ0Nt(q) + κ1Nt(p)) and
+ρ(λ) = mini
+β λ
+i
+λκi . By Lemma V.2 β λ
+i
+λ ≤κi =⇒ρ(λ) ∈(0,1]
+and β λ
+i
+λ ≥ρ(λ)κi, so −1
+t logRt(q) ≥ρ(λ)It −logGλ∗
+λt
+. As t →
+∞, liminft→∞−1
+t logRt(q) ≥liminft→∞ρ(λ)It. This holds
+simultaneously ∀λ ∈{1/k}k≥2 , where letting k →∞, ρ →1
+by Lemma V.2 and use φ(q,t) ≤Rt(q) to transfer the bound
+to φ(q,t). For the stronger case, the assumption implies
+Nt(q) + Nt(p) ≥⌊t/T⌋and It ≥min(κ0,κ1) (Nt(q)+Nt(p))
+t
+≥
+min(κ0,κ1) ⌊t/T⌋
+t
+. As t →∞we get our min rate.
+This bound is attained at the worst case (gated update
+within Xh,t,active, every look at the rim Pe = δ, and p
+never sensed). Unlike the min-rule rate maxv Kv of [16], it
+accumulates over looks since our team pools reports into
+one belief instead of relying on the best-informed agent. On
+average, each sensed look removes κ0 ≈log(1/δ) nats from
+an empty cell’s odds, or adds κ1 ≈log(1/Pfa) for the target.
+Corollary V.5.1 (Finite-time bound; time and error of con-
+firmation). Under (A1)–(A3), (i) for all t, m ≥0, and r >
+0: P(φ(q,t) ≥r) ≤
+p
+φ(q,0)/(rφ(p,0))e−βδ m + P(Nt(q) +
+Nt(p) < m). (ii) Let τη = inf{t : maxq φ(q,t) ≥1 −η} and
+ˆp the confirmed target cell. If every window of length T
+senses p or all of Xh \{p} on every sample path, then with
+Γ0 = ∑q̸=p
+p
+φ(q,0)/φ(p,0),
+E[τη] ≤T
+ ⌈log+(Γ0/√η)/βδ⌉+(1−e−βδ )−1
+,
+P( ˆp̸ = p) ≤
+η
+1−η · 1−φ(p,0)
+φ(p,0) .
+(iii) If p ∼φ(·,0), then P(τη < ∞, ˆp̸ = p) ≤η.
+Proof. From Lemma V.1, Gt = G1/2
+t
+=
+p
+Rt(q)eBt is a mar-
+tingale, so E[Gt] = G0 =
+p
+R0(q) since B0 = 0. At λ = 1/2,
+from Lemma V.2 Bt ≥βδ[Nt(q) + Nt(p)], with βδ = 2.29.
+We will also use Markov’s inequality.
+(i) Let event A = {Nt(q)+Nt(p) ≥m}, we have P(Rt ≥r) =
+P(Rt ≥r,A) + P(Rt ≥r,Ac) ≤P(Rt ≥r,A) + P(Ac). Lemma
+V.2 gives Bt ≥βδm on A, implying √Rt = Gte−Bt ≤Gte−βδ m.
+1A is 1 on A and 0 off it so √Rt1A ≤Gte−βδ m also always
+holds. So, E[√Rt1A] ≤√R0e−βδ m by substituting for E[Gt].
+The events {Rt ≥r,A} = {√Rt1A ≥√r} and Markov’s
+Inequality give P(√Rt1A ≥√r) ≤E[√Rt1A]/√r. Putting
+these together: P(Rt ≥r,A) ≤E[√Rt1A]
+√r
+≤
+q
+R0
+r e−βδ m. After
+adding P(Ac) and using φ(q,t) ≤Rt(q) we realize (i).
+(ii) Take m = ⌊t/T⌋after t steps since every window
+of T steps contains a sensed look at q or p for every
+q̸ = p, so Nt(q) + Nt(p) ≥⌊t/T⌋. Then, A always occurs
+and by steps in (i), E[
+p
+Rt(q)] ≤
+p
+R0(q)e−βδ ⌊t/T⌋for ev-
+ery wrong cell q. If by step t, the team has not con-
+firmed, then φ(p,t) < 1 −η and 1 −φ(p,t) =
+∑q Rt(q)
+1+∑q Rt(q) ≤
+∑q Rt(q), which means P(τη > t) ≤P(∑q̸=p Rt(q) ≥η) be-
+cause {τη > t} ⊆{φ(p,t) < 1 −η} ⊆{∑q̸=p Rt(q) ≥η}.
+By Markov’s inequality, subadditivity of square roots, and
+by our bound of the expectation above, P(∑q Rt(q) ≥η) =
+P(
+q
+∑q Rt(q) ≥√η) ≤∑q E√
+Rt(q)
+√η
+≤
+Γ0
+√η e−βδ ⌊t/T⌋where
+Γ0 = ∑q̸=p
+p
+R0(q) (Γ0 can be seen as a measure of how
+
+
+TABLE I: Simulation parameters
+Map X
+[0,5]2, 200×200 cells Agents n 10
+Pfa, δ
+10−6, 0.01
+Pe = δ at 0.15 (one agent)
+rc, dc
+0.1, 0.05
+r in L, s
+0.08, 20
+dmin, dmax 0.005, 0.006
+σ, ε
+0.1, 10−6
+ρ, w
+1.67, 10−4
+τ, σk
+1, 0.1
+Prior floor 0.1
+η
+0.01
+spread out the prior is). Let a = Γ0/√η , τη is a non-
+negative integer random variable, so E[τη] = ∑t≥0 P(τη >
+t) ≤∑t≥0 min{1,ae−βδ ⌊t/T⌋} = T ∑k≥0 min{1,ae−βδ k} where
+k = ⌊t/T⌋is exactly the k-th window of T timesteps. We
+re-index the sum over windows. Let k0 = ⌈log+ a/βδ⌉,
+such that k0 is the first window where ae−βδ k ≤1. For
+k ≥k0, ae−βδ k = (ae−βδ k0)e−βδ (k−k0) ≤e−βδ (k−k0). We can
+write ∑k≥0 min{1,ae−βδ k} ≤k0 +∑j≥0 e−βδ j = k0 +
+1
+1−e−βδ .
+Combining these two inequalities we get the first bound on
+E[τη] in (ii). The probability the confirmed cell is wrong is
+at most the probability a wrong cell reaches belief ≥1−η
+at some time, which is bounded by Theorem V.3.
+(iii) Since target is drawn from φ(·,0) (so that P also aver-
+ages over the target’s location), φ(·,t) is the true posterior
+of target’s location given Ft for any t, including τη (i.e.
+P(target at q | Ft) = φ(q,t)). On {τη < ∞}, φ( ˆp,τη) ≥
+1−η, so P( ˆp̸ = p | Fτη ) = 1−φ( ˆp,τη) ≤η. By law of total
+probability, averaging probability over all confirming runs
+gives: P(τη < ∞, ˆp̸ = p) = E
+h
+1{τη < ∞} P( ˆp̸ = p|Fτη )
+|
+{z
+}
+≤η
+i
+≤
+η E
+
+1{τη < ∞}
+
+= η P(τη < ∞) ≤η.
+Remark
+V.1
+(Scope and limitations). Communication.
+We
+assume
+lossless,
+instantaneous
+sharing
+within
+rc.
+Splits/Breaks in Connectivity. (A2) fails while the team is
+split, but each sub-team holds the exact posterior of its
+own reports, so results hold per sub-team with its own look
+counts. Misspecification. Results assume Pd and Pfa are
+modeled exactly; otherwise Rt(q) is no longer a martingale
+and Theorem V.3 can fail. Target. Results assume a single,
+static target and independent reports over time.
+VI. SIMULATIONS
+A. Simulation Setup
+All experiments were run in MATLAB, using the same
+world scale, sensor model, and belief update. The prior
+φ(·,0) is a mixture of anisotropic Gaussian hot spots of
+different sizes and orientations plus a 10% uniform floor,
+ensuring every cell has positive prior mass. The n = 10 agents
+start in a connected formation near the bottom left corner. We
+adopt the sensing cost flocal(∥q−xi(t)∥) = 1
+2∥q−xi(t)∥2 +ε,
+standard in coverage control [2], [19], where ε > 0 enforces
+flocal > 0. We assign ε = 10−6 and the pull region uses
+rs = 0.15, γ = 1.1, and εg = 10−12. Agents communicate
+within rc = 0.1 (inside the Laplacian we use 0.08 as a safety
+margin), with ζ = 1. A cell is confirmed when its belief
+reaches 1−η, with η = 0.01. The remaining parameters can
+be found in Table I. We run three experiments. (i) Single run:
+a fixed target, to show the belief evolution, trajectories, and
+Fig. 2: Belief φ (color) and robot trajectories (white) at three
+times of a single run; the star marks the target.
+Fig. 3: Empirical check of Assumption V.2 for PPALA (40
+trials, target drawn from prior). An episode starts when a cell
+q̸ = p first has φ(q,t) ≥εth and ends when q or p is sensed.
+W is its wait. Open episodes when a trial ends are censored.
+Dotted: lawnmower’s coverage window Tlawn, which satisfies
+the assumption for every εth.
+connectivity (Fig. 2). (ii) Lawnmower comparison: 30 paired
+trials in which PPALA and a connected lawnmower sweep
+search for the same target, drawn from a prior concentrated
+around the top third of the map, with identical sensing,
+false alarms, and belief update. The lawnmower agents
+move in a line (spacing 0.08) at full speed dmax along
+boustrophedon lanes that sense every cell in each sweep,
+ignoring the belief. (iii) Theory check: we compare measured
+evidence per look, rejection rates, and wrong-confirmation
+frequencies with Theorems V.4–V.5 and Corollary V.5.1, over
+100 PPALA trials at Pfa = 10−6 and 400 at Pfa = 10−2,
+plus 50 lawnmower trials at each rate. At Pfa = 10−2, γs is
+rescaled so the sense radius stays the same. Trials end at
+confirmation or at a step limit (20,000 steps in (ii), 15,000
+steps in (iii)).
+B. Results and Discussion
+Fig. 2 shows a single run. Starting from a connected
+formation at the corner, the team sweeps the map as one
+network, and the exact Bayes update clears the belief along
+its sensed path (dark region). The belief of unvisited cells,
+including the target’s, grows slowly as the cleared mass is
+renormalized over them. Once the team senses the target, the
+belief at the target p rises to 1 within a few looks, and the
+remaining belief vanishes everywhere else (rightmost plot
+in Fig. 2). Fig. 3 tests whether PPALA satisfies Assumption
+V.2, the condition under which Theorem V.4(ii) holds. Higher
+belief cells are visited sooner. The probability of seeing
+waits greater than the lawnmower’s deterministic window
+
+
+Fig. 4: (a) Residual belief after first sensed look at target
+(multi-trial median); dotted: slope −κ1/ln10 per look. (b)
+Empirical CDF of the evidence of one look at an empty
+cell. Vertical line: κ0. Solid: PPALA; dashed: lawnmower.
+Fig. 5: Frequency of confirming a wrong cell vs. confirmation
+level, showing bound η of Corollary V.5.1(iii) (target drawn
+from the prior). Filled markers: observed frequency with
+95% Wilson intervals; open triangles: no wrong confirmation
+observed (95% upper limit). Shaded region and dotted lines:
+not enough trials to resolve the bound.
+drops off very abruptly. PPALA does not enforce revisits,
+so Assumption V.2 is a condition on the planner that our
+runs satisfy in most, but not all trials. This is consistent with
+treating the planner as a black box in Section V. Next we
+compared PPALA with a connected lawnmower sweep over
+30 paired trials. Both planners confirmed the correct cell in
+every trial at η = 0.01. PPALA was faster in all 30, with a
+median of 1659 steps with interquartile range (IQR) 1327–
+1888 versus 3521 with IQR 3356–3881 for the lawnmower
+strategy. The advantage lies in the prior. PPALA moves to
+high-belief regions first, while the lawnmower sweeps in a
+fixed order regardless of the belief. Fig. 4 checks the rates of
+Section V. Once the target is sensed, φ(p,t) →1 (Theorem
+V.4(i)) for both planners, and 1−φ(p,t) decays at the rate set
+by the κ1Nt(p) term of Theorem V.5 (at about 5.9 decades
+per look at Pfa = 10−6 and 2.0 at Pfa = 10−2, Fig. 4a). Fig.
+4b illustrates Lemma V.2. Every miss at a sensed empty cell
+yields at least log((1 −Pfa)/δ) ≈κ0 nats (the only looks
+below this are false alarms, occurring at the modeled rates for
+Pfa). Fig. 5 tests Corollary V.5.1(iii). In every condition and
+at every η, the observed frequency of confirming a wrong
+cell lies below the bound. At the operating level η = 0.01,
+PPALA made no wrong confirmations in 400 trials even at
+Pfa = 10−2. Wrong confirmations appear only for η ≥0.03,
+and for PPALA at Pfa = 10−6 only for η ≥0.3. Not enough
+trials were run to conclude about η < 0.01.
+VII. CONCLUSION
+We presented a coordination framework for multi-agent
+search that fuses sensor uncertainties by inverse-variance
+weighting and keeps the team connected through a differ-
+entiable constraint maintained by a primal-dual planner. For
+any planner that does not anticipate future measurements, we
+bounded the probability of ever confirming a wrong location
+and showed that false locations are rejected exponentially
+fast in the number of looks. Under AGI, the belief provably
+concentrates on the target. In simulation, our planner main-
+tained connectivity, satisfied AGI in most trials, and located
+the target faster than a lawnmower sweep when the prior was
+informative. The measured residual belief, evidence per look,
+and false-confirmation rates all agreed with our bounds.
+REFERENCES
+[1] M. B. Agerman, Z. Zhang, J. G. Kim, S. Sundaram, and C. G.
+Brinton, “A primal-dual gradient descent approach to the connectivity
+constrained sensor coverage problem,” in Proc. IEEE 64th Conf.
+Decision and Control (CDC), Dec. 2025, pp. 6792–6797.
+[2] M. Schwager, D. Rus, and J.-J. Slotine, “Decentralized, adaptive
+control for coverage with networked robots,” Int. J. Robot. Res.,
+vol. 28, no. 3, pp. 357–375, Mar. 2009.
+[3] F. Pratissoli, M. Mantovani, A. Prorok, and L. Sabattini, “Distributed
+coverage control for time-varying spatial processes,” IEEE Trans.
+Robot., vol. 41, pp. 1602–1617, 2025.
+[4] K. R. Guruprasad and D. Ghose, “Automated multi-agent search using
+centroidal Voronoi configuration,” IEEE Trans. Autom. Sci. Eng.,
+vol. 8, no. 2, pp. 420–423, Apr. 2011.
+[5] S. Seo and K. Lee, “Density-driven optimal control for efficient and
+collaborative multiagent nonuniform coverage,” IEEE Trans. Syst.,
+Man, Cybern., Syst., vol. 55, no. 12, pp. 9340–9354, 2025.
+[6] K. Lee and J. Martinez, “AI-augmented density-driven optimal control
+for decentralized environmental mapping,” Engineering Applications
+of Artificial Intelligence, vol. 181, p. 115700, 2026.
+[7] I. I. Hussein and D. M. Stipanovi´c, “Effective coverage control for
+mobile sensor networks with guaranteed collision avoidance,” IEEE
+Trans. Control Syst. Technol., vol. 15, no. 4, pp. 642–657, Jul. 2007.
+[8] C. Prabhakar and S. Farzan, “Decoupled multi-robot localization and
+target tracking via dynamic covariance scaling and inverse covariance
+fusion,” in Proc. American Control Conf. (ACC), Jul. 2025, pp. 3152–
+3157.
+[9] G. Battistelli and L. Chisci, “Kullback–Leibler average, consensus
+on probability densities, and distributed state estimation,” Automatica,
+vol. 50, no. 3, pp. 707–721, Mar. 2014.
+[10] K. Wang, C. Wang, F. Dinessen, G. Spreen, R. Ricker, and X. Tian-
+Kunze, “Multisensor data fusion of operational sea ice observations,”
+Front. Mar. Sci., vol. 11, p. 1366002, 2024.
+[11] B. J. Julian, M. Angermann, M. Schwager, and D. Rus, “Distributed
+robotic sensor networks: An information-theoretic approach,” Int. J.
+Robot. Res., vol. 31, no. 11, pp. 1234–1254, Sep. 2012.
+[12] J. Hu, L. Xie, and J. Xu, “Vision-based multi-agent cooperative target
+search,” in Proc. 9th Int. Conf. Intell. Inf. Hiding Multimedia Signal
+Process. (IIH-MSP), Oct. 2013, pp. 178–181.
+[13] B. Moon, N. Suvarna, A. Jong, S. Chatterjee, J. Yuan, M. Cao, and
+S. Scherer, “IA-TIGRIS: An incremental and adaptive sampling-based
+planner for online informative path planning,” IEEE Trans. Robot.,
+2026.
+[14] M. M. Zavlanos and G. J. Pappas, “Potential fields for maintaining
+connectivity of mobile networks,” IEEE Trans. Robot., vol. 23, no. 4,
+pp. 812–816, 2007.
+[15] L. Siligardi, J. Panerati, M. Kaufmann, M. Minelli, C. Ghedini,
+G. Beltrame, and L. Sabattini, “Robust area coverage with connectivity
+maintenance,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), May
+2019, pp. 2202–2208.
+
+
+[16] A. Mitra, J. A. Richards, and S. Sundaram, “A new approach to
+distributed hypothesis testing and non-Bayesian learning: Improved
+learning rate and Byzantine resilience,” IEEE Trans. Autom. Control,
+vol. 66, no. 9, pp. 4084–4100, Sep. 2021.
+[17] D. A. Casta˜n´on, “Optimal search strategies in dynamic hypothesis
+testing,” IEEE Trans. Syst., Man, Cybern., vol. 25, no. 7, pp. 1130–
+1138, Jul. 1995.
+[18] J. G. Kim et al., “A fast single-loop primal-dual algorithm for
+non-convex functional constrained optimization,” arXiv preprint
+arXiv:2406.17107, Jun. 2024.
+[19] M. Schwager, J. McLurkin, and D. Rus, “Distributed coverage control
+with sensory feedback for networked robots,” in Proc. Robot.: Sci.
+Syst. (RSS), Aug. 2006, pp. 49–56.
+[20] C. Jin, R. Ge, P. Netrapalli, S. M. Kakade, and M. I. Jordan,
+“How to escape saddle points efficiently,” in Proceedings of the 34th
+International Conference on Machine Learning, ser. Proceedings of
+Machine Learning Research, vol. 70.
+PMLR, 2017, pp. 1724–1732.
