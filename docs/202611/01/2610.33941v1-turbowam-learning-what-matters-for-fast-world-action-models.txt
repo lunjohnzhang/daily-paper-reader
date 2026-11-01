@@ -1,0 +1,340 @@
+Title: TurboWAM: Learning What Matters for Fast World Action Models
+
+URL Source: https://arxiv.org/pdf/2610.33941v1
+
+Published Time: Tue, 27 Oct 2026 01:01:28 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# TurboWAM: Learning What Matters for Fast World Action Models 
+
+## Guile Wu 1, Shuangzhi Li 1,3,*, Xingxin Chen 1, Chengjie Huang 1, Sam Hosseini 1,Tongtong Cao 2, Yingxue Zhang 1, and Dongfeng Bai 11Huawei Noah’s Ark Lab 2Department of Foundation Model, Huawei 3University of Alberta 
+
+## https://turbowam.github.io/ “put the yellow and white mug in the microwave and close it”         
+
+> TurboWAM Faster-WAM Fast-WAM
+> In progress In progress Success
+> In progress In progress Success In progress
+> In progress In progress Success In progress In progress
+> Success Success
+> Success
+
+(a) Visual comparison of successful task execution.  (b) Inference Time (↓) vs. Success Rate (↑).    
+
+> TurboWAM
+> Fast-WAM
+> Faster-WAM
+> Faster-WAM-
+> SMoT
+> Light-WAM
+> LingBo-VA
+> Motus
+> Cosmos Policy
+> X-VLA
+> π0.5
+> TurboWAM*
+> Fast-WAM*
+> 96.5
+> 97
+> 97.5
+> 98
+> 98.5
+> 99
+> 99.5
+> 10 100 1000 10000
+> Success Rate (%, ↑)
+> Inference Time Per Action Chunk (ms, ↓)
+
+Figure 1. Overview of TurboWAM performance. (a) Visual comparison of successful task execution, highlighting the fast task completion of TurboWAM. (b) Comparison of inference time vs. success rate on LIBERO. TurboWAM achieves a better trade-off between inference time and success rate compared to state-of-the-art methods. TurboWAM* and Fast-WAM* denote versions accelerated using torch.compile with CUDA Graph replay, with compilation and graph capture performed during warm-up before model inference measurement. 
+
+## Abstract 
+
+World action models have demonstrated promising perfor-mance in robot policy learning, yet their high inference la-tency remains a critical bottleneck for real-world deploy-ment. Recent approaches have sought to improve inference efficiency by reducing test-time future-frame imagination or accelerating action prediction. However, these methods of-ten leverage representations from all video world model lay-ers without explicitly considering their varying relevance to action prediction, leading to redundant computation and suboptimal representation utilization. In this work, we pro-pose TurboWAM, a fast world action model that efficiently aggregates structured world representations conditioned on action predictions. Specifically, TurboWAM introduces a structured world representation aggregation module that adaptively fuses representations from different world model 
+
+> *
+
+S. Li contributed to this work during an internship at Huawei Canada. 
+
+layers according to their relevance to the evolving action denoising state. Furthermore, TurboWAM employs a struc-tured action supervision mechanism that adaptively mod-ulates gradients from action supervision across different world model layers during backward propagation, facil-itating world representation learning. During inference, by reducing the number of world model layers executed and caching relevant representations across action denois-ing steps, TurboWAM substantially reduces computational overhead. Extensive experiments on multiple robot manip-ulation benchmarks demonstrate that TurboWAM achieves low inference latency while maintaining competitive task success rates compared with state-of-the-art methods. 
+
+## 1. Introduction 
+
+World Action Models (WAMs) [2, 12, 14, 22, 23, 26] have recently emerged as a promising paradigm for robot policy learning. Typically, WAMs integrate future visual genera-1arXiv:2610.33941v1 [cs.CV] 24 Oct 2026 tion with action prediction into a unified framework, allow-ing robots to anticipate how the physical world evolves dur-ing interaction. Despite their promising performance, the high computational cost of WAMs remains a critical bottle-neck for real-world deployment. In particular, WAMs often rely on large-scale video generative models that require it-erative denoising to predict future observations, resulting in substantial computational overhead and inference latency. This limits their applicability to real-time robotic control, where efficient and responsive action prediction is essential. Recently, several methods [13, 15, 18, 23, 27] have been proposed to improve the inference efficiency of WAMs for robot policy learning. These methods primarily address the computational bottleneck by reducing test-time future imagination, accelerating action prediction, or developing more efficient model architectures. Despite their encourag-ing results, several limitations remain. First, these methods often process or aggregate features from all world model layers without explicitly considering their varying relevance to the ongoing action prediction. However, different lay-ers may contribute unequally to action prediction, and their importance can vary across denoising timesteps. Conse-quently, indiscriminately processing all layers introduces redundant computation and leads to suboptimal representa-tion utilization. Second, existing approaches typically lack explicit mechanisms to regulate how action supervision in-fluences the optimization of different world model layers. Without such mechanisms, the learned world representa-tions may not be sufficiently aligned with the requirements of action prediction, limiting policy performance. To resolve these limitations, in this work, we propose TurboWAM, a novel fast world action model that efficiently aggregates structured 1 world representations conditioned on action predictions. Following [18, 23], TurboWAM pre-serves video co-training during training while eliminat-ing future visual prediction during inference. Specifically, we introduce a structured world representation aggregation module that adaptively aggregates representations from dif-ferent world model layers according to their relevance to action prediction at each denoising timestep. Unlike exist-ing methods that rely on fixed or action-independent rep-resentation fusion, our approach dynamically adjusts the contribution of different layers based on the current action denoising state. Furthermore, by restricting inference to a limited number of world model layers and caching reusable representations for efficient aggregation, TurboWAM sub-stantially reduces redundant computation while preserving informative world representations for action prediction. To further improve the alignment between world representa-
+
+> 1In this work, “structure” refers to model structure rather than geomet-ric structure. Specifically, TurboWAM employs layer-wise world represen-tation aggregation and action supervision across world model layers. We therefore use “structured” to characterize this layer-wise design.
+
+tion learning and action prediction, we develop a structured action supervision mechanism that adaptively modulates gradients from action supervision across different world model layers during backward propagation. Importantly, this mechanism operates exclusively during backward prop-agation without introducing additional computation into the forward inference process, allowing TurboWAM to benefit from structured action supervision without compromising inference efficiency. We conduct extensive experiments on multiple robot manipulation benchmarks and on real-world robot manipulation tasks. Experimental results demonstrate that TurboWAM achieves low inference latency while main-taining competitive task success rates compared with state-of-the-art methods (as illustrated in Figure 1). In summary, our contributions are: • We propose TurboWAM, a novel fast world action model that efficiently leverages structured world representations for action prediction, reducing inference overhead while preserving the benefits of video co-training. • We develop a structured world representation aggregation module that fuses representations across different world model layers conditioned on the action denoising state. • We propose a structured action supervision mechanism that modulates action-supervision gradients across differ-ent world model layers during backward propagation. • Extensive experiments on multiple robot manipulation benchmarks demonstrate that TurboWAM achieves lower inference latency while maintaining competitive task suc-cess rates compared with state-of-the-art methods. 
+
+## 2. Related Work 
+
+World Action Models. World Action Models (WAMs) [12, 22, 24, 25, 29] and Vision-Language-Action (VLA) Models [3, 4, 10, 11] have emerged as two prominent paradigms for robot policy learning. While VLA models typically predict actions directly from visual observations and language instructions, WAMs leverage visual generative models, such as video generation mod-els [20], to incorporate knowledge of physical dynamics into action prediction. By jointly modeling future visual observations and robot actions, WAMs learn world rep-resentations that capture how the environment evolves during interaction [2, 12, 14, 22, 23]. Representative approaches, including DreamZero [22], Motus [2], Cosmos Policy [12], and LingBot-VA [14], have demonstrated the potential of leveraging predictive world modeling for robot control. Despite their promising performance, these methods often incur substantial computational overhead due to the expensive process of future visual generation, limiting their applicability to real-time robotic control. Our work focuses on improving the inference efficiency of WAMs while maintaining competitive task success rates. 2Current observation    
+
+> Future observations
+> Language & Proprioception
+> VAE encoder
+> Text/State encoder
+> Structured World Representation Aggregation
+> …
+> K/V bank
+> Structured
+> representation
+> aggregation module
+> Action
+> head
+> Noisy action
+> latents
+> Update
+> Structured action supervision
+> Video head
+> Action chunk
+> DiT
+> block 1
+> DiT
+> block m …DiT
+> block n
+> Action Prediction
+> Video world model
+> Future observations
+> Train & Eval Train only Figure 2. Overview of the TurboWAM framework. The structured world representation aggregation module adaptively fuses represen-tations from different world model layers according to the current action denoising state. The structured action supervision mechanism modulates action-supervision gradients across world model layers during the backward pass. Together, these complementary designs re-duce inference latency while maintaining competitive task success rates.
+
+Low-Latency World Action Models. Recent efforts have explored various strategies to reduce the inference la-tency of WAMs. Fast-WAM [23] eliminates explicit future visual generation during inference while retaining video co-training during training, enabling efficient action prediction without test-time future imagination. Faster-WAM [18] ag-gregates key and value representations from all video world model layers using learned fusion weights and employs a single-DiT-block action head to reduce action prediction la-tency. ARPS [8] aggregates intermediate world model fea-tures into a compact state for the action expert to reduce inference overhead and employs future-representation su-pervision to enhance world representation learning. Other methods explore model compression and lightweight archi-tectures [13, 15], as well as sparse video-action interac-tions [27], to improve inference efficiency. Despite these advances, existing methods do not explicitly explore adap-tive world representation learning conditioned on the evolv-ing action denoising state and still leave room for improve-ment in the efficient utilization of world representations. In contrast, our TurboWAM introduces structured world rep-resentation aggregation that dynamically adjusts the contri-butions of different world model layers conditioned on the current action denoising state. Additionally, our structured action supervision explicitly modulates gradients from ac-tion supervision across different world model layers. By re-ducing the number of world model layers executed during inference and caching reusable representations for efficient aggregation, TurboWAM further reduces inference latency. 
+
+## 3. Methodology 
+
+3.1. Approach Overview 
+
+Problem Formulation. This work focuses on world ac-tion models for robot control. Given a current observation 
+
+o, a language instruction l, and a proprioceptive state p, the goal is to predict an action chunk a1: H with horizon H. In conventional WAMs, future imagination and action predic-tion are jointly modeled during inference, where the world model extracts representations of the current observation and predicts representations of future states: 
+
+zf , z o = Fw(o, l, p ),a1: H = Fa(zf , z o, l, p ), (1) where zf and zo denote the future and current observation representations, respectively, Fw is the world model for rep-resentation extraction (the variational autoencoder (VAE) and language and proprioception encoders are omitted for brevity), Fa is the action expert for action prediction, and 
+
+a1: H = ( a1, . . . , a H ). However, generating future observa-tion representations incurs substantial computational over-head during inference. We follow [18, 23] and decouple future imagination from action prediction, jointly optimiz-ing video generation and action prediction during training while performing action prediction without future imagina-tion during inference. The language instruction and propri-oceptive state are encoded into world representations rather than directly provided to the action head. Unlike [18, 23], which use representations from all world model layers for action prediction, we reformulate Fw to produce structured world representations conditioned on noisy action latents at each denoising step and modulate the gradients from action supervision to the world model during backward propaga-3(a) Fusion weight distribution across layers.  (c) Influence of each layer across steps. 
+
+> (b) Spatial feature relationships across layers.
+> (d) Route distance across steps. Figure 3. Motivation for the proposed TurboWAM. (a) Distribution of fusion weights across world model layers in Faster-WAM. (b) Spatial feature relationships at different world-model depths in Faster-WAM, visualized through cosine similarity between the reference location (close to the gripper) and other spatial locations. (c) Influence of individual world model layers at different denoising steps in Faster-WAM, measured by the relative change in predicted action velocity when the key/value pairs from a given layer are excluded from fusion. (d) Routing distance across denoising steps, measured by the total variation distance between two layer-wise fusion weight distributions.
+
+tion in training. Thus, the inference process of TurboWAM can be formulated as: 
+
+zto = Fw(o, l, p, a t 
+
+> 1: H
+
+),at−11: H = Fa(at 
+
+> 1: H
+
+, z to, t ), t = T, . . . , 1, (2) where zto denotes the action-conditioned world represen-tation at denoising step t, at 
+
+> 1: H
+
+denotes the current noisy action latents, at−11: H denotes the updated action latents af-ter one denoising step, and T is the total number of ac-tion denoising steps. In Eq. (2), Fw represents the world model backbone together with action-conditioned represen-tation aggregation and Fa includes the action head and the sampler update, and the final predicted action chunk is a1: H = a01: H . In this way, TurboWAM efficiently ag-gregates relevant world representations while avoiding re-peated execution of the world model backbone, reducing inference latency without compromising task success rates. 
+
+Framework Overview. An overview of TurboWAM is shown in Figure 2. During training , we encode image ob-servations using a VAE encoder and process language in-structions and proprioceptive states using their respective encoders to obtain latent representations. Noise is then added to the future-observation latents, which are fed into the video world model Fw for denoising conditioned on the current-observation latents, language instructions, and proprioceptive states. Meanwhile, we extract the key and value tokens corresponding to the current observation from the first m layers of the video world model and use them directly for structured representation aggregation. Follow-ing [18], we employ a single DiT block as the action head, which takes noisy action latents as queries and the aggre-gated world representations as keys and values for attention-based action prediction. At a given action denoising step, the noisy action latents condition the structured representa-tion aggregation module, which produces the fused world representations used for action prediction. During back-ward propagation, structured action supervision modulates gradients from the action loss to the selected world model representations, while the video loss follows ordinary back-propagation. During inference , TurboWAM predicts ac-tions from the current observation, language instruction, and proprioceptive state without performing future imagi-nation. Only the first m world model layers are executed once per control decision, and their key and value represen-tations are cached for reuse throughout action denoising. The structured representation aggregation module updates the fusion weights at each denoising step based on the cur-rent noisy action latents, whereas structured action supervi-sion is not applied during inference. Thus, TurboWAM re-duces inference latency through efficient representation ag-gregation while maintaining competitive task success rates. 
+
+3.2. Structured World Representation 
+
+Observation and Motivation. In WAMs, the world model produces hierarchical representations across multi-4ple layers, capturing different levels of abstraction and tem-poral dynamics. Fast-WAM [23] employs a fixed one-to-one correspondence between world model layers and ac-tion head layers without aggregating world representations across layers. This rigid layer-wise coupling incurs substan-tial computational overhead and limits the flexibility of uti-lizing hierarchical world representations. Faster-WAM [18] instead employs a docking interface to fuse world represen-tations from all world model layers for action prediction. However, Faster-WAM still requires processing all world model layers during inference and does not explicitly adapt its learned fusion weights to the evolving action denoising state. As shown in Figure 3(a), the docking interface of Faster-WAM assigns larger fusion weights to intermediate world model layers than to early and late layers. This sug-gests that intermediate-layer representations are particularly relevant to action prediction. In addition, Figure 3(b) shows that spatial feature relationships between the reference lo-cation (close to the gripper) and other regions vary across world model layers, suggesting that different layers capture different aspects of the spatial information relevant to action prediction. Moreover, Figure 3(c) shows that the influence of individual world model layers on action prediction varies across denoising steps, with relatively small variations at early steps and more pronounced variations at later steps. These observations suggest that world model layers con-tribute unequally to action prediction and that their relative importance can change along the denoising trajectory. Mo-tivated by these observations, we propose a structured rep-resentation aggregation module that adaptively combines representations from selected world model layers according to the current action denoising state. 
+
+Structured Representation Aggregation. Let n denote the total number of layers 2 in the world model, and let Ki
+
+and Vi denote the keys and values of the current observa-tion extracted from the ith layer, respectively. Motivated by Figure 3(a), which indicates the importance of intermediate layers for action prediction, we introduce a layer budget m,where 1 ≤ m ≤ n, to specify the number of world model layers used for aggregation. Specifically, we use the first m
+
+layers, allowing the model to retain early-to-intermediate representations while avoiding execution of the remaining layers during inference. During training, all n layers are ex-ecuted for video co-training, while the key and value tokens from the first m layers are used for structured representa-tion aggregation. During inference, only the first m layers are executed, and their key and value tokens are cached for aggregation across denoising steps; the remaining n − m
+
+layers are skipped to reduce computational overhead. To aggregate representations from the selected layers, instead of using fixed fusion weights that are independent 
+
+> 2The terms transformer “layer” and “block” are used interchangeably.
+
+of the action denoising trajectory as in [18], we employ an action-conditioned aggregation mechanism that dynam-ically adjusts fusion weights based on the current noisy ac-tion latents. Aggregation is performed independently for each attention head, and for clarity, we omit the attention-head index throughout the following formulations. Let atj
+
+denote the noisy action latent of the jth action in the ac-tion chunk at denoising step t, where at 
+
+> 1: H
+
+= ( at
+
+> 1
+
+, . . . , a tH ).We first average the noisy action latents to obtain a sum-mary vector and then compute the action-conditioned fusion score αt,i for each selected world model layer: 
+
+αt,i =
+
+
+
+Wq
+
+ 1
+
+> H
+
+PHj=1 atj
+
+ T
+
+ei
+
+√r , (3) where Wq is a learned projection matrix, ei is a learned rout-ing vector for layer i, and r is the dimension of the projected query and routing vectors. The score αt,i represents the rel-evance of the ith selected world model layer to the current action denoising state. The fusion weights wt,i are com-puted as: 
+
+wt,i = exp( βi + γα t,i )
+
+Pmj=1 exp( βj + γα t,j ) , (4) where βi is a learned static logit for layer i, following the layer-mixing formulation in [18]. The scalar gate γ =sigmoid( η) is shared across attention heads, where η is a learnable scalar controlling the influence of the action-conditioned fusion score. The fused world representations for each attention head are then obtained as: 
+
+¯Kt =
+
+> m
+
+X
+
+> i=1
+
+wt,i Ki, ¯Vt =
+
+> m
+
+X
+
+> i=1
+
+wt,i Vi. (5) Here, zto = ( ¯Kt, ¯Vt) denotes the fused world representa-tions at denoising step t. The same fusion weights are applied to keys and values and shared across token posi-tions, preserving their spatial arrangement and key-value correspondence. During inference, the cached keys and val-ues remain fixed throughout action denoising, while the fu-sion weights are dynamically updated based on the current noisy action latents. This enables denoising-step-specific representation aggregation without repeatedly executing the world model backbone during inference. Following [18], we also apply RMS normalization and positional encoding to the fused keys. 
+
+Action Prediction. The action head incorporates the structured world representations for action prediction through the following attention operation: 
+
+Oat = Softmax 
+
+ Qat [ ¯Kt; Kat ]T
+
+√dhead 
+
+
+
+[ ¯Vt; V at ], (6) 5where Oat denotes the attention output; Qat , Kat , and V at de-note the query, key, and value representations of the action head at denoising step t, respectively; dhead is the attention-head dimension; and [·; ·] denotes concatenation along the token dimension. The output Oat is then processed by the re-maining action head operations (an output projection layer and a feed-forward layer) to predict the action velocity as-sociated with the noisy action sequence at 
+
+> 1: H
+
+. The sampler uses the predicted velocity to update at 
+
+> 1: H
+
+to at−11: H .
+
+3.3. Structured Action Supervision 
+
+Following [18, 23], we jointly optimize the video and action flow-matching objectives: 
+
+L = Lv + La, (7) where Lv and La are the video and action flow-matching losses, respectively. World representations are adaptively aggregated according to Eq. (5) during the forward pass and receive gradients from La during the backward pass. However, under ordinary backpropagation through the fu-sion operation, world model layers with smaller forward fu-sion weights receive weaker direct gradients from the action loss, potentially limiting world representation optimization. To address this issue, we propose structured action supervi-sion , which modulates the backward gradients to achieve a more balanced distribution of action supervision across the selected layers while leaving the forward pass unchanged. Specifically, let Xi = ( Ki, V i) represent the key/value features extracted from the ith selected world model layer, and let gt = ∂La/∂z to denote the action-loss gradient at the fused world representations zto at denoising step t. The fol-lowing gradients are understood component-wise for keys and values. Because the fusion weights in Eq. (5) are con-ditioned on the noisy action latents rather than on Xi, the direct gradient contribution through the fusion operation to the ith selected layer is 
+
+Gt,i = ∂La
+
+∂X i fusion ,t 
+
+= wt,i gt. (8) As shown in Eq. (8), this direct gradient contribution is proportional to the forward fusion weight, so layers with smaller weights receive weaker direct gradients. We there-fore decompose the gradients into a layer-shared component and a layer-specific residual component: 
+
+G′ 
+
+> t,i
+
+= μcom Gt, com + μres Gt, res ,i ,Gt, com = 1
+
+m
+
+> m
+
+X
+
+> j=1
+
+Gt,j , Gt, res ,i = Gt,i − Gt, com , (9) where μcom and μres control the contributions of the layer-shared and layer-specific residual components, respectively. The layer-shared component captures action supervision common to the selected layers, while the residual com-ponent preserves layer-specific adjustments. Combining Eqs. (9) and (8), we obtain 
+
+G′ 
+
+> t,i
+
+= μcom 
+
+
+
+ρw t,i + 1 − ρm
+
+
+
+gt, ρ = μres 
+
+μcom 
+
+, (10) where μcom > 0. For 0 ≤ ρ ≤ 1, the resulting gradi-ent weights interpolate between the learned fusion distribu-tion and a uniform distribution over the selected layers, pro-viding more balanced direct action supervision. Thus, the forward pass preserves the learned action-conditioned fu-sion weights, while the backward pass combines the layer-specific residual component with a shared gradient com-ponent. Structured action supervision is applied only to the action-loss gradients propagated to the selected world model representations during training and introduces no ad-ditional inference cost. The forward aggregation and action prediction remain unchanged, while the video loss and other parameters follow ordinary backpropagation. 
+
+## 4. Experiments 
+
+4.1. Experimental Setup 
+
+We evaluate TurboWAM on three widely used robot ma-nipulation benchmarks, namely LIBERO [16], LIBERO-Plus [7], and RoboTwin2.0 [5], and additionally conduct ex-periments on a real-world robot platform involving several manipulation tasks. LIBERO consists of four task suites, namely Spatial, Object, Goal, and Long, each containing 10 tasks with a total of 500 demonstrations. We train Tur-boWAM on all four suites and report task success rates over 2,000 evaluation trials across 40 tasks. LIBERO-Plus ex-tends LIBERO by introducing seven categories of pertur-bations, including camera viewpoints, robot initial states, language instructions, lighting conditions, background tex-tures, sensor noise, and object layouts, to evaluate the ro-bustness and generalization capabilities of robot policies. We evaluate the zero-shot generalization of TurboWAM on 10,030 LIBERO-Plus instances by directly applying the models trained on the original LIBERO suites without fur-ther adaptation. We report task success rates across all seven perturbation categories. RoboTwin2.0 is a bimanual robot manipulation benchmark comprising 50 tasks. Fol-lowing [18, 23], we train TurboWAM using 2,500 demon-strations from clean scenes and 25,000 demonstrations from randomized scenes across all 50 tasks. We report task suc-cess rates over 100 evaluation trials per task under both clean and randomized conditions. For real-world robot ex-periments, details of the experimental setup and results are provided in the supplementary material. 
+
+4.2. Implementation Details 
+
+We implement TurboWAM using Python and PyTorch. We adopt the VAE and video world model from the pretrained 6Table 1. Comparison with state-of-the-art methods on LIBERO and RoboTwin 2.0. EPT: Embodied Pre-Training. †Implementation based on the arXiv:2608.02365v1 version. ‡VLA results are for reference only.                                                                                                                               
+
+> Type Method EPT LIBERO RoboTwin 2.0 Spatial ↑Object ↑Goal ↑Long ↑Avg ↑Latency ↓(ms) Clean ↑Rand ↑Avg ↑Latency ↓(ms) VLA ‡X-VLA [28] ✓98.2 98.6 97.8 97.8 98.1 113.3 72.9 72.8 72.9 125.0
+> π0.5[4] ✓98.8 98.2 98.0 92.4 96.9 42.0 82.7 76.8 79.8 36.7 WAM CosmosPolicy [12] ✓98.1 100.0 98.2 97.6 98.5 296.9 ––––Motus [2] ✓96.8 99.8 96.6 97.6 97.7 1555.3 88.7 87.0 87.8 1534.7 LingBot-VA [14] ✓98.5 99.6 97.2 98.5 98.5 3032.3 92.9 91.5 92.2 3328.0 Efficient-WAM [13] ✗––––––86.7 85.7 86.2 329.2 Light-WAM [15] ✗98.2 99.6 97.8 93.0 97.2 118.5 76.4 76.3 76.4 116.9 Faster-WAM †[18] ✗98.0 99.8 98.6 96.4 98.2 76.1 89.6 89.5 89.6 77.1 Fast-WAM [23] ✗98.2 100.0 97.0 95.2 97.6 336.7 91.9 91.8 91.8 437.2 TurboWAM (ours) ✗99.4 99.8 98.6 98.0 99.0 49.7 90.4 90.5 90.5 47.1
+
+Table 2. Comparison with state-of-the-art methods on LIBERO-Plus across seven perturbation categories. TurboWAM + denotes results obtained with corrected language prompts following https://github.com/sylvestf/LIBERO-plus/issues/64.                                                                                               
+
+> Type Method EPT LIBERO-Plus Camera ↑Robot ↑Language ↑Light ↑Background ↑Sensor ↑Object ↑Avg ↑Latency (ms) ↓
+> VLA ‡X-VLA [28] ✓23.4 89.7 75.7 88.2 96.0 62.7 71.8 71.4 128.9
+> π0.5[4] ✓75.4 77.5 85.6 96.9 94.6 89.7 85.7 85.7 42.4 WAM CosmosPolicy [12] ✓75.8 63.3 81.7 96.5 88.9 92.7 82.2 82.2 323.8 LingBot-VA [14] ✓40.9 83.0 86.4 82.3 53.1 64.4 76.2 69.5 3757.0 Faster-WAM ∗[18] ✗71.6 54.0 89.6 93.6 55.3 81.6 80.2 75.3 84.9 Fast-WAM [23] ✗16.4 44.5 68.9 78.2 53.7 37.7 60.7 51.5 351.9 TurboWAM (ours) ✗69.5 65.2 93.0 93.7 63.9 78.9 82.6 78.1 50.1 TurboWAM +(ours) ✗81.0 74.5 93.0 93.2 65.4 89.1 83.7 83.3 50.1
+
+Wan2.2-5B [20] and employ T5 [19] as the text encoder. A linear projection layer is used to encode proprioceptive states into the same feature dimension as the language em-beddings before they are fed into the video world model. We set the action chunk horizon to H=32 , the layer budget to m=24 , and the routing dimension to r=16 . For struc-tured action supervision, we set μcom =0 .25 and μres =0 .05 .We optimize the model using AdamW [17] with a co-sine annealing learning rate schedule and linear warm-up, where the maximum learning rate is set to 10 −4. We train TurboWAM for 10 epochs on LIBERO and 5 epochs on RoboTwin2.0. Inference latency is measured with an action chunk horizon of 32, using cached instruction embeddings. 
+
+4.3. Comparison with State-of-the-Art Methods 
+
+Compared Methods. We compare TurboWAM against state-of-the-art WAM methods, including Motus[2], LingBot-VA[14], Cosmos Policy[12], Efficient-WAM[13], Light-WAM[15], Faster-WAM[18], and Fast-WAM[23]. We also include representative VLA-based methods (X-VLA[28] and π0.5[4]) for reference. The inference latency of all compared methods is measured on the same single data-center GPU with approximately 140 GB of memory under identical environmental settings. 
+
+Result Analysis. As shown in Table 1, TurboWAM achieves competitive task success rates with substan-tially reduced inference latency on both LIBERO and RoboTwin2.0. Specifically, on LIBERO, TurboWAM achieves the highest average success rate of 99.0% and the lowest inference latency of 49.7 ms among the com-pared methods. On RoboTwin2.0, TurboWAM maintains strong task performance, achieving an average success rate of 90.5% with the lowest inference latency of 47.1 ms. We further evaluate the zero-shot generalization of TurboWAM on LIBERO-Plus. As shown in Table 2, TurboWAM achieves competitive performance across the seven pertur-bation categories compared with state-of-the-art methods. Notably, these results are obtained by directly evaluating the models trained on the original LIBERO suites without any additional adaptation. This demonstrates the robust-ness and generalization capability of TurboWAM under di-verse perturbations and environmental variations. In addi-tion, Figure 4 presents qualitative comparison of task exe-cution among TurboWAM, Fast-WAM, and Faster-WAM. We observe that TurboWAM completes the manipulation tasks both quickly and accurately, whereas Fast-WAM and Faster-WAM either take longer to complete the tasks or fail in some scenarios. Overall, the experimental results demonstrate that TurboWAM achieves a favorable balance 7In progress            
+
+> “put the white mug on the left plate and put the yellow and white mug on the
+> right plate”
+> In progress In progress Success Success
+> In progress In progress In progress In progress Failed
+> In progress In progress In progress In progress Failed
+
+(a) Visualization on LIBERO.  (b) Visualization on RoboTwin2.0.         
+
+> TurboWAM Faster-WAM Fast-WAM
+> In progress
+> “click the alarm clock's center of the top side button on the table”
+> In progress In progress Success
+> In progress In progress In progress Success
+> In progress In progress In progress Success
+> In progress
+> In progress
+> Success
+> TurboWAM Faster-WAM Fast-WAM
+
+Figure 4. Qualitative comparison of task execution. Each row illustrates the progression of task execution from left to right. For clarity, we show only the primary camera view. Additional multi-camera visualizations are provided in the supplementary material. Table 3. Ablation study on structured representation aggregation. Average success rate ↑ is reported. 
+
+TurboWAM + [following method] LIBERO LIBERO-Plus Structured aggregation (default) 99.0 78.1 w/o the learned static logit 98.8 77.3 Direct average over layers 98.5 75.9 DoT aggregation [18] 98.8 77.0 between inference efficiency and task success rates. 
+
+4.4. Ablation Study 
+
+Structured Representation Aggregation. Table 3 stud-ies the effectiveness of the proposed structured representa-tion aggregation module. In addition to the default struc-tured representation aggregation, we investigate three alter-native strategies: (1) using the structured representation ag-gregation without the learned static logit; (2) directly av-eraging world representations across all layers; (3) adopt-ing the DoT aggregation strategy from Faster-WAM [18]. As shown in the table, the proposed structured representa-tion aggregation consistently outperforms these alternative strategies. Specifically, removing the learned static logit term leads to a slight performance degradation. Directly averaging world representations leads to substantially lower task success rates. Replacing the proposed aggregation with the DoT aggregation strategy within our TurboWAM frame-work results in inferior performance. These results validate the effectiveness of our design. 
+
+Structured Action Supervision. Table 4 investigates the effectiveness of the proposed structured action supervision mechanism. We compare our approach with three alterna-tive gradient optimization strategies: (1) ordinary action su-
+
+Table 4. Ablation study on structured action supervision. Average success rate ↑ is reported. 
+
+TurboWAM + [following method] LIBERO LIBERO-Plus Structured supervision (default) 99.0 78.1 Ordinary gradients 97.9 69.2 Gradient isotropic scaling 98.4 75.2 Gradient insulating [6] 93.9 56.6 pervision without gradient modulation; (2) gradient-norm-matched isotropic scaling; and (3) gradient insulation fol-lowing [6]. Overall, the proposed structured action super-vision consistently achieves better performance than the al-ternative strategies. These results show the effectiveness of the structured action supervision mechanism. Importantly, since the proposed mechanism operates exclusively during backward propagation, these improvements are achieved without introducing additional inference overhead. 
+
+## 5. Conclusion 
+
+In this work, we present TurboWAM, a novel fast world action model that reduces inference latency while main-taining competitive task success rates. TurboWAM intro-duces a structured world representation aggregation mod-ule that adaptively aggregates relevant world representa-tions conditioned on the evolving action denoising state. Also, TurboWAM introduces structured action supervision that adaptively modulates gradients from action supervi-sion across different world model layers. Extensive exper-iments show that TurboWAM achieves significantly lower inference latency while maintaining competitive task suc-cess rates compared with state-of-the-art methods. 8Limitations and Future Work. Despite its promising performance, TurboWAM still has several limitations. First, it may face challenges in scenarios requiring complex spa-tial reasoning and intricate object interactions. Incorporat-ing geometric priors from spatial foundation models [9, 21] or semantic knowledge from vision-language models [1] could be promising directions to address these challenges. Second, further improving task success rates while preserv-ing low inference latency remains an important research di-rection. Future work will explore these directions to further enhance the robustness and efficiency of TurboWAM. 
+
+## References 
+
+[1] Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao, Chunjiang Ge, Wenbin Ge, Zhifang Guo, Qidong Huang, Jie Huang, Fei Huang, Binyuan Hui, Shutong Jiang, Zhao-hai Li, Mingsheng Li, Mei Li, Kaixin Li, Zicheng Lin, Jun-yang Lin, Xuejing Liu, Jiawei Liu, Chenglong Liu, Yang Liu, Dayiheng Liu, Shixuan Liu, Dunjie Lu, Ruilin Luo, Chenxu Lv, Rui Men, Lingchen Meng, Xuancheng Ren, Xingzhang Ren, Sibo Song, Yuchong Sun, Jun Tang, Jianhong Tu, Jian-qiang Wan, Peng Wang, Pengfei Wang, Qiuyue Wang, Yux-uan Wang, Tianbao Xie, Yiheng Xu, Haiyang Xu, Jin Xu, Zhibo Yang, Mingkun Yang, Jianxin Yang, An Yang, Bowen Yu, Fei Zhang, Hang Zhang, Xi Zhang, Bo Zheng, Humen Zhong, Jingren Zhou, Fan Zhou, Jing Zhou, Yuanzhi Zhu, and Ke Zhu. Qwen3-vl technical report. arXiv preprint arXiv:2511.21631 , 2025. 9 [2] Hongzhe Bi, Hengkai Tan, Shenghao Xie, Zeyuan Wang, Shuhe Huang, Haitian Liu, Ruowen Zhao, Yao Feng, Chen-dong Xiang, Yinze Rong, et al. Motus: A unified latent ac-tion world model. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 35101–35113, 2026. 1, 2, 7 [3] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, Szymon Jakubczak, Tim Jones, Liyiming Ke, Sergey Levine, Adrian Li-Bell, Mohith Mothukuri, Suraj Nair, Karl Pertsch, Lucy Xiaoyang Shi, James Tanner, Quan Vuong, Anna Walling, Haohuan Wang, and Ury Zhilinsky. π0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 ,2024. 2 [4] Kevin Black, Noah Brown, James Darpinian, Karan Dha-balia, Danny Driess, Adnan Esmail, Michael Robert Equi, Chelsea Finn, Niccolo Fusai, Manuel Y. Galliker, Dibya Ghosh, Lachy Groom, Karol Hausman, brian ichter, Szymon Jakubczak, Tim Jones, Liyiming Ke, Devin LeBlanc, Sergey Levine, Adrian Li-Bell, Mohith Mothukuri, Suraj Nair, Karl Pertsch, Allen Z. Ren, Lucy Xiaoyang Shi, Laura Smith, Jost Tobias Springenberg, Kyle Stachowicz, James Tanner, Quan Vuong, Homer Walke, Anna Walling, Haohuan Wang, Lili Yu, and Ury Zhilinsky. π0.5: a vision-language-action model with open-world generalization. In Proceedings of The 9th Conference on Robot Learning , pages 17–40, 2025. 2, 7 [5] Tianxing Chen, Zanxin Chen, Baijun Chen, Zijian Cai, Yibin Liu, Zixuan Li, Qiwei Liang, Xianliang Lin, Yiheng Ge, Zhenyu Gu, et al. Robotwin 2.0: A scalable data gen-erator and benchmark with strong domain randomization for robust bimanual robotic manipulation. arXiv preprint arXiv:2506.18088 , 2025. 6 [6] Danny Driess, Jost Springenberg, Brian Ichter, Lili Yu, Adrian Li-Bell, Karl Pertsch, Allen Ren, Homer Walke, Quan Vuong, Lucy Xiaoyang Shi, et al. Knowledge insulat-ing vision-language-action models: Train fast, run fast, gen-eralize better. Advances in Neural Information Processing Systems , 38:102867–102888, 2026. 8 [7] Senyu Fei, Siyin Wang, Junhao Shi, Zihao Dai, Jikun Cai, Pengfang Qian, Li Ji, Xinzhe He, Shiduo Zhang, Zhaoye Fei, et al. Libero-plus: A progressive robustness bench-mark for visual-language-action models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 38574–38583, 2026. 6 [8] Qiwen Gu, Jifan Li, Bingjie Gao, Rui Chen, Jing Tang, Xi-angxiang Chu, and Junqiao Zhao. The right future for ac-tion: Learning action-relevant predictive states in world ac-tion models. arXiv preprint arXiv:2609.23369 , 2026. 3 [9] David Huang, Guile Wu, Chengjie Huang, Bingbing Liu, and Dongfeng Bai. Turbovggt: Fast visual geometry recon-struction with adaptive alternating attention. arXiv preprint arXiv:2605.14315 , 2026. 9 [10] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. 2 [11] Moo Jin Kim, Chelsea Finn, and Percy Liang. Fine-tuning vision-language-action models: Optimizing speed and suc-cess. arXiv preprint arXiv:2502.19645 , 2025. 2 [12] Moo Jin Kim, Yihuai Gao, Tsung-Yi Lin, Yen-Chen Lin, Yunhao Ge, Grace Lam, Percy Liang, Shuran Song, Ming-Yu Liu, Chelsea Finn, and Jinwei Gu. Cosmos policy: Fine-tuning video models for visuomotor control and planning. In 
+
+The Fourteenth International Conference on Learning Rep-resentations , 2026. 1, 2, 7 [13] Jiajun Li, Tiecheng Guo, Yifan Ye, Rongyu Zhang, Xiaowei Chi, Qianpu Sun, Ying Li, Yunfan Lou, Yan Huang, Zhihe Lu, et al. Efficient-wam: A 1b-parameter world-action model with low-cost future imagination. arXiv preprint arXiv:2606.10040 , 2026. 2, 3, 7 [14] Lin Li, Qihang Zhang, Yiming Luo, Shuai Yang, Ruilin Wang, Fei Han, Mingrui Yu, Zelin Gao, Nan Xue, Xing Zhu, et al. Causal world modeling for robot control. arXiv preprint arXiv:2601.21998 , 2026. 1, 2, 7 [15] Ziang Li, Dongzhou Cheng, Yibin Wang, Shiyue Wang, Xi-aoyang Xu, Lingxuan Weng, Juan Wang, and Jiaqi Wang. Light-wam: Efficient world action models with state-fusion action decoding. arXiv preprint arXiv:2606.08242 , 2026. 2, 3, 7 [16] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu, Yuke Zhu, and Peter Stone. Libero: Benchmarking knowl-
+
+9edge transfer for lifelong robot learning. Advances in Neural Information Processing Systems , 36:44776–44791, 2023. 6 [17] Ilya Loshchilov and Frank Hutter. Decoupled weight decay regularization. arXiv preprint arXiv:1711.05101 , 2017. 7 [18] Liheng Ma, Rui Heng Yang, Zhanguang Zhang, Mateo Clemente, Ziwen Hu, Tongtong Cao, and Yingxue Zhang. Faster-wam: Do world action models need deep action mod-ules? arXiv preprint arXiv:2608.02365 , 2026. 2, 3, 4, 5, 6, 7, 8 [19] Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, and Peter J Liu. Exploring the limits of transfer learning with a unified text-to-text transformer. Journal of machine learning research , 21(140):1–67, 2020. 7 [20] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, et al. Wan: Open and advanced large-scale video gen-erative models. arXiv preprint arXiv:2503.20314 , 2025. 2, 7[21] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea Vedaldi, Christian Rupprecht, and David Novotny. Vggt: Visual geometry grounded transformer. In 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 5294–5306. IEEE, 2025. 9 [22] Seonghyeon Ye, Yunhao Ge, Kaiyuan Zheng, Shenyuan Gao, Sihyun Yu, George Kurian, Suneel Indupuru, You Liang Tan, Chuning Zhu, Jiannan Xiang, et al. World action models are zero-shot policies. arXiv preprint arXiv:2602.15922 , 2026. 1, 2 [23] Tianyuan Yuan, Zibin Dong, Yicheng Liu, and Hang Zhao. Fast-wam: Do world action models need test-time future imagination? arXiv preprint arXiv:2603.16666 , 2026. 1, 2, 3, 5, 6, 7 [24] Jianjun Zhang, Jian Zhu, Taiyi Su, Chong Ma, Zitai Huang, Yi Xu, and Hanli Wang. Learning 4d geometric priors for inference-efficient world action models. arXiv preprint arXiv:2607.05468 , 2026. 2 [25] Yuyang Zhang, Wenyao Zhang, Zekun Qi, He Zhang, Haitao Lin, Jingbo Zhang, Yao Mu, Xiaokang Yang, Wenjun Zeng, and Xin Jin. Imagewam: Do world action models really need video generation, or just image editing? arXiv preprint arXiv:2606.19531 , 2026. 2 [26] Zhanguang Zhang, Zhiyuan Li, Behnam Rahmati, Rui Heng Yang, Yintao Ma, Amir Rasouli, Sajjad Pakdamansavoji, Yangzheng Wu, Lingfeng Zhang, Tongtong Cao, et al. Do world action models generalize better than vlas? a robust-ness study. arXiv preprint arXiv:2603.22078 , 2026. 1 [27] Weiheng Zhao, Haoyi Jiang, Xin Shi, Liu Liu, Fan Huang, Zhizhong Su, Wei Sui, and Xinggang Wang. Faster-wam: Efficient inference-time future conditioning for robust world action models. arXiv preprint arXiv:2608.04404 , 2026. 2, 3 [28] Jinliang Zheng, Jianxiong Li, Zhihao Wang, Dongxiu Liu, Xirui Kang, Yuchun Feng, Yinan Zheng, Jiayin Zou, Yilun Chen, Jia Zeng, et al. X-vla: Soft-prompted transformer as scalable cross-embodiment vision-language-action model. In International Conference on Learning Representations ,pages 60580–60606, 2026. 7 [29] Chuning Zhu, Raymond Yu, Siyuan Feng, Benjamin Burch-fiel, Paarth Shah, and Abhishek Gupta. Unified world mod-els: Coupling video and action diffusion for pretraining on large robotic datasets. arXiv preprint arXiv:2504.02792 ,2025. 2 
+
+10

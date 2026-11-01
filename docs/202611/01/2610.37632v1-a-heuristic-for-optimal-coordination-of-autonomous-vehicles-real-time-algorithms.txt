@@ -1,0 +1,1166 @@
+Title: A heuristic for optimal coordination of autonomous vehicles: real-time algorithms
+
+URL Source: https://arxiv.org/pdf/2610.37632v1
+
+Published Time: Wed, 28 Oct 2026 01:50:57 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+> 1
+
+# A heuristic for optimal coordination of autonomous vehicles: real-time algorithms 
+
+Saugat Shahi, Jonathan Frey, Filippo Fabiani, Moritz Diehl and Mario Zanon 
+
+Abstract —When coordinating connected and automated vehi-cles at an unsignalized intersection, the crossing order and the vehicle trajectories must be decided jointly. For a fixed crossing order, the problem can be formulated conveniently in a bi-level form where each vehicle solves its own optimal control problem, whose optimal value is a function of its entry and exit times, and a coordinator optimizes these times subject to precedence constraints. We compute the first and second order sensitivities of lower-level problems, which are required to solve the upper-level problem, by means of algorithmic differentiation using the real-time software package acados . This implementation exploits tailored algorithms to obtain a computationally efficient imple-mentation of the optimal coordination algorithm. We validate our implementation in numerical simulations that demonstrate both real-time feasibility and effectiveness of our algorithm. 
+
+I. I NTRODUCTION 
+
+At an unsignalized intersection, connected and automated vehicles (CAVs) travel through the conflict zone directly, which can reduce delay, energy consumption and collision risk [1], [2]. Coordinating them requires two decisions: a discrete crossing order and the continuous trajectories opti-mization. Together they form a mixed-integer nonlinear pro-gram (MINLP) [3], [4], and deciding optimal crossing order is combinatorially hard [5]. Existing work therefore fix the schedule, such as first-come-first-served reservation [6] or static priorities [7], but their solutions far from optimal for heterogeneous fleets [8]. For a fixed crossing order, the problem can be decomposed into an upper-level nonlinear program (NLP) that assigns occupancy slots of the intersection and independent optimal control problems (OCPs), one per vehicle [3], [9], [10]. The semi-distributed sequential quadratic programming (SQP) and interior-point schemes of [10], [11] build on this structure and solve only a small quadratic program (QP) centrally. Similar formulations for a fixed schedule are found in [12]–[22]. Choosing the crossing order remains the primary challenge. Exact methods formulate it with integer variables and use mixed-integer programming [4], [23], [24], tree search [25], branch-and-bound [26] or dedicated sequencing algorithms [27], but scales poorly. Heuristics instead improve a given order by swapping adjacent vehicles [24], [28]. In our previous study, the Lagrange multipliers associated with the precedence constraints quantify the cost related to the crossing order. They rank the critical vehicle pairs discussed in [8], which retrieves a significant portion of the optimality gap found in first-in-first-out. The extension in [29] incorporates this prioritization into a model predictive control (MPC) framework [30] that retains a history of performed swaps. Nevertheless, each swap is verified through a complete re-solving with a general-purpose NLP solver [31], [32], which prevents realtime operation as the number of vehicles increases. Parametric sensitivity analysis is an alternative to handle these re-solves. Under standard assumptions, the solution of a parametric NLP is differentiable in the parameter, and its derivatives follow from the Karush–Kuhn–Tucker (KKT) system [33], [34]. A second-order solver factorizes this system anyway, so first- and second-order derivatives of the optimal value come at little extra cost [34], [35]. The same idea un-derlies real-time iteration schemes [30], [36] and the solution sensitivities of acados [37], [38], which builds on HPIPM 
+
+[39] and CasADi [32]. This paper cast the coordination problem of [8], [29] in bi-level form, in which each vehicle solves its own acados 
+
+OCP and its optimal value is a function of its crossing times. Our contributions are fourfold. First, we compute the gradient of these value functions from the multipliers of the crossing conditions and their Hessian from the acados 
+
+solution sensitivities. Second, we use them in a prediction QP that estimates the cost change of a candidate swap. Only swaps predicted to improve are confirmed by a re-solve, which replaces most of the full re-solves of [8], [29]. Third, we solve the upper level by SQP with a dense or a structured HPIPM 
+
+solver. Fourth, we compare the solutions of centralized and decentralized formulation and evaluate real time feasibility in closed loop simulation with computation delay against controllers in section IV-D. Section II presents the centralized formulation and the multiplier-guided schedule refinement, Section III the decen-tralized formulation and the sensitivity-based method, Sec-tion IV the numerical results, and Section V concludes the paper. 
+
+Notation: We denote Iba := {a, . . . , b }, with Iba = ∅ if a > b ,and by |S| the cardinality of a finite set S. The sampling time is ts, k is the sampling instant, N the prediction horizon and 
+
+n ∈ IN 
+
+> 0
+
+the time step, which refers to the time (k + n)ts. The placeholders †, ‡ ∈ { in , out } denote entry and exit quantities. For vehicle i, xi := ( xi, 0, . . . , x i,N ), ui := ( ui, 0, . . . , u i,N −1)
+
+and ti := ( tin  
+
+> i
+
+, t out  
+
+> i
+
+). A schedule S is a permutation of the vehicles, Sc is the vehicle in position c, and swap( S, c )
+
+exchanges positions c and c + 1 . The superscripts (j) and 
+
+⋆ denote the j-th SQP iterate and optimal quantities, and the subscript sw a swapped schedule. We use ∂ for partial and 
+
+d for total derivatives, and diag( Ai)i∈I the block-diagonal matrix with blocks Ai.arXiv:2610.37632v1 [eess.SY] 27 Oct 2026 2Coordination Area Ck
+
+Intersection Zone Veh 1Veh 2
+
+Veh 3
+
+Veh 4
+
+Veh 5
+
+tarr 3
+
+tarr 1
+
+tarr 2
+
+tarr 4
+
+tarr 5
+
+pout  
+
+> i
+
+pin 
+
+> i
+
+pout 
+
+> i
+
+pin 
+
+> i
+
+pin 
+
+> i
+
+pout 
+
+> i
+
+pin  
+
+> i
+
+pout 
+
+> i
+
+Not coordinated (outside Ck)Intersection zone boundary Coordination area boundary Uncoordinated vehicle ( /∈ Ck)             
+
+> Fig. 1. Four-way unsignalized intersection scenario. Vehicles Veh 1–Veh 4
+> arrive asynchronously from different directions at times tarr 1, . . . , t arr 4and travel along fixed straight paths toward the intersection zone (dashed red boundary). Entry and exit positions are denoted by pin
+> iand pout
+> i, respectively, and colored arrows indicate each travelling direction. Vehicle Veh 5has not yet entered the coordination area Ck(dashed blue boundary) and is therefore not coordinated.
+
+II. P ROBLEM FORMULATION 
+
+We consider the coordination of cooperative CAVs ap-proaching an unsignalized intersection, as illustrated in Fig. 1, following the setting of [8], [29]. Each vehicle i moves along a fixed path, with state xi,n and control input ui,n at time step n. The dynamics are obtained from a twice continuously differentiable continuous-time model by discretization with sampling time ts and a zero-order hold on the input over each sampling interval: 
+
+xi,n +1 = fi(xi,n , u i,n ), (1) subject to path constraints 
+
+hi(xi,n , u i,n ) ≤ 0. (2) Vehicle i enters and exits the intersection at fixed positions 
+
+pin  
+
+> i
+
+and pout  
+
+> i
+
+, with entry and exit times implicitly defined via 
+
+pi
+
+
+
+t† 
+
+> i
+
+, x i, u i
+
+
+
+= p† 
+
+> i
+
+,
+
+where pi(t, x i, u i) is the position of vehicle i at time t. Since 
+
+xi and ui are sequences defined at the sampling instants only, pi is evaluated between them by holding the input ui,n 
+
+constant over the sampling interval [( k + n)ts, (k + n + 1) ts)
+
+and propagating the continuous-time model from xi,n over the fraction of the interval elapsed at time t; in this way, the pair 
+
+(xi, u i) defines a continuous-time trajectory, and tin  
+
+> i
+
+and tout 
+
+> i
+
+are not restricted to multiples of ts. Let tarr  
+
+> i
+
+and texit  
+
+> i
+
+denote the times at which vehicle i enters and leaves a predefined coordination area, which determines which vehicles take part in the coordination at every time. At sampling instant k the 
+
+coordination set is Ck := { i : tarr  
+
+> i
+
+≤ kt s ≤ texit  
+
+> i
+
+}, with cardinality M := |C k|. The crossing order at sampling instant 
+
+k is a permutation Sk of the elements of Ck. Collision-free schedule is enforced through the precedence constraints 
+
+tin  
+
+> Sc+1
+
+≥ tout  
+
+> Sc
+
+, c ∈ IM −11 .
+
+Collecting the decision variables in x := (xi)i∈C k , u := (ui)i∈C k and t := ( ti)i∈C k , the cost to be minimized is the sum of the individual vehicle costs, i.e., 
+
+J(x, u ) := X
+
+> i∈C k
+
+Ji(xi, u i), (3) 
+
+Ji(xi, u i) :=  
+
+> N−1
+
+X
+
+> n=0
+
+ℓi(xi,n , u i,n ) + ℓi, f (xi,N ),
+
+with stage and terminal costs ℓi(xi,n , u i,n ) = riu2 
+
+> i,n
+
++qi(vi,n −
+
+vref )2 and ℓi, f (xi,N ) = qi(vi,N − vref )2, where vi,n is the velocity of vehicle i at time step n, vref is the reference velocity, and the weights qi, r i > 0 penalize the deviation from it and the control effort, respectively, and depend on the class of the vehicle (i.e., light, medium, or heavy). 
+
+A. Centralized formulation 
+
+For a fixed coordination set Ck and schedule Sk, the coordination problem of [8], [29] reads 
+
+V (Sk) := min  
+
+> x,u,t
+
+J(x, u ) (4a) s.t. xi, 0 = ˆ xi, 0, ∀i ∈ C k, (4b) 
+
+xi,n +1 = fi(xi,n , u i,n ), ∀i ∈ C k, n ∈ IN −10 ,
+
+(4c) 
+
+hi(xi,n , u i,n ) ≤ 0, ∀i ∈ C k, n ∈ IN −10 ,
+
+(4d) 
+
+tin  
+
+> Sc+1
+
+≥ tout  
+
+> Sc
+
+, ∀c ∈ IM −11 , (4e) 
+
+pi(t† 
+
+> i
+
+, x i, u i) = p† 
+
+> i
+
+, ∀i ∈ C k, † ∈ { in , out },
+
+(4f) where ˆxi, 0 is the measured state of vehicle i. Problem (4) is an NLP in the continuous variables (x, u, t ), solved for a fixed 
+
+schedule Sk. The joint optimization over Sk and (x, u, t ) turns it into an MINLP, since the schedule is encoded by binary variables that select, for every pair of vehicles, which one crosses first [3], [4]. Its combinatorial part is addressed, as in [8], [29], by a multiplier-guided swapping heuristic which we describe below. 
+
+B. Multiplier-guided schedule refinement 
+
+The combinatorial part of (4) is addressed in [8], [29] by a local order swap over adjacent pairs between vehicles in the crossing order, guided by the multipliers of the precedence constraints. For a given schedule Sk, let λc ≥ 0, c ∈ IM −11 ,denote the Lagrange multiplier of the precedence constraint (4e) between the adjacent vehicles Sc and Sc+1 , so that the Lagrangian of (4) contains the term λc (tout  
+
+> Sc
+
+− tin  
+
+> Sc+1
+
+). As recalled in [8] and well-known from sensitivity analysis [33], [40], λc is the first-order sensitivity of the optimal cost with respect to a perturbation of this constraint: relaxing it by θ > 0,i.e., imposing tin  
+
+> Sc+1
+
+≥ tout  
+
+> Sc
+
+− θ, decreases V (Sk) by λcθ, up 3
+
+Algorithm 1 Multiplier-guided schedule refinement [8], [29]                                                             
+
+> 1: Input: Ck, schedule S, states {ˆxi, 0}, memory T
+> 2: Output: S⋆,Z⋆,T
+> 3: S⋆←S
+> 4: Solve (4) for S⋆, obtain (V⋆, Z ⋆, λ ⋆)
+> 5: while true do
+> 6: P ← { c∈IM−11:{S⋆c, S ⋆c+1 }/∈ T }
+> 7: if P=∅then break
+> 8: end if
+> 9: c⋆←arg max c∈P λ⋆c
+> 10: T ← T ∪ {{ S⋆c⋆, S ⋆c⋆+1 }}
+> 11: Ssw ←swap( S⋆, c ⋆)
+> 12: Solve (4) for Ssw , obtain (Vsw , Z sw , λ sw )
+> 13: if Vsw < V ⋆then
+> 14: (S⋆, V ⋆, Z ⋆, λ ⋆)←(Ssw , V sw , Z sw , λ sw )
+> 15: end if
+> 16: end while
+> 17: return (S⋆, Z ⋆,T)
+
+to first order. A large λc therefore marks the pair (Sc, S c+1 )
+
+as the most expensive one. The multiplier λc predicts the cost change only for a small relaxation θ of the precedence constraint, whereas a swap chnages the order of the two vehicles, which is a finite change of the constraints of (4). A large λc therefore might indicate a promising swap but does not guarantee that the swap reduces the cost. Every candidate is hence verified: the schedule Ssw := swap( Sk, c ) is evaluated by re-solving (4), and the swap is accepted only if V (Ssw ) < V (Sk).Algorithm 1 is the mechanism of heuristic, in which the set 
+
+T keeps track of pairs already evaluated and excludes them from the candidate set P. Here Z collects the primal-dual solu-tion of (4). In the receding-horizon setting of [29], Algorithm 1 is invoked whenever a vehicle enters the coordination area, the new vehicle appended at the tail of Sk−1 and the solution warm-started from the previous one. Throughout this paper, we use the variant denoted H1 in [29] because H1 required fewer NLP solves than H2 in all simulations. Algorithm 1 gives a monotone improvement of the cost: line 13 accepts a swap only when the cost decreases, so no swaps are accepted based on the magnitude of λc alone. III. D ECENTRALIZED FORMULATION 
+
+We now discuss why the centralized problem (4) is reformu-lated, by stating the three bottlenecks of Algorithm 1. First, the structure of the problem is not exploited: the cost and the constraints are separable across vehicles, only coupling between the vehicles is precedence constraints, yet (4) is solved as a single NLP. Second, the computation is centralized: the trajectories of all vehicles are optimized centrally, which requires the full state information of every vehicle. Third, every candidate swap is evaluated at line 12 by a complete re-solve of (4), and the memory T bounds the number of such evaluations but not their cost. We address these bottlenecks by reformulating the problem in a bi-level form first proposed in [10], in which each vehicle solves its own optimal control problem and only its crossing times are exchanged with a coordinator, and by exploiting the sensitivities of the value functions to replace expensive re-solves at line 12 by the solution of a QP. 
+
+A. Bi-level reformulation 
+
+By the decomposition principle of [10], we separate the trajectory optimization of each vehicle from the coordination decision. This is possible because the cost (3) is a sum of per-vehicle and the only coupling between vehicles is the precedence constraint (4e), which involves the crossing times 
+
+t not the trajectory. For fixed crossing times, the trajectory optimization of each vehicle is therefore an independent OCP, and problem (4) is the equivalent bi-level form described below. 
+
+1) Lower level: For a given pair ti = ( tin  
+
+> i
+
+, t out  
+
+> i
+
+) and initial state ˆxi, 0, each vehicle solves its own OCP, whose optimal solution defines the value function: 
+
+Vi(ˆ xi, 0, t i) := min 
+
+> xi,u i
+
+Ji(xi, u i) (5a) s.t. xi, 0 = ˆ xi, 0, (5b) 
+
+xi,n +1 = fi(xi,n , u i,n ), n ∈ IN −10 ,
+
+(5c) 
+
+hi(xi,n , u i,n ) ≤ 0, n ∈ IN −10 , (5d) 
+
+pi(t† 
+
+> i
+
+, x i, u i) = p† 
+
+> i
+
+, † ∈ { in , out }.
+
+(5e) The M problems defined as per (5) are independent and can be solved in parallel, as ti is imposed by a coordinator which solves the upper-level problem defined later. We collect the decision variables of (5) in wi := ( xi, u i) and write pi(t, w i)
+
+for pi(t, x i, u i). The multipliers of the crossing conditions (5e) are denoted by νi := ( νin  
+
+> i
+
+, ν out  
+
+> i
+
+), and the optimal primal solution of (5) and these multipliers, as functions of ti, are denoted respectively by wi(ti) and νi(ti).Problem (5) is not feasible for every ti, since the vehicle can reach pin  
+
+> i
+
+and pout  
+
+> i
+
+only within limited time intervals so the value function Vi is therefore defined only on its domain, i.e., the set of ti for which (5) is feasible, and this domain must be imposed as a constraint of the upper level introduced below. Following [9], [10], we impose it through the conditions 
+
+di(ˆ xi, 0, t i) ≥ 0, i.e., 
+
+tin  
+
+> i
+
+≤ tin  
+
+> i
+
+≤ ¯tin  
+
+> i
+
+, (6a) 
+
+tout  
+
+> i
+
+(tin  
+
+> i
+
+) ≤ tout  
+
+> i
+
+≤ ¯tout  
+
+> i
+
+(tin  
+
+> i
+
+). (6b) The earliest entry time tin  
+
+> i
+
+is reached from ˆxi, 0 with maximal acceleration, and the latest entry time ¯tin  
+
+> i
+
+is the last time at which the vehicle can still brake without passing pin  
+
+> i
+
+. The exit-time bounds tout  
+
+> i
+
+and ¯tout  
+
+> i
+
+follow from entering at tin  
+
+> i
+
+with the highest or the lowest reachable speed and then accelerating or braking maximally. All times are also bounded by the end 
+
+(k + N )ts of the prediction horizon. For the double integrator of Section IV, all bounds are given in closed form by profiles with at most one switch between maximal acceleration and deceleration. Since the entry speeds depend on tin  
+
+> i
+
+, the bounds on the exit time are functions of the entry time, and di is nonlinear. 4                 
+
+> Vehicle 1
+> OCP (5)
+> acados
+> · · ·
+> Vehicle i
+> OCP (5)
+> acados
+> · · ·
+> Vehicle M
+> OCP (5)
+> acados
+> Coordinator (upper level)
+> SQP on t: QP (8) with HPIPM (dense / structured) swap prediction: prediction QP (14), ranking by λc
+> t1
+> V1,d1
+> and their derivatives
+> ti
+> Vi,di
+> and their derivatives
+> tM
+> VM,dM
+> and their derivatives
+> Fig. 2. Bi-level architecture. The coordinator sends the crossing times ti
+> (downward arrows) to each vehicle, which solves its own OCP and returns its value function Viand domain constraints diwith their gradients and Hessians (upward arrows).
+
+2) Upper level: The upper level is a coordinator which can solve the overall coordination problem by accessing only the value functions Vi, the constraints di, and their derivatives, without exchanging the trajectories. The crossing times and the schedule are then optimized by solving [10] 
+
+min 
+
+> S, t
+
+¯V (S, t ) := X
+
+> i∈C k
+
+Vi(ˆ xi, 0, t i) (7a) s.t. tin  
+
+> Sc+1
+
+≥ tout  
+
+> Sc
+
+, c ∈ IM −11 , (7b) 
+
+di(ˆ xi, 0, t i) ≥ 0, i ∈ C k. (7c) For a fixed Sk, (7) is a smooth NLP in t only, and its optimal value coincides with the cost of the centralized problem, 
+
+V (Sk) = min 
+
+> t
+
+¯V (Sk, t ) s.t. (7b) , (7c) .
+
+By construction, (7) is an exact reformulation of (4): the lower level optimizes the trajectory variables and exposes only the value functions Vi to the upper level, which retains the precedence coupling on the 2M crossing times. The multipliers λc of the precedence constraints (7b) are those used to rank the candidate swaps in Algorithm 1, and they are now available directly from the upper-level solution. Fig. 2 illustrates the resulting architecture. The coordinator sends the crossing times ti to each vehicle, each vehicle solves its OCP (5) independently and returns the value Vi and the constraints di together with their gradients and Hessians, and the coordinator uses this information to update the crossing times and the schedule. No trajectory information is exchanged between the two levels. 
+
+B. Upper-level SQP 
+
+For a fixed schedule S, the upper-level NLP (7) is solved at every replanning and again for every confirmed candidate swap. Its computation time therefore determines that of the coordinator. We solve it by SQP [40], following [10], with a custom implementation in Python in which the lower-level OCPs (5) are solved as subproblems. Since SQP uses the Hessian of the Lagrangian, it needs only a few iterations when it is warm-started from the previous solution. The quadratic model built at the solution is also used in Section III-E to predict the effect of a swap. The method generates a sequence 
+
+t(0) , t (1) , . . . of crossing-time vectors, starting from a warm start t(0) . Each iterate t(j) is a tentative assignment of the entry and exit times of all vehicles in Ck, at which the vehicles solve (5) and return Vi and di together with their gradients and Hessians with respect to ti, computed as described in Sections III-C and III-D, and the sequence converges to the optimal crossing times for S. The iterate t(j) is updated with the step ∆t(j) that solves the QP: 
+
+min  
+
+> ∆t
+> 12
+
+∆t⊤ ¯H(j)∆t + ∇t ¯V  S, t (j)⊤∆t (8a) s.t. tin ,(j) 
+
+> Sc+1
+
++ ∆ tin  
+
+> Sc+1
+
+≥ tout ,(j) 
+
+> Sc
+
++ ∆ tout  
+
+> Sc
+
+, c ∈ IM −11 , (8b) 
+
+di
+
+ ˆxi, 0, t (j)
+
+> i
+
+ + ∇ti di
+
+ ˆxi, 0, t (j)
+
+> i
+
+⊤∆ti ≥ 0, i ∈ C k,
+
+(8c) in which the precedence constraints are kept exactly, and the domain constraints are linearized using the gradient. We de-note by λ and μi the multipliers of (8b) and (8c), respectively. To guarantee convexity of (8), each block Hi of the Hessian of the Lagrangian (12) is made positive definite by the eigenvalue modification of [10]: with Hi = EiDiE⊤ 
+
+> i
+
+its eigendecompo-sition, we set ¯Hi = Ei ¯DiE⊤ 
+
+> i
+
+, where the diagonal matrix ¯Di
+
+is obtained from Di by replacing every eigenvalue smaller than a small ϵ > 0 by ϵ, and take ¯H(j) = diag( ¯Hi)i∈C k ,evaluated at t(j). Note that these decompositions are cheap because the blocks have dimension 2. To save computation, the blocks ∇2 
+
+> ti
+
+Vi are recomputed only at every second iteration and reused in between. Far from the solution, the full step ∆t(j) may increase the cost, and SQP is then not guaranteed to converge. We therefore shorten the step by a backtracking line search, in which every trial point is first mapped by an operator Π into the set defined by the precedence constraints, the minimum occupancy times 
+
+(pout  
+
+> i
+
+− pin  
+
+> i
+
+)/v ref and the earliest entry and exit times. We order the crossing times as τ := ( tin  
+
+> S1
+
+, t out  
+
+> S1
+
+, . . . , t in  
+
+> SM
+
+, t out  
+
+> SM
+
+),denote by o the cumulative minimum occupancy times and by τ the earliest times. These constraints then require τ − o to be nondecreasing and not smaller than τ − o, and we define 
+
+Π( τ ) := o + max  iso( τ − o), cummax( τ − o),
+
+where iso is the Euclidean projection onto nondecreasing sequences, cummax is the cumulative maximum, and max 
+
+acts componentwise. The projection iso is computed exactly by the pool-adjacent-violators algorithm in O(M ) operations [41], so Π is cheap. Since (8c) is only a linearization, a trial point can still make a lower-level problem (5) infeasible; such a point is rejected and the step is shortened. The step size 
+
+α(j) ∈ (0 , 1] is reduced by a constant factor until the Armijo condition 
+
+¯V  S, Π( t(j) + α(j)∆t(j))
+
+≤ ¯V  S, t (j) + γ α (j) ∇t ¯V  S, t (j)⊤∆t(j)
+
+holds, where γ ∈ (0 , 12 ] [40]. The iterative scheme then reads as: 
+
+t(j+1) = Π  t(j) + α(j)∆t(j), (λ, μ )(j+1) = ( λ, μ )(j)QP ,
+
+(9) where (λ, μ )(j)QP are the multipliers of (8b) and (8c). The iteration stops when ∥∆t(j)∥ ≤ 10 −6. It also stops when t(j)
+
+satisfies (7b) and (7c) up to 10 −6 and, in addition, the decrease 5
+
+predicted by the QP model is below 10 −5 max(1 , | ¯V |) or every component of ∆t(j) is below 1 ms . The multipliers λc used in Algorithm 1 are those of (8b) at the last iterate. Each replanning starts from the previous crossing times, with those of a new vehicle appended at the tail of the schedule, and each vehicle warm-starts its OCP from its own previous primal-dual solution. The multipliers of the upper level are initialized at zero. Since consecutive coordination sets differ by at most one vehicle, only a few SQP iterations are needed. The QP in (8) is solved with HPIPM [39] in two different formulations. The dense formulation passes the 2M crossing times, the block-diagonal Hessian ¯H(j) and the constraint Ja-cobian as dense matrices. The structured formulation, instead, exploits the chain structure of (7b). It writes (8) as an OCP over the positions c ∈ IM 
+
+> 1
+
+of the schedule, in which stage c
+
+has the input ∆tSc ∈ R2 and the scalar state sc, which carries the exit-time step of the preceding vehicle. The dynamics and the stage cost are 
+
+sc+1 = ∆ tout  
+
+> Sc
+
+, 12 ∆t⊤
+
+> Sc
+
+¯HSc ∆tSc + ∇tSc V ⊤ 
+
+> Sc
+
+∆tSc ,
+
+subject to the stage constraints 
+
+tin ,(j) 
+
+> Sc
+
++ ∆ tin  
+
+> Sc
+
+− tout ,(j) 
+
+> Sc−1
+
+− sc ≥ 0, c ∈ IM 
+
+> 2
+
+,dSc + ∇tSc d⊤ 
+
+> Sc
+
+∆tSc ≥ 0, c ∈ IM 
+
+> 1
+
+,
+
+where dSc and its gradient are evaluated at t(j). Each prece-dence constraint then couples only consecutive stages, and 
+
+HPIPM solves this OCP by a Riccati recursion whose cost grows linearly with M . The dense formulation is faster for few vehicles and the structured one for many, so we choose between them by comparing M with the crossover size ¯M
+
+found in Section IV-C. 
+
+C. Derivatives of the value function and of the domain con-straints 
+
+The QP (8) requires the first and second derivatives of Vi
+
+and di with respect to ti. Those of Vi are obtained from the KKT system of the lower-level OCP, and those of di from its closed form. 
+
+1) First-order derivatives: The parameter ti enters (5) only through the crossing conditions (5e), which appear in the Lagrangian function of (5) as the terms ν†
+
+> i
+
+ pi(t† 
+
+> i
+
+, w i)−p†
+
+> i
+
+. By the implicit function theorem applied to the KKT conditions of (5), under the assumptions of Section III-D, the derivative of Vi with respect to t† 
+
+> i
+
+equals the partial derivative of these terms with respect to t† 
+
+> i
+
+, evaluated at the primal-dual solution [33], [40]: 
+
+∂V i
+
+∂t †
+
+> i
+
+= ν† 
+
+> i
+
+(ti) ∂p i
+
+∂t 
+
+ t† 
+
+> i
+
+, w i(ti), (10) where ∂p i/∂t is the velocity of vehicle i at the crossing time 
+
+t† 
+
+> i
+
+. The two components (10) form ∇ti Vi, and the gradient of the upper-level cost (7a) is ∇t ¯V =  ∇ti Vi
+
+
+
+> i∈C k
+
+.
+
+2) Second-order derivatives: Differentiating (10) with re-spect to t‡ 
+
+> i
+
+by the product and chain rules [33], [34] yields 
+
+∂2Vi
+
+∂t † 
+
+> i
+
+∂t ‡
+
+> i
+
+= dν†
+
+> i
+
+dt‡
+
+> i
+
+∂p i
+
+∂t + ν†
+
+> i
+
+∂2pi
+
+∂t ∂w i
+
+dwi
+
+dt‡
+
+> i
+
++
+
+
+
+ν†
+
+> i
+
+∂2pi
+
+∂t 2 , ‡ = †,
+
+0, ‡̸ = †,
+
+(11) with all partial derivatives of pi evaluated at  t† 
+
+> i
+
+, w i(ti). The second term accounts for the change of the optimal trajectory, and the last term, the acceleration at t† 
+
+> i
+
+weighted by the multiplier, appears only on the diagonal, because t† 
+
+> i
+
+is the first argument of pi in (10). The sensitivities dνi/dti and dwi/dti
+
+are computed in Section III-D. Since the Hessian ∇2 
+
+> ti
+
+Vi is symmetric in exact arithmetic, we compute only its diagonal entries and the entry with † = in , ‡ = out from (11), and use the latter for both off-diagonal entries. 
+
+3) Derivatives of the domain constraints: The constraints 
+
+di depend only on ti and on the measured state ˆxi, 0, not on the solution of (5). By (6), their components are 
+
+di(ˆ xi, 0, t i) = 
+
+
+
+tin  
+
+> i
+
+− tin 
+
+> i
+
+¯tin  
+
+> i
+
+− tin 
+
+> i
+
+tout  
+
+> i
+
+− tout  
+
+> i
+
+(tin  
+
+> i
+
+)¯tout  
+
+> i
+
+(tin  
+
+> i
+
+) − tout 
+
+> i
+
+ ,
+
+where tin  
+
+> i
+
+and ¯tin  
+
+> i
+
+do not depend on ti. The first two com-ponents are therefore affine, and only the exit-time bounds contribute curvature. Their gradients and Hessians with respect to ti are 
+
+∇ti di, 3 =
+
+−tout ′
+
+> i
+
+1
+
+
+
+, ∇2 
+
+> ti
+
+di, 3 =
+
+−tout ′′  
+
+> i
+
+00 0
+
+
+
+,
+
+∇ti di, 4 =
+
+¯tout ′
+
+> i
+
+−1
+
+
+
+, ∇2 
+
+> ti
+
+di, 4 =
+
+¯tout ′′  
+
+> i
+
+00 0
+
+
+
+,
+
+where ′ denotes the derivative with respect to tin  
+
+> i
+
+. Since 
+
+tout  
+
+> i
+
+and ¯tout  
+
+> i
+
+are given in closed form, these derivatives are obtained by algorithmic differentiation [32], at a cost that is negligible compared with the lower-level solve. The Hessian of the Lagrangian of (7) with respect to t con-tains the Hessian of the cost (7a) and the second derivatives of the constraints, weighted by their multipliers. The precedence constraints (7b) are affine and do not contribute, while the domain constraints (7c) do. Since the cost is separable and each di depends only on ti, this Hessian is block diagonal with one 2 × 2 block per vehicle, 
+
+Hi := ∇2 
+
+> ti
+
+Vi − X
+
+> m
+
+μi,m ∇2 
+
+> ti
+
+di,m , (12) where μi,m ≥ 0 is the m-th component of μi, taken from the previous QP. Only the (in , in) entry of the second term is nonzero, and it equals μi, 3 tout ′′  
+
+> i
+
+− μi, 4 ¯tout ′′  
+
+> i
+
+.
+
+D. Parametric sensitivity analysis 
+
+The expression (11) requires the sensitivities dwi/dti and 
+
+dνi/dti of the lower-level primal-dual solution. We assume that the solution of (5) satisfies the linear independence 6
+
+constraint qualification, strict complementarity and the second-order sufficient conditions [33], [40]. Then, by the implicit function theorem applied to the KKT conditions of (5), the primal-dual solution is locally a differentiable function of ti,and its derivative is the solution of a linear system whose matrix is the KKT matrix at the solution and whose right-hand side is the derivative of the KKT residual with respect to ti [33], [34], [38]. Since ti has two components, two such systems are solved, and their solutions provide dwi/dti and 
+
+dνi/dti for (11). We compute these sensitivities with the solution-sensitivity functionality of acados [37], [38]. The crossing conditions (5e) are implemented by augmenting the state with the posi-tions of the vehicle at tin  
+
+> i
+
+and tout  
+
+> i
+
+, which are recorded within the sampling interval that contains the respective crossing time and constrained at the final stage, so that νi are the multipliers of these terminal constraints. The OCP is solved by SQP with the exact Hessian of the Lagrangian, which is required for exact sensitivities [38], and its QP subproblems are solved by 
+
+HPIPM [39] with partial condensing [42]. At the converged solution, the KKT matrix of the interior-point formulation, which contains all inequality constraints, is formed with the exact Hessian and factorized once by the classical Riccati recursion, which requires positive definiteness only of the reduced Hessian, as ensured by the second-order sufficient conditions [38]. The forward sensitivities with respect to the two crossing times are then obtained by two back-substitutions with this factorization and are evaluated only at the stages that contain tin  
+
+> i
+
+and tout  
+
+> i
+
+and at the final stage. 
+
+E. Sensitivity-based swap prediction 
+
+Line 12 of Algorithm 1 evaluates a candidate swap by re-solving the coordination problem for the swapped schedule. In the bi-level form, each such evaluation costs one complete upper-level SQP solve together with the associated lower-level OCPs. We discuss next how the derivatives introduced in Section III-C can replace most of these re-solves by a single QP. Let t⋆ = t⋆(S) be the converged upper-level solution for the schedule S, let ∇t ¯V := ∇t ¯V (S, t ⋆) be the gradient and 
+
+¯H the Hessian of the Lagrangian (12) after the eigenvalue modification of Section III-B, both evaluated at t⋆, and let λ
+
+be the multipliers of (7b). Around t⋆, the cost admits a second-order approximation, in which a small step δt is distinguished from the SQP step ∆t:
+
+¯V (S, t ⋆ + δt ) ≈ ¯V (S, t ⋆) + ∇t ¯V ⊤δt + 12 δt ⊤ ¯H δt. (13) A swap of the adjacent pair c replaces the precedence con-straints (7b) by those of Ssw = swap( S, c ). The effect of the swap is predicted by minimizing the model (13) subject to the linearized constraints of Ssw , i.e., by the prediction QP: 
+
+∆Jpred (c) := min  
+
+> δt
+
+∇t ¯V ⊤δt + 12 δt ⊤ ¯H δt (14a) s.t. (8b) for Ssw and (8c) , (14b) with t(j) = t⋆ and ∆t = δt. (14c) 
+
+Algorithm 2 Sensitivity-based schedule refinement                                                                                              
+
+> 1: Input: Ck, schedule S, states {ˆxi, 0}, warm start t, memory T
+> 2: Output: S⋆,t⋆,T
+> 3: S⋆←S
+> 4: Solve (7) for S⋆by SQP from t, obtain (V⋆, t ⋆, λ ⋆,∇t¯V , ¯H)
+> 5: while true do
+> 6: P ← { c∈IM−11:{S⋆c, S ⋆c+1 }/∈ T }
+> 7: if P=∅then break
+> 8: end if
+> 9: c⋆←arg max c∈P λ⋆c
+> 10: T ← T ∪ {{ S⋆c⋆, S ⋆c⋆+1 }}
+> 11: Solve (14) for c⋆, obtain ∆Jpred (c⋆)and δt
+> 12: if ∆Jpred (c⋆)<0then
+> 13: Ssw ←swap( S⋆, c ⋆)
+> 14: Solve (7) for Ssw by SQP from t⋆+δt ,obtain
+> (Vsw , t sw , λ sw ,∇t¯Vsw ,¯Hsw )
+> 15: if Vsw < V ⋆then
+> 16: (S⋆, V ⋆, t ⋆, λ ⋆,∇t¯V , ¯H)←
+> (Ssw , V sw , t sw , λ sw ,∇t¯Vsw ,¯Hsw )
+> 17: end if
+> 18: end if
+> 19: end while
+> 20: return (S⋆, t ⋆,T)
+
+Since t⋆ is a KKT point for S, the same QP with the constraints of S has zero optimal value, so ∆Jpred (c) ap-proximates the cost change V (Ssw ) − V (S). Problem (14) has the same structure as (8) and is solved with the same HPIPM 
+
+formulation. It involves no lower-level solve, because it reuses the gradient and the Hessian already computed at t⋆.The pair c is predicted to improve the cost when 
+
+∆Jpred (c) < 0. Because the swap is a discrete, finite per-turbation of the schedule, the prediction is used as a screen. Pairs with ∆Jpred (c) ≥ 0 are discarded at the cost of one QP, whereas a pair predicted to improve is confirmed by a warm-started re-solve of (7) for Ssw and accepted only if 
+
+V (Ssw ) < V (S). Algorithm 2 reports the resulting procedure. It preserves the acceptance rule and hence the monotonicity of Algorithm 1, uses the same memory T , and replaces most of the re-solves by QPs. 
+
+F. Real-time scheduling iteration 
+
+Algorithm 2, though computationally cheaper than Algo-rithm 1, still relies on complete SQP solves: one for the replanning and one for every confirmation. For closed-loop simulation with a fixed sampling time we also consider a real-time scheduling variant based on the idea of the real-time iteration [36]. At every sampling instant, the derivatives (10) and (11) are evaluated at the current lower-level solutions, which are available from the vehicles’ own MPC controllers. Only a single full SQP step (8) is taken for the current schedule, and one prediction QP (14) is solved for the most promising pair not in T . If this pair is predicted to improve, the swapped schedule is accepted together with the step of its prediction QP. A swap is accepted based on the prediction alone, and the confirmation of Algorithm 2 is replaced by the next sampling instant, which linearizes the problem again at the new schedule and updates the multiplier ranking. The computation per sampling instant consists of one derivative evaluation and two QPs, independently of the number of 7
+
+candidate swaps, so its computation time varies little between sampling instants. IV. N UMERICAL RESULTS 
+
+As in [8], [29], the dynamics (1) are a double integrator, whose input ui,n is the acceleration. The path constraints (2) impose |ui,n | ≤ 2 m /s2 and vi,n ≥ 0. All experiments use 
+
+vref = 13 .89 m /s (50 km /h) and ts = 0 .1 s , and three vehicle classes, light, medium and heavy, with weights (qi, r i) =(1 , 1) , (10 , 10) and (100 , 500) . The lower-level OCPs (5) are generated with acados and solved with HPIPM . In the architecture of Fig. 2, each vehicle solves its own OCP. In our simulations, the OCPs are solved on one computer in parallel, with one thread per vehicle. All computations were carried out on a laptop with an Intel Core i7-13620H processor (10 cores, 16 hardware threads, up to 4.9 GHz ). 
+
+A. Distributed vs Centralized Solution 
+
+We compare the bi-level scheme with the centralized for-mulation (4) on 100 randomized scenarios with six vehicles each. In every scenario, the vehicles start 100 m upstream of the intersection at vref , with inter-arrival times drawn uniformly from [0 .2, 0.4] s , and the horizon is N = 150 .The vehicle classes are drawn independently with probabilities 
+
+(0 .4, 0.2, 0.4) for light, medium and heavy vehicles in 25 sce-narios, (0 .6, 0.2, 0.2) in 25 , (0 .2, 0.2, 0.6) in 25 and uniformly in the remaining 25 . The centralized problem (4) includes the same domain constraints (6). It is solved as one acados 
+
+OCP that contains all vehicles, by SQP with a Gauss–Newton Hessian, and its schedule is refined by Algorithm 1. Every arrival triggers both algorithms, with the new vehicle appended at the tail of the schedule. Both start each event from the same vehicle states, the same schedule and the same memory T . The bi-level scheme uses Algorithm 2. The bi-level scheme returns the same final crossing order as the centralized formulation in all 100 scenarios. The prediction QP was solved for 728 candidate swaps. To assess it, every candidate that was discarded was also re-solved, outside the timing, which gives the true cost change 
+
+∆Jtrue . The sign of ∆Jpred is correct for all of the 728 
+
+candidates. All 228 candidates with ∆Jpred < 0 improve the cost and were accepted, so no re-solve was spent on a swap that does not improve. The relative error |∆Jtrue −
+
+∆Jpred |/|∆Jtrue | has a median of 3.4% , and large relative errors occur only for small |∆Jtrue |.Fig. 3 shows the convergence of the upper-level SQP for all replanning and confirmation solves. The replanning converges in a median of 4 SQP iterations and at most 8. A confirmation 
+
+t⋆ + δt , converges in a median of 2 and at most 7. The QPs require a median of 7 and at most 13 HPIPM iterations. The centralized SQP, which optimizes all trajectories jointly, requires a median of 15 and up to 149 iterations per solve. The median computation time per event is 382 ms for the centralized formulation and 10 .6 ms for the bi-level scheme. The largest event takes 6.1 s and 79 ms , respectively. 0 1 2 3 4 5 6 7    
+
+> Upper-level SQP iteration j
+> 10 −9
+> 10 −7
+> 10 −5
+> 10 −3
+> 10 −1
+> 10 1
+> Predicted decrease / cost  median individual solves termination tolerance
+> Fig. 3. Convergence of the upper-level SQP in the 100 scenarios. Dashed: termination tolerance.
+
+B. Computation time of the bi-level scheme 
+
+We break down the computation time of Algorithm 2 on Scenario 1 of [29]. In this scenario, a heavy, a light, two medium and two heavy vehicles arrive within 1.7 s , each starting 100 m upstream of the intersection, and the horizon is N = 150 . Since M ≤ 6, the dense QP formulation is used. The replanning for a fixed schedule takes at most 
+
+15 .8 ms . A confirmation requires two SQP iterations and 
+
+4.90 ms on average, whereas a prediction costs 0.40 ms , about 
+
+12 times less. The prediction discarded five candidates, which saved about 24 .5 ms of confirmations at a prediction cost of 
+
+2.0 ms . The most expensive event, with two confirmed swaps, takes 28 .4 ms , and the whole scenario requires 103 ms of coordination time. All values are medians over five repeated simulations. Fig. 4 reports the computation time of one upper-level SQP iteration, split into its operations. A dense HPIPM QP takes 
+
+0.18 ms on average with 7.5 interior-point iterations. Most of the time is spent in the line search, because every trial point requires all vehicles to solve their OCPs to obtain Vi and 
+
+∇ti Vi. The accepted trial point provides these values for the next iterate, so this is the only lower-level solve per iteration. With one thread per vehicle, this time changes little between 
+
+M = 2 and M = 6 . For M = 1 , the SQP starts from an initial guess instead of a previous solution, and the line search needs more trial points. The Hessian computation adds 
+
+0.11 ms per iteration on average. Fig. 5 shows that a lower-level call that returns Vi and ∇ti Vi takes 0.79 ms , and that the Hessian adds 0.56 ms to the same solve. This addition consists of the factorization of the KKT matrix, the derivative of the KKT conditions with respect to ti, which forms the right-hand side of the sensitivity system, and two substitutions with the factorization, one per crossing time, together with the transfer of the results to Python. Since each stage has only four states and one input, a substitution costs about one quarter of the factorization. The prediction QP, which only reuses derivatives already computed, is therefore much cheaper than a confirmation. 81 2 3 4 5 6
+
+Number of vehicles M          
+
+> 012
+> Time per iteration [ms]  QP solve line search Hessian computation
+> Fig. 4. Computation time per upper-level SQP iteration in the six-vehicle scenario versus the number of vehicles M.0.00 0.25 0.50 0.75 1.00 1.25
+
+Mean time per call [ms]    
+
+> V; rV; r2VV; rV
+> acados solve KKT factorization KKT right-hand side sensitivity extraction interface overhead
+> Fig. 5. Mean computation time per lower-level call in the six-vehicle scenario, with and without the Hessian.
+
+C. Dense versus structured upper-level QP 
+
+Fig. 6 compares the two HPIPM formulations of Sec-tion III-B on upper-level QPs with M = 2 to 512 vehicles. The structured formulation scales as M 1.03 , in line with the linear cost of the Riccati recursion, while the dense one scales as M 2.85 . The dense formulation is faster for few vehicles. In each interior-point iteration, it factorizes a single matrix of size 2M , which is cheap when M is small. The structured formulation instead runs a Riccati recursion over M stages, and each stage requires its own operations on matrices of size at most 2. For few vehicles, this fixed work per stage costs more than the single dense factorization, whose cost grows as 
+
+M 3. The two curves cross at ¯M ≈ 39 , and at M = 512 the structured formulation is 121 times faster. The implementation therefore uses the dense formulation for M < ¯M and the structured one otherwise. 
+
+D. Closed-loop operation under computation delay 
+
+The MPC scheme of [29] neglects the computational time 
+
+talg needed for the schedule refinement to terminate. Because that assumption is unrealistic, any practical algorithm needs to account for talg and, once triggered, predict the initial states 
+
+ˆxi, 0 after time talg and compute the schedule using these pre-dictions rather than the current state measurements, which will be outdated once the algorithm terminates. Because different algorithms have different computation times talg , we evaluate next which of the controllers proposed above performs best, 2 4 8 16 32 64 128 256 512 
+
+Number of vehicles M             
+
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Time per QP [ms]  ¹M¼39
+> £121
+> structured (Riccati), /M1:03 dense, /M2:85
+> Fig. 6. Time per upper-level QP for the dense and the structured HPIPM
+> formulations versus the number of vehicles M. Dotted lines: fitted power laws.
+
+i.e., is it worth adopting an approximate solution earlier or adopting the fully converged solution after a longer time? Each run simulates 300 s of traffic with more than 300 vehicles in five random seeds, light, medium and heavy in the ratio 0.4/0.2/0.4, so that the intersection operates close to its capacity. All controllers store every evaluated pair in the memory T , as in H1 of Section II-B. Compared with the MPC scheme of [29], we make the following changes. Each controller has a fixed delay of 
+
+κ = ⌈tmax alg /t s⌉ sampling periods, where tmax alg is its largest computation time in calibration runs with the same traffic. A decision started at instant k uses the states predicted for instant 
+
+k + κ and takes effect at k + κ, when the next decision starts. Until then, the previous schedule remains in force. A decision that takes longer than κ t s is discarded. The crossing times of a vehicle are fixed once it can no longer stop before the intersection. The four controllers share the lower and upper levels and differ only in the schedule refinement. C0 runs Algorithm 1 at every sampling instant with κ = 0 . It cannot be implemented and serves as the reference. C1 performs the same search but stops after 2 s . C2 replans and evaluates at most one candidate per decision, namely the top-ranked pair not in T , by a re-solve. C3 is the real-time variant of Section III-F. The calibration gives κ = 28 , 13 and 1 for C1, C2 and C3. Table I and Figs. 7 and 8 summarize the results. In every run, C3 has the lowest cost after C0, followed by C2 and C1. C0 evaluates 3.9 candidate swaps per decision on average and C1 16 .2. C1 and C2 compute their decisions for states 
+
+2.8 s and 1.3 s ahead, and their costs are 197 .2% and 156 .3% 
+
+above that of C0. The computation time of C2 varies strongly, from 0.16 s on average to 1.3 s at most, and since the fixed delay must cover the worst case, most of its decisions are computed for states 1.3 s ahead. C3 decides at every sampling instant with a computation time of at most 69 .2 ms , and its cost is 19 .7% above that of C0. Its mean computation time is 
+
+25 .6 ms , of which 17 .1 ms are spent on the derivatives. In our simulation, these are evaluated for one vehicle after the other on a single thread, at 0.75 ms per vehicle. In the architecture 9
+
+TABLE I CLOSED -LOOP RESULTS , MEAN OVER FIVE RUNS OF 300 s 
+
+Cost increase Fixed delay Comp. time [ms] Controller w.r.t. C0 [%] κ t s [ms] mean max C0 (ideal) 0.0 0 449.5 10 321.3 C1 (full search) 197.2 2 800 1 483.6 2 454.1 C2 (one swap, NLP) 156.3 1 300 162.8 1 313.1 C3 (one swap, QP) 19.7 100 25.6 69.2 0 50 100 150 200 250 300 
+
+Time [s] 
+
+012345
+
+> Cumulative cost [ £10 4]
+
+C0 (ideal, no delay) C1 (full search) C2 (one swap, NLP) C3 (one swap, QP) 
+
+Fig. 7. Mean cumulative closed-loop cost over five runs of 300 s .02000 4000 C1 (full search), ∙ ts = 2.8 s 
+
+01000    
+
+> C2 (one swap, NLP), ∙ts= 1.3 s
+
+0 50 100 150 200 250 300 
+
+Time [s] 
+
+050 100    
+
+> C3 (one swap, QP), ∙ts= 100 ms
+> Computation time [ms]
+
+Fig. 8. Worst computation time per decision in each 5 s window over five runs. Dotted: fixed delay κ t s.
+
+of Fig. 2, each vehicle evaluates only its own derivatives, so that a decision of C3 would take about 9 ms : the two QPs and the acceptance step of the coordinator, which take 8.2 ms , plus the derivatives of one vehicle. V. C ONCLUSION 
+
+We have presented a sensitivity-based SQP method for the coordination of CAVs at an intersection, built on the bi-level formulation of the coordination problem. The gradient and the Hessian of each vehicle’s value function are ob-tained analytically from the acados solution sensitivities. With these derivatives, the bi-level fromulation yields the same crossing orders as the centralized formulation in 100 
+
+randomized scenarios, and a single prediction QP predicts the cost change of a candidate swap with the correct sign in every confirmed case. The structured HPIPM formulation makes the upper-level QP scale linearly with the number of vehicles. In closed loop with a fixed computation delay, the real-time variant is the only controller that decides within the 
+
+100 ms sampling period, and its cost is 19 .7% above that of the ideal controller without delay, whereas the controllers based on full re-solves lose 156 .3% and 197 .2% because of their latency. This work completes the line of research of [8], [29]: it retains the multiplier guided swapping heuristic, replaces the expensive re-solves with sensitivity-based QPs, and shows that, once the computation time is accounted for, a fast approximate decision is worth more than an exact but late one. REFERENCES [1] J. Rios-Torres and A. A. Malikopoulos, “A survey on the coordination of connected and automated vehicles at intersections and merging at highway on-ramps,” IEEE Transactions on Intelligent Transportation Systems , vol. 18, no. 5, pp. 1066–1077, 2017. [2] G. Rodrigues de Campos, P. Falcone, R. Hult, H. Wymeersch, and J. Sj¨ oberg, “Traffic coordination at road intersections: Autonomous decision-making algorithms using model-based heuristics,” IEEE Intel-ligent Transportation Systems Magazine , vol. 9, no. 1, pp. 8–21, 2017. [3] R. Hult, M. Zanon, S. Gros, and P. Falcone, “Optimal coordination of automated vehicles at intersections: Theory and experiments,” IEEE Transactions on Control Systems Technology , vol. 27, no. 6, pp. 2510– 2525, 2019. [4] S. A. Fayazi and A. Vahidi, “Mixed-integer linear programming for optimal scheduling of autonomous vehicle intersection crossing,” IEEE Transactions on Intelligent Vehicles , vol. 3, no. 3, pp. 287–299, 2018. [5] A. Colombo and D. Del Vecchio, “Least restrictive supervisors for inter-section collision avoidance: A scheduling approach,” IEEE Transactions on Automatic Control , vol. 60, no. 6, pp. 1515–1527, 2015. [6] K. Dresner and P. Stone, “A multiagent approach to autonomous intersection management,” Journal of Artificial Intelligence Research ,vol. 31, pp. 591–656, 2008. [7] X. Qian, J. Gregoire, F. Moutarde, and A. De La Fortelle, “Priority-based coordination of autonomous and legacy vehicles at intersection,” in 
+
+Proc. 17th International IEEE Conference on Intelligent Transportation Systems (ITSC) , 2014, pp. 1166–1171. [8] S. Shahi, F. Fabiani, and M. Zanon, “A heuristic for optimal coordination of autonomous vehicles: static problems,” 2026, manuscript submitted for publication. [9] R. Hult, M. Zanon, S. Gros, and P. Falcone, “Primal decomposition of the optimal coordination of vehicles at traffic intersections,” in Proc. 55th IEEE Conference on Decision and Control (CDC) , 2016, pp. 2567– 2573. [10] R. Hult, M. Zanon, G. Frison, S. Gros, and P. Falcone, “Experimen-tal validation of a semi-distributed sequential quadratic programming method for optimal coordination of automated vehicles at intersections,” 
+
+Optimal Control Applications and Methods , vol. 41, no. 4, pp. 1068– 1096, 2020. [11] R. Hult, M. Zanon, S. Gros, and P. Falcone, “A semidistributed interior point algorithm for optimal coordination of automated vehicles at inter-sections,” IEEE Transactions on Control Systems Technology , vol. 30, no. 5, pp. 1977–1989, 2022. [12] A. A. Malikopoulos, C. G. Cassandras, and Y. J. Zhang, “A decentralized energy-optimal control framework for connected automated vehicles at signal-free intersections,” Automatica , vol. 93, pp. 244–256, 2018. [13] Y. Zhang and C. G. Cassandras, “Decentralized optimal control of connected automated vehicles at signal-free intersections including comfort-constrained turns and safety guarantees,” Automatica , vol. 109, p. 108563, 2019. [14] A. A. Malikopoulos, L. Beaver, and I. V. Chremos, “Optimal time trajectory and coordination for connected and automated vehicles,” 
+
+Automatica , vol. 125, p. 109469, 2021. [15] K.-D. Kim and P. R. Kumar, “An MPC-based approach to provable system-wide safety and liveness of autonomous ground traffic,” IEEE Transactions on Automatic Control , vol. 59, no. 12, pp. 3341–3356, 2014. 10 
+
+[16] G. R. Campos, P. Falcone, H. Wymeersch, R. Hult, and J. Sj¨ oberg, “Cooperative receding horizon conflict resolution at traffic intersections,” in Proc. 53rd IEEE Conference on Decision and Control (CDC) , 2014, pp. 2932–2937. [17] A. Katriniok, P. Kleibaum, and M. Joˇ sevski, “Distributed model predic-tive control for intersection automation using a parallelized optimization approach,” IFAC-PapersOnLine , vol. 50, no. 1, pp. 5940–5946, 2017. [18] B. Xu, S. E. Li, Y. Bian, S. Li, X. J. Ban, J. Wang, and K. Li, “Distributed conflict-free cooperation for multiple connected vehicles at unsignalized intersections,” Transportation Research Part C: Emerging Technologies ,vol. 93, pp. 322–334, 2018. [19] N. Murgovski, G. R. de Campos, and J. Sj¨ oberg, “Convex modeling of conflict resolution at traffic intersections,” in Proc. 54th IEEE Conference on Decision and Control (CDC) , 2015, pp. 4708–4713. [20] X. Qian, J. Gregoire, A. de La Fortelle, and F. Moutarde, “Decentralized model predictive control for smooth coordination of automated vehicles at intersection,” in Proc. European Control Conference (ECC) , 2015, pp. 3452–3458. [21] M. Kneissl, A. Molin, H. Esen, and S. Hirche, “A feasible MPC-based negotiation algorithm for automated intersection crossing,” in Proc. European Control Conference (ECC) , 2018, pp. 1282–1288. [22] B. Chalaki and A. A. Malikopoulos, “Optimal control of connected and automated vehicles at multiple adjacent intersections,” IEEE Transac-tions on Control Systems Technology , vol. 30, no. 3, pp. 972–984, 2022. [23] Q. Ge, Q. Sun, Z. Wang, S. E. Li, Z. Gu, S. Zheng, and L. Liao, “Real-time coordination of connected vehicles at intersections using graphical mixed integer optimization,” IET Intelligent Transport Systems , vol. 15, no. 6, pp. 795–807, 2021. [24] R. Hult, M. Zanon, S. Gros, and P. Falcone, “An MIQP-based heuristic for optimal coordination of vehicles at intersections,” in Proc. 57th IEEE Conference on Decision and Control (CDC) , 2018, pp. 2783–2790. [25] H. Xu, Y. Zhang, L. Li, and W. Li, “Cooperative driving at unsignal-ized intersections using tree search,” IEEE Transactions on Intelligent Transportation Systems , vol. 21, no. 11, pp. 4563–4571, 2020. [26] P.-F. Li and X. Zhou, “Recasting and optimizing intersection automa-tion as a connected-and-automated-vehicle (CAV) scheduling problem: A sequential branch-and-bound search approach in phase-time-traffic hypernetwork,” Transportation Research Part B: Methodological , vol. 105, pp. 479–506, 2017. [27] F. Yan, M. Dridi, and A. El Moudni, “Autonomous vehicle sequencing algorithm at isolated intersections,” in Proc. 12th International IEEE Conference on Intelligent Transportation Systems (ITSC) , 2009, pp. 1– 6. [28] M. Faris, M. Zanon, and P. Falcone, “An optimization-based dynamic reordering heuristic for coordination of vehicles in mixed traffic inter-sections,” IEEE Transactions on Control Systems Technology , vol. 33, no. 4, pp. 1387–1402, 2025. [29] S. Shahi, F. Fabiani, and M. Zanon, “A heuristic for optimal coordi-nation of autonomous vehicles: dynamic problems,” 2026, manuscript submitted for publication. [30] J. B. Rawlings, D. Q. Mayne, and M. M. Diehl, Model Predictive Control: Theory, Computation, and Design , 2nd ed. Madison, WI, USA: Nob Hill Publishing, 2017. [31] A. W¨ achter and L. T. Biegler, “On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming,” 
+
+Mathematical Programming , vol. 106, no. 1, pp. 25–57, 2006. [32] J. A. E. Andersson, J. Gillis, G. Horn, J. B. Rawlings, and M. Diehl, “CasADi: a software framework for nonlinear optimization and optimal control,” Mathematical Programming Computation , vol. 11, no. 1, pp. 1–36, 2019. [33] A. V. Fiacco, Introduction to Sensitivity and Stability Analysis in Nonlinear Programming , ser. Mathematics in Science and Engineering. New York, NY, USA: Academic Press, 1983, vol. 165. [34] C. B¨ uskens and H. Maurer, “Sensitivity analysis and real-time opti-mization of parametric nonlinear programming problems,” in Online Optimization of Large Scale Systems , M. Gr¨ otschel, S. O. Krumke, and J. Rambau, Eds. Berlin, Heidelberg: Springer, 2001, pp. 3–16. [35] V. M. Zavala and L. T. Biegler, “The advanced-step NMPC controller: Optimality, stability and robustness,” Automatica , vol. 45, no. 1, pp. 86–93, 2009. [36] M. Diehl, H. G. Bock, and J. P. Schl¨ oder, “A real-time iteration scheme for nonlinear optimization in optimal feedback control,” SIAM Journal on Control and Optimization , vol. 43, no. 5, pp. 1714–1736, 2005. [37] R. Verschueren, G. Frison, D. Kouzoupis, J. Frey, N. van Duijkeren, A. Zanelli, B. Novoselnik, T. Albin, R. Quirynen, and M. Diehl, “acados—a modular open-source framework for fast embedded optimal control,” Mathematical Programming Computation , vol. 14, pp. 147– 183, 2022. [38] J. Frey, K. Baumg¨ artner, G. Frison, D. Reinhardt, J. Hoffmann, L. Ficht-ner, S. Gros, and M. Diehl, “Differentiable nonlinear model predictive control,” arXiv preprint arXiv:2505.01353, 2025. [39] G. Frison and M. Diehl, “HPIPM: a high-performance quadratic programming framework for model predictive control,” IFAC-PapersOnLine , vol. 53, no. 2, pp. 6563–6569, 2020. [40] J. Nocedal and S. J. Wright, Numerical Optimization , 2nd ed. New York, NY, USA: Springer, 2006. [41] M. J. Best and N. Chakravarti, “Active set algorithms for isotonic regression; a unifying framework,” Mathematical Programming , vol. 47, pp. 425–439, 1990. [42] G. Frison, D. Kouzoupis, J. B. Jørgensen, and M. Diehl, “An efficient implementation of partial condensing for nonlinear model predictive control,” in Proc. 55th IEEE Conference on Decision and Control (CDC) , 2016, pp. 4457–4462.

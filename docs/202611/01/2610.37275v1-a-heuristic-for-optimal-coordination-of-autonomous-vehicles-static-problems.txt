@@ -1,0 +1,1142 @@
+Title: A heuristic for optimal coordination of autonomous vehicles: static problems
+
+URL Source: https://arxiv.org/pdf/2610.37275v1
+
+Published Time: Wed, 28 Oct 2026 01:27:49 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+> 1
+
+# A heuristic for optimal coordination of autonomous vehicles: static problems 
+
+Saugat Shahi, Filippo Fabiani and Mario Zanon 
+
+Abstract —We consider the coordination of autonomous ve-hicles at unsignalized intersections, where trajectory planning and crossing-order decisions are intrinsically coupled, thereby making their simultaneous optimization intractable in practice. To this end, we propose a heuristic based on a hierarchical structure consisting of a series of nonlinear programs (NLP) in the lower level, which optimizes trajectories of each vehicle for a given crossing order, and a high-level heuristic to design new crossing schedules that exploits sensitivity information from the lower-level NLPs. Extensive numerical simulations across a broad range of traffic scenarios demonstrate that our strategy achieves substantially improved scheduling with respect to first-in-first-out ordering while preserving computational tractability. 
+
+I. I NTRODUCTION 
+
+The coordination of autonomous vehicles at unsignalized intersections is a crucial problem in transportation systems of the future, where the replacement of traffic rules with optimized coordination promises significant improvements in terms of travel time, fuel consumption, and throughput [1]– [3]. This problem requires one to simultaneously perform (a) trajectory planning, and (b) collision-free ordering of vehicles. Existing approaches address this challenge by using differ-ent strategies, see, e.g., the survey papers [4]–[7]. In particular, mixed-integer formulations [8]–[11] encode the crossing order through binary variables and optimize it jointly with the trajectories. While such formulations capture the coupling between order and motion explicitly, the number of binary variables however grows combinatorially with the number of vehicles, thereby hindering scalability to realistic scenarios. To alleviate the complexity of mixed-integer approaches, some techniques resort to heuristics in order to decide the crossing order. For instance, rule-based policies fix the order through predefined priorities, e.g., derived from right-of-way conventions [12] or from the kinematic state of each approach-ing vehicle [13]. Reservation-based schemes, instead, grant conflict-free space-time slots on a first-come basis through a central manager [14], [15]. These approaches are computa-tionally light and provably collision-free, but they decide the crossing order from simple fixed criteria that do not account for vehicle dynamics or the individual cost of each vehicle. Consequently, these heuristics may perform very poorly in scenarios where the vehicles have heterogeneous costs. The formulation we adopt builds upon the work of [3], [16]– [21], which casts intersection coordination as a constrained op-timal control problem and excludes collisions through prece-dence constraints based on the times at which vehicles enter and leave the intersection. This approach is flexible, as it offers the opportunity to include energy-optimal objectives [18], [22], vehicles that turn inside the intersection [23], as well as networks of adjacent intersections [24]. Closely related for-mulations are the convex conflict-resolution model of [25], the cooperative receding-horizon scheme of [26], the safety-and-liveness framework of [27], and the parallelized distributed MPC of [28]. Nevertheless, these formulations all share the same limitation, namely they assume a fixed crossing order, decoupling the scheduling decision from motion planning and leaving part of the achievable performance unexplored. Decoupling scheduling and motion planning motivates the interest in schedule-refinement heuristics, which attempt to improve an initial schedule based on some information given by the motion planning task. In [29], the order is selected by solving a mixed-integer quadratic approximation of the coor-dination problem, and in [30] vehicle priorities are reassigned within prioritized distributed model predictive control. Unlike available methods, we propose a coordination scheme that refines the crossing order using sensitivity infor-mation from the motion planner. For a fixed order, a single NLP jointly optimizes the trajectories and the entry and exit times of all vehicles. A higher-level heuristic then refines this order using the dual variables of the NLP: the Lagrange multipliers of the precedence constraints are the first-order sensitivities of the cost associated with each ordering decision. Since this information is local, each candidate swap is retained only if the cost is actually reduced. The resulting heuristic explores only the most promising part of the permutation space and solves a handful of NLPs, in contrast to schemes based on integer variables, whose computational cost grows combi-natorially with the number of vehicles. Extensive experiments over a broad set of traffic scenarios show that our approach recovers most of the optimality gap of first-in-first-out (FIFO) scheduling. The extension of this approach to make it suitable for dynamic environments in which vehicles keep arriving at the intersection and leaving it is studied in the companion paper [31]; and a real-time algorithm is proposed in companion paper [32]. 
+
+Notation: The set of consecutive integers from a to b is denoted Iba := {a, a + 1 , . . . , b }, with Iba = ∅ if a > b.For a finite set S, |S| denotes its cardinality. Throughout the paper, M is the number of vehicles and N the number of time steps, with sampling time ts, and the superscript † ∈ { in , out }
+
+is a placeholder for entry and exit quantities, so that any statement involving † is understood to hold for both values. A schedule S = ( S1, . . . , S M ) is a permutation of IM 
+
+> 1
+
+, where 
+
+Sc ∈ IM 
+
+> 1
+
+is the index of the vehicle occupying the position arXiv:2610.37275v1 [eess.SY] 27 Oct 2026 2pin  pout      
+
+> pout
+> pin
+> pin
+> pout  pout  pin
+> Fig. 1. Scenario considered in this paper. Vehicles approach a four-way unsignalized intersection from different directions. Colored arrows show the fixed straight paths, while the dashed black square marks the conflict zone where vehicles interact. Finally, pin
+> iand pout
+> iare the entry and exit positions.
+
+c in the crossing order. For each vehicle i, the state and input trajectories are collected as xi := ( xi, 0, . . . , x i,N ) and 
+
+ui := ( ui, 0, . . . , u i,N −1), and the corresponding quantities for all vehicles as x := ( x1, . . . , x M ), with u and t defined anal-ogously, ti := ( tin  
+
+> i
+
+, t out  
+
+> i
+
+). Superscript (r) denotes quantities at iteration r of the schedule-refinement heuristic, while ·⋆
+
+denotes optimal quantities. II. P ROBLEM FORMULATION 
+
+We aim at solving the problem of coordinating M co-operative autonomous vehicles approaching an unsignalized intersection, as illustrated in Figure 1. The main goal is to com-pute an optimal crossing order (schedule) with corresponding optimal state and input trajectories for each vehicle i. To this end, we implicitly assume that each vehicle follows a predefined path, and for simplicity no vehicle changes lane. At time k ∈ IN 
+
+> 0
+
+, each vehicle i has state xi,k ∈ Rnxi and control input ui,k ∈ Rnui , with dynamics evolving as: 
+
+xi,k +1 = fi(xi,k , u i,k ), (1) which we assume to be twice continuously differentiable. We formulate the local constraints imposed at each k as 
+
+hi(xi,k , u i,k ) ≤ 0. (2) These constraints include, for instance, actuator limitation and lane keeping. Each vehicle i enters and exits the intersection at specific positions along its path, denoted by pin  
+
+> i
+
+and pout  
+
+> i
+
+,respectively. We define the corresponding entry and exit times 
+
+tin  
+
+> i
+
+and tout  
+
+> i
+
+implicitly by exploiting functions pi(t, x i, u i),defining the position at any time t, as follows: 
+
+pi(t† 
+
+> i
+
+, x i, u i) = p† 
+
+> i
+
+, † ∈ { in , out }. (3) To ensure collision-free operation of the vehicles in the intersection, we impose precedence constraints [3], [29]. These specifically enforce that at most one vehicle occupies the intersection at any time t, i.e., if vehicle i is scheduled to pass through the intersection before vehicle j, then 
+
+tin  
+
+> j
+
+≥ tout  
+
+> i
+
+. (4) The optimization variables are therefore the states x := (x1, . . . , x M ), controls u := ( u1, . . . , u M ), entry/exit times 
+
+t := ( t1, . . . , t M ) of all vehicles, where ti := (tin  
+
+> i
+
+, t out  
+
+> i
+
+), as well as the schedule S := (S1, . . . , S M ). The overall cost function is given by the sum of individual cost functions associated with each vehicle, i.e., 
+
+J(x, u ) := 
+
+> M
+
+X
+
+> i=1
+
+Ji(xi, u i),Ji(xi, u i) :=  
+
+> N−1
+
+X
+
+> k=0
+
+ℓi(xi,k , u i,k ) + ℓi, f (xi,N ),
+
+where ℓi and ℓi, f are, respectively, the local stage and terminal costs. The overall coordination problem can therefore be formulated as the following optimization problem: 
+
+min  
+
+> S
+
+V (S), (5) where, given initial states ˆxi, 0, we define 
+
+V (S) := min  
+
+> x,u,t
+
+J(x, u ) (6a) 
+
+s.t. x i, 0 = ˆ xi, 0, ∀ i ∈ IM 
+
+> 1
+
+, (6b) 
+
+xi,k +1 = fi(xi,k , u i,k ),∀ i ∈ IM 
+
+> 1
+
+, k ∈ IN −10 ,
+
+(6c) 
+
+hi(xi,k , u i,k ) ≤ 0, ∀ i ∈ IM 
+
+> 1
+
+, k ∈ IN −10 ,
+
+(6d) 
+
+tin  
+
+> Sc
+
+≥ tout  
+
+> Sc−1
+
+, ∀ c ∈ IM 
+
+> 2
+
+, (6e) 
+
+pi(tin  
+
+> i
+
+, x i, u i) = pin  
+
+> i
+
+, ∀ i ∈ IM 
+
+> 1
+
+, (6f) 
+
+pi(tout  
+
+> i
+
+, x i, u i) = pout  
+
+> i
+
+, ∀ i ∈ IM 
+
+> 1
+
+. (6g) Problem (6) is an NLP that can be solved efficiently, though it does not optimize the schedule S, therefore missing one of the original aims, hence the need for Problem (5). By optimizing over S, however, (5) is a mixed-integer nonlinear program (MINLP), which is typically prohibitive to solve in real time, unless M is very small. A viable approach to circumvent this issue is to separate the schedule computation from the rest of the coordination problem, and accept that some degree of suboptimality might thus be introduced. This approach has been followed in several works on optimization-based coordination of autonomous vehicles at intersections, in-cluding centralized, semi-distributed, experimentally validated, and heuristic formulations, see, e.g., [3], [18]–[21], [23], [29], [33]. We follow a similar approach by formulating the problem in a hierarchical structure: the lower level solves (6) for a fixed schedule S, and a higher-level heuristic generates new schedules that reduce the overall cost, as detailed next. III. S CHEDULE -REFINING HEURISTIC 
+
+A popular heuristic consists in fixing the schedule based on a FIFO approach, i.e., by ordering the vehicles based on their arrival time in the absence of the other vehicles. This approach is very simple, computationally inexpensive, and would arguably deliver a very good solution in case Ji = Jj
+
+for all i, j . However, in the general case, the costs differ, and this approach can yield schedules that are far from optimal, as we will also illustrate later in our numerical simulations. 3
+
+An alternative heuristic solves a quadratic approximation of (5) to compute a schedule [29]. Even though solvers for quadratic mixed-integer programs are becoming increasingly efficient, the problems they solve are combinatorial and still do not scale well as the number of vehicles becomes large. We therefore propose a heuristic based on local information about optimality while avoiding computationally demanding algorithms. To this end, we exploit parametric sensitivities to iteratively improve a given schedule as follows. For a given 
+
+S, let λc ≥ 0 be the Lagrange multiplier associated with the constraint 
+
+tout  
+
+> Sc
+
+− tin  
+
+> Sc+1
+
+≤ 0,
+
+i.e., the Lagrangian of (6) contains the term λc(tout  
+
+> Sc
+
+− tin  
+
+> Sc+1
+
+).This multiplier coincides with the first-order sensitivity of the optimal cost with respect to perturbations of the corresponding constraint (6e)—see, e.g., [34], [35]. In particular, relaxing the constraint to tout  
+
+> Sc
+
+−tin  
+
+> Sc+1
+
+decreases the optimal cost at rate λc. Hence, a larger value of λc indicates that relaxing constraint has a significant impact on the optimal cost. Denoting by c⋆ the index of the largest multiplier, we propose to swap the corresponding vehicle pair in schedule 
+
+S(r), where the superscript indicates the generic r-th iteration of the proposed scheme, to define the following schedule: 
+
+Sswap = ( S(r)1 , . . . , S (r)
+
+> c⋆−1
+
+, S (r)
+
+> c⋆+1
+
+, S (r) 
+
+> c⋆
+
+, S (r)
+
+> c⋆+2
+
+, . . . , S (r) 
+
+> M
+
+),
+
+(7) with the hope that the new order yields a lower cost. While this is justified by the interpretation of the multiplier as a shadow cost, such information is local and can notoriously not be trusted for mixed-integer optimization. It therefore follows that each attempted swap needs to be evaluated to verify that an actual cost improvement is obtained. Starting from an initial schedule S(0) , the method then proceeds iteratively. At iteration r, the NLP (6) is solved for the current schedule S(r), yielding the optimal cost V (S(r))
+
+and the corresponding multipliers λ(r). A set of admissible indices c is initialized as P(r) = IM −11 . Among all admissible indices, the pair to be swapped is selected as (S(r) 
+
+> c⋆
+
+, S (r)
+
+> c⋆+1
+
+),with 
+
+c⋆ = arg max 
+
+> c∈P (r)
+
+λ(r) 
+
+> c
+
+. (8) A new schedule Sswap is obtained by exchanging the positions of vehicles S(r) 
+
+> c⋆
+
+and S(r)
+
+> c⋆+1
+
+, as per (7). The NLP is then solved once more to compute the updated cost V (Sswap ). The swap is accepted if 
+
+V (Sswap ) < V (S(r)),
+
+in which case the schedule is updated as S(r+1) = Sswap .Otherwise, the swap is rejected, and the current schedule is retained. Index c⋆ is removed from set P(r) and a new swap is attempted by selecting the pair according to (8). In case the set P(r) becomes empty, we terminate and return S = S(r).Our approach is reported in Algorithm 1, where Kmax 
+
+bounds the number of swap attempts. Let P = IM −11 denote the set of adjacent swap indices, and sets A and R collect the vehicle pairs of all accepted and rejected swaps at previous 
+
+Algorithm 1 Lagrange-multiplier-based vehicle reordering  
+
+> 1:
+
+Input: Sinit , J init , λ init , t in,init , t out,init , K max , α  
+
+> 2:
+
+Output: Sbest , J best , λ best , t in,best , t out,best  
+
+> 3:
+
+Initialize Sbest ← Sinit , J best ← Jinit , λ best ← λinit  
+
+> 4:
+
+A ← ∅ , R ← ∅ , r ← 0 
+
+> 5:
+
+while r < K max do  
+
+> 6:
+
+Solve NLP (6) for Sbest , extract λbest  
+
+> 7:
+
+if α = 2 then ▷ Heuristic 2: revisitable  
+
+> 8:
+
+P ← 
+
+n
+
+c ∈ IM −11 :
+
+
+
+S(r) 
+
+> c
+
+, S (r)
+
+> c+1
+
+
+
+/∈ R 
+
+o 
+
+> 9:
+
+else ▷ Heuristic 1: frozen  
+
+> 10:
+
+P ← 
+
+n
+
+c ∈ IM −11 :
+
+
+
+S(r) 
+
+> c
+
+, S (r)
+
+> c+1
+
+
+
+/∈ A ∪ R 
+
+o 
+
+> 11:
+
+end if  
+
+> 12:
+
+if P = ∅ then  
+
+> 13:
+
+break  
+
+> 14:
+
+end if  
+
+> 15:
+
+Select c ∈ P s.t. λc ≥ λc′ , ∀ c′ ∈ P  
+
+> 16:
+
+Sswap ← swap ( Sbest , c ) 
+
+> 17:
+
+Solve NLP (6) for Sswap , obtain Jswap  
+
+> 18:
+
+if Jswap < J best then  
+
+> 19:
+
+Update Sbest , J best , λ best  
+
+> 20:
+
+if α = 2 then  
+
+> 21:
+
+R ← ∅  
+
+> 22:
+
+end if  
+
+> 23:
+
+A ← A ∪ 
+
+n 
+
+S(r)
+
+> c+1
+
+, S (r)
+
+> c
+
+o  
+
+> 24:
+
+else  
+
+> 25:
+
+R ← R ∪ 
+
+n 
+
+S(r) 
+
+> c
+
+, S (r)
+
+> c+1
+
+o  
+
+> 26:
+
+end if  
+
+> 27:
+
+r ← r + 1  
+
+> 28:
+
+end while  
+
+> 29:
+
+Return: best solution 
+
+iterates, respectively. In this heuristic, which we call frozen swaps or Heuristic 1, ( α = 1 in Algorithm 1), at every iterate r the swap of each candidate pair (S(r) 
+
+> c
+
+, S (r)
+
+> c+1
+
+) is attempted at most once. If the swap succeeds, then A ← A ∪ { (S(r)
+
+> c+1
+
+, S (r) 
+
+> c
+
+)}, otherwise R ← R ∪ { (S(r) 
+
+> c
+
+, S (r)
+
+> c+1
+
+)}. The admissible set at iteration r + 1 then becomes: 
+
+P(r+1) =
+
+n
+
+c ∈ IM −11 :
+
+
+
+S(r) 
+
+> c
+
+, S (r)
+
+> c+1
+
+
+
+/∈ A ∪ R 
+
+o
+
+. (9) Consequently, the algorithm will never try again to swap the pair (S(r) 
+
+> c
+
+, S (r)
+
+> c+1
+
+) or (S(r)
+
+> c+1
+
+, S (r) 
+
+> c
+
+), such that fewer swap attempts will be performed. Heuristic 1 is motivated by the fact that, after swapping a pair of vehicles, Algorithm 1 might attempt to swap the same pair once more, which is not expected to yield any improvement, based on past decisions. Moreover, if at some previous step the algorithm tried a swap in the order of a given pair of vehicles which was rejected, it is likely to try to perform that swap once more at later iterations, as the Lagrange multiplier is expected to still be large. This situation is also unlikely to yield any improvement. For comparison, we also consider a second heuristic, cor-responding to α = 2 in Algorithm 1, which does not exploit these observations: revisitable swaps, or Heuristic 2, allows any adjacent pair to be revisited at later iterations. A rejected pair is excluded only until a swap is accepted, i.e., the next candidate is the pair with the next-largest multiplier for the same schedule. Unlike algorithms for mixed-integer optimization, both Heuristic 1 and 2 greedily explore the space of permutations by targeting the pairs with the largest expected impact on the cost. 4
+
+This drastically reduces the computational burden, at the price of obtaining possibly suboptimal solutions. These two variants share the same basic mechanism and differ only in the policy used to update the admissible swap set, and their performance will be compared through simulations in Section V-C. IV. B ASELINES FOR COMPARISON 
+
+We propose next two alternative problem formulations that we will use in our simulations as baselines for comparison, so as to evaluate the efficiency and effectiveness of Algorithm 1. 
+
+A. MINLP formulation (5) An important detail concerning the solution of the MINLP in (5) is related to the function pi. For a given time t† 
+
+> i
+
+, † ∈ {in , out }, one can define k† 
+
+> i
+
+:= max k such that kt s ≤ t† 
+
+> i
+
+,where ts is the sampling time. Then, function pi reads as: 
+
+pi(t† 
+
+> i
+
+, x i, u i) = f pi (x†
+
+> i,k †
+> i
+
+, u †
+
+> i,k †
+> i
+
+, t † 
+
+> i
+
+− k† 
+
+> i
+
+ts), (10) where each f pi integrates the vehicle dynamics starting at time 
+
+0 from state xi,k †
+
+> i
+
+and applying control input ui,k †
+
+> i
+
+to obtain the position at time t† 
+
+> i
+
+− k† 
+
+> i
+
+ts. While some solvers accept constraints formulated in this way (e.g., CasADi [36] with IPOPT [37], WORHP [38] or Bonmin [39]), some others do not, e.g., Gurobi [40]. We thus propose an alternative formulation. To formulate the position constraint more explicitly, we introduce the one-hot encoded binary variable: 
+
+b† 
+
+> i,k
+
+∈ { 0, 1}, 
+
+> N−1
+
+X
+
+> k=0
+
+b† 
+
+> i,k
+
+= 1 , ∀i ∈ IM 
+
+> 1
+
+, † ∈ { in , out }.
+
+(11) Since we want to exploit this variable to have 
+
+k† 
+
+> i
+
+= 
+
+> N−1
+
+X
+
+> k=0
+
+b†
+
+> i,k
+
+k, † ∈ { in , out }, (12) we need to enforce the constraints:  
+
+> N−1
+
+X
+
+> k=0
+
+b†
+
+> i,k
+
+kt s ≤ t† 
+
+> i
+
+≤ 
+
+> N−1
+
+X
+
+> k=0
+
+b†
+
+> i,k
+
+kt s + ts, † ∈ { in , out }. (13) We can then exploit (10), together with the definition of k†
+
+> i
+
+in (12), to conclude that 
+
+x†
+
+> i,k †
+> i
+
+= 
+
+> N−1
+
+X
+
+> k=0
+
+b†
+
+> i,k
+
+xi,k , u†
+
+> i,k †
+> i
+
+= 
+
+> N−1
+
+X
+
+> k=0
+
+b†
+
+> i,k
+
+ui,k .
+
+Note that, even for linear vehicle models, (10) contains nonlinear terms involving the time t† 
+
+> i
+
+− k† 
+
+> i
+
+ts. For example, for a double integrator model, (10) is quadratic in t† 
+
+> i
+
+− k† 
+
+> i
+
+ts.With b := (b1, . . . , b M ), bi := (b†
+
+> i, 0
+
+, . . . , b † 
+
+> i,N −1
+
+), the resulting optimization problem is a MINLP that reads as: 
+
+min  
+
+> x,u,t,S,b
+
+J(x, u ) (14a) 
+
+s.t. (6b)–(6g) , (14b) (10) , (11) , (13) . (14c) 
+
+B. MIQP formulation 
+
+Solving an MINLP is notoriously difficult, thus we propose next a simplified formulation that allows one to turn (14) into a mixed-integer quadratic program (MIQP). We assume to have a linear vehicle model, such that equality constraints (6c) and path constraints (6d) are affine. Then, the only nonconvex constraints are the position constraints (6f)– (6g), that implicitly define the entry and exit times of each vehicle. As discussed above, note that also (14c) is nonlinear. To obtain an MIQP formulation, we simplify (14c) by discretizing t† 
+
+> i
+
+as described below. For each vehicle i ∈ IM
+
+> 1
+
+and k ∈ IN −10 , we introduce the binary variables bin 
+
+> i,k
+
+, b out  
+
+> i,k
+
+∈{0, 1}. To ensure that exactly one time index is selected for each event, we impose the one-hot encoding constraints:  
+
+> N−1
+
+X
+
+> k=0
+
+bin  
+
+> i,k
+
+= 1 , 
+
+> N−1
+
+X
+
+> k=0
+
+bout  
+
+> i,k
+
+= 1 , ∀i ∈ IM 
+
+> 1
+
+. (15) These variables are used to define the discrete time index 
+
+k† 
+
+> i
+
+≥ t† 
+
+> i
+
+/t s, selected by b†
+
+> i,k †
+> i
+
+= 1 , for each † ∈ { in , out }.In other words, b† is the one-hot encoding of the sampling time immediately following the time at which each vehicle enters or exits the intersection. The sampling time immediately preceding the same event, of index k† 
+
+> i
+
+= k† 
+
+> i
+
+− 1, does not require a dedicated variable: it is recovered by shifting the index of b†, i.e., as b†
+
+> i,k +1
+
+. Since b† is one-hot with k† 
+
+> i
+
+≤ N −1,the predecessor index k† 
+
+> i
+
+− 1 ∈ IN −20 is always well defined. To that end, we impose the following constraints:  
+
+> N−1
+
+X
+
+> k=0
+
+b† 
+
+> i,k
+
+pi,k ≥ p† 
+
+> i
+
+, † ∈ { in , out }, (16)  
+
+> N−1
+
+X
+
+> k=0
+
+b† 
+
+> i,k +1
+
+pi,k ≤ p† 
+
+> i
+
+, † ∈ { in , out }. (17) The entry and exit times are then linked to the binary variables through 
+
+tin  
+
+> i
+
++ ts = 
+
+> N−1
+
+X
+
+> k=0
+
+kt s bin 
+
+> i,k
+
+, (18) 
+
+tout  
+
+> i
+
+= 
+
+> N−1
+
+X
+
+> k=0
+
+kt s bout  
+
+> i,k
+
+, (19) for all i ∈ IM 
+
+> 1
+
+. Equivalently, the entry and exit times are fixed by the selected sample and its predecessor, i.e.,  
+
+> N−1
+
+X
+
+> k=0
+
+kt s b† 
+
+> i,k +1
+
+≤ t† 
+
+> i
+
+≤ 
+
+> N−1
+
+X
+
+> k=0
+
+kt s b†
+
+> i,k
+
+, † ∈ { in , out }. (20) Note that this formulation is actually a relaxation of the original problem, as 
+
+pi(tin  
+
+> i
+
+, x i, u i) ≥ pin  
+
+> i
+
+, pi(tout  
+
+> i
+
+, x i, u i) ≤ pout  
+
+> i
+
+,
+
+such that the obtained solution might actually be infeasible. This issue could be compensated for and is not an issue in the context of this paper, as we only introduce this formulation to have an additional term of comparison that supports the use of our NLP formulation rather than a mixed-integer one. 5
+
+With the introduced binary variables and linear dynamics, the coordination problem can then be formulated as the MIQP 
+
+min  
+
+> x,u,t,S,b
+
+J(x, u ) (21a) 
+
+s.t. (6b)–(6e) , (21b) (15)–(20) . (21c) V. S IMULATION RESULTS 
+
+We now evaluate the proposed coordination framework across a range of traffic scenarios, aiming at quantifying both the performance of the computed solution and computational efficiency. We compare our heuristic from Section III, based on NLP (6), with MINLP (14) and MIQP (21) of Section IV. 
+
+A. Simulation setup 
+
+All numerical experiments are conducted in a Python-based environment integrating CasADi, Gurobi, and the NLP solvers IPOPT and WORHP. The NLP formulations are implemented in CasADi and solved with both IPOPT and WORHP, and the Lagrange-multiplier-based reordering strategy is likewise implemented within CasADi. The MIQP and MINLP formu-lations are solved using Gurobi. The parameters used for the simulations are reported in Table I. Initial positions and velocities are varied across scenarios to capture heterogeneous traffic conditions, while entry/exit positions are all fixed to pin  
+
+> i
+
+= 0 m and pout  
+
+> i
+
+= 10 m. In the results, vehicles are labeled 0, . . . , M − 1, and crossing orders are reported as lists of these labels.                 
+
+> TABLE I PROBLEM PARAMETERS
+> Parameter Description Value
+> NNumber of discrete time steps 200
+> tsSampling time 0.1 s
+> MNumber of vehicles 3, 6, 9, 12
+> pin
+> iEntry position of vehicle i0 m
+> pout
+> iExit position of vehicle i10 m
+> vref Reference velocity 13.88 m/s
+
+The cost function is quadratic and penalizes both the control effort and the deviation of the velocity from the reference value. Specifically, the stage cost for vehicle i ∈ IM 
+
+> 1
+
+reads as: 
+
+ℓi(xi,k , u i,k ) = ri u2 
+
+> i,k
+
++ qi (vi,k − vref )2, (22) while the terminal cost is defined as 
+
+ℓi, f (xi,N ) = qi (vi,N − vref )2. (23) The weight ri penalizes acceleration and braking effort, while 
+
+qi the velocity-tracking error. Larger values of ri discourage aggressive control actions, while larger values of qi enforce tighter tracking of the reference speed. These coefficients hence enable heterogeneous vehicle behavior and are selected according to three vehicle classes, as summarized in Table II. The algorithms are evaluated on unsignalized intersection scenarios with M ∈ { 3, 6, 9, 12 } vehicles. For each scenario, four scheduling strategies are then considered:          
+
+> TABLE II VEHICLE CLASSES AND CORRESPONDING WEIGHTS
+> Vehicle class riqi
+> Light 11Medium 10 10 Heavy 100 500
+> •
+
+FIFO scheduling: vehicles ordered according to the entry time they would have in the absence of other vehicles;  
+
+> •
+
+Swapping-based heuristic: order refinement, Algorithm 1;  
+
+> •
+
+MINLP/MIQP: solution obtained with Gurobi;  
+
+> •
+
+Brute-force search: exhaustive enumeration (when com-putationally feasible). Before proceeding with the schedule optimization, we fix 
+
+S and compare the different algorithms in Table III. All solvers except MIQP (which is suboptimal by design) produce the same cost, with deviations below 0.001% of the MINLP solution in the scenarios with 9 and 12 vehicles. The NLP solvers, IPOPT and WORHP, are the fastest. IPOPT is gen-erally faster than WORHP on the smaller instances, although the gap narrows as the number of vehicles grows and reverses in the 12 -vehicle case. The MINLP solver is extremely slow, even in this simplified setting with fixed S. The MIQP solver is much faster instead, but still orders of magnitude slower than the NLP solvers. It is hence clear how mixed-integer formulations cannot tackle realistic scenarios in a reasonable time, and the continuous formulation is the only viable option for real-time intersection coordination. 
+
+B. Swapping-based heuristic 
+
+To overcome the intrinsic limitations of FIFO ordering, we apply the Lagrange-multiplier-based swapping heuristic. Figures 2 and 3 illustrate the performance of Heuristic 1 (top) and Heuristic 2 (bottom) on a 6-vehicle scenario. The sequence progression is depicted through both successful and failed swap attempts, with the corresponding cost decrease shown across iterations. Similarly, Figures 4 and 5 illustrate the results for a 9-vehicle case. To evaluate the effectiveness of our swapping-based heuris-tic, we now compare the performance of two NLP solvers, IPOPT and WORHP, on five problem instances. Each in-stance is characterized by a distinct randomized initial ve-hicle crossing sequence to which we apply Algorithm 1. Table IV reports the numerical results obtained in a 6-vehicle intersection setting. The initial and final (swapped) orders are shown alongside solver runtimes and total cost reduction percentages. While both IPOPT and WORHP provide the same final reordering and cost, it is clear that the former largely outperforms the latter in terms of computational time. The same trend can also be appreciated in the 9-vehicle case, reported in Table V. 
+
+C. Comparing swapping heuristics, brute force, and FIFO 
+
+We evaluate next our Lagrange-multiplier-based reorder-ing strategy and compare it to brute-force search and FIFO scheduling, across 100 different scenarios with 6 vehicles. 6
+
+TABLE III COMPARISON OF SOLVERS FOR FIFO S CHEDULING 
+
+Scenario IPOPT (NLP) WORHP (NLP) Gurobi (MIQP) Gurobi (MINLP) Cost Time (s) Cost Time (s) Cost Time (s) Cost Time (s) 3 Vehicle 2433.84 0.25 2433.84 0.47 2546.41 387 2433.84 651.77 6 Vehicle 91416.24 1.08 91416.24 3.47 113966.95 696 91416.24 3600.00 9 Vehicle 1080763.61 4.50 1080763.61 5.62 1418502.03 1000 1080765.10 4116.72 12 Vehicle 4229269.36 18.63 4229269.36 13.90 5245213.74 1384 4229282.94 32000.00 012345Swapping Diagram (Solid = Success, Dotted = Failed) 
+
+> 532014
+
+0 5 10 15 Swapping Steps 012345
+
+> 532014
+> Order Position
+
+Light Medium Heavy 
+
+Fig. 2. Swapping diagram for 6 vehicles under Heuristic 1 (top) and Heuristic 2 (bottom). The vehicle order is updated based on Lagrange multiplier sensitivity. Solid lines indicate successful swaps; dotted lines are failed attempts. 100000 80000 60000 40000 20000 Cost Progression (Blue = Accepted Cost, Black Dots = Failed Swaps) 0 5 10 15 Number of Swaps 80000 60000 40000 20000 Cost Initial Cost = 96346.93 Final Cost = 12767.59 
+
+Fig. 3. Cost progression during vehicle reordering (6 vehicles) under Heuristic 1 (top) and Heuristic 2 (bottom). The blue line indicates successful swaps with cost reduction; black dots are failed attempts. TABLE IV COMPARISON OF IPOPT AND WORHP SOLVERS FOR THE 6-VEHICLE SCENARIO 
+
+Inst. IPOPT (s) WORHP (s) Initial order Final order Initial cost Final cost Reduction (%) 1 16.26 35.21 [2,4,0,1,3,5] [0,1,2,3,4,5] 67431.96 16715.55 75.21% 2 8.56 14.34 [5,3,1,4,2,0] [1,3,5,4,2,0] 49800.19 9060.13 81.81% 3 7.37 17.28 [1,4,2,0,5,3] [1,0,2,4,5,3] 48223.00 9842.01 79.59% 4 14.03 23.71 [5,3,2,0,1,4] [0,3,2,5,4,1] 96346.93 12767.59 86.75% 5 8.35 19.86 [2,1,3,5,4,0] [1,2,3,5,4,0] 20848.18 15266.23 26.77% 
+
+Brute-force search provides a globally optimal benchmark by evaluating all admissible vehicle orderings. However, the number of possible schedules, M !, grows combinatorially with the number of vehicles, making the exhaustive enumeration intractable even for moderate problem sizes. While both heuristics require only a small fraction of the NLP solves needed by brute-force search, they are in fact equivalent in solution quality: across all scenarios, Heuristic 1 and Heuris-tic 2 return the same final crossing order, and hence the same cost. They differ only in computational effort, that is, in the number of NLPs that must be solved to reach that order. As empirically confirmed in Figure 6, Heuristic 1 requires fewer swap evaluations across all scenarios, owing to its restricted search space controlled by the parameter α in Algorithm 1, and is therefore the more efficient of the two. Because the two heuristics returned the same solution in all simulations we ran, we only report the results of Heuristic 1 for the remaining experiments. 70 5 10 15 Swapping Steps 012345678Swapping Diagram (Solid = Success, Dotted = Failed) 
+
+> 582417306
+> Order Position
+
+Light Medium Heavy  
+
+> Fig. 4. Swapping diagram for 9 vehicles under Heuristic 1. The vehicle order is updated based on Lagrange multiplier sensitivity. Solid lines indicate successful swaps; dotted lines are failed attempts.
+
+0 5 10 Number of Swaps 450000 400000 350000 300000 250000 200000 150000 Cost Progression (Blue = Accepted Cost, Black Dots = Failed Swaps) Cost Initial Cost = 452799.97 Final Cost = 119808.49                                              
+
+> Fig. 5. Cost progression during vehicle reordering (9 vehicles). The blue line indicates successful swaps with cost reduction; black dots are failed attempts. TABLE V COMPARISON OF IPOPT AND WORHP SOLVERS FOR THE 9-VEHICLE SCENARIO
+> Inst. IPOPT (s) WORHP (s) Initial order Final order Initial cost Final cost Reduction (%) 156.65 96.25 [8,3,7,2,5,6,4,1,0] [3,8,7,6,5,4,2,1,0] 261533.76 72179.17 72.40% 2107.55 291.55 [5,8,2,4,1,7,3,0,6] [5,2,4,8,7,6,3,1,0] 452799.97 119808.49 73.54% 387.11 91.61 [6,0,3,7,8,2,4,1,5] [0,3,6,7,8,4,5,2,1] 248303.87 93611.71 62.30% 493.00 358.77 [4,2,8,0,3,7,1,6,5] [4,2,0,8,7,6,3,5,1] 330573.35 129685.82 60.77% 531.86 59.90 [1,4,7,3,8,6,5,2,0] [1,4,3,7,8,6,5,2,0] 167475.01 156774.43 6.39%
+
+0 10 20 30 40 50 60 70 80 90 100 Scenario Index 14 13 12 11 10 987Number of Swaps Swap Comparison Across 100 Scenarios (6 Vehicles) Heuristic 1 Heuristic 2  
+
+> Fig. 6. Number of swaps across 100 scenarios for Heuristic 1 and 2 with 6 vehicles.
+
+Then, let J(s)BF , J(s)FIFO , and J(s)H denote the total cost of brute force, FIFO, and Heuristic 1, respectively, in scenario s. The optimality gap reduction (OGR) is 
+
+OGR (s) = J(s)FIFO − J(s)H
+
+J(s)FIFO − J(s)BF 
+
+× 100 , (24) and the optimality gap (OG) is 
+
+OG (s) = J(s)H − J(s)BF 
+
+J(s)BF 
+
+× 100 . (25) In Figure 7 we illustrate the cost trend across all scenarios. As expected, brute force provides the optimal lower bound, while FIFO yields significantly higher costs. Compared to FIFO, our heuristic scheme consistently reduces the cost and follows the optimal trend in most cases. Figure 8 reports both OGR and OG. Our heuristic achieves an average OGR of approximately 77 .4% relative to FIFO, with several scenarios approaching near-complete gap closure. At the same time, the average OG relative to the brute-force optimal solution is around 41 .8% , indicating a practical trade-off between solution quality and computational efficiency. 
+
+D. 12-Vehicle scenario: Scalability analysis 
+
+To assess the scalability of the proposed heuristic beyond the six-vehicle case, we conduct a large-scale evaluation on 100 randomly generated scenarios with M = 12 vehicles. With this problem size, brute-force enumeration becomes computationally infeasible, since the number of admissible schedules is 12! = 479 ,001 ,600 . Consequently, FIFO schedul-ing serves as the sole reference baseline, and our objective is to quantify the improvement achieved by the proposed Lagrange-multiplier-based reordering strategy relative to this baseline. Figure 9 reports the normalized cost of the proposed heuristic relative to FIFO across all 100 scenarios, sorted by increasing cost reduction, together with the corresponding cost reduction. The heuristic consistently achieves costs well below the FIFO baseline: the normalized cost ranges from values close to unity in the least favorable scenarios down 80 10 20 30 40 50 60 70 80 90 100 Scenario Index 12 10 8642Cost Cost Trend Worst Cost FIFO Proposed Heuristic 
+
+> Fig. 7. Cost trend across 100 scenarios for brute force, FIFO, and the proposed heuristic. All costs are normalized by the brute-force (optimal) cost, shown as the black dotted line, and scenarios are sorted by the worst-case cost.
+
+100 80 60 40 20 0Optimality Gap Reduction (%) Performance Relative to Baselines Optimality Gap Reduction (vs FIFO) 0 10 20 30 40 50 60 70 80 90 100 Scenario Index 600 400 200 0Optimality Gap (%) FIFO (vs Optimal) Proposed Heuristic (vs Optimal)  
+
+> Fig. 8. Performance metrics across 100 scenarios. Top: optimality gap reduction relative to FIFO. Bottom: optimality gap of FIFO and our proposed heuristic relative to the brute-force optimal solution.
+
+to approximately 0.1 in the most favorable ones, confirming that meaningful improvements are obtained across the entire range of scenarios. The average cost reduction relative to FIFO is approximately 53 .5% , with individual scenarios exhibiting reductions ranging from roughly 9% up to nearly 88% . The distribution of improvements is broadly spread across the sce-nario set, indicating that the heuristic is not limited to favorable instances but consistently exploits scheduling structure across heterogeneous traffic conditions. Figure 10 compares the two heuristic variants in terms of 0 10 20 30 40 50 60 70 80 90 100 Scenario Index 1.0 0.8 0.6 0.4 0.2 Normalized Cost (relative to FIFO)  Cost Comparison: FIFO vs Proposed Heuristic FIFO Proposed Heuristic 0 10 20 30 40 50 60 70 80 90 100 Scenario Index 90 80 70 60 50 40 30 20 10 Cost Reduction (%)  Cost Reduction of Proposed Heuristic vs FIFO Cost Reduction (vs FIFO) Mean = 53.5%  
+
+> Fig. 9. Cost comparison for 100 scenarios with 12 vehicles, sorted by cost reduction. Top: normalized cost relative to FIFO; Bottom: cost reduction of the proposed heuristic relative to FIFO.
+
+0 10 20 30 40 50 60 70 80 90 100 Scenario Index 100 80 60 40 20 Number of Swaps Swap Comparison Across 100 Scenarios (12 Vehicles) Heuristic 1 Heuristic 2  
+
+> Fig. 10. Number of swap evaluations per scenario for Heuristic 1 and Heuristic 2 with 12 vehicles.
+
+swap count. Heuristic 1 requires, on average, approximately 20 to 25 swap evaluations per scenario, whereas Heuristic 2 per-forms substantially more, ranging between 55 and 105 swaps. This difference results from the mechanism of Heuristic 1 that prevents revisiting previously evaluated pairs and thereby produces a non-redundant search. These trends are consistent with those observed in the six-vehicle case and confirm that the computational advantage of Heuristic 1 is preserved as the problem dimension increases. These results demonstrate that the proposed framework scales favorably to larger vehicle populations. While the ab-sence of a global optimal reference precludes direct optimality 920 40 60 80 100 Scenario Index 10 5
+
+10 4
+
+> Total cost  J
+
+Comparison Against Baselines FIFO Rule-based Reservation-based Proposed Heuristic  
+
+> Fig. 11. Total cost across 100 randomized 6-vehicle scenarios, sorted by FIFO cost. The rule-based baseline and the reservation-based scheme exceed even the FIFO cost, while the proposed heuristic attains the lowest cost in all scenarios.
+
+gap quantification at this scale, the consistent and substantial reductions over FIFO, paired with the fast search of Heuristic 1, confirm that our schedule refinement remains an effective and efficient coordination strategy as the combinatorial com-plexity of the scheduling problem grows. 
+
+E. Comparison against rule-based and reservation-based heuristics 
+
+Finally, we compare the proposed heuristic against represen-tatives of the two classes of computationally light coordination schemes discussed in the introduction, over the same 100 randomized 6-vehicle scenarios considered in Section V-C. Rule-based policies fix the crossing order through predefined priorities, independently of the vehicles’ objectives [12]. As a representative of this class, we evaluate a static right-of-way convention in which main-road approaches take prece-dence over secondary ones, with vehicles ordered by arrival within each class. The reservation-based baseline implements the first-come-first-served scheme of [14]: a central manager processes vehicles in arrival order and grants each one the earliest conflict-free occupancy slot no earlier than its free-flow crossing interval, and each vehicle then plans its trajectory individually so as to comply with the granted slot. In both cases, the resulting schedules are evaluated with the objective of (6), so that all methods are directly comparable. Figure 11 reports the total cost across all scenarios. Both baselines are consistently outperformed: on average, the right-of-way rule is approximately 2.7× and the reservation-based scheme approximately 6× more expensive than FIFO, as cost-blind or-dering and rigid slot allocation, respectively, penalize precisely the vehicles with the largest weights. We remark that these schemes target throughput and provable collision avoidance rather than the objective of (6), and are considerably cheaper to evaluate; the comparison thus quantifies the performance they forgo when vehicles have heterogeneous objectives. The proposed heuristic attains the lowest cost in all 100 scenarios, with an average cost reduction of 51 .2% with respect to FIFO. Although the proposed heuristic is orders of magnitude faster than the mixed-integer formulations, its runtime is not yet compatible with real-time operation, since the schedule is recomputed from scratch for a fixed set of vehicles and every candidate swap requires a full NLP solve. Both aspects can be improved: the schedule can be updated incrementally as ve-hicles arrive, within a receding-horizon scheme, and the NLP re-solves can be replaced by sensitivity-based approximations that exploit the bi-level structure of the problem. VI. C ONCLUSION 
+
+We have presented an optimization-based framework for co-ordinating autonomous vehicles at unsignalized intersections. Having formulated the overall control problem as a nonlin-ear program, we have proposed a Lagrange-multiplier-based heuristic to address the combinatorial nature of the vehicles crossing order scheduling. By exploiting sensitivity informa-tion available for free from the KKT conditions, our technique refines vehicle crossing orders through targeted swaps, avoid-ing exhaustive enumeration or combinatorial optimization. Evaluated against brute-force search, FIFO scheduling, and mixed-integer formulations on extensive numerical sim-ulations, our scheme has demonstrated several advantages. Specifically, it usually requires significantly lower computa-tional time compared to a mixed-integer setup and brute-force search, while achieving a comparable performance in terms of cost minimization, and improving crossing order over the basic FIFO approach. The proposed architecture then enables efficient approximation of optimal schedules while preserving computational tractability, making it suitable for real-time intersection coordination. Future work will extend the framework in two directions that build on each other. First, the heuristic can be embedded in a receding-horizon scheme in which vehicles enter the coordination area over time, so that the crossing order is updated incrementally at each arrival rather than recomputed from scratch. Second, the computational cost of the swap evaluations can be reduced by exploiting the bi-level structure of the problem and the parametric sensitivities of the vehicle trajectory problems, with the aim of executing the reordering within the sampling time. Further directions include robustness to model uncertainty, multi-intersection coordination, and inte-gration with learning-based components for adaptive decision-making. REFERENCES [1] F. Fabiani and S. Grammatico, “Multi-vehicle automated driving as a generalized mixed-integer potential game,” IEEE Transactions on Intelligent Transportation Systems , vol. 21, no. 3, pp. 1064–1073, 2020. [2] M. W. Levin and D. Rey, “Conflict-point formulation of intersection control for autonomous vehicles,” Transportation Research Part C: Emerging Technologies , vol. 85, pp. 528–547, 2017. [3] R. Hult, M. Zanon, S. Gros, and P. Falcone, “Optimal coordination of automated vehicles at intersections: Theory and experiments,” IEEE Transactions on Control Systems Technology , vol. 27, no. 6, pp. 2510– 2525, 2019. [4] E. Namazi, J. Li, and C. Lu, “Intelligent intersection management sys-tems considering autonomous vehicles: A systematic literature review,” 
+
+> IEEE Access , vol. 7, pp. 91 946–91 965, 2019. 10
+
+[5] J. Wu and X. Qu, “Intersection control with connected and automated vehicles: A review,” Journal of Intelligent and Connected Vehicles ,vol. 5, no. 3, pp. 260–269, 2022. [6] J. Rios-Torres and A. A. Malikopoulos, “A survey on the coordination of connected and automated vehicles at intersections and merging at highway on-ramps,” IEEE Transactions on Intelligent Transportation Systems , vol. 18, no. 5, pp. 1066–1077, 2017. [7] M. Al-Turki, N. T. Ratrout, S. M. Rahman, and K. J. Assi, “Signalized intersection control in mixed autonomous and regular vehicles traffic environment—a critical review focusing on future control,” IEEE Access ,vol. 10, pp. 16 942–16 951, 2022. [8] S. A. Fayazi and A. Vahidi, “Mixed-integer linear programming for optimal scheduling of autonomous vehicle intersection crossing,” IEEE Transactions on Intelligent Vehicles , vol. 3, no. 3, pp. 287–299, 2018. [9] E. R. M¨ uller, R. C. Carlson, and W. Kraus Jr., “Intersection control for automated vehicles with MILP,” IFAC-PapersOnLine , vol. 49, no. 3, pp. 37–42, 2016, 14th IFAC Symposium on Control in Transportation Systems (CTS 2016). [10] S. A. Fayazi, A. Vahidi, and A. Luckow, “Optimal scheduling of autonomous vehicle arrivals at intelligent intersections via MILP,” in 
+
+2017 American Control Conference (ACC) , 2017, pp. 4920–4925. [11] C. Yu, Y. Feng, H. X. Liu, W. Ma, and X. Yang, “Integrated optimization of traffic signals and vehicle trajectories at isolated urban intersections,” 
+
+Transportation Research Part B: Methodological , vol. 112, pp. 89–112, 2018. [12] X. Qian, J. Gregoire, F. Moutarde, and A. De La Fortelle, “Priority-based coordination of autonomous and legacy vehicles at intersection,” in 17th International IEEE Conference on Intelligent Transportation Systems (ITSC) , 2014, pp. 1166–1171. [13] K. Zhang, D. Zhang, A. de La Fortelle, X. Wu, and J. Gr´ egoire, “State-driven priority scheduling mechanisms for driverless vehicles approaching intersections,” IEEE Transactions on Intelligent Transporta-tion Systems , vol. 16, no. 5, pp. 2487–2500, 2015. [14] K. Dresner and P. Stone, “A multiagent approach to autonomous intersection management,” Journal of Artificial Intelligence Research ,vol. 31, pp. 591–656, 2008. [15] M. W. Levin, H. Fritz, and S. D. Boyles, “On optimizing reservation-based intersection controls,” IEEE Transactions on Intelligent Trans-portation Systems , vol. 18, no. 3, pp. 505–515, 2017. [16] R. Hult, M. Zanon, S. Gros, and P. Falcone, “Primal decomposition of the optimal coordination of vehicles at traffic intersections,” in 2016 IEEE 55th Conference on Decision and Control (CDC) , 2016, pp. 2567– 2573. [17] M. Zanon, S. Gros, H. Wymeersch, and P. Falcone, “An asynchronous algorithm for optimal vehicle coordination at traffic intersections,” IFAC-PapersOnLine , vol. 50, no. 1, pp. 12 008–12 014, 2017, 20th IFAC World Congress. [18] R. Hult, M. Zanon, S. Gros, and P. Falcone, “Energy-optimal coordina-tion of autonomous vehicles at intersections,” in 2018 European Control Conference (ECC) , 2018, pp. 602–607. [19] R. Hult, M. Zanon, S. Gros, H. Wymeersch, and P. Falcone, “Optimisation-based coordination of connected, automated vehicles at intersections,” Vehicle System Dynamics , vol. 58, no. 5, pp. 726–747, 2020. [20] R. Hult, M. Zanon, G. Frison, S. Gros, and P. Falcone, “Experimen-tal validation of a semi-distributed sequential quadratic programming method for optimal coordination of automated vehicles at intersections,” 
+
+Optimal Control Applications and Methods , vol. 41, no. 4, pp. 1068– 1096, 2020. [21] R. Hult, M. Zanon, S. Gros, and P. Falcone, “A semidistributed interior point algorithm for optimal coordination of automated vehicles at inter-sections,” IEEE Transactions on Control Systems Technology , vol. 30, no. 5, pp. 1977–1989, 2022. [22] Y. J. Zhang, A. A. Malikopoulos, and C. G. Cassandras, “Optimal control and coordination of connected and automated vehicles at urban traffic intersections,” in 2016 American Control Conference (ACC) , 2016, pp. 6227–6232. [23] R. Hult, M. Zanon, S. Gros, and P. Falcone, “Optimal coordination of automated vehicles at intersections with turns,” in 2019 18th European Control Conference (ECC) , 2019, pp. 225–230. [24] B. Chalaki and A. A. Malikopoulos, “Optimal control of connected and automated vehicles at multiple adjacent intersections,” IEEE Transac-tions on Control Systems Technology , vol. 30, no. 3, pp. 972–984, 2022. [25] N. Murgovski, G. R. de Campos, and J. Sj¨ oberg, “Convex modeling of conflict resolution at traffic intersections,” in 2015 54th IEEE Conference on Decision and Control (CDC) , 2015, pp. 4708–4713. [26] G. R. de Campos, P. Falcone, H. Wymeersch, R. Hult, and J. Sj¨ oberg, “Cooperative receding horizon conflict resolution at traffic intersections,” in 53rd IEEE Conference on Decision and Control , 2014, pp. 2932– 2937. [27] K.-D. Kim and P. R. Kumar, “An MPC-based approach to provable system-wide safety and liveness of autonomous ground traffic,” IEEE Transactions on Automatic Control , vol. 59, no. 12, pp. 3341–3356, 2014. [28] A. Katriniok, P. Kleibaum, and M. Joˇ sevski, “Distributed model predic-tive control for intersection automation using a parallelized optimization approach,” IFAC-PapersOnLine , vol. 50, no. 1, pp. 5940–5946, 2017, 20th IFAC World Congress. [29] R. Hult, M. Zanon, S. Gros, and P. Falcone, “An MIQP-based heuristic for optimal coordination of vehicles at intersections,” in 2018 IEEE Conference on Decision and Control (CDC) , 2018, pp. 2783–2790. [30] P. Scheffe, G. Dorndorf, and B. Alrifaee, “Increasing feasibility with dynamic priority assignment in distributed trajectory planning for road vehicles,” in 2022 IEEE 25th International Conference on Intelligent Transportation Systems (ITSC) , 2022, pp. 3873–3879. [31] S. Shahi, F. Fabiani, and M. Zanon, “A heuristic for optimal coordi-nation of autonomous vehicles: dynamic problems,” 2026, manuscript submitted for publication. [32] S. Shahi, F. Fabiani, and M. Zanon, “A heuristic for optimal coordina-tion of autonomous vehicles: real time algorithms,” 2026, manuscript submitted for publication. [33] M. Faris, M. Zanon, and P. Falcone, “An optimization-based dynamic reordering heuristic for coordination of vehicles in mixed traffic inter-sections,” IEEE Transactions on Control Systems Technology , vol. 33, no. 4, pp. 1387–1402, 2025. [34] J. Nocedal and S. J. Wright, Numerical Optimization , 2nd ed., ser. Springer Series in Operations Research and Financial Engineering. New York, NY, USA: Springer, 2006. [35] R. Fletcher, Practical Methods of Optimization , 2nd ed. Chichester: Wiley, 1987. [36] J. A. E. Andersson, J. Gillis, G. Horn, J. B. Rawlings, and M. Diehl, “CasADi: a software framework for nonlinear optimization and optimal control,” Mathematical Programming Computation , vol. 11, no. 1, pp. 1–36, 2019. [37] A. W¨ achter and L. T. Biegler, “On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming,” 
+
+Mathematical Programming , vol. 106, no. 1, pp. 25–57, 2006. [38] C. B¨ uskens and D. Wassel, “The ESA NLP solver WORHP,” in Model-ing and Optimization in Space Engineering , ser. Springer Optimization and Its Applications, G. Fasano and J. D. Pint´ er, Eds. Springer New York, 2013, vol. 73, pp. 85–110. [39] P. Bonami, L. T. Biegler, A. R. Conn, G. Cornu´ ejols, I. E. Grossmann, C. D. Laird, J. Lee, A. Lodi, F. Margot, N. Sawaya, and A. W¨ achter, “An algorithmic framework for convex mixed integer nonlinear programs,” 
+
+Discrete Optimization , vol. 5, no. 2, pp. 186–204, 2008. [40] Gurobi Optimization, LLC, “Gurobi Optimizer Reference Manual,” 2026. [Online]. Available: https://www.gurobi.com
