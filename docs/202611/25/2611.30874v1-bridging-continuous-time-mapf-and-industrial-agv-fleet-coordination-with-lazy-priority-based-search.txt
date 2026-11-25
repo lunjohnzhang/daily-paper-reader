@@ -1,0 +1,2471 @@
+This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be
+accessible.
+Bridging Continuous-Time MAPF and Industrial AGV
+Fleet Coordination with Lazy Priority-Based Search
+Preprint, compiled November 24, 2026
+Federico Signorile
+ID
+1, Raffaele Carli
+ID
+1, Alessandro Bertogli2, Roberto Olmi2, Sven Koenig
+ID
+3,
+and Mariagrazia Dotoli
+ID
+1
+1Department of Electrical and Information Engineering, Politecnico di Bari, Bari, Italy
+2E80 Group S.p.A., Viano, Italy
+3Department of Computer Science, University of California, Irvine, CA, USA
+Abstract
+Continuous-time multi-agent path finding on roadmaps (MAPFR) offers a principled way to coordinate
+robot fleets with geometric collision avoidance, yet its deployment on industrial automated guided
+vehicle (AGV) infrastructures remains challenging, as highly connected and redundant roadmaps
+amplify both safe-interval reasoning and multi-agent interaction handling. To bridge this gap, we
+formalize AGV-MAPFR-CTC, a configuration-space variant of MAPFR with precomputed continuous-
+time conflicts that enables the reuse of MAPFR solvers for AGV fleet coordination with minimal
+changes. We then revisit continuous-time priority-based search (CPBS), identifying the boundary
+conditions required by its safe interval path planning (SIPP) low-level planner under priority-induced
+constraints and enabling earlier solution detection. As a central contribution, we analyze the structure
+of the priority search space, clarifying which agents are affected by each priority refinement and when
+replanning can be avoided. Building on this analysis, we introduce a novel algorithm, Lazy-CPBS,
+which materializes high-level nodes lazily: a child’s plans are computed only when it is expanded, so
+siblings that are never expanded cost no low-level search. Experiments on standard MAPF benchmarks
+and on industrial AGV roadmaps imported from a proprietary digital-twin simulator show that CPBS-
+based solvers remain effective well beyond the agent counts reachable by optimal MAPFR solvers, while
+Lazy-CPBS substantially reduces CPBS overhead and offers the most consistent robustness/runtime
+trade-off across industrial layouts.
+1
+Introduction
+1.1
+From MAPF to Continuous-Time Roadmap
+Planning
+Multi-agent path finding (MAPF) has emerged as a central
+problem in both AI and robotics, providing algorithmic
+foundations for coordinating large fleets of robots under
+collision-avoidance constraints. Its techniques have been
+successfully applied in domains such as warehouse logis-
+tics [1], office service robots [2], airport towing [3], and
+video games [4], and have also inspired solutions to related
+problems including 3D pipe routing [5], autonomous driv-
+ing in urban environments [6], and other complex routing
+and scheduling tasks. In the classical MAPF formulation,
+the environment is discretized into a grid and agents move
+synchronously in discrete time steps, seeking non-colliding
+paths that minimize global objectives such as the sum of
+arrival times [7, 8]. Over the last decade, this setting has
+led to a rich algorithmic landscape, ranging from opti-
+mal [9] and bounded-suboptimal search [10] to subopti-
+mal methods that scale to hundreds or even thousands of
+agents in seconds [11, 12]. However, discrete-time, grid-
+based MAPF remains an abstraction: it disregards the
+continuous nature of time, the geometry of real roadmaps,
+and the kinematic constraints of industrial vehicles, lim-
+iting its direct applicability in real-world domains such as
+warehouses with automated forklifts and other car-like au-
+tomated guided vehicles (AGVs).
+To address these limitations, the continuous-time variant
+MAPFR has been proposed, in which agents move along
+a generic roadmap, collisions are detected geometrically
+rather than via grid-cell conflicts, and actions have arbi-
+trary real-valued durations [13]. A key component in this
+context is safe interval path planning (SIPP) [14], an A∗-
+based algorithm that performs continuous-time planning
+by encoding dynamic obstacles as time-varying safe inter-
+vals on vertices and edges. SIPP serves as the single-agent
+planner underlying most MAPFR algorithms, such as
+continuous-time conflict-based search (CCBS) [15]. CCBS
+and its recent refinements based on wait discretization [16]
+or improved branching rules [17] currently represent the
+main optimal and solution-complete baselines for MAPFR.
+1.2
+Industrial AGV Coordination and Roadmap
+Complexity
+Unlike autonomous mobile robots (AMRs), which navi-
+gate primarily through onboard intelligence [18], indus-
+trial AGVs are designed to operate on fixed, predefined
+roadmaps [19]. Recent advances in MAPFR therefore ap-
+pear as a natural algorithmic candidate for AGV fleet co-
+ordination, seemingly lowering the barrier to a direct in-
+tegration of multi-agent planning into industrial systems.
+arXiv:2611.30874v1  [cs.RO]  23 Nov 2026
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+2
+In practice, however, most deployments still follow a de-
+coupled architecture: each vehicle plans as if it were alone,
+while a separate traffic-management layer resolves interac-
+tions online [20]. Such controllers typically ensure safety
+and liveness through priority rules, local negotiation over
+shared resources [21], hierarchical control schemes [22], or
+segment-reservation policies [23], rather than through a
+globally coordinated multi-agent planner. Although well
+established, these approaches can degrade in dense, cus-
+tomized warehouse layouts, where congestion, deadlocks,
+and suboptimal traffic patterns become increasingly fre-
+quent as fleet sizes grow [24].
+A key reason why MAPFR techniques remain challenging
+to deploy at scale lies in the structure of industrial AGV
+roadmaps. Such roadmaps are typically highly connected
+and redundant, providing strong connectivity, broad cov-
+erage of the free space, and multiple alternative routes
+between most locations [21, 25]. While this redundancy
+is desirable for robustness and for handling local distur-
+bances, it amplifies the combinatorial complexity of both
+layers in MAPFR solvers. At the single-agent level, many
+methods rely on SIPP, which represents temporal con-
+straints by maintaining, for each vertex and edge, the
+time windows in which it can be safely occupied. Large
+and edge-dense industrial roadmaps inflate the number of
+vertex/edge safe intervals, raising memory and bookkeep-
+ing overhead.
+Moreover, redundancy offers many alter-
+native outgoing edges that traverse similar regions of the
+roadmap, increasing the branching factor that the low-
+level planner must consider. At the multi-agent level, the
+same structural property induces dense clusters of tem-
+porally overlapping interactions, which in CCBS-like ap-
+proaches translates into an explosion in the number of con-
+flicts to detect and resolve through branching and repeated
+replanning. As a consequence, the scalability observed on
+standard MAPFR benchmarks often fails to transfer to
+real industrial layouts, and practitioners still overwhelm-
+ingly rely on faster coordination schemes.
+1.3
+Priority-Based Algorithms and the Cost of
+Replanning
+Within this landscape, priority-based planning offers a
+natural compromise between the speed of decoupled co-
+ordination and the adaptability of conflict-driven MAPF
+solvers. In classical prioritized planning, a total order over
+the agents is fixed in advance, and each agent plans its
+path while treating all higher-priority agents as moving
+obstacles [26]. This yields a simple and fast framework,
+but it is well known to be incomplete: a fixed priority
+ordering may fail to admit any solution even when an al-
+ternative ordering would succeed [27].
+To mitigate this
+limitation, restart-based variants repeatedly modify the
+priority order, either by random resampling [28] or by de-
+terministic promotion rules for agents that fail to find a
+path [29]. A more principled alternative is priority-based
+search (PBS), which systematically explores the space of
+priority orderings and searches for a priority structure that
+is consistent with a conflict-free solution [30].
+Continuous-time priority-based search (CPBS) extends
+this idea to MAPFR by combining a PBS-style high-level
+search over partial priority relations with a SIPP-based
+low-level planner operating in continuous time [31].
+In
+roadmap-based settings, CPBS can exploit precomputed
+continuous-time conflict annotations (CTC). These anno-
+tations specify, offline, which pairs of roadmap actions or
+resources may lead to a collision for given relative exe-
+cution times.
+At runtime, they allow the trajectory of
+a higher-priority agent to be converted into time-varying
+reservations for lower-priority agents without performing
+geometric collision checks online. Related offline conflict-
+detection and annotation strategies are widely used in in-
+dustrial AGV systems [23] and have also been explored in
+roadmap-based MAPF planning [32, 33].
+The resulting framework is attractive for industrial AGV
+coordination, but its performance is strongly affected by
+the cost of repeated replanning.
+Each new priority re-
+finement may require recomputing the path of the lower-
+priority agent and, through transitivity, the paths of
+all agents whose set of higher-priority predecessors has
+changed. We refer to this computation of the multi-agent
+plan of a high-level node as its materialization. On large
+or highly connected industrial roadmaps, this operation
+can be expensive because each replanning step requires re-
+building priority-induced safe intervals and running SIPP
+over a roadmap with many alternative outgoing motions.
+At the same time, the benefit of this effort depends on
+the interaction density of the instance. In dense or highly
+constrained layouts, where bottlenecks generate many con-
+flicts, revising priorities is essential because fixed-order pri-
+oritized planning is brittle. In sparse layouts, instead, a
+simple priority ordering may already be sufficient, and ea-
+ger materialization of high-level nodes can introduce over-
+head with limited conflict-resolution benefit.
+These observations motivate a lazy variant of CPBS
+that avoids materializing nodes that are never expanded.
+Rather than replanning immediately for every generated
+child node, the proposed Lazy-CPBS delays materializa-
+tion until node expansion, so that siblings that are never
+expanded cost no low-level search.
+The goal is to pre-
+serve the robustness of systematic priority revision in con-
+gested regimes while approaching the efficiency of priori-
+tized planning when interactions are sparse.
+1.4
+Contributions and Paper Outline
+This paper makes the following contributions. First, we
+analyze the priority-search space induced by partial pri-
+ority orderings in priority-based continuous-time MAPFR
+solvers. The analysis clarifies how priority decisions prop-
+agate through the search, which agents are affected by a
+priority refinement, and why different priority branches
+can be reasoned about independently.
+This structural
+view also provides implementation-level consequences for
+CPBS-style solvers, including the identification of the
+SIPP boundary conditions required by priority-induced
+reservations and the possibility of detecting solutions ear-
+lier during node materialization. Second, building on this
+structural analysis, we introduce Lazy-CPBS, which delays
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+3
+a)
+b)
+c)
+Figure 1:
+Illustration of the AGV-MAPFR-CTC formulation.
+(a) Excerpt of a directed configuration-space roadmap −→
+R,
+where each vertex v ∈V represents an admissible AGV stopping configuration and the outgoing edges Φ(v) ⊆E encode the
+feasible motion primitives from that configuration. (b) Example of an AGV-MAPFR-CTC instance, with sample precomputed
+continuous-time conflict annotations. Geometrically coincident vertices may still represent different states if they correspond to
+different headings, as illustrated by v6 and v7. The annotation (v7, e14, ∞) ∈CVEC means that, as long as an agent occupies
+v7, any other agent starting move(e14, ·) would cause a collision. (c) Interpretation of the relative-delay semantics of an edge-
+edge CTC annotation: if one agent executes move(e7, t), then t + τ is the earliest safe start time for another agent to execute
+move(e4, ·); in the illustrated case, any start time in the interval [t, t + τ) would lead to a collision.
+node materialization until expansion, avoiding the low-
+level search for children that are never expanded.
+This
+reduces redundant SIPP calls and safe-interval updates
+while preserving the priority-search-space semantics of the
+eager formulation. To ground these algorithmic contribu-
+tions in industrial AGV coordination, we formalize AGV-
+MAPFR-CTC as a configuration-space variant of MAPFR
+with precomputed continuous-time conflicts.
+We then
+evaluate CPBS and Lazy-CPBS both on standard MAPF
+benchmarks converted to continuous-time roadmaps and
+on industrial AGV roadmaps imported from a propri-
+etary digital-twin simulator.
+Taken together, these re-
+sults strengthen the connection between continuous-time
+MAPF and industrial AGV coordination, while identify-
+ing priority-search-space structure as a concrete lever for
+reducing replanning overhead and enabling further accel-
+eration.
+The remainder of this paper is organized as follows. Sec-
+tion 2 formalizes the continuous-time multi-agent problem,
+introducing the MAPFR-CTC model and its AGV-specific
+instantiation. Section 3 revisits the CPBS framework, de-
+scribes a SIPP-based low-level planner that ensures sound
+behavior under priority constraints, and formalizes struc-
+tural properties of the CPBS high-level search that sup-
+port efficient implementations.
+Section 4 presents the
+novel Lazy-CPBS algorithm and discusses its relation to
+standard CPBS. Section 5 reports the experimental setup
+and results on standard MAPFR benchmark instances.
+Section 6 then presents the industrial evaluation on ware-
+house roadmaps imported from a proprietary digital-twin
+simulator and derived from real AGV installations. Sec-
+tion 7 presents an ablation study that isolates the contri-
+butions of lazy materialization and child ordering to the
+speed-up of Lazy-CPBS over CPBS. Finally, Section 8 con-
+cludes the paper and outlines directions for future work.
+2
+Problem Statement
+The scope of this work spans both the MAPFR litera-
+ture and the specific requirements of industrial AGV co-
+ordination. We therefore introduce the problem setting in
+three steps. We first recall the classical continuous-time
+MAPF problem on generic roadmaps (MAPFR). We then
+introduce MAPFR-CTC, where continuous-time conflict
+annotations are precomputed and provided as part of the
+problem input. Finally, we formalize AGV-MAPFR-CTC,
+a configuration-space variant tailored to AGV fleets op-
+erating on fixed industrial infrastructures. This modeling
+structure is illustrated in Fig. 1.
+This separation between the general MAPFR model and
+its industrial variant clarifies both the algorithmic con-
+text of our approach and the operational constraints under
+which our methods will be evaluated.
+2.1
+MAPFR
+In the classical MAPFR problem, agents are identical—
+typically modeled as non-rotating discs of equal radius—
+and move at constant nominal speed along a predefined
+roadmap. Formally, let A = {1, ..., n} be the set of agents.
+An instance of the MAPFR problem is a tuple (G, T ),
+where G = (V, E) is a weighted graph representing the
+roadmap and T = {(si, gi)}n
+i=1 assigns each of the n ∈N
+agents a start vertex si ∈V and a goal vertex gi ∈V ,
+with no two agents sharing start and goal positions: ∀i ∈
+A ∄j | i̸ = j ∧
+( si = sj
+∨
+gi = gj).
+Each vertex
+v ∈V corresponds to a point in the planar workspace
+M ⊆R2, and each edge e = (u, v) ∈E represents a
+collision-free geometric path in M that can be traversed
+at any departure time. Edges are assumed to be straight
+segments with associated traversal time w(e) ∈R≥0, and
+G is symmetric.
+Agents may either wait at a vertex or traverse an outgoing
+edge. A traversal of edge e initiated at time t ∈R≥0 is
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+4
+denoted move(e, t) and lasts w(e), while a waiting action
+at vertex v for duration ∆t ∈R≥0 is denoted wait(v, t, ∆t).
+A solution of the problem is a collection of individual
+continuous-time trajectories Π = {π1, . . . , πn}, one per
+agent, where each πi is a temporally ordered sequence of
+admissible actions connecting si ∈V to gi ∈V . The ar-
+rival time of agent i—the time at which it reaches its goal
+vertex for the last time—is denoted Ti ∈R≥0, and the
+objective is to minimize the sum of arrival times Pn
+i=1 Ti,
+known as the sum of costs (SoC) of the solution.
+Trajectories must be mutually collision-free: for any pair
+of agents (i, j), i̸ = j and any time t ∈R≥0, their occupied
+regions in M must be disjoint. For disc-shaped agents of
+radius r ∈R>0, this requires ∥mi(t)−mj(t)∥2 > 2r, where
+mi(t) and mj(t) denote the centers of agents i and j at
+time t ∈R≥0.
+2.2
+MAPFR-CTC
+The classical MAPFR formulation defined in Section 2.1
+assumes that planners have no prior knowledge of which
+pairs of actions may lead to collisions: any potential inter-
+action between agents must be detected online through ge-
+ometric collision checks. In this sense, MAPFR solvers are
+conflict-blind:
+all continuous-time interference between
+agents must be inferred dynamically during planning.
+In many roadmap-based domains, however—including au-
+tomated warehouses, factory logistics, and other infras-
+tructures where the roadmap is fixed—collision relation-
+ships between roadmap elements can be computed offline,
+before planning begins. Providing this information as part
+of the problem input yields a richer model, which we refer
+to as MAPFR-CTC.
+A defining feature of the MAPFR-CTC formulation is that
+the roadmap is annotated offline with continuous-time
+conflicts (CTC). For every vertex–edge and edge–edge
+pair, preprocessing computes a maximal, time-translation-
+invariant unsafe interval of relative start times:
+if two
+actions begin within this interval, they are guaranteed
+to collide, whereas any larger delay is guaranteed to be
+safe [33].
+All non-empty intervals are stored as tuples
+(v, e, Imax(v, e)) and (e1, e2, Imax(e1, e2)) in the vertex–
+edge and edge–edge conflict sets CVEC and CEEC, which
+are treated as part of the problem input.
+A tuple (e1, e2, Imax(e1, e2))
+∈
+CEEC means that if
+one agent performs move(e1, t) and another executes
+move(e2, t + τ), then a collision is inevitable for every
+τ ∈Imax(e1, e2), whereas any delay τ ≥sup Imax(e1, e2) is
+guaranteed to avoid the collision. An analogous interpreta-
+tion holds for (v, e, Imax(v, e)) ∈CVEC, relating wait(v, ·, ·)
+and move(e, ·). At runtime, these conflict sets allow plan-
+ners to enforce collision avoidance through simple interval
+checks rather than online geometric tests. See [33] for the
+full construction of CVEC and CEEC and a representative
+roadmap-annotation example with circular agents.
+2.3
+AGV-MAPFR-CTC
+We now introduce a variant of MAPFR tailored to in-
+dustrial AGV fleets. Unlike holonomic disc agents, AGVs
+follow steering-constrained trajectories, have direction-
+dependent motion primitives,
+and must satisfy non-
+holonomic continuity between successive segments [34].
+Each vehicle is modeled as a rigid rectangle of dimensions
+LAGV × WAGV, moving in a planar workspace M ⊆R2
+with configuration space C = R2 × S1 [35]. These con-
+straints are captured by representing the navigation infras-
+tructure as a directed, generally non-planar and non-strict
+roadmap embedded in configuration space. Directionality
+accounts for the fact that kinematic feasibility and nominal
+speed may depend on the traversal direction. Moreover,
+geometrically coincident positions with different headings
+correspond to distinct vertices, while multiple kinemati-
+cally distinct motion primitives may connect the same pair
+of configurations.
+More formally, an AGV-MAPFR-CTC instance is de-
+fined as a tuple (−→
+R, T ), where −→
+R = (V, E) is a directed
+weighted roadmap embedded in configuration space and
+T = {(si, gi)}i∈A assigns each agent i ∈A = {1, . . . , n} a
+start and goal vertex in V . Each vertex v ∈V represents
+an admissible stopping configuration
+q(v) = (xv, yv, θv) ∈C,
+(1)
+where (xv, yv) ∈R2 is the footprint-center position and
+θv ∈S1 is the vehicle heading (Fig. 1(a)). The rectangular
+footprint associated with q(v) ∈C is obtained by rotating
+an axis-aligned LAGV × WAGV rectangle by angle θv ∈
+S1 in the workspace.
+Each directed edge e = (u, v) ∈
+E encodes a physically realizable motion primitive from
+configuration q(u) ∈C to q(v) ∈C with travel time w(e) ∈
+R≥0; the primitive implicitly fixes the traversal mode (e.g.,
+forward or reverse) and its admissible velocity profile. By
+constructing −→
+R directly in configuration space, the non-
+holonomic continuity constraints are embedded into the
+adjacency structure. The outgoing set
+Φ(v) = { e = (v, u) ∈E },
+(2)
+therefore contains exactly the motion primitives that may
+follow a stop at configuration q(v) ∈C.
+Thus, any
+roadmap path selected by the planner is kinematically con-
+sistent by construction.
+As in MAPFR, an agent may execute either a traversal
+action move(e, t) or a waiting action wait(v, t, ∆t).
+A
+feasible solution is a set of n collision-free trajectories
+Π = {π1, . . . , πn} connecting each pair (si, gi), and the
+objective is to find a SoC-minimal solution Π⋆. Follow-
+ing the MAPFR-CTC framework, the roadmap is enriched
+with offline continuous-time conflict annotations derived
+from the vehicle geometry and the curvature-constrained
+motion primitives.
+For each relevant pair of roadmap
+elements, these annotations specify the time-translation-
+invariant unsafe intervals of relative start times that would
+unavoidably lead to a collision.
+We denote by CVEC
+and CEEC the vertex–edge and edge–edge conflict sets,
+respectively.
+Examples of such annotations are shown
+in Fig. 1(b)-(c).
+This model, denoted AGV-MAPFR-
+CTC, preserves the continuous-time geometric structure
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+5
+of MAPFR while capturing the kinematic specificity and
+infrastructural regularity characteristic of industrial AGV
+systems.
+Remark 1. The sets CVEC and CEEC are part of the AGV-
+MAPFR-CTC input. If not available, they can be com-
+puted offline by checking pairwise roadmap actions; for
+rectangular AGVs, collision queries are constant-time via
+the separating axis theorem, and unsafe delay intervals can
+be sampled over relative start times [36, 37].
+Remark
+2. AGV-MAPFR-CTC generalizes MAPFR-
+CTC: the roadmap becomes directed and possibly non-
+strict, with pose vertices. Since geometry and kinematics
+are compiled into the roadmap and into CVEC and CEEC,
+both problems share the same input, a weighted directed
+graph with conflict sets, so any MAPFR-CTC solver that
+does not rely on roadmap symmetry applies without modi-
+fying its search logic.
+3
+Continuous-Time Priority-Based
+Search
+Continuous-time priority-based search (CPBS) [31] is
+an incomplete, suboptimal MAPFR-CTC (and AGV-
+MAPFR-CTC) solver that extends the classical priority-
+based search (PBS) framework [30] to continuous-time set-
+tings. It follows a two-level architecture: the high level
+explores partial priority orderings among agents, while
+the low level performs single-agent replanning using a
+SIPP-based planner that treats higher-priority agents as
+dynamic obstacles through time-varying reservations on
+roadmap resources.
+A key difference between CPBS and CCBS lies in how
+conflicts are handled. When CPBS imposes a precedence
+constraint i ≺j, i, j ∈A, the meaning is global: agent
+j ∈A must find a trajectory that avoids every possible
+continuous-time interaction with the current trajectory of
+agent i ∈A. To enforce this, CPBS must treat the full
+timed path of i as a dynamic obstacle for j, inserting time-
+stamped reservations not only on the vertices and edges
+directly occupied by i, but also on all roadmap elements
+that are geometrically blocked by those resources. These
+reservations can be constructed online by checking candi-
+date roadmap actions against the complete timed trajec-
+tories of higher-priority agents. Without annotations, re-
+peated low-level searches may require recomputing forbid-
+den intervals for many resources, which can be expensive
+on large, highly connected roadmaps. CTC annotations
+avoid repeating the geometric computation by translating
+precomputed conflict relations into time-stamped reserva-
+tions.
+CCBS instead introduces agent-specific action-time con-
+straints from selected conflicts between current plans. Its
+low-level planner enforces these constraints without treat-
+ing other agents’ complete trajectories as fixed obsta-
+cles.
+CCBS can use online geometric conflict detection
+or precomputed annotations. Priority-based solvers like-
+wise remain applicable to MAPFR without CTC annota-
+tions. We adopt MAPFR-CTC to reuse precomputed col-
+lision geometry across replanning calls, priority branches,
+Figure 2: High-level CPBS priority tree.
+and instances on a fixed roadmap, while constructing
+trajectory-dependent reservations online.
+In the remainder of this section, we denote by −→
+R a generic
+CTC-annotated roadmap.
+Depending on the domain,
+−→
+R may correspond either to the standard MAPFR-CTC
+roadmap G or to the AGV configuration-space roadmap
+−→
+R. The CPBS and Lazy-CPBS search logic is unchanged
+in both cases.
+3.1
+CPBS High-Level Search
+Unlike CCBS-style methods, which maintain and expand
+a constraint tree, CPBS relies exclusively on priority re-
+lations to solve conflicts, incrementally refining a prior-
+ity directed acyclic graph (pDAG) that encodes the local
+precedence constraints required to eliminate inter-agent
+collisions.
+As illustrated in Fig. 2, CPBS performs a depth-first
+search [38] over the priority tree (PT), whose nodes en-
+code partial priority structures and their associated multi-
+agent plans.
+A PT node N is defined by a tuple N =
+(N.pDAG, N.Π, N.cost, N.Conflicts), where N.pDAG
+is a priority directed acyclic graph, N.Π = {π1, . . . , πn} is
+a set of continuous-time paths that comply with N.pDAG,
+N.cost is the SoC of N.Π, and N.Conflicts is the set of
+unresolved pairwise conflicts in the current solution N.Π.
+Formally,
+a
+priority
+graph
+is
+represented
+as
+pDAG = (A, ≺), where A = {1, . . . , n} is the set of
+agents and ≺⊆A × A specifies precedence constraints.
+An ordered pair (i, j) ∈≺indicates that agent i has
+higher priority than agent j, denoted i ≺j.
+By con-
+struction, pDAG must be acyclic. Acyclicity ensures that
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+6
+≺defines a valid partial order, and therefore admits at
+least one topological ordering [39] of the agents.
+If a
+cycle existed—e.g., i ≺j ≺k ≺i—the induced ordering
+would be contradictory: each agent in the cycle would be
+required to defer to another, making the set of constraints
+infeasible.
+The set of single-agent paths N.Π is said to respect
+N.pDAG if every path πi was produced by the low-level
+SIPP planner while treating each higher-priority agent j
+with j ≺i as a dynamic obstacle. This mechanism ensures
+that N.Π is consistent with N.pDAG by construction and
+that collisions between higher- and lower-priority agents
+are systematically avoided.
+Algorithm 1 illustrates the high-level search procedure of
+CPBS. The algorithm initializes the root PT node with an
+edge-empty Root.pDAG = (A, ∅) and an initially empty
+multi-agent plan Root.Π (line 1). It then constructs the
+root plan by calling UpdatePlan once per agent i ∈A,
+ensuring that the initial multi-agent plan is computed in
+a temporally unconstrained environment, with constraints
+introduced only through explicit precedence relations in
+the pDAG. Since no precedence relations are enforced yet,
+these initial paths treat all other agents as absent; if any
+SIPP call fails, the instance is deemed infeasible and the
+algorithm terminates immediately (lines 2–6).
+Once the initial multi-agent plan Root.Π has been com-
+puted, the algorithm tests it for conflicts (line 7). If no
+collisions are present, the root node already represents a
+valid solution and the search halts. Otherwise, CPBS ini-
+tiates a depth-first search over the priority tree: a stack
+is created and the root node is pushed onto it (line 10),
+after which nodes are extracted and expanded in LIFO or-
+der (lines 11–13).
+For each extracted PT node N, the
+algorithm selects one conflict according to a determin-
+istic conflict selection heuristic (in our implementation,
+earliest-conflict-time policy, line 14). Let the selected con-
+flict involve agents i and j. To solve it, CPBS branches on
+the two possible local precedence assignments i ≺j and
+j ≺i, thereby generating two child nodes (lines 15–18).
+Each child inherits the parent’s pDAG and adds exactly
+one new edge: the child priority graph is obtained by ex-
+tending the parent pDAG with the corresponding directed
+edge choice x ≺y.
+Since enforcing x ≺y makes agent y ∈A responsible for
+avoiding x ∈A, CPBS invokes UpdatePlan on y, which
+recomputes its trajectory and, if necessary, those of all
+agents that depend on it through transitivity. This replan-
+ning step materializes the child node: the full multi-agent
+plan associated with the updated pDAG is generated im-
+mediately, and its conflicts can therefore be evaluated on
+the spot. Unlike [31, 30], where the goal test is performed
+at expansion, this anticipates it to the moment a child is
+materialized. As a consequence, if a child node already
+yields a conflict-free plan, the solver can recognize it as a
+valid solution without exploring the sibling branch. We
+refer to this as the early goal test.
+The UpdatePlan procedure (lines 29–42) operates as fol-
+lows. Given a child node N′ and the agent y whose pri-
+Algorithm 1 High-level CPBS search
+Require: −→
+R, T , CVEC, CEEC
+1: Root.pDAG ←(A, ∅),
+Root.Π ←∅
+2: for all i ∈A do
+3:
+success ←UpdatePlan(Root, i)
+4:
+if ¬success then return “no solution”
+5:
+end if
+6: end for
+7: Root.Conflicts ←FindConflicts(Root.Π, CVEC, CEEC)
+8: if Root.Conflicts = ∅then return Root.Π
+9: end if
+10: STACK ←{Root}
+11: while STACK̸ = ∅do
+12:
+N ←top node in STACK
+13:
+STACK ←STACK \{N}
+14:
+⟨i, j⟩←SelectConflict(N.Conflicts)
+15:
+for x ∈{ i, j } do
+16:
+y ←other agent in {i, j} \ {x}
+17:
+N ′ ←copy of N
+18:
+N ′.pDAG ←N.pDAG ∪{ x ≺y }
+19:
+success ←UpdatePlan(N ′, y)
+20:
+if success then
+21:
+N ′.Conflicts ←
+FindConflicts(N ′.Π, CVEC, CEEC)
+22:
+if N ′.Conflicts = ∅then return N ′.Π
+23:
+end if
+24:
+insert N ′ into STACK so that the lower-cost
+sibling is on top
+25:
+end if
+26:
+end for
+27: end while
+28: return “no solution”
+29: function UpdatePlan(N ′, y)
+30:
+order ←TopoFrom(N′.pDAG, y)
+31:
+for all a ∈order do
+32:
+I ←ResetFullSafe(−→
+R)
+33:
+H ←Predecessors(N ′.pDAG, a)
+34:
+I ←InsertHigherReservations(H, N ′.Π)
+35:
+π′
+a ←SIPP(−→
+R, sa, ga, I, H)
+36:
+if π′
+a = failure then return false
+37:
+end if
+38:
+N ′.Π[a] ←π′
+a
+39:
+end for
+40:
+N ′.cost ←SoC(N ′.Π)
+41:
+return true
+42: end function
+orities have worsened, a topological ordering of the sub-
+graph induced by y and all its descendants in the pDAG
+is computed with a standard linear-time topological sort-
+ing algorithm [39] (line 30). This ordering ensures that
+agents are replanned in a sequence consistent with the
+current precedence structure: a descendant agent is never
+replanned before all its higher-priority predecessors have
+been fixed. For each agent a ∈order appearing in this
+ordering, the algorithm resets all safe intervals (line 32),
+retrieves the set H ⊂A of agents that dominate a in the
+pDAG (line 33), and inserts their time-stamped reserva-
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+7
+Figure 3: Example of priority-induced safe intervals used by
+SIPP.
+tions into the safe-interval tables of the roadmap (line 34).
+This process effectively removes from the temporal search
+space all time intervals during which a would collide with
+a higher-priority agent, thereby constraining its admissi-
+ble continuous-time motions. A new SIPP query is then
+executed for agent a (line 35), producing a new trajectory
+that avoids all such reservations. If any replanning step
+fails, UpdatePlan returns false and the corresponding
+branch of the priority tree is discarded. Otherwise, after
+all affected agents have been replanned, the cost of the
+resulting plan is updated (line 40), and the algorithm re-
+sumes the high-level search.
+If the child node N′ remains feasible and is not a solution,
+it is pushed onto the stack for further exploration (lines 20–
+24); feasible siblings are pushed so that the one with the
+lower cost is expanded first. Due to the depth-first nature
+of the search, CPBS prioritizes deepening along one branch
+of the priority space before backtracking, allowing it to
+rapidly discover feasible orderings when they exist. The
+search continues until either a conflict-free node is found
+or all branches of the priority tree are exhausted.
+3.2
+SIPP
+CPBS relies on a modified version of SIPP [14] as its single-
+agent planner. SIPP extends A∗search [40] by associating
+each vertex v ∈V and edge e ∈E with a set of safe inter-
+vals (Iv ∈I and Ie ∈I, respectively), i.e., maximal time
+windows during which the resource can be used without
+colliding with any higher-priority agent. A state is a pair
+(v, I), where v ∈V is a vertex and I = [Is, Ie] ∈Iv
+is one such interval; its cost g(v, I) is the earliest fea-
+sible arrival time at v within I, and its priority key is
+f(v, I) = g(v, I)+h(v, ga), where h(v, ga) ∈H is a precom-
+puted admissible heuristic. In our implementations we use
+the exact shortest-path travel time on the static roadmap
+with unbounded resource availability, precomputed once
+by running backward Dijkstra search from each goal ver-
+tex over the entire roadmap, which is admissible by con-
+struction. The OPEN list is ordered by increasing f, and
+dominated states are pruned: if a state (v, I) is reached
+with an arrival time no better than a previously observed
+one, it is discarded [41]. Fig. 3 illustrates how priority-
+induced reservations are translated into safe intervals for
+the low-level planner.
+To ensure soundness under priority-based reasoning,
+CPBS requires two boundary conditions on the SIPP low-
+level planner that are not necessarily enforced in CCBS-
+style implementations.
+First, the planner must start
+from the earliest safe interval of sa, which must inter-
+sect t = 0; allowing SIPP to start from a later interval
+(e.g., [45, +∞) when [0, 33] exists) would introduce an ini-
+tial wait that may already violate reservations imposed by
+higher-priority agents. Second, a plan is accepted as a goal
+only if it terminates in the unbounded safe interval of ga:
+reaching ga inside a finite interval, such as [33, 190], would
+imply that the agent remains at its goal beyond the end
+of that interval, thereby postponing an unavoidable future
+conflict that CPBS cannot repair within the same priority
+assignment.
+These conditions are specific to the semantics of priority-
+induced reservations. In CCBS-style solvers, SIPP is typi-
+cally used inside an incremental repair loop: if a later con-
+flict is detected, the high level can introduce an additional
+constraint and replan. In CPBS, instead, a precedence re-
+lation is interpreted as eliminating all interactions between
+the replanned agent and its higher-priority predecessors in
+a single low-level call. Therefore, starting from a late safe
+interval or accepting a finite goal interval may produce a
+plan that is valid for a CCBS repair step but invalid under
+CPBS semantics. Enforcing the two boundary conditions
+above ensures that SIPP preserves the intended meaning
+of the pDAG.
+Given a state (v, I), successors are generated by consid-
+ering each outgoing edge e = (v, u) and computing the
+earliest departure time compatible with the current inter-
+val I, the safe intervals of e, and those of u. A successor
+(u, J) is added only if the traversal lies entirely within the
+corresponding edge and vertex intervals; for each interval
+J, only the earliest feasible arrival is retained, since later
+departures cannot improve the solution under a monotone
+time metric [41]. This SIPP variant is thus both sound for
+CPBS and efficient, matching the structure of standard
+SIPP while enforcing the additional temporal constraints
+required by priority-based continuous-time planning.
+3.3
+Structural Properties and Implementation
+Implications
+This subsection discusses structural properties of the
+CPBS high-level search and outlines how they can guide
+future multi-threaded implementations aimed at further
+accelerating CPBS-style solvers. Note that a CPBS node
+N is represented by its priority graph N.pDAG: for each
+agent a, the low-level constraints depend only on the set
+of higher-priority agents
+HN(a) = {b ∈A | b ≺∗
+N a},
+(3)
+where ≺∗
+N denotes the transitive closure of N.pDAG.
+Thus, a pDAG, or equivalently its transitive closure, pro-
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+8
+vides a canonical representation of the high-level priority
+state.
+Property 1 (Conflicts involve incomparable agents). Let
+N be a materialized CPBS node whose plan N.Π respects
+N.pDAG. If two agents are comparable in N.pDAG, then
+the lower-priority one has been planned while treating the
+higher-priority one as a dynamic obstacle. Hence, under
+sound SIPP planning and correct CTC reservations, se-
+lected conflicts can only involve agents that are incompa-
+rable in the current N.pDAG.
+Property 2 (Acyclicity preservation). Let N be a valid
+CPBS node with an acyclic pDAG, and let ⟨i, j⟩be the se-
+lected conflict. By Property 1, neither i ≺∗
+N j nor j ≺∗
+N i
+holds. Therefore, adding either i ≺j or j ≺i cannot cre-
+ate a directed cycle, and both generated children preserve
+the pDAG invariant.
+Property 3 (Affected-subgraph replanning). Let N ′ be ob-
+tained from N by adding x ≺y. Only y and its descen-
+dants in the updated pDAG may have changed low-level
+constraints. Therefore, the agents to be replanned are ex-
+actly
+DN ′(y) = {y} ∪{a ∈A | y ≺∗
+N′ a},
+(4)
+processed in a topological order of the updated pDAG.
+Property 4 (Disjoint priority subtrees). Let N be a
+CPBS node and let ⟨i, j⟩be the conflict selected for branch-
+ing. The two children add opposite precedence relations,
+i ≺j and j ≺i.
+Since CPBS only extends pDAGs
+monotonically, every descendant of the first child contains
+i ≺∗j, whereas every descendant of the second contains
+j ≺∗i.
+Hence, under the acyclicity invariant, the two
+subtrees cannot contain the same valid canonical high-level
+state.
+Property 5 (Replan list from the parent). Let N ′ be ob-
+tained from N by adding x ≺y. Then DN′(y) = DN(y),
+and any topological order of N.pDAG restricted to DN(y)
+is a valid replanning order in N ′. Indeed, the new edge en-
+ters y, so it creates no new path leaving y, and x /∈DN(y)
+by Property 1. Hence the child’s replan list and its size
+|DN(y)| can be computed on the parent without updating
+or re-sorting the child pDAGs.
+These properties also suggest a natural parallel implemen-
+tation strategy. Fig. 4 sketches the corresponding frontier-
+parallel view: whenever a worker is available, an unpro-
+cessed frontier node is assigned to it, and the worker per-
+forms a local depth-first descent within the subtree rooted
+at that node; the worker terminates when it backtracks
+to its assigned root and cannot continue without enter-
+ing subtrees already assigned to other workers. Different
+workers could therefore expand and materialize distinct
+frontier nodes independently, while sharing only read-only
+data such as the roadmap −→
+R, the CTC annotations CVEC
+and CEEC, and the heuristic table used by SIPP. Muta-
+ble low-level structures, such as safe-interval tables and
+conflict calendars, should instead be local to each worker.
+The only global mutable structures would be a concurrent
+frontier and an atomic generated-state table indexed by
+canonical pDAG keys. Such an implementation is left for
+future work.
+Figure 4: Parallel CPBS high-level exploration from indepen-
+dent frontier nodes.
+Figure 5: Replan-list construction in Lazy-CPBS. A conflict
+between agents 1 and 5 generates two children with opposite
+precedence relations. Adding 1 ≺5 requires replanning only
+agent 5, whereas adding 5 ≺1 affects agent 1 and its descen-
+dants in the pDAG, producing N ′′.ReplanList = (1, 2, 3). Since
+Lazy-CPBS prioritizes the child with the smaller ReplanList,
+the branch induced by 1 ≺5 is expanded first.
+4
+Lazy-CPBS
+In this section we introduce Lazy-CPBS, a novel algorithm
+that explores the PT while postponing replanning until
+nodes are expanded.
+The CPBS solver described in Section 3.1 already ex-
+ploits a depth-first exploration of the PT. At each high-
+level step, CPBS incrementally refines the current pDAG
+by adding precedence edges between conflicting agents,
+thereby constructing a search tree over feasible priority re-
+lations. However, whenever a conflict between two agents
+⟨i, j⟩is selected, CPBS immediately materializes both chil-
+dren. For each child, it augments the pDAG with either
+i ≺j or j ≺i and then triggers a full low-level replanning
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+9
+cycle via UpdatePlan. This procedure first resets all safe
+intervals on the roadmap to their default “fully safe” state
+and then scans the agents in a topological order of the up-
+dated pDAG, repeatedly shrinking safe intervals and call-
+ing SIPP to replan the lower-priority agent and any agent
+that becomes reachable from it in pDAG (4). As a result,
+a single high-level branching may induce multiple SIPP
+calls and global passes over the safe-interval structure.
+This eager strategy becomes particularly costly on sparse
+instances. Instance density plays a crucial role in the be-
+havior of priority-based methods: as the interaction den-
+sity grows, CPBS remains robust by systematically re-
+vising priority decisions through precedence constraints.
+However, on large layouts the same number of agents in-
+duces much sparser interactions. In such regimes, even a
+fixed priority ordering is frequently sufficient to solve the
+instance, while CPBS may still pay the full cost of re-
+peatedly descending the priority tree. As a result, CPBS
+can spend a significant portion of its runtime materializing
+children that are never expanded, even on instances that
+a simple fixed ordering would already solve.
+These observations motivate the introduction of Lazy-
+CPBS, a lazy variant of CPBS that preserves the same
+search space over priority orderings but avoids eagerly
+recomputing safe intervals and single-agent plans at ev-
+ery high-level decision. Algorithm 2 shows the high-level
+search of Lazy-CPBS. The PT has the same meaning as
+in CPBS, but each node now stores different information:
+besides the current pDAG, a node N keeps a multi-agent
+plan N.Π and a replan list N.ReplanList containing ex-
+actly the agents to be replanned (Property 3) when N is
+expanded.
+The search starts by creating the root node Root.
+Its
+pDAG contains all agents but no precedence edges, rep-
+resenting a fully unconstrained priority ordering. No low-
+level paths are computed at this point: the root carries
+an unmaterialized plan, and the node is simply pushed
+onto the STACK (lines 1–3). When a node N is popped
+from STACK for expansion (lines 5–6), it is first mate-
+rialized.
+The current multi-agent plan N.Π (empty at
+the root) is updated by replanning exactly the agents in
+N.ReplanList (line 7). If materialization fails, the node
+is discarded without branching and the high-level search
+backtracks; otherwise, N.Π is updated and conflicts are
+then checked on the resulting plan (lines 7-9). If the cur-
+rent multi-agent plan N.Π is collision-free, it is returned
+as a valid solution. Otherwise, a conflict ⟨i, j⟩is selected
+for expansion (lines 10–12). As in CPBS, our implementa-
+tion adopts the earliest-conflict-time policy. The selected
+conflict ⟨i, j⟩is then resolved by branching on the two
+possible local precedence relations.
+Lazy-CPBS creates
+two children, N ′ and N ′′, whose pDAGs extend N.pDAG
+with the corresponding precedence edge (lines 13–15). For
+each child, the new constraint is injected into the pDAG,
+the set of agents to be replanned is extracted in topo-
+logical order from the parent (Property 5) and stored in
+N ′.ReplanList and N′′.ReplanList (lines 16–17). At this
+point, both children inherit a copy of N.Π as a provisional
+multi-agent plan, which will only be updated when the
+node is expanded and materialized. Finally, the two child
+nodes are pushed onto STACK in an order that favors the
+node with the smaller replan list as illustrated in Fig. 5
+(line 19). In this way, Lazy-CPBS not only performs low-
+level materialization for one node at a time, but also biases
+the depth-first search towards nodes that require less re-
+planning effort, in terms of both safe-interval updates and
+SIPP calls, thereby accelerating the descent along the PT.
+The MaterializeNode procedure plays the same role as
+UpdatePlan in CPBS and replans the same set of agents
+(Property 3), the only difference is that this set, together
+with its topological order, has already been computed on
+the parent (Property 5) and stored in N.ReplanList. For
+each agent in this list, the procedure resets the safe inter-
+vals, inserts the reservations of its higher-priority agents,
+and calls SIPP to compute a new collision-free path (lines
+24–27). If all SIPP calls succeed, the multi-agent plan N.Π
+is updated accordingly (line 30) and the node N is con-
+sidered fully materialized; otherwise, MaterializeNode
+returns false and the node is discarded (lines 28 and 7).
+Remark 3. Lazy-CPBS inherits the structural Proper-
+ties 1–5: it changes only when replanning is performed
+and which child is explored first, not the PT itself, and is
+therefore amenable to the same parallel high-level explo-
+ration strategy discussed in Section 3.3.
+5
+Experimental MAPFR Evaluation
+To assess the performance of Lazy-CPBS and CPBS, we
+conducted two extensive experimental campaigns with a
+twofold objective: (i) providing reproducible results on
+standard benchmarks from the MAPF literature, and (ii)
+validating transferability and robustness in a realistic in-
+dustrial setting. Specifically, the evaluation comprises: (a)
+a benchmark campaign in the MAPFR-CTC domain on
+classical MAPF instances, and (b) an industrial campaign
+on AGV-MAPFR-CTC instances built from roadmaps and
+conflict annotations imported from a proprietary indus-
+trial simulator. In the remainder of this section we focus
+on the standard benchmark campaign; results on indus-
+trially derived AGV roadmaps are reported and discussed
+separately in Section 6.
+5.1
+Simulation Setup
+The simulation setup follows the protocol in [33].
+We
+consider a standard suite of environments from the
+MAPF benchmark, consistently with prior works [42, 30,
+43].
+Starting from the original grid maps for discrete-
+time MAPF, we automatically generate corresponding
+roadmaps used in our continuous-time planning domain.
+The evaluated environments are den, Berlin, random,
+maze, warehouse, empty16, and empty256.
+Table 1 re-
+ports the main characteristics of the underlying grid maps,
+including their dimensions and obstacle density, while
+Fig. 6 provides a visual overview of the considered en-
+vironments.
+All experiments are conducted on a notebook equipped
+with an Intel Core i7-12700H CPU (2.30 GHz, 14 cores,
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+10
+Algorithm 2 Lazy-CPBS high-level search
+Require: −→
+R, T , CVEC, CEEC
+1: Root.pDAG ←(A, ∅), Root.Π ←∅
+2: Root.ReplanList ←(1, . . . , n)
+3: STACK ←{Root}
+4: while STACK̸ = ∅do
+5:
+N ←top node in STACK
+6:
+STACK ←STACK \{N}
+7:
+if ¬MaterializeNode(N) then continue
+8:
+end if
+9:
+conflicts ←FindConflicts(N.Π, CVEC, CEEC)
+10:
+if conflicts = ∅then return N.Π
+11:
+end if
+12:
+⟨i, j⟩←SelectConflict(conflicts)
+13:
+N ′ ←new node, N ′′ ←new node
+14:
+N ′.pDAG ←N.pDAG ∪{ i ≺j }
+15:
+N ′′.pDAG ←N.pDAG ∪{ j ≺i }
+16:
+N ′.ReplanList ←TopoFrom(N.pDAG, j)
+17:
+N ′′.ReplanList ←TopoFrom(N.pDAG, i)
+18:
+N ′.Π ←N.Π,
+N ′′.Π ←N.Π
+19:
+push N ′ and N ′′ onto STACK in non-increasing
+order of |N ′.ReplanList| and |N ′′.ReplanList|
+20: end while
+21: return “no solution”
+22: function MaterializeNode(N)
+23:
+for all a ∈N.ReplanList do
+24:
+I ←ResetFullSafe(−→
+R)
+25:
+H ←Predecessors(N.pDAG, a)
+26:
+I ←InsertHigherReservations(H, N.Π)
+27:
+π′
+a ←SIPP(−→
+R, sa, ga, I, H)
+28:
+if π′
+a = failure then return false
+29:
+end if
+30:
+N.Π[a] ←π′
+a
+31:
+end for
+32:
+return true
+33: end function
+Table 1: Characteristics of the MAPF benchmark environ-
+ments.
+Environment
+Grid size
+Obstacle density
+den
+256×257
+57.2%
+Berlin
+256×256
+24.2%
+random
+64×64
+10.0%
+maze
+128×128
+33.7%
+warehouse
+340×164
+30.5%
+empty16
+16×16
+0%
+empty256
+256×256
+0%
+20 threads) and 16 GB DDR4 RAM. Following [33], each
+grid environment is converted into a geometric roadmap
+G = (V, E) for continuous-time planning by sampling ver-
+tices in free space and adding bidirectional edges with ei-
+ther k-nearest simplified probabilistic roadmap method (k-
+sPRM, k = 15) [44] or constrained Delaunay triangulation
+(CDT) [45]. Agents are modeled as discs of radius r = 0.5
+moving at constant speed along straight-line edges, with
+(a) den
+(b) Berlin
+(c) maze
+(d) random
+(e) warehouse
+Figure 6: Static environments used in the experiments.
+traversal time proportional to the Euclidean edge length,
+and collisions are checked in continuous time via exact ge-
+ometric overlap of disc trajectories.
+For every environment–roadmap combination we compare
+CPBS and Lazy-CPBS against PSIPP-CTC (hereafter
+also referred to as PP) and CCBS (augmented with the
+enhancements of [43]), by considering an increasing num-
+ber of agents: for each map we first sample a pool of nmax
+start-goal pairs {(si, gi)}nmax
+i=1
+uniformly at random from
+roadmap vertices, enforcing unique start and goal loca-
+tions, and then build instances with n ∈{1, . . . , nmax}
+agents by taking the first n pairs from the pool so that
+all methods are evaluated on identical instance sets while
+progressively increasing the level of roadmap congestion.
+We repeat this procedure for 25 independent pools and im-
+pose a per-run runtime cap of 30 s; an instance is counted
+as failed if no solution is found within the limit. For CCBS,
+we consider online constraint/safe-interval construction
+(i.e., not an augmented variant CCBS-CTC). In this disc-
+on-segment setting, geometric conflict checking and the
+induced safe-interval reconstruction are a marginal compo-
+nent of the total runtime; moreover, each high-level CCBS
+expansion branches on a single conflicting pair of moves
+and replans only one agent, so constant-time access to pre-
+annotated roadmap collision data (CTC) did not yield a
+noticeable speed-up in our experiments—unlike in solvers
+where many pairwise interactions must be repeatedly eval-
+uated (e.g., PP, CPBS, and Lazy-CPBS). This is partly
+because, in this setting, collision checks reduce to inex-
+pensive distance computations between disc trajectories,
+whereas in more complex settings (e.g., AGV-MAPFR-
+CTC) collision detection is more costly and CCBS-CTC
+can provide gains.
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+11
+(a) 100 CDT
+(b) 100 k-sPRM
+(c) 700 CDT
+(d) 700 k-sPRM
+Figure 7: Geometric roadmaps for the den environment.
+Finally, for reproducibility, our C++ implementation is
+publicly available online1 and interfaces with the authors’
+official implementations of PSIPP-CTC2 and CCBS3.
+5.2
+Results
+As done in [43, 15, 33], we use the den environment as our
+baseline testbed. For this environment, we consider four
+roadmaps obtained by combining the CDT and k-sPRM
+generators with two sampling budgets (100 and 700 ver-
+tices). Fig. 7 visualizes the resulting roadmaps. Overall,
+k-sPRM produces roadmaps with a higher edge density
+due to the value of k = 15, offering many alternative rout-
+ing possibilities. In contrast, CDT tends to place samples
+more effectively in cluttered regions, often yielding feasi-
+ble transitions through narrow bottlenecks and improving
+connectivity in constrained passages.
+The results of the simulations on the four roadmaps are
+reported in Fig. 8. For each roadmap and algorithm, run-
+time, SoC of the computed solutions, and success rate are
+shown as a function of the number of agents.
+Across all four den roadmaps, CCBS solves only instances
+with few agents and then quickly becomes impractical as
+conflicts proliferate. This is expected for CBS-style opti-
+mal solvers: when it succeeds it achieves the lowest SoC,
+but its scalability remains limited in this continuous-time
+roadmap setting.
+Among the non-optimal solvers, PP (PSIPP-CTC) is con-
+sistently the fastest, but its fixed priority order makes it
+fragile once the problem instances become congested. In
+contrast, CPBS and Lazy-CPBS trade additional compu-
+tation for robustness by revising priority orders, obtain-
+ing higher success deeper into the congested regime, until
+the runtime limit becomes dominant.
+When all meth-
+ods succeed, solution quality follows a stable ordering:
+CCBS yields the best (lowest) SoC, CPBS is typically close
+but slightly higher, and Lazy-CPBS is slightly worse than
+CPBS, often comparable to PP.
+Success rates are highly sensitive to roadmap scale and
+to how quickly instances become dense. On the smaller
+100-vertex roadmaps, Lazy-CPBS outperforms the other
+methods as congestion emerges early. On 700 CDT, in-
+stead, PP achieves the highest success: the larger roadmap
+provides enough spatial slack that feasibility is preserved
+longer, and PP’s negligible runtime lets it solve many in-
+1https://github.com/FedericoSignorile/Lazy-CPBS
+2https://github.com/omron-sinicx/PSIPP-CTC.
+3https://github.com/thaynewalker/CCBS.
+(a) 100 CDT
+(b) 100 k-sPRM
+(c) 700 CDT
+(d) 700 k-sPRM
+Figure 8: Experimental results across den roadmaps. Each
+row shows runtime (left), SoC (middle) and success rate (right).
+Lines show the mean over solved instances and shaded bands
+±1 standard deviation.
+stances before timeout becomes a limiting factor for the
+more expensive solvers. On 700 k-sPRM it is possible to
+observe a clear trade-off: PP and Lazy-CPBS end up with
+comparable success, with neither method uniformly dom-
+inating across agent densities.
+Since CDT yields consistently higher success rates, the
+remainder of the benchmark campaign focuses on CDT
+roadmaps and is extended to all remaining environments
+by reporting results on 100 CDT and 700 CDT. The only
+exception is empty16, whose limited free space makes 700-
+vertex roadmap instances impractical; for this map, results
+are reported on 100 CDT and 100 k-sPRM. Fig. 9 reports
+runtime and success rate on the remaining environments.
+The density-driven pattern largely carries over to the re-
+maining environments. For instance, in the smallest map
+empty16 (Fig. 9(d) and (j)), instances become congested
+almost immediately even in the absence of obstacles. In
+this regime, the fixed-order policy of PP breaks down early,
+whereas CPBS and Lazy-CPBS remain effective over a
+wider range of agent counts.
+More broadly, on 100 CDT roadmaps Lazy-CPBS tends
+to achieve the best success rates overall. The advantage
+is most pronounced in smaller or more cluttered envi-
+ronments with tight bottlenecks (e.g., maze and random),
+where Lazy-CPBS clearly outperforms PP and CPBS typ-
+ically follows closely until the highest agent counts. On
+larger and less constrained maps (e.g., warehouse, Berlin,
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+12
+(a) 100 CDT — Berlin
+(b) 100 CDT — Maze
+(c) 100 CDT — Random
+(d) 100 CDT — Empty16
+(e) 100 CDT — Empty256
+(f) 100 CDT — Warehouse
+(g) 700 CDT — Berlin
+(h) 700 CDT — Maze
+(i) 700 CDT — Random
+(j) 100 k-sPRM — Empty16
+(k) 700 CDT — Empty256
+(l) 700 CDT — Warehouse
+Number of Agents
+0
+50
+100
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+50
+100
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+20
+40
+60
+80
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+20
+40
+60
+80
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+50
+100
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+50
+100
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+20
+40
+60
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+20
+40
+60
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+50
+100
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+50
+100
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+50
+100
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+50
+100
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+200
+400
+600
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+200
+400
+600
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+100
+200
+300
+400
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+100
+200
+300
+400
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+100
+200
+300
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+100
+200
+300
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+20
+40
+60
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+20
+40
+60
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+200
+400
+600
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+200
+400
+600
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Number of Agents
+0
+200
+400
+600
+Runtime (s)
+0
+10
+20
+30
+40
+50
+PP
+CPBS
+Lazy-CPBS
+CCBS
+Number of Agents
+0
+200
+400
+600
+Success Rate
+0
+0.2
+0.4
+0.6
+0.8
+1
+Figure 9: Runtime (left) and success rate (right) across benchmark environments and roadmap configurations. Lines show the
+mean over solved instances and shaded bands ±1 standard deviation.
+and empty256), the gap narrows: the additional free space
+and connectivity delay the onset of congestion, so the sub-
+optimal planners scale more smoothly and the robustness
+advantage of priority revision, while still visible, becomes
+less pronounced.
+A similar but reversed picture emerges on 700 CDT. Here
+PP benefits systematically from the larger roadmap, which
+reduces effective congestion and preserves feasibility for
+longer. In the largest and least bottlenecked environments,
+this translates into scalability to hundreds of agents,
+whereas CPBS and Lazy-CPBS typically become limited
+earlier as the cost of managing interactions grows and the
+runtime limit becomes the dominant failure mode. Lazy-
+CPBS nevertheless reaches 1.3–1.6× as many agents as
+CPBS before this limit.
+5.3
+Overall Findings
+Across all environments, the observed behaviors are largely
+density-driven, where density refers to the effective conges-
+tion induced by agents competing for the same free space
+and, especially, the same bottlenecks. When instances be-
+come dense quickly (e.g., narrow corridors and tight pas-
+sages), PP’s fixed-order policy is brittle and often collapses
+early due to infeasibility, whereas priority-revising meth-
+ods (CPBS and Lazy-CPBS) remain effective over a wider
+range of agent counts. Conversely, in environments that
+remain relatively sparse as n grows (e.g., open layouts such
+as empty256), all suboptimal solvers retain high success
+for longer ranges and PP benefits the most from its low
+computational overhead, typically dominating runtime by
+a wide margin; CPBS/Lazy-CPBS become mainly bene-
+ficial near the highest densities, where revising priorities
+mitigates the fragility of fixed ordering.
+Finally, it is important to note that these instances origi-
+nate from discrete-time MAPF benchmarks, where scaling
+to hundreds or even thousands of agents is often feasi-
+ble. In the continuous-time roadmap setting, feasibility
+and runtime are shaped by interaction handling: poten-
+tially conflicting motions require continuous-time collision
+checking and safe-interval/time-constraint updates, and
+planning occurs on geometric roadmaps rather than grids.
+As a result, once congestion emerges, computational over-
+head increases sharply and the practical “hardness thresh-
+old” is reached at substantially smaller agent counts than
+in the discrete domain.
+6
+Industrial Evaluation on
+AGV-MAPFR-CTC
+After the benchmark evaluation on standard instances
+from the MAPF literature, we assess the proposed meth-
+ods in a realistic industrial setting, in collaboration with
+E80 Group S.p.A., a leading international provider of
+automation solutions for logistics.
+As discussed in Sec-
+tion 2.3, solvers tailored for MAPFR-CTC can be deployed
+for the management and control of AGV fleets with mini-
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+13
+Figure 10: Portion of a roadmap in a real industrial plant
+(extracted from layout A).
+mal algorithmic changes: the key adaptation is to interpret
+the underlying roadmap as a discretization of the vehicles’
+configuration space.
+6.1
+Simulation Setup
+In this experimental campaign, all algorithms are imple-
+mented in C# within a custom MAPF evaluation frame-
+work developed in-house.
+The framework is interfaced
+with the company’s proprietary simulator only to access
+the digital twin of deployed AGV systems and to import
+the industrial roadmaps −→
+R used in real customer plants,
+together with the corresponding offline conflict annota-
+tions CVEC and CEEC. Heuristic preprocessing, instance
+generation, continuous-time conflict handling, and multi-
+agent planning are performed outside the proprietary sim-
+ulator, within our own evaluation pipeline. Experiments
+are executed on a notebook equipped with an Intel Core i7-
+12700H CPU (2.30 GHz, 14 cores, 20 threads) and 16 GB
+DDR4 RAM.
+We evaluate on five industrial warehouse layouts derived
+from real-world installations (Layouts A-E). Table 2 sum-
+marizes the corresponding roadmap statistics, reporting
+the number of vertices and edges, the average and maxi-
+mum branching factor (i.e., out-degree), and the number
+of AGVs operating in each environment.
+Layout A is compact, with redundant one-way lanes. Lay-
+out B is a regular grid of long parallel aisles lined with
+dead-end bays.
+Layout C is compact but dense:
+long
+single-lane aisles traversed in both directions, with per-
+pendicular dead-end bays, so that the aisles act as bottle-
+necks. Layout D is small and sparsely connected, with two
+clusters joined through a narrow junction. Layout E has a
+comb-like topology, with two parallel spine corridors from
+which many dead-end bays branch on both sides. Fig. 10
+presents an excerpt of the roadmap −→
+R extracted from lay-
+out A. For confidentiality reasons, the complete layouts
+and the industrial implementation cannot be disclosed.
+For each layout, we generate benchmark instances by sam-
+pling distinct start-goal pairs on the roadmap and progres-
+sively increasing the fleet size. For each agent count n, we
+Table 2: Characteristics of the industrial layouts.
+Layout
+|V |
+|E|
+b (bmax)
+Installed AGVs
+A
+≈1400
+≈3400
+≈2.3 (8)
+20
+B
+≈8700
+≈19200
+≈2.1 (7)
+21
+C
+≈1700
+≈4300
+≈2.5 (6)
+5
+D
+≈250
+≈400
+≈1.5 (7)
+2
+E
+≈1200
+≈2100
+≈1.7 (8)
+5
+run 25 random instances per layout and impose a per-run
+runtime cap of 30 s; an instance is marked as failed if no
+solution is found within the limit.
+Industrial roadmaps
+may become interaction-dense already at relatively small
+fleet sizes because of bottlenecks, narrow passages, and ge-
+ometric constraints. In this regime, fixed-order prioritized
+planning can be brittle, while priority-revising methods
+are expected to remain effective deeper into congestion.
+Motivated by this density-driven behavior, we compare:
+(i) CPBS and Lazy-CPBS; (ii) CCBS augmented with
+CTC annotations (CCBS-CTC, referred to as CCBS for
+brevity); and (iii) prioritized planning baselines based
+on PSIPP-CTC (hereafter PP) and two restart enhance-
+ments: PP+RR (random restart) and PP+DR (determin-
+istic restart). Random restart repeatedly samples new ran-
+dom priority orderings as long as runtime allows, whereas
+deterministic restart promotes the agent that fails to find
+a path to highest priority in subsequent runs.
+6.2
+Results and Discussion
+The results of the simulations on the five layouts are re-
+ported in Fig. 11. For each layout and algorithm, we ana-
+lyze runtime, solution SoC, and success rate as the number
+of agents increases, with particular attention to the oper-
+ating fleet sizes reported in Table 2.
+The first observation concerns CCBS. Consistently with
+the benchmark-domain experiments, CCBS provides the
+lowest SoC when it succeeds, but its scalability remains
+limited in the industrial AGV-MAPFR-CTC setting. Its
+success rate degrades after only a few agents and vanishes
+by about ten agents on every layout. As a result, CCBS
+does not reliably reach the operating fleet size on any lay-
+out: it solves no instance at the operating points of lay-
+outs A and B, and only a fraction of them on layouts C,
+D, and E. This behavior is expected for CBS-style opti-
+mal solvers: resolving conflicts through a constraint tree
+becomes increasingly expensive on redundant roadmaps,
+where many alternative low-level paths traverse overlap-
+ping regions and generate additional interactions. Thus,
+although CCBS remains the strongest method in terms of
+solution quality, it is not a viable option at the operating
+points of any of the considered layouts.
+The second observation concerns prioritized planning. PP
+is consistently the fastest method when it succeeds, but it
+4Sample animations of instances solved by Lazy-CPBS
+are
+available
+at:
+https://www.youtube.com/watch?v=
+5NBPDKT-ud8 (industrial animations displayed at 4× real-time
+speed).
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+14
+(a) Layout A
+(b) Layout B
+(c) Layout C
+(d) Layout D
+(e) Layout E
+Figure 11: Experimental results across five warehouse lay-
+outs. Each row corresponds to a different layout, showing run-
+time (left), SoC (middle), and success rate (right). Lines show
+the mean over solved instances and shaded bands ±1 standard
+deviation. 4
+also exhibits one of the lowest success rates across the in-
+dustrial layouts. Its fixed priority ordering makes it frag-
+ile under congestion: once the initial ordering is incom-
+patible with the interaction structure of the instance, PP
+has no mechanism to revise it.
+This limitation is more
+pronounced than in several standard MAPF benchmark
+settings, because industrial AGV roadmaps contain bot-
+tlenecks, shared passages, and larger effective vehicle foot-
+prints, so interactions arise already at moderate fleet sizes.
+PP never achieves full success at the operating points: it
+solves only a subset of instances on layouts A, C, D, and E,
+and none on layout B, so its low runtime does not com-
+pensate for its limited reliability.
+The restart-based variants PP+RR and PP+DR substan-
+tially improve over vanilla PP. By testing multiple priority
+orderings, they recover feasible solutions in cases where a
+single fixed ordering fails, and around the operating points
+they match CPBS-based methods on layouts C and D,
+miss at most two instances on layouts A and E, and fall
+well behind on layout B. Neither variant dominates the
+other: PP+RR is more reliable at intermediate densities
+on layout A, whereas PP+DR degrades more gracefully
+as density grows and scales further on layouts A and B.
+However, both methods remain weakly informed: they ex-
+plore complete priority orderings without maintaining a
+structured representation of partial priority decisions or
+of previously failed priority prefixes. As a consequence,
+their performance is more variable across layouts and den-
+sity regimes. In dense instances, where only a small frac-
+tion of priority orderings may be feasible, restart strate-
+gies can spend significant runtime testing orderings that do
+not lead to valid plans, whereas CPBS-based methods ex-
+ploit partial priority constraints to guide the search more
+systematically. Thus, although PP+RR and PP+DR are
+effective practical improvements over PP, their lower pre-
+dictability near the operating points limits their suitability
+as standalone strategies for industrial AGV fleet coordina-
+tion.
+The strongest overall results are obtained by the CPBS-
+based methods.
+Both CPBS and Lazy-CPBS maintain
+partial priority relations and revise priorities only when
+conflicts arise, which makes them substantially more ro-
+bust than PP and more consistent than its restart variants
+across the congested regimes typical of industrial AGV
+roadmaps. Lazy-CPBS further avoids materializing chil-
+dren that are never expanded. On layouts A, B, and E,
+this translates into markedly lower runtimes than CPBS,
+and on layouts B and C it allows Lazy-CPBS to solve in-
+stances with more agents than any other method.
+The comparison across layouts is, however, more nuanced
+than a uniform ranking. On layout A, PP+RR is the most
+reliable method up to about 28 agents, CPBS from about
+30 to 46 agents, and PP+DR at the highest densities;
+Lazy-CPBS stays close to CPBS up to 28 agents and is less
+robust beyond, but it is the fastest of the priority-revising
+methods. On layout B, Lazy-CPBS has the best success
+profile over most of the range and is the only method solv-
+ing instances beyond 31 agents, with CPBS and PP+DR
+marginally ahead on some instances. On layout C, Lazy-
+CPBS remains fully reliable up to 8 agents, when all other
+methods have started to fail, and scales the furthest; at in-
+termediate densities, the priority-based methods perform
+similarly. On layout D, CPBS, Lazy-CPBS, and PP+RR
+are nearly indistinguishable in success rate, with Lazy-
+CPBS slightly ahead at 5 agents, whereas PP+DR de-
+grades earlier; however, PP+RR pays for its reliability
+with a sharp runtime increase, up to two orders of mag-
+nitude above the other priority-based methods, which all
+run in a fraction of a second. On layout E, Lazy-CPBS,
+CPBS, and PP+DR largely overlap, with Lazy-CPBS re-
+maining fully reliable up to 7 agents and CPBS incurring
+higher runtimes at high densities.
+Thus, Lazy-CPBS is
+not the best method on every layout and density, but it is
+the most consistent: every competitor falls clearly behind
+on at least one layout, namely CPBS in runtime, PP+RR
+through its collapse at higher densities on layouts A and B,
+and PP+DR through its lower reliability near the operat-
+ing points of layouts A and B.
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+15
+The advantage of Lazy-CPBS is particularly clear around
+the operating fleet sizes. In this regime, Lazy-CPBS solves
+all instances on layouts A, C, D, and E, and about 80%
+on layout B, the highest rate among all methods there.
+CPBS matches it on the first four layouts but is less reli-
+able on layout B, at more than twice the runtime, whereas
+the restart variants miss instances on layouts B and E, and
+PP+DR also on layout A. This makes Lazy-CPBS prefer-
+able for the considered industrial setting: it preserves the
+robustness of systematic priority revision while substan-
+tially reducing the replanning overhead that limits eager
+CPBS.
+Finally, the SoC results follow the expected trade-off be-
+tween optimality and greediness. When several methods
+solve the same instance, CCBS returns the lowest-cost so-
+lution, typically followed by CPBS, Lazy-CPBS, and the
+prioritized-planning baselines. The restart-based variants
+produce solutions of comparable quality to Lazy-CPBS,
+but with less predictable success.
+6.3
+Overall Findings
+The industrial evaluation identifies CPBS-based planners
+as the most promising methods among the evaluated alter-
+natives for realistic AGV roadmap coordination. In par-
+ticular, Lazy-CPBS provides the strongest overall robust-
+ness/runtime compromise: it remains reliable under con-
+gestion and bottlenecks, where fixed or weakly informed
+priority strategies are less consistent across layouts, while
+substantially reducing the replanning overhead of CPBS
+and avoiding the scalability limitations of CCBS.
+At the same time, the current implementation does not yet
+meet the strictest industrial requirements for real-time co-
+ordination of very large AGV fleets. However, CPBS and
+Lazy-CPBS provide concrete directions for further accel-
+eration because they are grounded in a principled, sys-
+tematic search structure.
+In particular, the structural
+properties discussed in Section 3.3 indicate that differ-
+ent regions of the priority-search space can be explored
+independently, suggesting that parallel high-level imple-
+mentations could reach feasible priority structures earlier.
+This stands in contrast to heuristic prioritized-planning
+enhancements such as PP+RR and PP+DR, which may
+occasionally yield strong performance but tend to be less
+predictable and less consistent across layouts and traffic
+regimes.
+7
+Ablation Study
+Lazy-CPBS differs from CPBS in two respects:
+when
+it materializes nodes, and how it orders children, by
+|ReplanList| instead of SoC, which is unknown before
+materialization.
+To isolate the contribution of each to
+the speed-up of Lazy-CPBS over CPBS, in this section
+we present an ablation study on the 100 CDT benchmark
+roadmaps of Section 5 and on the industrial layouts of
+Section 6.
+Table 3: Ablation of Lazy-CPBS on the 100 CDT benchmark
+roadmaps (top) and on the industrial layouts (bottom). Times
+in ms.
+Lazy materialization
+Child ordering
+Env.
+d
+∆m
+¯tm ∆t pred/meas
+ρ Exp. S/R SIPP S/R
+Berlin
+86.8
+86.7
+9.1
+792/1192
+0.25
+74/86
+678/527
+den
+92.7
+92.7
+15.0
+1393/2058
+0.27
+78/92
+910/720
+empty16
+62.4
+58.6
+5.1
+298/328
+0.49
+61/66
+534/516
+empty256 118.6 118.5
+4.0
+479/701
+0.29 102/118
+1263/932
+maze
+73.3
+68.9
+13.5
+927/1270
+0.35
+66/74
+796/646
+random
+135.4 135.1
+9.1
+1225/1754
+0.30 110/135 1487/1224
+wareh.
+55.2
+55.2
+10.7
+589/822
+0.31
+56/55
+367/260
+A
+49.9
+42.2
+28.2
+1193/1641
+0.41
+43/54
+297/315
+B
+19.0
+17.9 151.2
+2707/3321
+0.42
+17/19
+78/79
+C
+10.4
+6.0
+28.3
+169/150
+0.78
+16/16
+66/64
+D
+4.3
+1.9
+1.0
+2/3
+0.63
+4/4
+15/15
+E
+23.5
+18.7
+12.5
+234/285
+0.52
+22/28
+128/141
+7.1
+Experimental Design
+We introduce an intermediate CPBS-based variant, Eager-
+RL, which materializes both children at every expansion
+as CPBS does, but orders them by |ReplanList| as Lazy-
+CPBS does. Comparing Eager-RL with Lazy-CPBS iso-
+lates the effect of lazy materialization. To make this com-
+parison exact, Eager-RL is run here without the early goal
+test (i.e., plans are checked for conflicts at node expansion
+rather than at materialization): the two algorithms then
+expand the same sequence of nodes, so their runtime dif-
+ference is due to lazy materialization alone. Comparing
+CPBS with Eager-RL, both with the early goal test, iso-
+lates instead the effect of the child ordering.
+Table 3 reports means over the instances solved by all
+variants. For the first comparison, d is the depth of the
+solution node, ∆m the number of materializations saved by
+Lazy-CPBS, ¯tm the mean time of one eager materializa-
+tion, and ρ the runtime of Lazy-CPBS relative to Eager-
+RL. The predicted saving ∆tpred = ∆m ¯tm is compared
+with the measured one, ∆tmeas. For the second compari-
+son, the table reports the number of expanded nodes and
+of SIPP calls under SoC (S) and ReplanList (R) ordering.
+7.2
+Results and Discussion
+When a node is expanded, Lazy-CPBS materializes the
+child it pops next and leaves its sibling unmaterialized
+on the stack, whereas eager search materializes both. A
+sibling that is popped later, upon backtracking, is mate-
+rialized by both algorithms. The savings therefore come
+from the siblings that are never popped, of which there is
+at most one per level of the branch from the root to the
+solution node, so ∆m ≤d.
+On the benchmark roadmaps, backtracking is rare and ∆m
+almost coincides with d. On the industrial layouts, which
+are denser, backtracking is more frequent and ∆m falls
+below d. In all settings but one (layout C), ∆tpred un-
+derestimates the measured saving. The reason is that the
+skipped sibling is the child with the longer replan list, so its
+materialization costs more than the average ¯tm. Overall,
+lazy materialization reduces the runtime by a factor of 2–4
+on the benchmark roadmaps and by 22–59% on the indus-
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+16
+trial layouts. The gain is smaller on the industrial layouts
+because backtracking and failed materializations reduce
+the share of materializations that can be saved: ∆m is
+about half of the eager materializations on the benchmark
+roadmaps, but only 25–47% on the industrial layouts.
+With eager materialization, SoC ordering expands fewer
+nodes than ReplanList ordering in most settings, up to
+about 20% fewer, i.e., it selects slightly better children.
+However, the child with the lower SoC often requires re-
+planning a larger part of the pDAG. On the benchmark
+roadmaps, SoC ordering therefore performs up to 41%
+more SIPP calls, each more expensive on average, and
+CPBS is 1.5–2.6× slower than Eager-RL. The only excep-
+tion is empty16, where the two orderings are on par. On
+the industrial layouts, the two orderings differ by approx-
+imately 10% in SIPP calls and 11% in runtime.
+Hence, on the benchmark roadmaps the weaker guid-
+ance of ReplanList ordering is more than compensated
+by cheaper materializations, and it is the only one of the
+two orderings that is compatible with lazy materializa-
+tion. There, the speed-up of Lazy-CPBS over CPBS com-
+bines lazy materialization, the larger contribution, and the
+cheaper child ordering. On the industrial layouts, it stems
+from lazy materialization alone: its absolute size is gov-
+erned by ∆m ¯tm, and its relative size by the share of ma-
+terializations saved.
+8
+Conclusion
+In this paper, we studied priority-based continuous-time
+MAPFR on industrial AGV roadmaps. We first revisited
+the algorithmic foundations of this setting by analyzing
+the interaction between priority-induced reservations and
+the SIPP low-level planner. This clarified the SIPP bound-
+ary conditions required by priority-induced reservations
+and enabled earlier solution detection in CPBS.
+As a key contribution, we analyzed the priority-based
+search space induced by partial precedence relations
+among agents.
+The resulting structural properties clar-
+ify how priority decisions propagate through the search,
+which agents are affected by a refinement, and why dif-
+ferent branches of the priority space can be treated inde-
+pendently. Beyond their theoretical interest, these prop-
+erties provide concrete guidance for engineering more ef-
+ficient priority-based algorithms, including parallel high-
+level exploration. Building on this analysis, we introduced
+Lazy-CPBS, a novel algorithm that delays node material-
+ization until expansion. By avoiding redundant low-level
+replanning, Lazy-CPBS improves the practical scalability
+of priority-based continuous-time planning while preserv-
+ing the robustness benefits of systematic priority revision
+under congestion. An ablation study showed that these
+savings are bounded by the depth of the solution in the
+priority tree, and that the replan-list ordering required by
+laziness is itself cheaper than SoC ordering on the bench-
+mark roadmaps.
+We grounded the proposed approach in industrial AGV
+coordination by formalizing AGV-MAPFR-CTC and eval-
+uating the methods on both standard MAPF bench-
+marks and industrial AGV roadmaps imported from a
+proprietary digital-twin simulator. The results show that
+priority-based MAPFR solvers provide a strong robust-
+ness/runtime compromise and that Lazy-CPBS is a prac-
+tical step toward centralized AGV fleet coordination on
+realistic warehouse roadmaps.
+Future research will focus on further accelerating CPBS
+and Lazy-CPBS through structural speed-up techniques,
+including the design of zone-distributed variants to bet-
+ter exploit large and highly redundant roadmaps.
+We
+also plan to study theoretical guarantees of completeness
+and to develop a structurally efficient multi-threaded im-
+plementation. In addition, we aim to extend CPBS and
+Lazy-CPBS to a lifelong planning setting and integrate
+them into a novel AGV traffic manager capable of han-
+dling continuous streams of tasks under real-time indus-
+trial constraints. Taken together, these directions aim to
+further narrow the gap between theory and practice, ad-
+vancing both the academic foundations and the industrial
+applicability of continuous-time MAPF.
+References
+[1] Peter R Wurman, Raffaello D’Andrea, and Mick
+Mountz. Coordinating hundreds of cooperative, au-
+tonomous vehicles in warehouses. AI magazine, 29
+(1):9–19, 2008.
+[2] Manuela M Veloso, Joydeep Biswas, Brian Coltin,
+and Stephanie Rosenthal. Cobots: Robust symbiotic
+autonomous mobile service robots. In IJCAI, page
+4423, 2015.
+[3] Robert Morris, Corina S Pasareanu, Kasper Søe
+Luckow, Waqar Malik, Hang Ma, TK Satish Kumar,
+and Sven Koenig. Planning, scheduling and monitor-
+ing for airport surface operations. In AAAI Work-
+shop: Planning for Hybrid Systems, pages 608–614,
+2016.
+[4] Devon Sigurdson, Vadim Bulitko, William Yeoh,
+Carlos Hernández, and Sven Koenig.
+Multi-agent
+pathfinding with real-time heuristic search. In 2018
+IEEE conference on computational intelligence and
+games (CIG), pages 1–8. IEEE, 2018.
+[5] Gleb Belov, Wenbo Du, Maria Garcia De La Banda,
+Daniel Harabor, Sven Koenig, and Xinrui Wei. From
+multi-agent pathfinding to 3d pipe routing. In Pro-
+ceedings of the International Symposium on Combi-
+natorial Search, volume 11, pages 11–19, 2020.
+[6] Jiaoyang Li, Eugene Lin, Hai L Vu, Sven Koenig,
+et al. Intersection coordination with priority-based
+search for autonomous vehicles. In Proceedings of the
+AAAI conference on artificial intelligence, volume 37,
+pages 11578–11585, 2023.
+[7] Roni Stern, Nathan Sturtevant, Ariel Felner, Sven
+Koenig, Hang Ma, Thayne Walker, Jiaoyang Li, Dor
+Atzmon, Liron Cohen, TK Kumar, et al.
+Multi-
+agent pathfinding: Definitions, variants, and bench-
+marks. In Proceedings of the International Symposium
+on Combinatorial Search, volume 10, pages 151–158,
+2019.
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+17
+[8] Roni Stern.
+Multi-agent path finding–an overview.
+Artificial Intelligence:
+5th RAAI Summer School,
+Dolgoprudny, Russia, July 4–7, 2019, Tutorial Lec-
+tures, pages 96–115, 2019.
+[9] Edward Lam and Peter J Stuckey. Low-level search on
+time intervals in branch-and-cut-and-price for multi-
+agent path finding.
+In Proceedings of the Inter-
+national Symposium on Combinatorial Search, vol-
+ume 18, pages 92–100, 2025.
+[10] Jiaoyang Li,
+Wheeler Ruml,
+and Sven Koenig.
+EECBS: A bounded-suboptimal search for multi-
+agent path finding. In Proceedings of the AAAI con-
+ference on artificial intelligence, volume 35, pages
+12353–12362, 2021.
+[11] Keisuke Okumura, Manao Machida, Xavier Défago,
+and Yasumasa Tamura.
+Priority inheritance with
+backtracking for iterative multi-agent path finding.
+Artificial Intelligence, 310:103752, 2022.
+[12] Keisuke Okumura. LaCAM: Search-based algorithm
+for quick multi-agent pathfinding. In Proceedings of
+the AAAI Conference on Artificial Intelligence, vol-
+ume 37, pages 11655–11662, 2023.
+[13] Thayne T Walker, Nathan R Sturtevant, and Ariel
+Felner. Extended increasing cost tree search for non-
+unit cost domains. In IJCAI, volume 18, pages 534–
+540, 2018.
+[14] Mike Phillips and Maxim Likhachev. SIPP: Safe in-
+terval path planning for dynamic environments. In
+2011 IEEE international conference on robotics and
+automation, pages 5628–5635. IEEE, 2011.
+[15] Anton
+Andreychuk,
+Konstantin
+Yakovlev,
+Pavel
+Surynek, Dor Atzmon, and Roni Stern. Multi-agent
+pathfinding with continuous time. Artificial Intelli-
+gence, 305:103662, 2022.
+[16] Andy Li, Zhe Chen, Danial Harabor, and Mor Vered.
+CBS with continuous-time revisit.
+arXiv preprint
+arXiv:2501.07744, 2025.
+[17] Alvin Combrink, Sabino Francesco Roselli, and Mar-
+tin Fabian. Optimal multi-agent path finding in con-
+tinuous time. arXiv preprint arXiv:2508.16410, 2025.
+[18] Emmanuel A. Oyekanlu, Alexander C. Smith, Wind-
+sor
+P.
+Thomas,
+Grethel
+Mulroy,
+Dave
+Hitesh,
+Matthew Ramsey, David J. Kuhn, Jason D. Mcgh-
+innis, Steven C. Buonavita, Nickolus A. Looper, Ma-
+son Ng, Anthony Ng’oma, Weimin Liu, Patrick G.
+Mcbride, Michael G. Shultz, Craig Cerasi, and Dan
+Sun. A review of recent advances in automated guided
+vehicle technologies: Integration challenges and re-
+search areas for 5g-based smart manufacturing appli-
+cations. IEEE Access, 8:202312–202353, 2020. doi:
+10.1109/ACCESS.2020.3035729.
+[19] Iris FA Vis. Survey of research in the design and con-
+trol of automated guided vehicle systems. European
+journal of operational research, 170(3):677–709, 2006.
+[20] Silvia Proia, Graziana Cavone, Marino Calefati, Luigi
+Mazzoccoli, Raffaele Carli, and Mariagrazia Dotoli.
+Decentralized path planning with supervisory coor-
+dination for multi-AGV systems in non-standardized
+automated warehouses. IEEE Transactions on Au-
+tomation Science and Engineering, 2026.
+[21] Valerio Digani, Lorenzo Sabattini, Cristian Secchi,
+and Cesare Fantuzzi.
+Ensemble coordination ap-
+proach in multi-AGV systems applied to industrial
+warehouses. IEEE Transactions on Automation Sci-
+ence and Engineering, 12(3):922–934, 2015.
+[22] Federico Pratissoli, Nicola Battilani, Cesare Fan-
+tuzzi, and Lorenzo Sabattini. Hierarchical and flex-
+ible traffic management of multi-AGV systems ap-
+plied to industrial environments. In 2021 IEEE In-
+ternational Conference on Robotics and Automation
+(ICRA), pages 10009–10015. IEEE, 2021.
+[23] Roberto Olmi, Cristian Secchi, and Cesare Fantuzzi.
+An efficient control strategy for the traffic coordi-
+nation of AGVs.
+In 2011 IEEE/RSJ International
+Conference on Intelligent Robots and Systems, pages
+4615–4620. IEEE, 2011.
+[24] Sumanth Varambally, Jiaoyang Li, and Sven Koenig.
+Which MAPF model works best for automated ware-
+housing? In Proceedings of the international sympo-
+sium on combinatorial search, volume 15, pages 190–
+198, 2022.
+[25] Roland Geraerts and Mark H. Overmars. Creating
+high-quality roadmaps for motion planning in vir-
+tual environments. In 2006 IEEE/RSJ International
+Conference on Intelligent Robots and Systems, pages
+4355–4361, 2006. doi: 10.1109/IROS.2006.282009.
+[26] David Silver. Cooperative pathfinding. In Proceed-
+ings of the aaai conference on artificial intelligence
+and interactive digital entertainment, volume 1, pages
+117–122, 2005.
+[27] Michal Čáp, Jiří Vokřínek, and Alexander Kleiner.
+Complete decentralized method for on-line multi-
+robot trajectory planning in well-formed infrastruc-
+tures. In Proceedings of the international conference
+on automated planning and scheduling, volume 25,
+pages 324–332, 2015.
+[28] Maren Bennewitz, Wolfram Burgard, and Sebastian
+Thrun.
+Optimizing schedules for prioritized path
+planning of multi-robot systems. In Proceedings 2001
+ICRA. IEEE International Conference on Robotics
+and Automation (Cat. No. 01CH37164), volume 1,
+pages 271–276. IEEE, 2001.
+[29] Anton Andreychuk and Konstantin Yakovlev.
+Two
+techniques that enhance the performance of multi-
+robot prioritized path planning.
+arXiv preprint
+arXiv:1805.01270, 2018.
+[30] Hang Ma, Daniel Harabor, Peter J Stuckey, Jiaoyang
+Li, and Sven Koenig. Searching with consistent prior-
+itization for multi-agent path finding. In Proceedings
+of the AAAI conference on artificial intelligence, vol-
+ume 33, pages 7643–7650, 2019.
+[31] Federico
+Signorile,
+Raffaele
+Carli,
+Alessandro
+Bertogli, Roberto Olmi, Sven Koenig, and Maria-
+grazia Dotoli. Continuous-time priority-based search
+
+
+Preprint – Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy
+Priority-Based Search
+18
+with offline collision detection and roadmap annota-
+tion for efficient multi-AGV coordination.
+In 2026
+IEEE 22nd International Conference on Automation
+Science and Engineering (CASE), pages 1755–1760.
+IEEE, 2026.
+[32] Wolfgang Hönig, James A Preiss, TK Satish Kumar,
+Gaurav S Sukhatme, and Nora Ayanian. Trajectory
+planning for quadrotor swarms. IEEE Transactions
+on Robotics, 34(4):856–869, 2018.
+[33] Kazumi Kasaura, Mai Nishimura, and Ryo Yonetani.
+Prioritized safe interval path planning for multi-agent
+pathfinding with continuous time on 2d roadmaps.
+IEEE Robotics and Automation Letters, 7(4):10494–
+10501, 2022.
+[34] Bruno Siciliano, Lorenzo Sciavicco, Luigi Villani, and
+Giuseppe Oriolo. Robotics: modelling, planning and
+control. Springer, 2009.
+[35] Steven M LaValle. Planning algorithms. Cambridge
+university press, 2006.
+[36] Christer Ericson. Real-time collision detection. Crc
+Press, 2004.
+[37] Thayne T Walker and Nathan R Sturtevant. Collision
+detection for agents in multi-agent pathfinding. arXiv
+preprint arXiv:1908.09707, 2019.
+[38] Stuart Russell and Peter Norvig.
+Artificial Intelli-
+gence: A Modern Approach.
+Pearson, 4th edition,
+2021.
+[39] Arthur B Kahn. Topological sorting of large networks.
+Communications of the ACM, 5(11):558–562, 1962.
+[40] Peter E. Hart, Nils J. Nilsson, and Bertram Raphael.
+A formal basis for the heuristic determination of min-
+imum cost paths.
+IEEE Transactions on Systems
+Science and Cybernetics, 4(2):100–107, 1968.
+doi:
+10.1109/TSSC.1968.300136.
+[41] Juan P Gonzalez, Andrew Dornbush, and Maxim
+Likhachev. Using state dominance for path planning
+in dynamic environments with moving obstacles. In
+2012 IEEE International Conference on Robotics and
+Automation, pages 4009–4015. IEEE, 2012.
+[42] Guni Sharon, Roni Stern, Meir Goldenberg, and Ariel
+Felner. The increasing cost tree search for optimal
+multi-agent pathfinding. Artificial intelligence, 195:
+470–495, 2013.
+[43] Anton Andreychuk, Konstantin Yakovlev, Eli Bo-
+yarski, and Roni Stern. Improving continuous-time
+conflict based search.
+In Proceedings of the AAAI
+Conference on Artificial Intelligence,
+volume 35,
+pages 11220–11227, 2021.
+[44] Sertac Karaman and Emilio Frazzoli. Sampling-based
+algorithms for optimal motion planning. The inter-
+national journal of robotics research, 30(7):846–894,
+2011.
+[45] L Paul Chew. Constrained delaunay triangulations.
+In Proceedings of the third annual symposium on
+Computational geometry, pages 215–222, 1987.

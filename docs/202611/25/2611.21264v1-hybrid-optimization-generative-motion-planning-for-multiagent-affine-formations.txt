@@ -1,0 +1,598 @@
+Title: Hybrid Optimization-Generative Motion Planning for Multiagent Affine Formations
+
+URL Source: https://arxiv.org/pdf/2611.21264v1
+
+Published Time: Tue, 17 Nov 2026 05:52:48 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Hybrid Optimization-Generative Motion Planning for Multiagent Affine Formations 
+
+Zhonggang Li, Hongyu Zhou, and Raj Thilak Rajan 
+
+Abstract — Formation maneuver control enables a multiagent system to cooperatively navigate through constrained environ-ments in collective motion. While various formation controllers exist, they rely heavily on high-quality and dynamically feasible reference trajectories provided a priori, making formation motion planning (FMP) essential. To address the computational challenges for high-dimensional joint trajectories faced by con-ventional constrained optimization-based solutions, this paper introduces a hybrid optimization-generative framework with a focus on affine formations, which provide the necessary spatial flexibility. By formulating the planning task as a constrained Maximum-a-Posteriori estimation, we decouple multiagent ob-jectives to leverage pre-trained single-agent diffusion priors for dynamic feasibility, obstacle avoidance, and smoothness. We then interleave the generative process with projected gradient descent (PGD) to strictly enforce affine geometric constraints with safety guarantees. Simulations demonstrate our framework generates highly smooth, collision-free plans that are readily trackable by common distributed controllers, and outperforms state-of-the-art planners in various metrics. 
+
+I. I NTRODUCTION 
+
+Formation maneuvering is an essential task for multi-robotic systems, aiming to navigate a swarm of robots safely through a potentially cluttered area while maintaining a desired range of geometries. This is often desired in applica-tions such as cooperative object transport [1], satellite inter-ferometry [2], sensing and coverage [3], [4], etc. Recently, deformable formations [5], [6], [7] have received increasing attention due to the advantages of flexible geometries for complex environments, over conventional rigid body control [8]. In particular, affine formations [6], [9], [10], includ-ing translation, rotation, scaling, and shear, have become a popular expressive class. Predominant formation control literature solves stabilization and tracking of maneuvers assuming given references, i.e., the trajectories are assumed to be provided a priori and are inherently collision-free and dynamically feasible. Moreover, in common distributed control [6], followers rely solely on local information. Conse-quently, if the planned trajectories deviate from a strict affine transformation, the formation cannot be resolved locally, leading to severe tracking degradation. Hence, enforcing affine geometry is essential for such distributed controllers.                    
+
+> This work is partially funded by the Sensor AI Lab, under the AI Labs program of Delft University of Technology, and by the RVO (Missie gedreven Onderzoek, Ontwikkeling en Innovatie (MOOI)) Aerial Quadcopter Units for Aquatic Flow Investigation and Nautical Data (AQUAFIND) project. The authors are with the Signal Processing Systems group, Department of Microelectronics, Faculty of EEMCS of Delft Univer-sity of Technology, The Netherlands. Emails: {z.li-22, r.t.rajan }@tudelft.nl, and h.zhou-13@student.tudelft.nl.
+
+Generating a full set of high-quality reference trajectories subject to complex geometry constraints is difficult. Practical approaches typically decouple the problem hierarchically by pairing a simple global path planner (typically artificial po-tential field (APF) or A*) for the swarm centroid or a leader with a reactive local controller to resolve collisions and geometry [11], [12], [13], [14], [15]. For instance, [12] plans for a formation that allows rotation and anisotropic scaling of the geometry, and it uses APF to traverse a feasible global path for the centroid with coarse shape planning, followed by a model predictive controller (MPC) that refines the shape geometry and resolves collision avoidance at runtime. This paradigm shifts the heavy sensing and computational burden of collision avoidance and geometric maintenance entirely onto the local controller. Consequently, the required complex online solvers can easily overwhelm the limited onboard resources, such as on lightweight or space robots. More fundamentally, this approach is bottlenecked by the quality of the reference trajectory, making it difficult to apply common tracking controllers such as [6], which will inevitably lead to suboptimal maneuvers or tracking failure. An alternative paradigm to mitigate complexity is to plan within a low-dimensional space parameterized by the formation’s macroscopic geometric variables [1], [16], [17]. Since geometric coupling intrinsically binds the agents, a 2D affine transformation allows the entire swarm’s configuration to be fully described by just 6 degrees of freedom (DOF). Leveraging this reduction, [1], [17] optimize trajectories strictly within the 7-DOF 3D similarity transformation space, while [16] restricts planning to a 3-DOF 2D rigid body trans-formation. However, planning exclusively within the geo-metric parameter space is highly susceptible to disturbances. Small perturbations in the macroscopic parameters are often significantly amplified when mapped to the individual agents, resulting in severe non-smoothness and dynamic infeasibility in the actual trajectory domain. As such, these geometric ab-stractions must be paired with advanced auxiliary space-time smoothers in the trajectory domain. For example, [17] devel-ops a spatiotemporal polynomial optimization framework to guarantee smooth, dynamically feasible flight, embedded in the precomputed geometric references. Recently, learning-based motion planning has received increasing attention, such as reinforcement learning-based FMP [18]. In particular, generative models such as dif-fusion models [19], [20] have been successfully applied to robot motion planning [21], [22], [23]. The idea is to internalize the complex, non-convex motion constraints into learned structural priors through a large amount of arXiv:2611.21264v1 [cs.RO] 16 Nov 2026 data. Then, during inference, we sample from this learned prior with mild intervention from conventional optimization using gradient descent for task-specific objectives. Compared with conventional approaches, this optimization-generative method is computationally tractable, with better smoothness and reachability in cluttered settings [22]. However, this approach is currently limited to single-agent planning, as multiagent trajectory data is much more difficult to collect for an arbitrary number of mobile agents. As such, pioneering works for general multiagent motion planning with diffusion models [24] mostly focus on higher-level priority coordina-tion based on single-agent priors. Moreover, diffusion-based motion planning for multiagent flexible formation maneuvers remains unexplored. In this work, we propose a diffusion-based motion plan-ning framework specifically for multiagent affine formations. We formulate the FMP task as a constrained Maximum-a-Posteriori (MAP) estimation, which naturally translates to a hybrid constrained optimization with generative priors. By decoupling the high-dimensional multiagent objectives, we can leverage pre-trained single-agent diffusion priors to fulfill intra-agent requirements (such as smoothness and obstacle avoidance), while resolving inter-agent interactions, i.e., the formation, through projected gradient descent (PGD). Addi-tionally, a safety distance among agents can be guaranteed by configuring the affine geometry parameters in the projection step. Our proposed approach avoids the need for complex reactive controllers or additional spatiotemporal trajectory smoothers as in conventional methods. The generated trajec-tories are smooth, strictly affine, and executable by common distributed tracking controllers. The remainder of the paper is organized as follows. The general problem formulation and single-agent motion planning with diffusion is introduced in Section II. Then the proposed FMP framework with formation projection and safety guarantees is discussed in Section III. Finally, we validate our algorithm and the quality of the planned trajectories in comparison with state-of-the-art methods in Section IV. We then conclude the discussion with insights into the future directions in Section V. Throughout the paper, we adhere to the following notation conventions for mathematical clarity. 
+
+Notations. Vectors and matrices are represented by lowercase and uppercase boldface letters, respectively, such as a and 
+
+A. Sets and graphs are represented using calligraphic letters, e.g., A. Vectors of length N of all ones and zeros are denoted by 1N and 0N , respectively, and their matrix versions are similarly 1M ×N and 0M ×N . An identity matrix of size N
+
+is denoted by IN . The diag( ·) operator creates a diagonal matrix from a vector. Units are enclosed by square brackets, e.g., seconds [s].II. PRELIMINARIES We consider an N -agent swarm in D-dimensional Eu-clidean space. A trajectory of an agent i = 1 , . . . , N is denoted by τi = s⊤
+
+> i, 0
+
+, . . . , s⊤
+
+> i,H −1
+
+⊤ ∈ R2DH , which is a collection of the agents’ states si,h across a horizon 
+
+h = 0 , . . . , H − 1. The state contains the agent’s position and velocity, i.e., si,h = p⊤ 
+
+> i,h
+
+˙p⊤
+
+> i,h
+
+⊤ ∈ R2D . The joint planning variable is then the collection of all agents’ trajectories τ = τ ⊤ 
+
+> 1
+
+, . . . , τ ⊤
+
+> N
+
+⊤ ∈ R2DHN . Given a set of task objectives O, the formational motion planning (FMP) could be formulated as a constrained Maximum-a-Posteriori (MAP) problem 
+
+τ ∗ = arg max 
+
+> τ
+
+log p(τ |O ), (1a) 
+
+= arg max 
+
+> τ
+
+log p(O| τ ) + log p(τ ), (1b) 
+
+s.t. τ ∈ F , (1c) where p(O| τ ) is the trajectory cost, p(τ ) is a prior of trajectories that can be learned from real-world or simulated data, and F is a set of hard constraints, e.g., terminal or formation. Thus, in the hybrid optimization-generative approach, generative models provide informative priors that accelerate the convergence towards high-likelihood regions. An alternative view is to guide the sampling of the generative model to meet the task-specific objectives [22] 
+
+A. Decoupling Multiagent Objectives 
+
+Since it is difficult to directly learn a joint prior p(τ ) = 
+
+p(τ1, . . . , τN ) for multiple agents, we decompose the task such that single-agent priors are compatible. The set of objectives O admits 
+
+O =
+
+> N
+
+[
+
+> i=1
+
+Oi, (2) where Oi = {oi, 1, . . . , o i,K i } contains Ki individual objec-tives for agent i. We then make the following assumption on the decomposition of O.
+
+Assumption 1 (Conditional independence of objectives and local dependence of trajectories ). Given the joint trajectory 
+
+τ , all task objectives are conditionally independent; for example, trajectory smoothness does not provide information about collision. Furthermore, objectives depend only on that agent’s trajectory i.e., pi,k (oi,k |τ ) = pi,k (oi,k |τi).Given Assumption 1, the likelihood (1b) could be factorized as 
+
+p(O| τ ) = p
+
+
+
+{oi,k } i=1: Nk=1: Ki
+
+| τ
+
+
+
+, (3a) 
+
+=
+
+> N
+
+Y
+
+> i=1
+> Ki
+
+Y
+
+> k=1
+
+pi,k (oi,k | τi). (3b) 
+
+Assumption 2 (Exponential form of objectives [22] ). We assume the likelihood of satisfying objectives oi,k for 
+
+i = 1 , . . . , N , k = 1 , . . . , K i takes the exponential form 
+
+pi,k (oi,k |τi) ∝ exp ( −λi,k ci,k (τi)) , where ci,k is the corre-sponding cost function with λi,k > 0 being the respective tuning weights. Fig. 1. Forward and reverse diffusion processes: noise injection (blue arrows) and iterative denoising (orange arrows) 
+
+This common assumption bridges the deterministic cost functions of the system with their statistical form. Then, the log-likelihood form of (3) can be further simplified to 
+
+log p(O | τ ) ∝ − 
+
+> N
+
+X
+
+> i=1
+> Ki
+
+X
+
+> k=1
+
+λi,k ci,k (τi), (4) where the per-agent costs ci,k (τi) include obstacle collision cost using the signed distance field (SDF) and a Gaussian process (GP) smoothness cost, which we adopt from [22]. Since we have decomposed the high-dimensional multia-gent objectives, we can now apply the single-agent hybrid planning workflow to the decoupled objectives. Next, we orient through the single-agent planning workflow with dif-fusion models. 
+
+B. Single-agent Motion Planning Diffusion 
+
+In this section, we sketch the essentials of single-agent motion planning diffusion without the intricate mechanics. Readers may refer to [19], [22] for additional details. An illustration of the process is shown in Fig. 1. To learn the single-agent prior p(τi) from data, a diffusion model progressively adds Gaussian noise to a clean trajectory 
+
+τi, 0 through a T -step Markovian forward process. Let τi,t 
+
+denote the trajectory of agent i at diffusion step t = 1 , . . . , T .The forward transition is defined as 
+
+q(τi,t |τi,t −1) = N (τi,t ; √αtτi,t −1, (1 − αt)I), (5) where αt is a predefined noise schedule. This formulation allows us to derive τi,t directly from the clean data τi, 0 via 
+
+τi,t = √¯αtτi, 0 +√1 − ¯αtϵ0 ∼ N  τi,t ; √¯αtτi, 0, (1 − ¯αt)I,
+
+(6) where ¯αt = Qts=1 αs and the source noise is ϵ0 ∼ N (0, I).Conversely, the generative reverse process recovers the clean trajectory from standard Gaussian noise τi,T ∼N (0, I) through a sequence of denoising transitions 
+
+pθ (τi,t −1|τi,t ), which We model as Gaussian, parameterized by a neural network with weights θ i.e., 
+
+pθ (τi,t −1|τi,t ) = N (τi,t −1; μθ (τi,t , t ), Σt). (7) The covariance is typically fixed to Σt = σ2 
+
+> t
+
+I, where σ2 
+
+> t
+
+=   
+
+> (1 −αt)(1 −¯αt−1)1−¯αt
+
+. The mean of the reverse process is predicted by a noise-estimation network ˆϵθ (τi,t , t ), given by 
+
+μθ (τi,t , t ) = 1
+
+√αt
+
+τi,t − 1 − αt
+
+√1 − ¯αt
+
+√αt
+
+ˆϵθ (τi,t , t ). (8) The network parameters θ are trained using a loss function that minimizes the difference between the true source noise and the predicted noise: 
+
+L(θ) = Et, ϵ0,τi, 0 ∥ˆϵθ (τi,t , t ) − ϵ0∥22, (9) where t is sampled uniformly from {1, . . . , T }.While the trained network captures the trajectory prior 
+
+p(τi), single-agent planning requires conditioning this gen-eration on the local task objectives Oi. Applying Bayes’ rule at each denoising step yields the task-conditioned posterior 
+
+pθ (τi,t −1|τi,t , Oi) ∝ pθ (τi,t −1|τi,t )p(Oi|τi,t −1). (10) Now, to evaluate the likelihood p(Oi|τi,t −1), we approximate the task log-likelihood with a first-order Taylor expansion around the unconditional mean μi,t = μθ (τi,t , t ), which gives 
+
+log p(Oi|τi,t −1) ≈ log p(Oi|μi,t )+( τi,t −1 −μi,t )⊤gi, (11) where the gradient gi = ∇τi,t −1 log p(Oi|τi,t −1) τi,t −1=μi,t 
+
+incorporates the decoupled intra-agent costs 
+
+gi = −
+
+> Ki
+
+X
+
+> k=1
+
+λi,k ∇τi ci,k (μi,t ). (12) Combining this linear approximation with the Gaussian tran-sition in (7) results in a shifted Gaussian distribution for the guided denoising step: 
+
+pθ (τi,t −1|τi,t , Oi) ≈ N (τi,t −1; μi,t + Σtgi, Σt). (13) Consequently, we can generate task-satisfying trajectories for a single agent by iteratively sampling from this distribution. As can be seen, the mean μi,t +Σtgi combines the diffusion denoising and the gradient of the objectives, which is the backbone of the hybrid optimization-generative approach. The single-agent diffusion process only tackles the intra-agent objective, such as collision avoidance with obstacles, smoothness, etc. Inter-agent interactions, such as the forma-tion and collision avoidance are formulated as constraints and will be introduced in the next section. III. F ORMATIONAL MOTION PLANNING DIFFUSION 
+
+This section generalizes the single-agent motion plan-ning diffusion to the multiagent case, particularly under the formation constraints. More specifically, the diffusion priors still fulfill the individual objectives, while the agents’ interactions are handled through formation constraints F in (1c). By interleaving the guided reverse diffusion with pro-jected gradient descent (PGD), we systematically project the multiagent trajectories onto the feasible formation manifold. Note that the diffusion with PGD has been initially attempted in [25] however, it has not been explored for FMP problems. A. Joint Posterior for Multiagent Planning 
+
+Let τt ∈ R2DHN denote the joint sample at diffusion step t = 1, . . . , T , which concatenates the ensemble of trajectories for all N agents. Similar to (10), the task-conditioned posterior of the joint denoising step follows Bayes’ rule: 
+
+pθ (τt−1|τt, O) ∝ pθ (τt−1|τt)p(O| τt−1). (14) Since the unconditioned trajectory generation is independent across agents, the joint unconditioned denoising transition 
+
+pθ (τt−1|τt) remains Gaussian, given by 
+
+log pθ (τt−1|τt) ∝ − 12 (τt−1 − μt)⊤Σ−1 
+
+> t
+
+(τt−1 − μt), (15) where the joint mean and covariance take the block-structured forms 
+
+μt = [ μ⊤
+
+> 1,t
+
+, . . . , μ⊤
+
+> N,t
+
+]⊤ ∈ R2DHN , (16a) 
+
+Σt = IN ⊗ σ2 
+
+> t
+
+I2DH . (16b) Here, μi,t = μθ (τi,t , t ) represents the denoising mean for agent i = 1 , . . . , N . Note that each agent applies the same denoiser trained from the single-agent dataset. Again, the task likelihood is approximated using afirst-order Taylor expansion around μt, the task likeli-hood is approximated as log p(O| τt−1) ≈ log p(O| μt) + (τt−1 − μt)⊤g, where the joint guidance gradient is g =
+
+∇τt−1 log p(O| τt−1) τt−1=μt . Combining this with the prior yields a shifted joint Gaussian: 
+
+pθ (τt−1|τt, O) ∝ N (τt−1; μt + Σtg, Σt). (17) Since the covariance Σt is block-diagonal, the mean shift decouples strictly across the agents, i.e., Σtg =[σ2 
+
+> t
+
+g⊤ 
+
+> 1
+
+, . . . , σ 2 
+
+> t
+
+g⊤ 
+
+> N
+
+]⊤. This structural property splits the joint Gaussian posterior into a product of independent, parallel distributions: 
+
+pθ (τt−1|τt, O) = 
+
+> N
+
+Y
+
+> i=1
+
+N  τi,t −1; μi,t + σ2 
+
+> t
+
+gi, σ 2 
+
+> t
+
+I2DH 
+
+.
+
+(18) As derived from the factorized multiagent likelihood in (4), the gradient per-agent gi admits 
+
+gi = −
+
+> Ki
+
+X
+
+> k=1
+
+λi,k ∇τi ci,k (μi,t ). (19) 
+
+B. Affine Formation Constraints with Safety Guarantees 
+
+While the soft costs in (19) effectively manage the in-dividual objectives, we formulate the formation require-ment as hard constraints. Recollect that the state si,h =
+
+p⊤ 
+
+> i,h
+
+˙p⊤
+
+> i,h
+
+⊤ ∈ R2D contains the position pi,h ∈ RD of agent i = 1 , . . . , N at waypoint h = 1 , . . . , H . We stack the positions of all N agents column-wise into the configuration matrix ,
+
+Ph = [ p1,h , . . . , pN,h ] ∈ RD×N , (20) which should be a continuous transformation of a template, namely the nominal configuration . Typically, the nominal configuration is chosen as the initial configuration P0 =[p1,0, . . . , pN, 0] ∈ RD×N . Then the transformation could be described by a general affine transformation 
+
+Ph = AhP0 + bh1⊤ 
+
+> N
+
+, (21) where Ah ∈ RD×D and bh ∈ RD are the shape transfor-mation and the translations, respectively. Now, we seek a projection operator ΠF (Ph) that satisfies (21). We now define the augmented nominal configuration 
+
+Q = P ⊤ 
+
+> 0
+
+1N
+
+⊤ ∈ R(D+1) ×N , (22) and a compact notation Θh = Ah bh
+
+ ∈ RD×(D+1) .Then the affine constraint (21) can be written compactly as Ph = ΘhQ. A naive approach would project each waypoint independently by solving Θh = PhQ⊤(QQ ⊤)−1,which ignores the temporal coherence, potentially resulting in erratic behaviors in the trajectories. To overcome this limitation, we propose a temporally-regularized fit as follows 
+
+min 
+
+> {Θh}H−1
+> h=0
+> H−1
+
+X
+
+> h=0
+
+∥Ph − ΘhQ∥2F + ηr 
+
+
+
+{Θh}H−1
+
+> h=0
+
+
+
+(23) where the regularization term r(·) can be any smoothing function over a discrete set of affine parameters Θh for h =0, . . . , H − 1, weighted by a hyperparameter η. In practice, 
+
+Θh could also be separated into Ah and bh, and estimated individually whose weights are tuned independently. The advantage of navigating a swarm of agents in forma-tion is that the agents’ separation is directly related to the geometry setting Ah, which we could leverage to guarantee inter-agent collision avoidance. Observe that 
+
+∥pi,h − pj,h ∥ = ∥Ah(pi, 0 − pj, 0)∥, (24a) 
+
+≥ σmin (Ah)∥pi, 0 − pj, 0∥, (24b) 
+
+≥ σmin (Ah) d0, (24c) where σmin (Ah) is the smallest singular value of Ah, and 
+
+d0 = min i̸=j ∥pi, 0 − pj, 0∥2 is the minimum separation in the nominal template. Thus, by flooring the smallest singular value of Ah from the projected configuration, we could ensure a minimum safety distance dsafe . As such, given the generated configuration Ph and a initial projection Θh =Ah bh
+
+ from (23), we could further perform a clamping 
+
+Ah = U ΣV ⊤, Σ = diag( σ1, . . . , σ D ), (25a) 
+
+Σh = diag (max( σ1, d th ), . . . , max( σD , d th )) , (25b) 
+
+Ah = U ΣhV ⊤, (25c) where dth = dsafe /d 0. Finally, the smooth affine formation projection with safety guarantees can be written as 
+
+ΠF (Ph) = AhP0 + bh1⊤ 
+
+> N
+
+. (26) Note that in practice, the singular value clamping might also disrupt the trajectory smoothness, which could be effectively mitigated with a few iterations of alternating (25) and (23). The data generation and the training parts of the diffusion model match the setup from Algorithm 1 in [22], and are thus Algorithm 1 Formational Motion Planning Diffusion  
+
+> 1:
+
+Input : Pre-trained diffusion model ˆϵθ ; Nominal configu-ration template P0 and the goal configuration PH ; Intra-agent costs ci,k with weights λi,k ; Inter-agent costs cij 
+
+with weights λij ; scheduling terms αt, σ 2 
+
+> t
+> 2:
+
+▷ Sample initial joint noise  
+
+> 3:
+
+τi,T ∼ N (02DH , I) ∀i = 1 , . . . , N  
+
+> 4:
+
+▷ Enforce boundary conditions  
+
+> 5:
+
+τT [i, 0] = pi, 0, τT [i, H − 1] = pi,H −1 ∀i ≤ N 
+
+> 6:
+
+for t = T, . . . , 1 do  
+
+> 7:
+
+▷ Diffusion prior mean  
+
+> 8:
+
+μi,t = 1
+
+√αt
+
+
+
+τi,t − 1 − αt
+
+√1 − ¯αt
+
+ˆϵθ (τi,t , t )
+
+
+
+∀i ≤ N 
+
+> 9:
+
+Compute gi ∀i ≤ N based on (19)  
+
+> 10:
+
+▷ Unconstrained update  
+
+> 11:
+
+eτi,t −1 = μi,t + σ2 
+
+> t
+
+gi + σtεi, εi ∼ N (0, I) ∀i ≤ N 
+
+> 12:
+
+▷ Formation Projection  
+
+> 13:
+
+for waypoint h = 1 , . . . , H − 2 do  
+
+> 14:
+
+Ph = [ p1,h · · · pN,h ] 
+
+> 15:
+
+Projection using (23) and (26) Ph ← ΠF (Ph) 
+
+> 16:
+
+Reassemble projected states back into eτt−1 
+
+> 17:
+
+end for  
+
+> 18:
+
+▷ Update trajectory  
+
+> 19:
+
+τi,t −1 = eτi,t −1 ∀i ≤ N 
+
+> 20:
+
+end for  
+
+> 21:
+
+Output : Optimized formational plan τ0 = {τ0,i }Ni=1 
+
+not discussed in detail. Algorithm 1 outlines the inference part of the framework, which generally follows a sequence of diffusion steps, gradients, and projections as discussed previously. The flexibility in the implementation lies in applying the gradient steps, i.e., we could apply multiple gradient steps after one diffusion step, while applying no gradient steps for the first few diffusion steps. This flexibility shows better computational efficiency and performance in existing literature. IV. S IMULATIONS 
+
+In this section, we demonstrate our planner using a 7-agent formation in a confined environment, and we also provide the results for two other state-of-the-art methods, Du et al. [12] and Quan et al. [17], representing the two classic paradigms of complexity reduction discussed in Section I. Apart from the planner results, we also show that the planned trajectories are easy to track by a simple proportion-derivative (PD)-based distributed controller under double-integrator dynamics [6]. 
+
+A. Experimental Setup 
+
+The environment is a square of 20 m and the agents are 2D disks with a radius of 0.2m. We then set the minimum safety distance dsafe = 0 .45 m, and all agents are color-coded in the plots. Our proposed planner is given a horizon of H = 128 
+
+with a duration of 30 s, resulting in a discrete-time interval 
+
+∆t = 0 .23 s. We run T = 25 denoising steps for the diffusion model. The results are run on a workstation equipped with an AMD Ryzen 7900X CPU with 64 GB RAM and an NVIDIA RTX PRO 4500 Blackwell GPU with 32 GB of VRAM. For the smoothing regularization function proposed in (23), we opt for a discrete second-order derivative 
+
+r({Θh}H−1 
+
+> h=0
+
+) = PH−2 
+
+> h=1
+
+∥Θh+1 − 2Θh + Θh−1∥2F, which promotes smooth geometry transition across the horizon. To execute the planned trajectories, we employ a discrete-time version [26] of the classic distributed affine forma-tion controller [6] under discrete double-integrator dynamics 
+
+zi,h +1 = zi,h + ∆ tvi,h , vi,h +1 = vi,h + ∆ tui,h , where 
+
+zi,h ∈ R2 is the real position of agent i at waypoint h.Each leader i, then tracks its reference trajectory pi,h under the control law 
+
+ui,h = −kp(zi,h − pi,h ) − kv (vi,h − ˙pi,h ) + ˙ pi,h , (27) where kp and kv are the tuning gains, and pi,h with its derivative ˙pi,h are the planned states. For a follower i, which interacts with a set of neighboring agents Ni predefined by the underlying communication graph, the corresponding control law is 
+
+ui,h = − 1
+
+γi
+
+X
+
+> j∈N i
+
+ωij (kp(zi,h − zj,h )+ kv (vi,h − vj,h ) − ˙vj,h ), (28) where γi = P 
+
+> j∈N i
+
+ωij , and ωij are the equilibrium stresses which can be computed using e.g., framework [27]. 
+
+B. Evaluation Metrics 
+
+We propose the following metrics to quantify the quality of the generated trajectories. 
+
+Affine Residual (AR) measures the instantaneous geometry of the trajectories, aiming to evaluate how much the forma-tion is compromised in resolving collisions. It is computed by measuring the distance of the configuration from the affine set using the orthogonal projector M = IN −
+
+Q⊤(QQ ⊤)−1Q, where Q ∈ R(D+1) ×N is the augmented nominal configuration (22). Then the error δar is defined as 
+
+δar = 1
+
+N H 
+
+> H−1
+
+X
+
+> h=0
+
+∥PhM ∥2F, (29) which equals zero if every waypoint across the horizon is an exact affine transformation of the nominal template. Note that this metric also applies to the compared candidates [12], [17], since their formation geometries are special cases of the general affine transformation with reduced degrees of freedom. 
+
+Smoothness (S) in [m/s 2] evaluates the temporal smooth-ness of the generated trajectories by leveraging the discrete second difference of the positions for each agent, denoted as ∆2pi,h = pi,h +1 − 2pi,h + pi,h −1. Then the smoothness metric is expressed as 
+
+δs =
+
+vuut 1
+
+N (H − 2) 
+
+> N
+
+X
+
+> i=1
+> H−2
+
+X
+
+> h=1
+
+∆2pi,h 
+
+∆t2
+
+> 22
+
+, (30) where ∆t is the discrete time interval. Trajectories are considered smoother for lower values of δs.Step 0 Step 10 Step 15 Step 20 Step 25 Fig. 2. The multiagent trajectories (color-coded) at different diffusion inference steps, with some intermediate formations outlined with dashed lines. The gray areas are the obstacles. 
+
+Tracking Error (TE) in [m] evaluates how well the for-mation maneuvers can be tracked using basic distributed controllers (27) and (28). For individual agents, TE is defined as δte (i, h ) = ∥zi,h − pi,h ∥2.
+
+Collision (C) in [%] evaluates the percentage of waypoints that violate the minimum clearance distance given the robot model and the obstacles. 
+
+Planning Time (PT) in [s] is the computation time for the planning. This metric provides a general insight into the complexity of the algorithms. We do not draw any comparative conclusions with the state-of-the-art, as [12] is an online planner and admits distributed executions, and we translate [17]’s own implementation from C++ to Python for our test environment. 
+
+C. Results and Discussions 
+
+We first show the process of the proposed diffusion-based planner in Fig. 2, where the trajectories are gradually de-noised from random Gaussian initialization to clean samples. Observe that at initial steps, e.g., Step 10, there are still collisions with the obstacles, but the trajectories are nudged away from the obstacles as a mutual effort of the diffusion priors and the cost gradients. Next, we show a few more examples of the proposed solutions and the state-of-the-art for both the planned and controller-tracked trajectories in Fig. 3. The proposed solu-tion does not lead to deterministic results, as can be seen in the top row of Fig. 3, where the swarm could either pass from the left or right corridor given different random-ness. This multi-modality is favored in motion planning for reachability and avoiding local minima. From a trajectory quality perspective, the proposed planner and [17] yield visibly smoother and more natural trajectories compared to [12], which relies on a coarse artificial potential field (APF) planner. From a formation constraints perspective, the proposed method admits rigorous affine transformation of the nominal template, and [12] can also maintain its desired geometry, i.e., rotation with anisotropic scaling. However, [17] trades off the formation geometry for maneuverability across the passages, as formation is never strictly enforced in their framework. From a tracking control perspective, the planned trajectories overlap with the controlled trajectories after initial convergence from random positions, which shows trackability for the proposed planner. The tracking error δte Planned Controlled Followers Leaders Start Goal   
+
+> Proposed Proposed Quan et al. Du et al.
+> Fig. 3. The planned and controlled trajectories of the proposed (upper) and state-of-the-art (lower). The proposed planner is tracked with a basic controller (27) and (28); Du et al. [12] is tracked with its own MPC; Quan et al. [17] is tracked using designated quadrotor controllers, hence not implemented.
+
+for each agent can be seen in Fig. 4, where the agents rapidly converge to their target positions and maintain a low tracking error ( ≤ 0.02 m). As a comparison, [12]’s MPC tracker partially corrects the coarse planning, hence the misalignment between the planned and the controlled trajectories in Fig. 3. Lastly, we present the quantitative evaluations in Table I, where all results are the mean of 50 Monte Carlo runs given different randomness. As indicated, the proposed planner has the best affine residual and smoothness among all. This shows the effectiveness of the generative prior and its com-patibility with external objectives, especially in use of ag-gressive projections. Moreover, the safe formation projection guarantees collision-free interactions, while the framework Time [s]
+
+> Tracking Error  δte  [m]
+> Transient settled 1.9 [s] Follower Leader
+
+Fig. 4. Agents’ tracking error over time for the trajectories using the proposed planner under tracking controllers (27) and (28). TABLE I QUANTITATIVE PLANNING PERFORMANCE 
+
+Method AR S [m/s 2] TE [m] C [%] PT [s]
+
+Proposed 3.0e−13 0.5 1.5e−3 0.08 0.97 
+
+Du et al. [12] 3.7e−3 1.9 - 0.2 65 .3∗
+
+Quan et al. [17] 4.2e−1 1.4 - 0.00 12 .0   
+
+> ∗Actual PT occupies 0.2% of the reported number; the rest is the MPC tracking.
+
+also keeps collisions with the obstacles to a minimum. Finally, recall that the joint trajectory τ ∈ R2DHN =3584 is high-dimensional and usually intractable to directly optimize. Here, our proposed solution takes less than a second to plan for a 7-agent formation, and we also recorded less than 1.5s
+
+on average to plan for 50 agents. The most computational complexity is offloaded to the training phase, such that the inference speed is primarily bottlenecked by the size of the neural network θ. Compared with [12], where the tracking requires significantly more effort than the planning, we could claim that high-quality planning can offload the complexity on the control end, which consumes less onboard resource for these autonomous agents. The low tracking error also verifies this claim. V. C ONCLUSIONS 
+
+This work proposes a multiagent motion planning frame-work under affine formation constraints. The planning mixes projected gradient descent (PGD) and diffusion priors under a MAP formulation, where the diffusion prior is learned from the single-agent trajectory data and is shared across the agents for individual objectives, and PGD tackles the inter-agent interactions while maintaining feasible formations. Numerical results indicate our planner yields smooth and dynamically feasible trajectories under strict affine formation constraints with safety guarantees. The planner also admits moderate computation complexity which is tractable as the swarm size scale. Our future work includes a convergence analysis, physical simulation and experiments, and more comprehensive benchmarking. REFERENCES [1] J. Alonso-Mora, S. Baker, and D. Rus, “Multi-robot formation control and object transport in dynamic environments via constrained opti-mization,” The International Journal of Robotics Research , vol. 36, no. 9, pp. 1000–1021, 2017. [2] G. Zhao, H. Cui, and C. Hua, “Hybrid event-triggered bipartite consensus control of multiagent systems and application to satellite formation,” IEEE Transactions on Automation Science and Engineer-ing , vol. 20, no. 3, pp. 1760–1771, 2023. [3] F. Abbasi, A. Mesbahi, and J. M. Velni, “A team-based approach for coverage control of moving sensor networks,” Automatica , vol. 81, pp. 342–349, 2017. [4] M. Saska, V. Kr´ atk` y, V. Spurn` y, and T. B´ aˇ ca, “Documentation of dark areas of large historical buildings by a formation of unmanned aerial vehicles using model predictive control,” in 2017 22nd IEEE interna-tional conference on emerging technologies and factory automation (ETFA) . IEEE, 2017, pp. 1–8. [5] M. H. Trinh, S. Zhao, Z. Sun, D. Zelazo, B. D. Anderson, and H.-S. Ahn, “Bearing-based formation control of a group of agents with leader-first follower structure,” IEEE Transactions on Automatic Control , vol. 64, no. 2, pp. 598–613, 2018. [6] S. Zhao, “Affine formation maneuver control of multiagent systems,” 
+
+IEEE Transactions on Automatic Control , vol. 63, no. 12, pp. 4140– 4155, 2018. [7] K. Cao, M. Cao, and L. Xie, “Similar formation control via range and odometry measurements,” IEEE Transactions on Cybernetics , vol. 54, no. 6, pp. 3765–3776, 2023. [8] H. M. Vu, M. H. Trinh, Q. Van Tran, and H.-S. Ahn, “Distance-based formation tracking of single-and double-integrator agents,” IEEE Transactions on Automatic Control , vol. 69, no. 2, pp. 1332–1339, 2023. [9] Z. Li and R. T. Rajan, “Geometry-aware edge-state tracking for robust affine formation control,” IEEE Open Journal of Control Systems ,2026. [10] M. Aranda, R. Arag¨ u´ es, and G. L´ opez-Nicol´ as, “Combined leaderless control of translational, shape-preserving, and affine multirobot for-mations,” IEEE Robotics and Automation Letters , vol. 8, no. 11, pp. 7567–7574, 2023. [11] J. Alonso-Mora, E. Montijano, M. Schwager, and D. Rus, “Distributed multi-robot formation control among obstacles: A geometric and optimization approach with consensus,” in 2016 IEEE international conference on robotics and automation (ICRA) . IEEE, 2016, pp. 5356–5363. [12] Z. Du, H. Zhang, Z. Wang, and H. Yan, “Motion planning and tracking mpc for multiagent systems: A dynamic affine formation approach,” 
+
+IEEE Transactions on Cybernetics , 2025. [13] Q. Zhang et al. , “Obstacle avoidance algorithm for multi-robot for-mation based on affine transformation,” Symmetry , vol. 17, no. 11, p. 1816, 2025. [14] L. Wang, D. Zhu, W. Pang, and C. Luo, “A novel obstacle avoidance consensus control for multi-auv formation system,” IEEE/CAA Journal of Automatica Sinica , vol. 10, no. 5, pp. 1304–1318, 2023. [15] M. Saska, Z. Kasl, and L. Pˇ reucil, “Motion planning and control of formations of micro aerial vehicles,” IFAC Proceedings Volumes ,vol. 47, no. 3, pp. 1228–1233, 2014. [16] W. Liu, J. Hu, H. Zhang, M. Y. Wang, and Z. Xiong, “A novel graph-based motion planner of multi-mobile robot systems with formation and obstacle constraints,” IEEE Transactions on Robotics , vol. 40, pp. 714–728, 2023. [17] L. Quan, L. Yin, T. Zhang, M. Wang, R. Wang, S. Zhong, X. Zhou, Y. Cao, C. Xu, and F. Gao, “Robust and efficient trajectory planning for formation flight in dense environments,” IEEE Transactions on Robotics , vol. 39, no. 6, pp. 4785–4804, 2023. [18] B. Hadi, A. Khosravi, and P. Sarhadi, “Adaptive formation mo-tion planning and control of autonomous underwater vehicles using deep reinforcement learning,” IEEE Journal of Oceanic Engineering ,vol. 49, no. 1, pp. 311–328, 2023. [19] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” Advances in neural information processing systems , vol. 33, pp. 6840–6851, 2020. [20] A. Q. Nichol and P. Dhariwal, “Improved denoising diffusion prob-abilistic models,” in International conference on machine learning .PmLR, 2021, pp. 8162–8171. [21] M. Janner, Y. Du, J. Tenenbaum, and S. Levine, “Planning with diffusion for flexible behavior synthesis,” in International Conference on Machine Learning , 2022. [22] J. Carvalho, A. T. Le, M. Baierl, D. Koert, and J. Peters, “Motion planning diffusion: Learning and planning of robot motions with diffusion models,” in 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2023, pp. 1916–1923. [23] J. K. Christopher, S. Baek, and F. Fioretto, “Constrained synthesis with projected diffusion models,” URL https://arxiv. org/abs/2402.03559 ,2024. [24] Y. Shaoul, I. Mishani, S. Vats, J. Li, and M. Likhachev, “Multi-robot motion planning with diffusion models,” in International Conference on Learning Representations , vol. 2025, 2025, pp. 95 791–95 811. [25] J. Liang, J. K. Christopher, S. Koenig, and F. Fioretto, “Simultaneous multi-robot motion planning with projected diffusion models,” in International Conference on Machine Learning (ICML) , vol. 267, 2025, pp. 37 162–37 180. [Online]. Available: https://proceedings.mlr.press/v267/liang25e.html [26] Y. Xu, D. Luo, Y. You, and H. Duan, “Affine transformation based formation maneuvering for discrete-time directed networked systems,” 
+
+Science China Technological Sciences , vol. 63, no. 1, pp. 73–85, 2020. [27] Z. Li, G. Leus, and R. T. Rajan, “Fast multiagent formation stabiliza-tion with sparse universally rigid frameworks,” in 2025 33rd European Signal Processing Conference (EUSIPCO) . IEEE, 2025, pp. 2392– 2396.

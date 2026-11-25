@@ -1,0 +1,755 @@
+Title: Spatially Conditioned Trajectory Diffusion
+
+URL Source: https://arxiv.org/pdf/2611.26127v1
+
+Published Time: Fri, 20 Nov 2026 03:07:52 GMT
+
+Number of Pages: 22
+
+Markdown Content:
+# Spatially Conditioned Trajectory Diffusion 
+
+## Yefim Nudelman, Dor Atzmon *, and Tom Tirer *
+
+Faculty of Engineering, Bar-Ilan University Ramat Gan, Israel 
+
+Abstract 
+
+Multi-Robot Motion Planning (MRMP) requires trajectories that avoid environmental obstacles and collisions between robots in a shared workspace. Diffusion-based planners often address obstacle avoidance through sampling-time guidance, while some conditioned approaches aggregate map ge-ometry into a global representation. We present Spatially Conditioned Trajectory Diffusion (SCTD), a map-conditioned trajectory generator for multi-robot planning. SCTD retains multiple position-aware occupancy tokens accessed through cross-attention throughout a temporal U-Net, with hard endpoint inpainting enforcing start and goal states. One model trained on single-robot demonstrations across procedural environments generates obstacle-aware trajectories without sampling-time obstacle-cost guidance. High-level Conflict-Based Search (CBS) coordinates these trajectories through constrained replanning, retaining inter-agent guidance during sampling and reusing the model across workspace layouts and team sizes. Experiments assess single-robot success and trajectory quality, generalization to unfamiliar layouts with added obstacles, and coordinated multi-robot planning. On 15,000 held-out tasks, SCTD achieves higher success than the evaluated guided diffusion baseline, with the largest gains on hard-detour tasks, while trajectory-quality comparisons show smoother trajectories. Condi-tioning ablations show higher success with spatial tokens than with a global map embedding, and map-replacement tests demonstrate dependence on the supplied geometry. The resulting multi-robot system achieves higher team success than the compared diffusion baselines, with experiments covering teams of up to 15 robots. 
+
+Keywords: diffusion models | motion planning | trajectory generation | map conditioning | multi-robot systems 
+
+# 1 Introduction 
+
+Multi-Robot Motion Planning (MRMP) is a fundamental challenge in robotics, requiring teams of robots to move through a shared continuous workspace while avoiding environmental obstacles and one an-other. Applications such as automated warehouses require individual routes to account for workspace geometry while remaining compatible with the motions of other robots. This coupling makes planning computationally challenging as the team size and complexity of the workspace increase. Obstacle lay-outs also vary across tasks, requiring planners to adapt their routes to changing workspace geometry. One approach to this complexity is to formulate a discrete abstraction of MRMP as Multi-Agent Path Finding (MAPF), representing configurations and transitions on a graph, typically in discrete timesteps [19]. MAPF methods such as Conflict-Based Search (CBS) separate coordination from individual path planning: a high-level search resolves conflicts by imposing constraints, while low-level planners re-vise affected agents’ paths [15]. Within this decomposition, coordination repeatedly requests individual paths under updated constraints. Extending this structure to continuous-space planning therefore mo-tivates studying low-level generators that account for the current workspace geometry while supplying trajectories for individual sampling and replanning [14]. Diffusion models [16, 17, 5, 18] offer a learned approach to low-level trajectory generation by mod-eling distributions over complete trajectories and generating samples through iterative denoising [8]. 
+
+Motion Planning Diffusion [3] (MPD) develops this approach for robot motion planning, learning trajec-tory priors from demonstrations and adapting generated motions through sampling-time cost-gradient guidance. 
+
+Multi-robot Multi-model planning Diffusion (MMD) [14] combines single-robot diffusion planners with constraint-based coordination, resolving conflicts through guided individual replanning. Simultaneous MRMP Diffusion (SMD) [9] instead plans trajectories for all robots simultaneously, using constrained op-timization during denoising to address obstacle and inter-robot collisions. MMD’s local priors capture 
+
+> *Equal supervision.
+
+1arXiv:2611.26127v1 [cs.RO] 19 Nov 2026 motion patterns associated with their training environments, supporting data-adherent planning. Dur-ing sampling, obstacle-cost gradients adapt generated trajectories to workspace geometry, while inter-robot guidance addresses coordination constraints. The current map therefore influences sampling, but does not explicitly condition the learned denoiser. This distinction matters when coordination repeat-edly requests trajectories: workspace-dependent routing can also be represented in the learned prior used for each request. Supplying geometry directly to the denoiser offers this complementary role, while sampling-time guidance continues to address coordination constraints. Explicit environment conditioning offers a complementary way to incorporate workspace geometry into trajectory generation. Carvalho et al. [2] encode an occupancy map and combine its embedding with task features as a single “token” for conditioning a temporal U-Net through cross-attention. Building on this approach, we examine how trajectory features access the map during denoising. An aggregated map embedding can encode geometry, while spatially indexed features presented as separate attention tokens allow different workspace regions to be queried individually. Spatial map tokens also appear in Roken’s joint multi-robot diffusion transformer [1]; our focus is their use in a single-robot backbone learned across workspace layouts and evaluated within inherited multi-robot coordination. In this paper, we present Spatially Conditioned Trajectory Diffusion (SCTD), a single-robot trajectory backbone trained across procedurally generated environments. A convolutional occupancy encoder produces position-aware spatial features that trajectory features can query separately through cross-attention throughout a temporal U-Net. Start and goal states remain fixed through hard endpoint in-painting during denoising. For multi-robot planning, we integrate SCTD as the low-level trajectory generator in XECBS [14], retaining inter-agent guidance to address coordination constraints during sam-pling and replanning. This formulation uses one map-conditioned backbone across workspace layouts while retaining the established coordination machinery. Our contributions are: 1. Spatially Conditioned Trajectory Diffusion. We introduce SCTD, a trajectory diffusion model that retains occupancy-derived convolutional features as position-aware spatial tokens and ex-poses them to trajectory features through cross-attention throughout a temporal U-Net. 2. Generalization and map-dependent generation in unseen workspaces. We show that an SCTD model generates feasible trajectories in held-out maps without static-obstacle-cost guidance, in-cluding obstacle-dependent and hard-detour tasks. Compared with MPD, SCTD achieves higher single-agent success. 3. Reusable low-level planning for multi-robot coordination. We integrate SCTD as the low-level trajectory generator in XECBS [14], retaining inter-agent guidance and reusing one map-conditioned model across robots and workspace layouts. On held-out maps, the resulting system achieves higher team success than MMD at every evaluated team size from 3 to 15 robots, and than SMD [9] at the shared sizes of 3, 6, and 9 robots, under a 180-second trial limit. 
+
+# 2 Related Work 
+
+Diffusion models for motion planning. Diffuser [8] formulates planning as trajectory denoising and combines guidance for planning objectives with inpainting for fixed trajectory states. Motion Planning Diffusion (MPD) [3] uses learned trajectory priors and adapts samples through task-specific cost gra-dients, while EDMP [11] combines multiple inference-time cost objectives. Sampling-time objectives are distinct from denoiser inputs and task conditions such as endpoint inpainting. Environment con-ditioning and sampling-time cost guidance are not mutually exclusive. SceneDiffuser [7] combines scene-conditioned generation with differentiable physical objectives and goal-directed planning during sampling. PRESTO [13] conditions its trajectory model on a key-configuration environment representa-tion and examines additional collision and smoothness cost guidance in a sampling ablation. Learned conditioning supplies an environment-dependent trajectory prior, while cost guidance adjusts samples according to further objectives/constraints. Within this trajectory-prior formulation, SCTD focuses on learning workspace-dependent routing through map conditioning. 
+
+Environment-Conditioned Trajectory Diffusion. Environment-conditioned trajectory diffusion dif-fers in the geometric representations exposed to the denoiser. Carvalho et al. [2] pretrain an occupancy-image encoder through signed-distance regression, aggregate its features into a global map embedding, and combine this embedding with task features to condition a temporal U-Net through cross-attention. 2CAMPD [12] instead attends to a variable set of structured contextual elements, including obstacle pa-rameters, and uses classifier-free guidance to strengthen conditioning rather than applying obstacle-cost gradients. Observation-conditioned approaches include RobotDiffuse [20], which encodes obstacle point clouds for transformer-based trajectory generation, and DiffusionSeeder [6], which uses depth observations to generate trajectory seeds for subsequent motion optimization. Spatial map tokens are also used in Roken [1], where robot tokens cross-attend to position-aware map patches within a joint multi-robot diffusion transformer. These approaches distinguish aggregated map context, structured environmental elements, and separately addressable spatial features. SCTD uses occupancy-derived spatial features to learn a single-robot trajectory backbone across procedural environments, rather than a joint team-trajectory model. We assess this backbone both in single-agent generation and within inher-ited multi-robot coordination; the contribution is the resulting planning system and its evaluated use, not spatial tokens or cross-attention in isolation. 
+
+Diffusion-based Multi-Robot Motion Planning. Diffusion-based multi-robot planners differ in how trajectory generation is coupled to coordination. MMD [14] pairs reusable single-robot diffusion plan-ners with MAPF-inspired coordination, including CBS [15], using only single-robot training data rather than learning a joint trajectory distribution over the team. Its planning framework translates spatiotem-poral constraints into sampling-time guidance and replans affected robots under those constraints. Other formulations include joint trajectory generation with constrained projection in Simultaneous MRMP Diffusion [9] and robot-token-based joint generation for safety and connectivity in Roken [1]. Discrete-Guided Diffusion [10] instead uses MAPF-derived spatiotemporal structure to guide continuous trajec-tory generation, followed by constraint repair. Within MMD’s inherited constraint-based coordination framework, we evaluate SCTD’s shared spatially map-conditioned backbone on held-out maps, retain-ing inter-agent guidance while assessing its effectiveness as the low-level generator across workspace layouts. 
+
+# 3 Preliminaries and Problem Formulation 
+
+## 3.1 Multi-Robot Motion Planning 
+
+Multi-Robot Motion Planning (MRMP) concerns the coordinated motion of multiple robots in a shared continuous workspace. An environment E consists of a bounded planar workspace Ω ⊂ R2 and an obstacle region OE ⊂ Ω.The environment is represented by a binary occupancy grid ME , with occupied cells marked by one. We consider N disk robots of radius r > 0. At waypoint h, robot i has state si,h = ( qi,h , v i,h ) ∈ R4,where qi,h ∈ R2 denotes its planar position and vi,h ∈ R2 contains its velocity channels. Its trajectory is represented by a sequence of Htraj states: 
+
+τi = ( si, 0, . . . , s i,H traj −1). (1) Together, these trajectories form a joint plan τ = ( τ1, . . . , τ N ). Given prescribed start and goal states 
+
+ss 
+
+> i
+
+and sg 
+
+> i
+
+, MRMP seeks a joint plan satisfying 
+
+si, 0 = ss 
+
+> i
+
+, i = 1 , . . . , N, si,H traj −1 = sg 
+
+> i
+
+, i = 1 , . . . , N, 
+
+qh ∈ Q free (E), h = 0 , . . . , H traj − 1.
+
+(2) Here, qh = ( q1,h , . . . , q N,h ) denotes the joint position at synchronized waypoint h. The set Qfree (E) con-tains joint configurations in which robot centers lie within the workspace and robot footprints intersect neither obstacles nor one another. 
+
+## 3.2 MAPF and Conflict-Based Coordination 
+
+Multi-Agent Path Finding (MAPF) formulates coordinated routing on a graph, typically using discrete timesteps [19]. Conflict-Based Search (CBS) separates this problem into high-level coordination and low-level individual planning [15]. A high-level search node contains individual paths and their constraints. When two paths conflict, the search branches by imposing an additional constraint on either agent and replanning the affected path. 3This decomposition provides a framework for coordinating continuous trajectory generators: indi-vidual planning produces candidate motions, while the coordination layer identifies incompatibilities and requests replanning under additional conditions [14]. The decomposition can be retained while replacing graph-based individual planning with continuous-space trajectory generation. The proposed method specifies how SCTD serves as the individual trajectory generator within the selected coordination procedure. 
+
+## 3.3 Diffusion Models 
+
+A denoising diffusion probabilistic model (DDPM) [5] learns to generate data by reversing a gradual noising process. For trajectory generation, let u0 denote a clean trajectory representation [8]. At a sam-pled diffusion step k, the forward process adds Gaussian noise: 
+
+uk = √¯αk u0 + √1 − ¯αk ϵ, ϵ ∼ N (0 , I ), (3) where ¯αk is determined by the noise schedule. The denoiser learns to predict the added noise from the corrupted trajectory and the diffusion step. At inference, generation starts from Gaussian noise and applies successive reverse updates, uK → · · · → u0, where K is the number of diffusion steps. Each update revises the complete trajectory representation rather than generating waypoints sequentially. 
+
+## 3.4 Conditional Trajectory Diffusion 
+
+In conditional diffusion, the denoiser also receives context c:
+
+bϵ k = ϵθ (uk, k, c ). (4) The context guides the denoising process toward samples compatible with the specified task or envi-ronment. In SCTD, the environmental context is the encoded occupancy map, c = ZE = Eϕ(ME ). Start and goal states are handled separately: endpoint inpainting fixes them before denoising and restores them after reverse updates. Thus, map conditioning informs generation of the trajectory interior, whereas inpainting enforces its boundary states. Section 4 describes the spatial conditioning interface and its integration with multi-robot coordination. 
+
+# 4 Spatially Conditioned Trajectory Diffusion 
+
+In this section, we present SCTD from architecture to multi-robot integration. We first present the spatial-conditioning architecture, then the training and single-robot inference procedures, and finally how the shared generator provides per-robot trajectories within MRMP coordination. 
+
+## 4.1 SCTD Architecture 
+
+Building on the conditional denoising formulation (Section 3), SCTD takes an occupancy map and pre-scribed start and goal states as input. It encodes the map as spatial tokens and predicts noise for a trajectory conditioned on those tokens; endpoint inpainting fixes the boundary states, and reverse dif-fusion produces the complete trajectory. 
+
+Spatial map representation. As illustrated in Figure 1, a convolutional encoder maps the binary oc-cupancy grid ME to a 16 × 16 × 64 feature grid Fϕs (ME ). Flattening its spatial dimensions and adding learned positional embeddings produces the map tokens: 
+
+ZE = Eϕ(ME ) = Flatten( Fϕs (ME )) + P, ZE , P ∈ R256 ×64 , (5) where ϕ = ( ϕs, P ) collects the map encoder’s trainable parameters: ϕs denotes the convolutional stem and P the learned positional embeddings. Each row of P corresponds to a fixed grid location. Each token therefore combines an occupancy-derived feature with positional information. Keeping the tokens separate allows trajectory features to query different map regions individually. Analytic signed-distance values supervise stem pretraining, as described in the Training subsection; occupancy is the denoiser’s environmental input. 4A. Training Learn geometry-aware denoising from expert trajectories and occupancy maps 
+
+1 Encode the map         
+
+> SGoccupancy map
+> ME ∈{0,1}¹× ⁶⁴ ×⁶⁴
+> CNN map encoder
+> Conv 3 × 3, s = 2: 1→32 Conv 3 × 3, s = 2: 32 →64 spatial feature grid 16 × 16 × 64
+> Spatial map tokens
+> flatten + learned position
+> ZE ∈ℝ²⁵⁶ ×⁶⁴
+> K, V at all scales
+
+2 Corrupt an expert trajectory normalized expert    
+
+> u0∈ℝ⁶⁴ ×⁴
+> RRTConnect →
+> GPMP2
+
+sample k and ε     
+
+> uk =√ᾱₖ u0 +√(1 −ᾱₖ )ε
+> k ~ U{1,…,25},
+> ε~ N(0,I)
+
+inpaint endpoints  
+
+> rows {0,63}
+> ←clean
+
+3 Predict the injected noise 
+
+Temporal U-Net · εθ             
+
+> attention after every down / mid / up block · schematic stacks Down attn Up attn Down attn Up attn Down attn Up attn Middle attn skip connections attn: self-attn over waypoints →
+> cross-attn →FF Q = trajectory features · K, V = map tokens
+
+Time encoder     
+
+> k→embedding →added in every residual block
+
+noise estimate   
+
+> ε̂ =εθ (u k, k, ZE)
+> same shape as u
+
+diffusion loss     
+
+> ℒ=‖ε₁ :₆₂ −ε̂₁ :₆₂‖ ²
+> endpoints excluded from loss
+
+B. Inference Condition every step on the same map tokens, re-imposing the fixed start and goal     
+
+> SGsame occupancy map
+> ME ∈{0,1}¹× ⁶⁴ ×⁶⁴
+> same CNN encoder
+> 64 × 64 →
+> 16 × 16 × 64
+> →256 spatial tokens
+
+ZE · 256 × 64 
+
+> depends only on the map identical at all 25 steps K, V
+
+initialize 
+
+> u25 ~ N(0,I)
+> then inpaint S,G
+
+Reverse diffusion step 
+
+> for k = 25,…,1 uk + endpoints
+> εθ (u k, k, ZE)
+> same conditioned U-Net
+
+sampler step   
+
+> uk→uk−1
+
+re-inpaint 
+
+> rows 0, 63 repeat until k = 0
+
+Generated trajectory  
+
+> same map · same start/goal · no guidance · no smoothing
+> SG
+> start goal trajectory
+
+Figure 1: Training and inference of the map-conditioned trajectory diffuser. During training, the temporal U-Net predicts noise added to normalized expert trajectories, conditioned on spatial occupancy-map tokens and the dif-fusion timestep. Endpoints are fixed by inpainting and excluded from the loss. During single-agent inference, map tokens depend only on the map and are therefore identical at every reverse step; endpoints are restored after every update. The raw trajectory is converted back to world coordinates without static-obstacle-cost guidance or a sepa-rate smoother; this describes the single-agent pipeline, not the multi-agent system. Start/goal markers on the maps are illustrative only. 
+
+Map-conditioned trajectory denoiser. A temporal U-Net processes the noisy trajectory uk ∈ R64 ×4 at diffusion step k and predicts the added noise: 
+
+bϵ k = ϵθ (uk, k, Z E ), bϵ k ∈ R64 ×4. (6) The discrete diffusion step k is encoded with sinusoidal features and an MLP; in every residual convolu-tional block, a learned projection of this embedding is added channel-wise to the intermediate features. Each down, middle, and up stage of the U-Net combines residual convolutional blocks with one trans-former layer, which applies self-attention over trajectory waypoints, cross-attention to the map tokens, and a feed-forward layer, each with a residual connection. In cross-attention, trajectory features provide the queries and ZE provides the keys and values, so the map tokens are the only conditioning context. Start and goal states are fixed separately through hard endpoint inpainting. Detailed layer dimensions and configuration are provided in Appendix A. 
+
+## 4.2 Training 
+
+Occupancy-encoder pretraining. We first initialize the convolutional occupancy stem through signed-distance regression, motivated by the encoder pretraining approach of Carvalho et al. [2]. Our pre-training head operates on the spatial feature grid used to construct SCTD’s map tokens. For a sam-pled workspace coordinate x, bilinear interpolation extracts a local feature vector from this grid. A5Algorithm 1 SCTD training 
+
+Input: SDF pretraining data DSDF , trajectory demonstrations Dτ
+
+Output: map encoder Eϕ and trajectory denoiser ϵθ
+
+Stage 1: occupancy-stem pretraining  
+
+> 1:
+
+while the pretraining criterion is not reached do  
+
+> 2:
+
+Sample (ME , x, ¯dE (x)) ∼ D SDF  
+
+> 3:
+
+bd ← bdϕs,ξ (ME , x ) 
+
+> 4:
+
+LSDF ← | ¯dE (x) − bd| 
+
+> 5:
+
+Update ϕs and ξ using ∇L SDF  
+
+> 6:
+
+end while  
+
+> 7:
+
+Discard the SDF query head 
+
+Stage 2: joint trajectory-diffusion training  
+
+> 8:
+
+while the diffusion-training criterion is not reached do  
+
+> 9:
+
+Sample (ME , u 0, u s, u g) ∼ D τ 
+
+> 10:
+
+Sample k ∼ U{ 1, . . . , K } and ϵ ∼ N (0 , I ) 
+
+> 11:
+
+uk ← √¯αk u0 + √1 − ¯αk ϵ 
+
+> 12:
+
+uk ← I us,u g (uk ) 
+
+> 13:
+
+ZE ← Eϕ(ME ) 
+
+> 14:
+
+bϵ k ← ϵθ (uk , k, Z E ) 
+
+> 15:
+
+Ldiff ← [ϵ − bϵ k ]1:62  
+
+> 22
+> 16:
+
+Update ϕ and θ using ∇L diff  
+
+> 17:
+
+end while  
+
+> 18:
+
+return Eϕ, ϵ θ
+
+lightweight MLP receives this feature together with x and predicts the clipped analytic obstacle signed distance ¯dE (x) at query points drawn uniformly over the workspace. The head reads only the stem’s output features, without connections to intermediate encoder features. The signed distance is positive in free space, zero on obstacle boundaries, and negative inside obstacles. Let ϕs denote the occupancy-stem parameters within ϕ, and ξ the query-head parameters. We opti-mize 
+
+LSDF (ϕs, ξ ) = EME ,x 
+
+h ¯dE (x) − bdϕs,ξ (ME , x )
+
+i
+
+. (7) This stage uses occupancy maps and signed-distance targets without trajectory demonstrations. The query head is then discarded, and the pretrained stem initializes the map encoder Eϕ.
+
+Joint encoder and trajectory-diffusion training. We next optimize the map encoder and temporal denoiser jointly on occupancy maps and expert trajectories. The pretrained stem remains trainable; the positional embeddings and the entire temporal U-Net, including its cross-attention layers, are trained from random initialization in this stage. For a clean expert trajectory u0, we sample a diffusion step k
+
+uniformly and noise ϵ ∼ N (0 , I ), and construct uk using the forward process in Section 3. Let us and ug denote the prescribed start and goal states in the trajectory representation. The in-painting operator Ius,u g replaces trajectory rows 0 and 63 with these states while leaving interior rows unchanged. The noise-prediction objective is 
+
+Ldiff (θ, ϕ ) = Eu0,M E ,k,ϵ 
+
+h ϵ − ϵθ
+
+ Ius,u g (uk), k, E ϕ(ME ) 
+
+> 1:62
+> 22
+
+i
+
+, (8) where [·]1:62 selects interior rows 1 through 62. The denoiser therefore receives clean endpoints at every sampled noise level, and endpoint prediction entries are overwritten before the loss, so they contribute no gradient; Eq. (8) gives the equivalent objective. Map context is supplied through the occupancy-derived tokens defined in the Architecture subsection. Signed-distance regression is used only for ini-tialization; subsequent joint training optimizes the diffusion objective. Algorithm 1 summarizes the two-stage training procedure; Appendix A provides implementation-specific details. Figure 2 details the occupancy encoder and its two-stage training. 
+
+## 4.3 Inference 
+
+Given an occupancy map and prescribed start and goal states, SCTD generates a trajectory by iteratively denoising an initial Gaussian sample. At each reverse step, the denoiser predicts noise conditioned on 6Stage 2 · diffusion training / inference initialized from Stage 1, then finetuned end-to-end with the denoiser         
+
+> occupancy map
+> ME · 64 × 64 × 1
+> Conv 3 × 3 stride 2, pad 1
+> GroupNorm, SiLU 64 × 64 →32 × 32 channels 1 →32
+> feature volume
+> 32 × 32 × 32
+> Conv 3 × 3 stride 2, pad 1
+> GroupNorm, SiLU 32 × 32 →16 × 16 channels 32 →64
+> encoder output
+> 16 × 16 × 64
+> flatten 16 × 16 grid
+> + learned position embedding
+> spatial map tokens ZE
+> 256 tokens × 64 one token per 16 × 16 grid location
+> cross-attention
+> map tokens are K, V at every down / mid / up block
+
+Stage 1 · SDF pretraining only pretrains the same occupancy encoder; the SDF head is discarded afterward 16×16×64 grid, bilinearly sampled at x          
+
+> sample query point x ~ Uniform(workspace)
+> blue dots: sampled queries
+> query point
+> x = (x, y)
+> shallow SDF head (MLP)
+> [x, y]
+> feature at x 64 dimensions ⊕
+> 66-D input Linear 66 →64 Mish Linear 64 →64 Mish Linear 64 →64 Mish Linear 64 →166 →64 →64 →64 →1 · Mish after each hidden layer
+
+d̂(x)    
+
+> predicted SDF at query point
+> L1 loss
+> ℒSDF = Ex [ | d ̂(x) −d(x) | ]
+> analytic SDF d(x)
+> ground truth (same map)
+
+Figure 2: The occupancy encoder Eϕ and its two-stage training. A binary occupancy map is converted into 256 position-aware, 64-dimensional tokens. These tokens condition the denoiser through cross-attention and retain spatial structure instead of compressing the map into a single global vector. In Stage 1 (bottom), the convolutional stem is pretrained to predict clipped analytic signed distances at sampled workspace points using an auxiliary head and an L1 loss. The head is then discarded, and the stem is finetuned jointly with the denoiser in Stage 2 (top). Analytic SDF supplies supervision only; occupancy is the planner’s only learned environmental input. Token and SDF illustrations are schematic; ⊕ denotes concatenation. Additional head and sampling details appear in Appendix A. 
+
+the spatial map tokens and the diffusion step, and uses it to compute uk−1:
+
+uk−1 = 1
+
+√αk
+
+
+
+uk − βk
+
+√1 − ¯αk
+
+ϵθ (uk, k, Z E )
+
+
+
++ s σ kz, z ∼ N (0 , I ), (9) where αk = 1 − βk, σ2 
+
+> k
+
+= 1− ¯αk−1  
+
+> 1−¯αk
+
+βk, s = 0 .5 scales the sampling noise as in MMD [14], and z = 0 at the final step. Equation (9) gives the update without clipping; in implementation, the predicted clean trajectory is clipped to [−1, 1] before computing the reverse mean, as specified in Table 7. The inpainting operator defined in Training imposes the endpoints before denoising and restores them after every up-date. This preserves the boundary states throughout sampling and matches the endpoint conditioning used during training. Alg. 2 summarizes the single-agent procedure. Note that during inference, obstacle information enters through the learned map representation, sparing the need for sampling-time static-obstacle-cost guidance or a separate trajectory smoother. Re-peated sampling provides multiple candidate trajectories for the same task. Collision-free feasibility is assessed separately using the evaluation protocol in Section 5. The multi-agent integration described next adds coordination constraints to this single-robot generation process. 
+
+## 4.4 SCTD-MRMP Integration 
+
+For multi-robot planning, we reuse the same SCTD model to generate trajectories for every robot, both during initial planning and when conflicts require replanning. Each planning request supplies the workspace occupancy map and the requesting robot’s prescribed endpoints. We coordinate these tra-jectories using XECBS [14], a variant of CBS [15] which detects inter-agent conflicts at synchronized waypoints, branches on additional constraints, and replans the affected robot. Search continues until the selected trajectories have no detected inter-agent conflicts, or the planner fails or reaches its runtime limit. Coordination constraints influence trajectory generation through sampling-time guidance. The de-noiser’s learned context remains map-only: spatial tokens supply workspace information, while con-straint guidance accounts for other robots’ current trajectories. 7Algorithm 2 Single-agent inference                                                       
+
+> Input: occupancy map ME, endpoint states us, u g, trained map encoder Eϕand denoiser ϵθ
+> Output: world-space trajectory τ
+> 1: ZE←Eϕ(ME)
+> 2: Let Kdenote the number of reverse diffusion steps
+> 3: Sample uK∼ N (0 , I )and impose endpoints us, u g
+> 4: for k=K, K −1, . . . , 1do
+> 5: Predict noise bϵk←ϵθ(uk, k, Z E)
+> 6: Update ukto uk−1with the reverse diffusion step
+> 7: Impose endpoints us, u gon uk−1
+> 8: end for
+> 9: Convert u0to a world-space trajectory τ
+> 10: return τ
+
+The high-level SCTD with XECBS procedure used in our multi-robot evaluation is summarized in Algorithm 3. 
+
+# 5 Experimental Results 
+
+Our experiments address three questions: how reliably SCTD generates feasible trajectories on unseen maps, whether its outputs genuinely depend on the supplied map, and how effectively the same gen-erator supports multi-robot coordination. Bold values indicate the best result within each comparison, including ties at the reported precision. 
+
+## 5.1 Experimental Setup 
+
+Environment and data. Experiments use disk robots of radius r = 0 .05 in Ω = [ −1, 1] 2, with disk and axis-aligned rectangular obstacles. SCTD observes a 64 × 64 binary occupancy grid, while task construction and feasibility evaluation use analytic geometry. The principal single-agent benchmark contains 15,000 tasks on 500 maps held out from training. 
+
+Metrics. A single-agent trajectory is feasible if the robot avoids obstacles and remains within the workspace at every waypoint and interpolated check point. Success@ J (or simply @ J) is the percentage of tasks with at least one feasible trajectory among J samples, computed separately for each map and averaged equally across maps. Team success is the percentage of multi-agent tasks solved within the trial time limit, requiring feasible trajectories for all robots and no detected inter-agent conflicts. 
+
+## 5.2 Single-Agent Performance on Unseen Maps 
+
+Single-agent baselines. We compare SCTD with MPD using MMD’s public implementation [14]. MPD applies SDF-based obstacle guidance and post-sampling smoothing, whereas SCTD uses occupancy conditioning without obstacle-cost guidance or a separate smoother. Both methods use the same tasks and feasibility criterion. Table 1 reports single-agent success overall and on obstacle-dependent tasks, split into mild and hard-detour tasks (defined in Appendix D). SCTD achieves higher success than MPD overall, both with one sample (90.5% versus 82.3%) and with 64 samples (99.2% versus 89.4%). The largest differences occur on obstacle-dependent tasks, particularly hard detours, while both diffusion planners perform near ceiling on straight-clear tasks (not shown). 
+
+Single-agent trajectory quality. We measure path length and geometric smoothness on feasible trajec-tories. Our smoothness measure is the maximum local turn angle, which captures the sharpest change in direction over a path distance of one robot diameter ( w = 0 .1). Smaller angles indicate gentler local turns. Principal quality comparisons use tasks for which every compared method produces at least one feasible trajectory. We average over feasible samples within each task, then over tasks within each map, and finally equally across maps. For the trajectory-quality comparison, we also include an A* planner [4]. 8Table 1: Single-agent success (%) on 15,000 held-out tasks across 500 maps, averaged equally across maps. Success@ J measures whether at least one of J candidates is feasible. Task group Success@1 (%) Success@64 (%) SCTD MPD SCTD MPD Overall 90.5 82.3 99.2 89.4 Mild obstacle-dependent 88.6 79.3 99.4 91.7 Hard-detour 72.7 33.8 97.7 52.1                         
+
+> Table 2: Single-agent path length and geometric smoothness on tasks with feasible outputs. Smoothness is mea-sured by the maximum local turn angle over a path distance of one robot diameter; smaller angles indicate gentler local turns. Values are means ±standard deviations across maps. Method Path length ↓
+> Smoothness: max. turn angle ( ◦)↓
+> SCTD 1.255 ±0.220 17 .8±4.7
+> MPD 1.255 ±0.170 125 .6±10 .1
+> A* 1.438 ±0.260 80 .7±4.3
+
+As shown in Table 2, on commonly solved tasks, SCTD produces shorter paths and smoother paths than the evaluated A* planner. Compared with MPD, SCTD has a similar mean path length but markedly smaller maximum local turn angles. Figure 3 illustrates generated trajectories across two task groups, complementing the population-level success and quality comparisons. MPD’s large turn angles fre-quently occur near the trajectory end, as examined further in Appendix E.2. 
+
+## 5.3 Map-Pathway Ablation 
+
+We compare SCTD’s spatial map tokens with the global map embedding of Carvalho et al. [2]: an SDF-pretrained CNN encodes the map as a 128-dimensional vector, which is combined with the normalized start and goal into one cross-attention token. Both designs use the same diffusion-training data and budget, as described in Appendix A. For each design, we evaluate a frozen encoder, as in Carvalho et al., and a jointly fine-tuned encoder, as in SCTD. All four configurations use the same 500 evaluation maps and 15,000 tasks; this population is held out from training and separate from the sealed test set. For this ablation, single-sample success (Suc-cess@1) is estimated from the fraction of feasible trajectories among the 64 samples per task; Success@64 records whether at least one is feasible. Task-level values are averaged within each map and then equally across maps. Table 3 shows that SCTD outperforms the global embedding across all reported task groups with both frozen and fine-tuned encoders. The advantage is especially pronounced on tasks requiring ob-stacle avoidance: on hard-detour tasks, the fine-tuned SCTD achieves 73.7% Success@1 and 97.5% Suc-cess@64, compared with 2.6% and 38.6% for the fine-tuned global model. Fine-tuning improves SCTD’s success across all groups, whereas it reduces success for the global model. SCTD’s advantage also per-sists when both encoders are frozen, supporting the spatial conditioning design beyond the benefit of encoder fine-tuning alone. 
+
+## 5.4 Map Dependence and Out-of-Distribution Evaluation 
+
+We first test whether SCTD’s trajectories depend on the supplied geometry. Replacing the input map with a wrong map, while keeping the endpoints fixed, reduces its collision-free rate (on the original map) from 87.3% to 7.6% on obstacle-dependent held-out tasks, supporting dependence on the supplied obstacle layout. Details are reported in Appendix E.1. We then evaluate generalization beyond the procedural training distribution using MMD’s Con-veyor and Highways environments [14], adding rounded boxes to passages traversed by the demon-strations. Across 26 maps, we evaluate 5,200 reachability-screened start–goal tasks (200 per map), with 9Figure 3: First-sample trajectories from SCTD and MPD on one held-out mild obstacle-dependent task (top) and one hard-detour task (bottom). Grey regions denote obstacles; green and red paths are feasible and colliding, respectively, and a red cross marks the first collision. Blue circles mark starts and black stars mark goals. 
+
+Table 3: Map-pathway ablation on the 500-map evaluation population (15,000 tasks), held out from training and drawn from the same generator as the sealed test set. Success (%) is averaged per map and then equally across maps. Task group Encoder SCTD Global @1 @64 @1 @64 Overall Fine-tuned 91.0 99.4 43.4 73.7 Frozen 87.0 98.8 50.7 80.1 Mild obstacle-dependent Fine-tuned 89.4 99.4 7.1 57.6 Frozen 82.1 98.6 17.0 67.9 Hard-detour Fine-tuned 73.7 97.5 2.6 38.6 Frozen 65.8 96.2 8.2 53.0 
+
+64 ordered samples per task. MPD uses MMD’s released checkpoint for each environment with SDF ob-stacle guidance and smoothing; SCTD uses raw output without static-obstacle guidance or smoothing and was not trained or tuned on these environments. Here, OOD-k denotes added obstacles absent from MPD’s training data. Table 4 shows higher Success@1 and Success@64 for SCTD on the added-obstacle scenes. SCTD achieves at least 99.5% Success@64 in every displayed scene, while MPD’s success varies substantially; on Conveyor OOD-4, the rates are 100.0% and 7.0%, respectively. Figure 4 illustrates the corresponding trajectory examples. Results for all evaluated scenes are reported in Table 8. 10 SCTD Original Corridor blocked 
+
+> MPD
+> feasible first sample colliding (× first collision) start goal env obstacles added obstacles
+
+(a) Conveyor environment. SCTD Original Large block in lane Lane blocked 
+
+> MPD
+> feasible first sample colliding (× first collision) start goal env obstacles added obstacles
+
+(b) Highways environment. 
+
+Figure 4: Trajectory examples for MPD and SCTD on selected tasks in MMD’s Conveyor (a) and Highways (b) en-vironments. The map-conditional model (SCTD) handles new obstacles better than a model that relies on guidance (MPD). 
+
+11 Table 4: Single-agent success (%) on selected added-obstacle scenes in MMD’s Conveyor and Highways environ-ments. Each value is averaged equally across maps. See Appendix E.4 for all scenes and their definitions. Conveyor Highways Scene MPD SCTD Scene MPD SCTD @1 @64 @1 @64 @1 @64 @1 @64 OOD-3 4.5 71.0 62.0 99.5 OOD-3 51.6 89.4 87.1 100.0 
+
+OOD-4 0.0 7.0 73.0 100.0 OOD-4 44.6 49.5 82.4 100.0 
+
+OOD-5 47.5 98.5 64.0 99.8 Table 5: Multi-robot team success (%) within the 180-second trial limit. Dashes indicate team sizes not evaluated for SMD. Robots SCTD MMD SMD 3 96.7 67.8 33.3 6 90.3 50.1 3.7 9 82.2 33.5 0.0 12 71.3 22.1 –15 60.3 15.1 –MMD N = 6 N = 9 N = 15 SCTD 
+
+> robot MMD drives into a wall other robots wall collision (robot disc) start goal obstacle robot-radius margin
+
+Figure 5: Selected multi-robot trajectory comparisons for teams of 6, 9, and 15 robots, with MMD above and SCTD below. Colored paths highlight robots whose MMD trajectories collide with obstacles; corresponding SCTD paths avoid these collisions. Other robots’ paths are gray. Red markers indicate obstacle collisions accounting for the robot radius, and light-gray obstacle margins depict that radius. 
+
+## 5.5 Multi-Agent Results 
+
+Multi-agent baselines. We evaluate coordinated planning on 100 maps held out from training, with 10 newly sampled team tasks per map at each evaluated team size. Tasks are shared across methods. 12 We compare SCTD and MMD using XECBS coordination [14], and additionally evaluate SMD [9] for teams of 3, 6, and 9 robots. Each trial has a 180-second limit, and each low-level call in SCTD and MMD samples 64 candidates. Both XECBS systems retain inter-agent constraint guidance and post-sampling smoothing. SCTD disables static-obstacle and smoothness cost guidance, while MMD retains these terms. Table 5 reports team success: the percentage of tasks solved within 180 seconds with feasible trajec-tories for all robots and no detected inter-agent conflicts. At every reported team size, SCTD has higher team success than the MMD baseline. At the shared sizes of 3, 6, and 9 robots, it also exceeds SMD. Figure 5 compares selected multi-robot plans for teams of 6, 9, and 15 robots. In these examples, MMD produces trajectories with obstacle collisions, whereas SCTD routes the highlighted robots around the obstacles. The nine-robot example shows a particularly clear routing difference: SCTD takes the highlighted robot around the opposite side of the central obstacle. These cases illustrate obstacle-avoidance differences within the shared XECBS coordination framework, complementing the success results in Table 5. 
+
+# 6 Conclusion 
+
+We presented SCTD, a spatially map-conditioned trajectory generator. Multiple position-aware occu-pancy tokens allow trajectory features to access different workspace regions through cross-attention throughout denoising. On held-out maps, SCTD achieves higher single-agent success than the MPD baseline without sampling time obstacle cost guidance, with the largest gains on hard-detour tasks. The conditioning-design ablation further shows higher success with spatial tokens than with a global map embedding. Integrating SCTD into XECBS supports multi-robot motion planning. This combination of spatial map conditioning and high-level conflict-based coordination enables one model trained on single-robot demonstrations to serve different robots, workspace layouts, and team sizes, while inter-agent guidance addresses coordination constraints during sampling and replanning. This integration of SCTD into XECBS achieves higher team success than MMD at all evaluated team sizes and than SMD at the shared sizes of 3, 6, and 9 robots. 
+
+# References 
+
+[1] Ruofei Bai, Jie Chen, Yuxin Cai, Jun Li, Wei-Yun Yau, and Lihua Xie. Robots as tokens: Unified diffu-sion transformer for coordinated multi-robot trajectory generation. arXiv preprint arXiv:2606.15550 ,2026. [2] João Carvalho, Mark Baierl, Julen Urain, and Jan Peters. Conditioned score-based models for learn-ing collision-free trajectory generation. In NeurIPS 2022 Workshop on Score-Based Methods , 2022. [3] João Carvalho, An T. Le, Piotr Kicki, Dorothea Koert, and Jan Peters. Motion planning diffusion: Learning and adapting robot motion planning with diffusion models. IEEE Transactions on Robotics ,41:4881–4901, 2025. [4] Peter E. Hart, Nils J. Nilsson, and Bertram Raphael. A formal basis for the heuristic determination of minimum cost paths. IEEE Transactions on Systems Science and Cybernetics , 4(2):100–107, 1968. doi: 10.1109/TSSC.1968.300136. [5] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffusion probabilistic models. Advances in neural information processing systems , 33:6840–6851, 2020. [6] Huang Huang, Balakumar Sundaralingam, Arsalan Mousavian, Adithyavairavan Murali, Ken Goldberg, and Dieter Fox. DiffusionSeeder: Seeding motion optimization with diffusion for rapid motion planning. In Proceedings of The 8th Conference on Robot Learning , volume 270 of Proceedings of Machine Learning Research , pages 4392–4409. PMLR, 2025. [7] Siyuan Huang, Zan Wang, Puhao Li, Baoxiong Jia, Tengyu Liu, Yixin Zhu, Wei Liang, and Song-Chun Zhu. Diffusion-based generation, optimization, and planning in 3D scenes. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 16750–16761. IEEE, 2023. 13 [8] Michael Janner, Yilun Du, Joshua Tenenbaum, and Sergey Levine. Planning with diffusion for flexible behavior synthesis. In Proceedings of the 39th International Conference on Machine Learning ,volume 162 of Proceedings of Machine Learning Research , pages 9902–9915. PMLR, 2022. [9] Jinhao Liang, Jacob K. Christopher, Sven Koenig, and Ferdinando Fioretto. Simultaneous multi-robot motion planning with projected diffusion models. In Proceedings of the 42nd International Conference on Machine Learning , volume 267 of Proceedings of Machine Learning Research , pages 37162– 37180. PMLR, 2025. [10] Jinhao Liang, Sven Koenig, and Ferdinando Fioretto. Discrete-guided diffusion for scalable and safe multi-robot motion planning. Proceedings of the AAAI Conference on Artificial Intelligence , 40(28): 23417–23424, 2026. doi: 10.1609/aaai.v40i28.39512. [11] Kallol Saha, Vishal Mandadi, Jayaram Reddy, Ajit Srikanth, Aditya Agarwal, Bipasha Sen, Arun Singh, and Madhava Krishna. EDMP: Ensemble-of-costs-guided diffusion for motion planning. In 
+
+2024 IEEE International Conference on Robotics and Automation . IEEE, 2024. doi: 10.1109/ICRA57147. 2024.10610519. [12] Edward Sandra, Lander Vanroye, Dries Dirckx, Ruben Cartuyvels, Jan Swevers, and Wilm Decré. Accelerated multi-modal motion planning using context-conditioned diffusion models. In 2026 IEEE International Conference on Robotics and Automation . IEEE, 2026. arXiv:2510.14615. [13] Mingyo Seo, Yoonyoung Cho, Yoonchang Sung, Peter Stone, Yuke Zhu, and Beomjoon Kim. PRESTO: Fast motion planning using diffusion models based on key-configuration environment representation. In 2025 IEEE International Conference on Robotics and Automation . IEEE, 2025. arXiv:2409.16012. [14] Yorai Shaoul, Itamar Mishani, Shivam Vats, Jiaoyang Li, and Maxim Likhachev. Multi-robot mo-tion planning with diffusion models. In International Conference on Learning Representations , 2025. arXiv:2410.03072. [15] Guni Sharon, Roni Stern, Ariel Felner, and Nathan R. Sturtevant. Conflict-based search for optimal multi-agent pathfinding. Artificial Intelligence , 219:40–66, 2015. [16] Jascha Sohl-Dickstein, Eric Weiss, Niru Maheswaranathan, and Surya Ganguli. Deep unsupervised learning using nonequilibrium thermodynamics. In Proceedings of the 32nd International Conference on Machine Learning , volume 37 of Proceedings of Machine Learning Research , pages 2256–2265. PMLR, 2015. [17] Yang Song and Stefano Ermon. Generative modeling by estimating gradients of the data distribu-tion. Advances in neural information processing systems , 32, 2019. [18] Yang Song, Jascha Sohl-Dickstein, Diederik P Kingma, Abhishek Kumar, Stefano Ermon, and Ben Poole. Score-based generative modeling through stochastic differential equations. In Interna-tional Conference on Learning Representations , 2021. URL https://openreview.net/forum?id= PxTIG12RRHS .[19] Roni Stern, Nathan Sturtevant, Ariel Felner, Sven Koenig, Hang Ma, Thayne Walker, Jiaoyang Li, Dor Atzmon, Liron Cohen, T. K. Satish Kumar, Eli Boyarski, and Roman Barták. Multi-agent pathfinding: Definitions, variants, and benchmarks. Proceedings of the International Symposium on Combinatorial Search , 10(1):151–158, 2019. doi: 10.1609/socs.v10i1.18510. [20] Xiaohan Zhang, Xudong Mou, Rui Wang, Tianyu Wo, Ningbo Gu, Tiejun Wang, Cangbai Xu, and Xudong Liu. RobotDiffuse: Motion planning for redundant manipulator based on diffusion model. 
+
+arXiv preprint arXiv:2412.19500 , 2024. 14 A Implementation Details 
+
+Hardware and software. All experiments ran on NVIDIA RTX 6000 Ada Generation GPUs (48 GB) with Intel Xeon Gold 6438Y+ CPUs, using Python 3.8.20, PyTorch 2.0.0, and CUDA 11.8. Our imple-mentation builds on the official code of MMD [14], which in turn builds on MPD [3]. 
+
+Trajectory representation. A trajectory has 64 waypoints with state (x, y, ˙x, ˙y). Each channel is scaled to [−1, 1] with limits fitted on the training split: positions use their minima and maxima, and both velocity channels share the 99.9th percentile of absolute velocity, above which values saturate. Start and goal states have zero velocity. Generated trajectories are converted back to world coordinates once, before evaluation. 
+
+Network architecture. Table 6 lists the layer dimensions. Each convolution in the occupancy encoder is followed by group normalization and a SiLU activation. Cross-attention uses two heads of dimension 32. The SDF pretraining head receives the bilinearly interpolated 64-dimensional stem feature concate-nated with the query coordinates and applies three hidden layers of width 64 with Mish activations and a scalar output. It is discarded after pretraining.   
+
+> Table 6: Layer dimensions of SCTD. Convolutional tuples give (output channels, kernel size, stride, padding); B
+> denotes batch size.
+
+Module Layer Dimensions 
+
+Occupancy encoder 
+
+Input [B, 1, 64 , 64] 
+
+Conv2d (32 , 3, 2, 1) → [B, 32 , 32 , 32] 
+
+Conv2d (64 , 3, 2, 1) → [B, 64 , 16 , 16] 
+
+Spatial map tokens 
+
+Flatten spatial grid [B, 256 , 64] 
+
+Learned positional embedding [1 , 256 , 64] 
+
+Context output [B, 256 , 64] 
+
+Temporal U-Net 
+
+Trajectory input [B, 64 , 4] 
+
+Down stages (4 → 32 , 64) , (32 → 64 , 32) , (64 → 128 , 16) 
+
+Middle stage [B, 128 , 16] 
+
+Up stages 128 → 64 → 32 channels; horizons 16 → 32 → 64 
+
+Output projection [B, 64 , 4] predicted noise 
+
+Conditioning 
+
+Cross-attention context 256 keys/values of dimension 64 Attention locations every down, middle, and up block Diffusion-time conditioning additive channel-wise bias in every residual block Hard endpoint conditions trajectory rows {0, 63 }
+
+15 Table 7: Training and sampling hyperparameters of SCTD. Setting Value 
+
+Stage 1: SDF pretraining 
+
+Maps 45 ,450 
+
+Query points per map 1,024 , uniform over the workspace Target signed distance clipped to [−0.2, 0.2] 
+
+Optimizer Adam, learning rate 10 −3
+
+Batch size / epochs 32 / 4
+
+Stage 2: diffusion training 
+
+Demonstrations 44 ,984 on 4,500 maps Optimizer Adam, constant learning rate 10 −4
+
+Batch size 32 
+
+Training steps 1,000 ,000 
+
+Gradient clipping global norm 1.0
+
+Reported weights EMA, decay 0.995 , updated every 10 steps from step 1,000 
+
+Sampling 
+
+Sampler DDPM, 25 steps, last step noiseless Variance schedule exponential, βstart = 10 −4, βend = 1 .0
+
+Extra reconstruction one noiseless pass at diffusion step zero Reverse-noise multiplier 0.5 times the posterior standard deviation Clean-trajectory estimate clamped to [−1, 1] at each step Candidates per task 64 
+
+Training and sampling. Table 7 lists the hyperparameters of both training stages and of sampling. 
+
+# B Dataset Generation 
+
+Maps. Each map is a 2 × 2 workspace containing four to six obstacles: disks with radius in [0 .20 , 0.32] 
+
+and axis-aligned rectangles with half-extents in [0 .16 , 0.30] . A fraction of obstacles is placed adjacent to a neighbour to form compound shapes that force detours; the others keep a gap of at least 0.11 , wider than the robot diameter. Maps are generated deterministically from their index and rasterized to a 64 × 64 
+
+occupancy grid. 
+
+Tasks. Start and goal positions are sampled with obstacle clearance at least 0.16 , at least 0.15 apart, and in the same connected free region of a 128 × 128 grid. 
+
+Expert trajectories. For each of 30 candidate tasks per training map, a single RRTConnect–GPMP2 run produces a 64-waypoint trajectory (RRTConnect initialization followed by 500 GPMP2 optimization it-erations). We discard trajectories that collide, and for straight-clear tasks those whose arc length exceeds 
+
+1.10 times the start–goal distance. From the remaining trajectories, each map keeps at most ten, aiming for one straight-clear and nine obstacle-dependent examples while preserving the available ratio of mild to hard-detour tasks. The resulting diffusion-training set contains 44,984 demonstrations on 4,500 maps. 
+
+Encoder-pretraining maps. SDF pretraining uses 45,450 maps from the same generator: 450 of the diffusion-training maps and 45,000 additional maps. Pretraining needs no demonstrations. 
+
+Evaluation maps. Training, held-out evaluation, and test maps are disjoint by index. The single-agent benchmark consists of 500 test maps with 30 tasks each, taken in sampling order among candidates that pass a 512 × 512 four-connected reachability check for the robot. The map-dependence control in Appendix E.1 uses a separate set of 500 held-out evaluation maps. 16 C Multi-Robot Planning Details 
+
+Algorithm 3 summarizes how SCTD is used within XECBS [14]. Each node stores conflict constraints, a batch of candidate trajectories for each robot, and one selected trajectory per robot. Plan( i, n, Bprev ) sam-ples a new batch for robot i from SCTD, conditioned on the occupancy map and the robot’s endpoints and guided by its conflict constraints and by soft constraints derived from the other robots’ selected trajectories in n. With an empty previous batch, sampling starts from Gaussian noise; otherwise, the previous batch is re-noised for 3 steps and denoised for 3 steps. A call fails if no candidate is free of ob-stacle collisions. At the root, each robot selects its lowest-cost collision-free candidate; after replanning, the collision-free candidate with the fewest inter-robot conflicts. 
+
+Parameters. Each call samples 64 candidates; initial planning uses 25 denoising steps. As in MMD, guidance is applied during the final half of the reverse process with 20 gradient steps per denoising step. Conflict constraints are spheres of radius 0.12 (weight 2 × 10 −1), and soft constraints use weight 
+
+2 × 10 −2. SCTD sets the static-obstacle and smoothness guidance weights to zero; the MMD baseline uses its defaults of 2 × 10 −2 and 8 × 10 −2. Returned trajectories are smoothed with a Savitzky–Golay filter (window 10, order 2). 
+
+Algorithm 3 SCTD within XECBS, adapted from Shaoul et al. [14] 
+
+Input: occupancy map M , endpoint states {(ss 
+
+> i
+
+, s g 
+
+> i
+
+)}Ni=1 , shared SCTD model, runtime limit 
+
+Output: selected trajectories with no detected inter-agent conflicts, or failure  
+
+> 1:
+
+n0 ← new node with empty constraints, batches, and selected trajectories  
+
+> 2:
+
+for i = 1 , . . . , N do  
+
+> 3:
+
+if Plan( i, n 0, ∅) fails then  
+
+> 4:
+
+return failure  
+
+> 5:
+
+end if  
+
+> 6:
+
+end for  
+
+> 7:
+
+Q ← { n0} 
+
+> 8:
+
+while Q̸ = ∅ and time remains do  
+
+> 9:
+
+Remove from Q a node n with the fewest inter-agent conflicts  
+
+> 10:
+
+if the selected trajectories in n have no detected conflict then  
+
+> 11:
+
+return n. τ 
+
+> 12:
+
+end if  
+
+> 13:
+
+c ← a detected conflict between robots i and j 
+
+> 14:
+
+for k ∈ { i, j } do  
+
+> 15:
+
+n′ ← copy of n 
+
+> 16:
+
+Add the conflict constraint for robot k derived from c to n′.C k 
+
+> 17:
+
+if Plan( k, n ′, n. Bk ) succeeds then  
+
+> 18:
+
+Insert n′ into Q 
+
+> 19:
+
+end if  
+
+> 20:
+
+end for  
+
+> 21:
+
+end while  
+
+> 22:
+
+return failure 
+
+# D Evaluation Details 
+
+Single-agent feasibility. A trajectory is feasible if, at every waypoint and at three interpolated points per segment, the robot clears every obstacle by its radius and its centre stays inside the workspace. For candidate budget J, let Fmtj indicate whether draw j for task t on map m is feasible, and let Tm be the map’s tasks in the reported group. Success@ J is 
+
+bSJ = 1
+
+|M ∗|
+
+X
+
+> m∈M ∗
+
+1
+
+|Tm|
+
+X
+
+> t∈Tm
+
+1
+
+
+
+max  
+
+> 1≤j≤J
+
+Fmtj = 1 
+
+
+
+,
+
+M∗ = {m : |Tm| > 0}.
+
+17 Task groups. A task is straight-clear if the straight start–goal segment clears all obstacles by the robot radius, and obstacle-dependent otherwise. An obstacle-dependent task is hard-detour if its shortest 8-connected path on the 64 × 64 grid is at least 1.2 times the start–goal distance, and mild otherwise. Tasks that are reachable at 512 × 512 but disconnected at 64 × 64 are kept and counted as mild. 
+
+Trajectory quality. Path length is the sum of distances between consecutive waypoints. Smoothness is the maximum local turn angle: the largest angle between consecutive chords spanning a path distance of one robot diameter ( w = 0 .1). Quality comparisons use tasks for which every compared method produces at least one feasible trajectory; metrics are averaged over feasible draws within a task, then over tasks within a map, and then equally over maps. 
+
+Multi-robot success. A trial succeeds if XECBS returns a solution within 180 seconds, no two robots come closer than 0.105 at any synchronized waypoint, no robot’s smoothed trajectory collides with an obstacle under MMD’s grid-based collision check, and every robot’s smoothed trajectory starts and ends within 0.05 of its endpoints. SMD trajectories are scored with the same checks. 
+
+Single-agent baselines. MPD uses MMD’s released Empty prior ( EnvEmpty2D-RobotPlanarDisk )with its default SDF-based obstacle and smoothness guidance computed on the evaluated map, followed by MMD’s Savitzky–Golay smoothing; it is scored after smoothing, and SCTD on its raw output. We use the Empty prior because MMD’s other priors encode application-specific motion patterns that are absent from our maps. A* plans on a 4-connected grid with spacing 0.1, using exact obstacle geometry; each endpoint is connected by straight segments to the free corners of its grid cell. A* returns one unsmoothed route per task. 
+
+Multi-robot baselines. MMD runs XECBS with the Empty prior and its default guidance weights. SMD [9] uses its released composite models, which exist for teams of 3, 6, and 9 robots. Its projec-tion step handles only circular obstacles, so each rectangle is replaced by a disk cover with maximum boundary error 0.01 , shared by guidance and projection. The projection uses robot radius 0.055 , so its ac-cepted solutions satisfy our separation and clearance thresholds, and is initialized with the model’s own sample. SMD uses 64 samples and 25 denoising steps, as MMD and SCTD do. The 180-second limit is enforced externally, and BLAS is limited to one thread per trial. We did not run the disk-cover-resolution and A*-initialization sensitivity checks that we had planned. 
+
+# E Additional Results 
+
+## E.1 Map-dependence control 
+
+To test whether SCTD uses its map input, we replace the supplied occupancy map with a different map while keeping the start and goal fixed, and score the result against the original obstacles. We use obstacle-dependent tasks solved by the expert planner on the 500 evaluation maps held out from training. For each task, we select up to 15 replacement maps with clear, connected endpoints using a fixed seed. We then keep only those that block the straight segment between the start and goal. We exclude 39 tasks with no remaining replacement. For each task, we generate 64 samples per replacement map, sharing sampling noise across its replacements. Over 7,336 tasks and 84,373 replacement comparisons, the collision-free rate is 87.3% with the cor-rect map and 7.6% with a replacement map. Within each original map, we average success with the correct map over tasks and success with replacement maps over replacement comparisons. We then average both rates equally across original maps. The difference is 79.7 percentage points, with a 95% bootstrap interval of [78 .4, 80 .9] , computed from 10,000 resamples over both original and replacement maps. Figures 6 and 7 show selected qualitative examples from a separate pool of replacement maps. 
+
+## E.2 Location of large turns 
+
+Among feasible MPD paths whose maximum local turn angle is at least 90 ◦, the maximum lies in the final 10% of the path in 62.6% of cases overall, 96.4% on mild obstacle-dependent tasks, and 97.3% on hard-detour tasks. For SCTD the overall share is 4.0%, and only 1.5% of its feasible paths contain a turn of at least 90 ◦.18 Figure 6: Same-noise map replacement for an obstacle-dependent task (left) and a straight-route task (right). The top row shows collision-free draws on the true map. In the lower rows, solid grey obstacles are the true walls used for scoring, dashed outlines show the supplied replacement map, faint green curves repeat the true-map paths, and the bold red curve is the draw produced from identical noise under the replacement; each collides. 
+
+19 Figure 7: All replacement maps for one obstacle-dependent task. The top-left panel shows the true map and true-map draws. Other panels show the true walls (solid grey), the replacement map (dashed orange), and the same-noise draw, green if collision-free and red if it collides. 
+
+20 E.3 Qualitative results 
+
+Figure selection. For the main-text trajectory figure, each task is drawn at random (seed 1) from test tasks in its group whose first SCTD draw is feasible. Figure 8 shows additional test tasks.  
+
+> Figure 8: SCTD on test tasks. Rows are straight-clear, mild obstacle-dependent, and hard-detour tasks. Each panel overlays several of the 64 raw draws; the bold curve is the first draw, and green and red mark collision-free and colliding draws. Each row has a fixed number of first-draw failures (one, one, and two), filled at random with seed 0, so the rows do not reflect success rates.
+
+## E.4 Unseen obstacles in MMD environments 
+
+We add obstacles to MMD’s Conveyor and Highways environments on the routes followed by MPD’s training demonstrations. All added obstacles are axis-aligned rounded boxes, every scene remains con-nected, the workspace is [−1, 1] 2, and the robot radius is 0.05 .
+
+Scenes. In Conveyor, OOD-1 adds a 0.2-unit bump to the middle bar of the top or bottom corridor, leaving a 0.15-unit gap (two maps). OOD-2 adds a chicane of 0.1-unit bumps in either corridor, with 0.15-unit gaps (two maps). OOD-3 and OOD-4 apply the OOD-1 and OOD-2 changes to both corridors (one map each). OOD-5 adds a 0.2-unit plug closing either corridor (two maps). In Highways, OOD-1 adds a 0.1 × 0.2 block in each of the four lanes in turn, leaving gaps of 0.25 and 0.15; OOD-2 centres the same block, leaving two 0.20 gaps; OOD-3 uses a 0.2 × 0.2 block, leaving two 0.15 gaps; OOD-4 adds a 
+
+0.6 × 0.2 bar to OOD-3, closing the counter-clockwise route. 
+
+Protocol. Each map has 200 tasks from MMD’s random endpoint sampler (obstacle clearance 0.16), kept if reachable. Endpoints are sampled independently on each map, while the sampling-noise seed is fixed across scenes. Rates are averaged equally across maps, using the feasibility check and 64-sample protocol of Appendix D. MPD uses MMD’s released checkpoint for each environment with SDF-based guidance and is scored after smoothing; SCTD, which was not trained on either environment, receives the scene’s 64 × 64 occupancy map and is scored on its raw output. The detour subset contains tasks whose shortest path is longer than in the Original scene. Main-text scenes were chosen after the results were known: per environment, among scenes where SCTD’s Success@1 exceeds MPD’s by at least 10 points, up to three with the largest Success@64 gap. Table 8 reports all scenes. 21 Table 8: Single-agent success (%) in MMD’s Conveyor and Highways environments. “–” marks an empty detour subset. Environment Scene Maps All tasks Detour subset MPD SCTD n MPD SCTD @1 @64 @1 @64 @1 @64 @1 @64 Conveyor Original 1 98.5 100.0 65.5 100.0 – – – – –OOD-1 2 51.2 100.0 60.8 100.0 – – – – –OOD-2 2 48.0 98.8 63.7 100.0 8 62.5 100.0 50.0 100.0 
+
+OOD-3 1 4.5 71.0 62.0 99.5 – – – – –OOD-4 1 0.0 7.0 73.0 100.0 8 0.0 0.0 50.0 100.0 
+
+OOD-5 2 47.5 98.5 64.0 99.8 18 27.8 100.0 33.3 100.0 
+
+Highways Original 1 100.0 100.0 100.0 100.0 – – – – –OOD-1 4 88.5 100.0 93.6 100.0 37 86.5 100.0 67.6 100.0 
+
+OOD-2 4 99.8 100.0 90.5 100.0 46 97.8 100.0 58.7 100.0 
+
+OOD-3 4 51.6 89.4 87.1 100.0 50 56.0 100.0 64.0 100.0 
+
+OOD-4 4 44.6 49.5 82.4 100.0 175 46.9 46.9 39.4 100.0 
+
+Illustrations. The main-text illustrations show the first draw for one task per scene whose straight start–goal segment is blocked; a red cross marks the first collision. For scenes with added obstacles, the task is the one closest to the scene’s mean feasible-draw counts among tasks where SCTD has more feasible draws than MPD. 22

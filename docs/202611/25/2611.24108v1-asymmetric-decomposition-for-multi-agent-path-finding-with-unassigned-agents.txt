@@ -1,0 +1,1925 @@
+1
+Asymmetric Decomposition for Multi-Agent
+Path Finding with Unassigned Agents
+Xi Jin1,3, Chen Qian1, Renjun Zhang1, Guowei Wu1,
+Xiaobo Li2, Jun Jiang2,3, and Weiwei Shang1,2
+1University of Science and Technology of China
+2State Key Laboratory of Precision and Intelligent Chemistry
+3Hefei National Laboratory
+E-mail: jinxi@mail.ustc.edu.cn, wwshang@ustc.edu.cn
+Abstract—Robots without assigned tasks may obstruct active
+robots, while routing them to designated parking locations
+can cause unnecessary travel. This article proposes flow-oracle
+conflict-based search (FOCBS) for Multi-Agent Path Finding
+with unassigned agents (MAPF-UA). FOCBS searches over
+assigned-agent paths using conflict-based search (CBS) and
+routes targetless unassigned agents through a min-cost flow
+oracle. When the selected assigned-agent paths leave unassigned
+agents no collision-free paths, flow-conflict branching converts
+min-cut blockers into assigned-agent constraints, which guide the
+search without excluding optimal solutions. A batched zero-cost
+warm start accelerates the oracle, and start-avoiding tie-breaking
+reduces unassigned-agent movement. For feasible instances on
+finite graphs, we prove termination and global minimization
+of assigned-agent sum of service time, measured by last-arrival
+times. Unassigned-agent movement is minimized conditional on
+the selected assigned-agent paths, without a global lexicographic
+optimality guarantee. Benchmark experiments show that FOCBS
+scales well with the number of unassigned agents, and ablation
+studies show that, compared with discarding non-completable
+assigned-agent paths, flow-conflict branching solves substan-
+tially more instances while retaining optimality. Simulation and
+physical-robot experiments demonstrate plan executability, with
+laboratory tests reducing fleet travel by 40.8% relative to the
+parking-based coordination baseline. The source code and related
+resources are available at https://github.com/Chin-hsi/focbs.
+Index Terms—Conflict-based search, min-cost flow, Multi-
+Agent Path Finding, multi-robot systems, unassigned agents.
+I. INTRODUCTION
+M
+ULTI-ROBOT systems improve productivity in auto-
+mated warehouses, fulfillment centers, manufacturing
+logistics, and self-driving laboratories [1]–[3]. Their opera-
+tion relies on Multi-Agent Path Finding (MAPF) [4], which
+computes collision-free paths from agents’ starts to goals
+while optimizing a prescribed cost. For continuously arriving
+tasks, rolling-horizon methods decompose lifelong warehouse
+MAPF into successive planning episodes [5]. In many de-
+ployed mobile robot systems, however, not every robot is
+assigned a service task in every planning episode. Some robots
+must travel from their starts to designated targets to per-
+form transportation, pick-and-place, or laboratory operations,
+while others have no task targets but still occupy the shared
+workspace. Treating these idle robots as static obstacles can
+block narrow passages, limiting active robots’ reachability
+or forcing long detours; assigning each idle robot a parking
+ai Assigned robot
+uj Unassigned robot
+gi Goal
+a1
+u2
+u1
+g1
+(a)
+a1
+u1
+u2
+g1
+(b)
+Tree branches:
+Constraints on A
+Constraints on U
+Joint CBS
+(all agents in one tree)
+a1
+a2
+u1
+u2
+u3
+· · ·
+NP-hard
+All conflict types
+Asymmetric Decomposition
+(FOCBS)
+Assigned A
+ai
+si
+gi
+CBS
+NP-hard
+Unassigned U
+uj
+ŝj
+any v
+s+
+s−
+Flow oracle
+Polynomial
+Conflicts involving A
+A-paths
+Blockers
+(c)
+Fig. 1. MAPF-UA scenario and algorithm comparison. (a) Laboratory scene.
+(b) Top view. (c) Algorithm comparison: joint CBS searches over all agents
+in one constraint tree; FOCBS combines CBS over assigned agents with
+polynomial-time flow routing for unassigned agents under fixed assigned-
+agent paths.
+location can instead cause unnecessary travel and occupy
+valuable workspace. The comparison in Fig. 2 motivates a
+planner that determines which idle robots need to move, when
+they should yield, and where they can stop without requiring
+designated parking locations.
+Multi-Agent Path Finding with unassigned agents (MAPF-
+UA) [6] captures this setting. Assigned agents have designated
+targets, whereas unassigned agents have only starts and may
+terminate at any vertex; all agents must remain collision-free.
+Minimizing assigned-agent service time alone may move unas-
+signed agents unnecessarily. Subject to collision-free paths for
+all agents, we therefore first minimize the sum of service
+time (SST) for assigned agents and then minimize the sum of
+moves by unassigned agents (SMU) conditional on the selected
+assigned-agent paths.
+Because MAPF-UA generalizes MAPF, solving it optimally
+arXiv:2611.24108v1  [cs.RO]  18 Nov 2026
+
+
+2
+is NP-hard [7]. Unassigned agents add two difficulties. Their
+terminal vertices are decision variables, and permuting them
+over the same vertices yields equivalent states. Moreover, static
+unassigned agents may greatly increase service time or render
+dense instances unsolvable [6]. In dense instances, scarce free
+vertices leave unassigned agents little space to yield.
+Conflict-based search (CBS) [8] uses a two-level search.
+The high level resolves conflicts by creating child nodes
+in a constraint tree, each imposing a constraint on one of
+the conflicting agents; the low level replans that agent’s
+path under the updated constraints. Applying CBS jointly
+to both agent types places assigned agents and unassigned
+agents in the same high-level constraint tree (Fig. 1(c), left).
+This direct application does not fully exploit the targetless,
+interchangeable nature of unassigned agents. As unassigned-
+agent density grows, branching on conflicts involving them
+substantially increases high-level search overhead, creating a
+scalability bottleneck.
+Optimal CBS extensions reduce search effort via stronger
+reasoning and splitting, including improved CBS (ICBS) [9],
+disjoint splitting [10], dependency-graph heuristics [11], and
+symmetry reasoning [12]. In-depth cluster reasoning strength-
+ens CBS heuristics by identifying conflicts involving more
+than two agents [13]. Enhanced CBS (ECBS) [14] and ex-
+plicit estimation CBS (EECBS) [15] improve efficiency with
+bounded-suboptimality guarantees. For multi-agent combina-
+torial path finding, CBSS-A and CBSS-AF combine approx-
+imate target sequencing with collision-free routing [16]. The
+cited formulations consider agents with prescribed targets.
+Other methods emphasize scalable coordination or feasible-
+path search. Priority inheritance with backtracking (PIBT) [17]
+provides fast online coordination, the LaCAM family [18]
+uses lazy constraint addition, and the multi-agent corridor
+generating algorithm (MACGA) [19] constructs target-directed
+corridors and evacuates blocking agents. The acceptance-
+rejection sampling-guided discrete rapidly-exploring random
+tree (adRRT) [20] searches for feasible paths through random-
+ized expansion. Learning-based methods, including pathfind-
+ing via reinforcement and imitation multi-agent learning (PRI-
+MAL) [21] and transformer-based approaches [22], train de-
+centralized policies for online decisions. Chen et al. [23]
+combine deep reinforcement learning with hot supervision
+contrastive loss to learn coordination without interagent com-
+munication. These methods provide efficient coordination
+mechanisms, but their original formulations do not explicitly
+minimize unassigned-agent movement.
+Network-flow and decomposition methods offer another
+way to organize multi-agent planning. Time-expanded net-
+works (TENs) encode routing as network flow [24], and
+conflict-based min-cost flow (CBM) [25] combines CBS be-
+tween teams with min-cost flow within teams having pre-
+scribed target sets. For labeled robots, multicommodity-flow
+encodings support integer-programming algorithms for several
+path-cost objectives [26]. Branch-and-cut-and-price also uses
+decomposition [27], while anonymous MAPF exploits agent
+interchangeability with respect to goals [28]. Layered decom-
+position for large agents partitions the planning problem and
+merges subproblems when needed to restore solvability [29].
+(a) Static obstacle
+(b) Parking-area routing
+(c) MAPF-UA
+Fig. 2.
+A motivating example for MAPF-UA. (a) Treating unassigned
+agents as static obstacles forces a costly assigned-agent detour. (b) Sending
+unassigned agents to parking areas clears the path but causes unnecessary
+movement. (c) MAPF-UA lets only the blocking unassigned agent step aside
+and stop at any free cell.
+Lexicographic bi-objective MAPF [30] and multi-objective
+CBS [31] address ordered objectives and Pareto-optimal so-
+lution sets, respectively. These formulations assign each agent
+a target or each group a target set, whereas unassigned agents
+may stop at any free vertex.
+MAPF-UA is closely related to MAPF with the reachability
+objective (MAPF-RO) [32], in which each agent must visit its
+target at least once but may subsequently leave it. Gabay et
+al. [32] reduce the reachability-based MAPF-UA formulation
+to MAPF-RO by assigning each unassigned agent its start ver-
+tex as its target; this reduction preserves soundness, optimality,
+and completeness under their first-arrival-based SST objective.
+The resulting MAPF-RO instance treats both groups as agents
+with targets, and the originally unassigned agents satisfy their
+targets at the initial time. Their subsequent movement there-
+fore contributes nothing to the standard MAPF-RO objective,
+which neither penalizes that movement nor optimizes SMU.
+In MAPF-UA, unassigned agents are commonly treated as
+static obstacles, assigned surrogate targets such as their starts
+or parking locations, or planned individually within a joint
+search. These treatments do not fully exploit the targetless,
+interchangeable nature of unassigned agents. Decomposition is
+a natural approach: with assigned-agent paths fixed, targetless
+unassigned agents can be routed by single-commodity min-
+cost flow in polynomial time. However, SST-optimal assigned-
+agent paths computed without unassigned agents may occupy
+the vertices and time steps they need to yield, leaving no
+collision-free paths for unassigned agents, and the failure alone
+does not identify which paths to revise. The central challenge
+is to exploit the targetless structure for scalability while using
+such failures to guide the assigned-agent search.
+Feeding subproblem infeasibility back to a higher-level
+search follows the decomposition principle of Benders [33].
+Logic-based Benders decomposition derives constraints from
+subproblem inference [34], and combinatorial Benders cuts
+exclude combinations of decisions that make a subproblem
+infeasible [35]. FOCBS adopts a similar feedback idea for
+MAPF-UA: a minimum cut [36] identifies assigned-agent
+reservations whose joint retention prevents unassigned-agent
+routing, and their negations form a CBS branching disjunc-
+tion. Standard CBS splitting enforces such a disjunction for
+a pairwise conflict [8]; for MAPF-UA, the key step is to
+show that the flow-derived disjunction covers every feasible
+
+
+3
+completion under the current constraints, including those with
+longer horizons.
+Our contributions are as follows.
+1) We formulate sequential MAPF-UA and establish its
+asymmetric decomposition: finding SST-optimal com-
+pletable assigned-agent paths is NP-hard, whereas
+unassigned-agent routing under fixed assigned-agent
+paths is solvable by min-cost flow in time polynomial
+in TEN size.
+2) We propose flow-oracle conflict-based search (FOCBS),
+using CBS for assigned agents and flow-conflict branch-
+ing to convert min-cut blockers into a CBS disjunction.
+We prove that this disjunction preserves every feasible
+completion, including those with longer horizons, which
+yields termination and sequential optimality for feasible
+instances on finite graphs.
+3) We develop a batched zero-cost warm start to accelerate
+the flow oracle, and a start-avoiding tie-breaking rule to
+reduce SMU without compromising SST optimality.
+4) We evaluate FOCBS on standard benchmarks and val-
+idate path executability in warehouse simulation and
+physical-robot experiments.
+The remainder of this article is organized as follows. Sec-
+tion II formulates MAPF-UA and the asymmetric decomposi-
+tion. Section III presents the FOCBS algorithm and the flow
+oracle. Section IV evaluates FOCBS on standard benchmarks,
+reports ablation experiments and runtime analysis, and val-
+idates path executability through simulation and real-world
+experiments. Section V concludes this article.
+II. PROBLEM FORMULATION
+We formulate sequential MAPF-UA, which minimizes SST
+globally and then SMU for the selected assigned-agent paths.
+Finding SST-optimal completable assigned-agent paths is NP-
+hard, whereas unassigned-agent routing under fixed ones is
+polynomial-time solvable by min-cost flow.
+Definition 1 (MAPF-UA). A MAPF-UA instance consists of
+an undirected graph G = (V, E) and disjoint sets of as-
+signed agents A
+=
+{a1, . . . , an} and unassigned agents
+U = {u1, . . . , um}. Each assigned agent ai has a start si ∈V
+and target gi ∈V ; each unassigned agent uj has a start
+ˆsj ∈V but no target. All start vertices are distinct. A path
+is a vertex sequence, indexed by time step, whose consecutive
+vertices are either identical (a wait) or adjacent in G (a move).
+We call assigned-agent paths A-paths and unassigned-agent
+paths U-paths. A complete plan consists of an A-path set
+πA = (πA
+i )ai∈A and a U-path set πU = (πU
+j )uj∈U, where πA
+i
+starts at si and πU
+j starts at ˆsj. A vertex conflict occurs when
+two agents occupy the same vertex at the same time step; an
+edge conflict occurs when two agents traverse the same edge
+in opposite directions between the same two consecutive time
+steps. A complete plan is feasible if it is conflict-free, each A-
+path reaches its target and stays there from some finite time
+onward, and each U-path eventually stays at some vertex.
+The agent-location ratio (ALR) is defined as ALR = (n +
+m)/|V | [6]. As ALR approaches one, free vertices become
+scarce, and unassigned agents more often need to yield, which
+makes unassigned-agent routing harder.
+The last-arrival time is the earliest time step from which ai
+stays at gi forever:
+tlast
+i
+(πA
+i ) := min{t ∈Z≥0 : πA
+i (τ) = gi, ∀τ ∈Z≥t}.
+(1)
+SST uses this last-arrival time because an assigned agent
+must remain at its target to perform its task; the reachability
+formulation of [32] instead uses first-arrival times and permits
+subsequent departure. The A-paths determine the horizon
+T(πA) = max
+ai∈A tlast
+i
+(πA
+i ),
+(2)
+after which every assigned agent waits at its target.
+For a complete plan π = (πA, πU), the two costs are
+SST(π) = P
+ai∈A tlast
+i
+(πA
+i ),
+(3)
+SMU(π) = P
+uj∈U
+PT (πA)
+t=1
+1{πU
+j (t)̸ = πU
+j (t−1)}.
+(4)
+Here SST is the sum of service time for assigned agents [6],
+also written SST(πA), and SMU is the sum of moves by unas-
+signed agents through T(πA). In Fig. 2, the static-obstacle,
+parking, and MAPF-UA plans have (SST, SMU) = (4, 0),
+(2, 3), and (2, 1), respectively. The last two plans share the
+same A-path, but parking moves unassigned agents beyond
+what yielding requires. Let A be the set of mutually conflict-
+free A-path sets in which each ai starts at si, reaches gi, and
+waits there from its last arrival through T(πA). For πA ∈A,
+let R(πA) be the set of U-path sets that, over time steps
+0, . . . , T(πA), are conflict-free among themselves and with
+πA. Define
+Acomp = {πA ∈A : R(πA)̸ = ∅}.
+(5)
+We call πA completable if R(πA)̸ = ∅, and each πU ∈R(πA)
+a completion of πA. After T(πA), all assigned agents wait
+at their targets; thus, a conflict-free configuration at T(πA)
+remains conflict-free if all agents wait thereafter. Hence, an
+instance is feasible if and only if Acomp̸ = ∅, and restricting
+U-paths to 0, . . . , T(πA) loses no feasible plan. For a feasible
+instance, let
+C∗=
+min
+πA∈Acomp
+SST(πA),
+(6)
+A∗= arg
+min
+πA∈Acomp
+SST(πA).
+(7)
+For each πA ∈Acomp, define
+Q(πA) =
+min
+πU∈R(πA) SMU((πA, πU)),
+(8)
+R∗(πA) = arg
+min
+πU∈R(πA) SMU((πA, πU)).
+(9)
+Definition 2 (Sequential MAPF-UA). A complete plan ˆπ =
+(ˆπA, ˆπU) is sequentially optimal if
+ˆπA ∈A∗,
+ˆπU ∈R∗(ˆπA).
+(10)
+Equivalently, SST(ˆπ) = C∗and SMU(ˆπ) = Q(ˆπA).
+For comparison, global lexicographic optimization first min-
+imizes SST and then minimizes SMU over all SST-optimal
+
+
+4
+feasible plans. A globally lexicographically optimal plan ˆπ
+therefore satisfies
+SST(ˆπ) = C∗,
+SMU(ˆπ) = min
+πA∈A∗Q(πA).
+(11)
+Both objectives attain the same globally minimum SST.
+Sequential optimality minimizes SMU conditional on one
+selected ˆπA ∈A∗, whereas global lexicographic optimality
+also minimizes Q over A∗. This additional optimization can
+increase the search effort.
+We adopt the sequential objective because completing as-
+signed tasks is the primary concern in the target applica-
+tions, while unassigned-agent movement is secondary. A small
+amount of extra movement by agents without current tasks
+is often acceptable in exchange for improved scalability,
+provided that SST remains globally optimal. This tradeoff is
+evaluated in Section IV-C.
+Remark
+1
+(Completability
+coupling). Let
+CA
+=
+minπA∈A SST(πA). Since Acomp ⊆A, we have CA ≤C∗.
+However, SST-optimal A-paths in A may occupy the vertices
+and time steps that unassigned agents need to yield, so
+that R(πA)
+=
+∅. In Fig. 5, conflict-free A-paths with
+SST = CA = 4 admit no U-paths, whereas C∗= 5. A
+two-stage method that fixes such A-paths fails; the search
+over A-paths must therefore account for completability.
+Proposition 1 (Asymmetric structure). This formulation has
+the following structural properties: (a) finding an A-path set
+in A∗is NP-hard; and (b) for fixed πA ∈A, finding U-paths
+in R∗(πA), or reporting R(πA) = ∅, takes time polynomial
+in |V |, |E|, and T(πA).
+Proof. For part (a), when m = 0, every A-path set in A
+is completable; hence, A∗is the set of sum-of-costs-optimal
+MAPF solutions, whose computation is NP-hard [7]. Thus,
+finding an A-path set in A∗, and hence solving sequential
+MAPF-UA, is NP-hard. For part (b), fixed A-paths determine
+which vertices and edge traversals are occupied at each time
+step, while the targetless unassigned agents form a single
+commodity. By the construction in Section III-B, every U-path
+set in R(πA) induces an integral flow of value m with cost
+equal to its SMU, and every integral flow of value m can be
+converted into a U-path set in R(πA) without increasing cost.
+Thus, R(πA)̸ = ∅if and only if a flow of value m exists;
+when such a flow exists, its minimum cost equals Q(πA).
+The TEN has O((|V | + |E|)(T(πA) + 1)) vertices and arcs.
+Min-cost flow on this network can be solved in polynomial
+time [37].
+■
+III. FOCBS ALGORITHM
+FOCBS solves sequential MAPF-UA with a CBS search
+over assigned agents and a flow oracle for unassigned-agent
+routing (Fig. 3). Following Proposition 1, it exploits the
+absence of individual targets: a single-commodity flow de-
+cides the terminal vertices of unassigned agents implicitly;
+hence, the high-level search constrains only A-paths. Each
+constraint-tree (CT) node N stores only constraints and A-
+paths πA
+N, whose horizon is TN := T(πA
+N); the open list OPEN
+is ordered by SST. FOCBS first resolves conflicts among
+Fig. 3. Overview of FOCBS. CBS constrains only assigned agents. For each
+conflict-free A-path set, the flow oracle seeks conflict-free U-paths. If none
+exist, it returns min-cut blockers to generate new CBS constraints.
+assigned agents with standard CBS splits. Once the A-paths
+of a node are mutually conflict-free, the oracle treats them
+as reservations and computes minimum-SMU U-paths in a
+time-expanded network (TEN). If such U-paths exist, FOCBS
+returns the complete plan; otherwise, flow-conflict branching
+converts min-cut blockers into constraints on assigned agents
+and replans their paths. The two groups thus remain coupled:
+unassigned agents determine the flow value, the TEN size, and
+whether the selected A-paths are completable.
+A. Assigned-Agent CBS with Flow Oracle
+Algorithm 1 presents FOCBS: assigned-agent CBS [8]
+forms the search backbone, while lines 11–13 implement the
+flow-oracle extension. If FOCBS returns INSTANCEINFEASI-
+BLE, the MAPF-UA instance has no solution. For feasible
+instances, FOCBS terminates and returns a solution (Theo-
+rem 1); termination is not guaranteed for infeasible instances.
+FOCBS applies start-avoiding tie-breaking only among cost-
+equivalent choices, preferring A-paths or CT nodes with fewer
+visits to unassigned-agent starts. When an A-path visits an
+unassigned agent’s start, that agent must leave it at least
+once; fewer such visits therefore tend to reduce SMU. Let
+ˆS = {ˆsj : uj ∈U} be the unassigned-agent start set. At
+the low level, FOCBS computes A-paths with lexicographic
+A* (LexA*) using the key ⟨f, c, p, h⟩and a conflict-avoidance
+table (CAT) [8]. Here, f=g+h, c counts CAT conflicts, p
+counts time-indexed visits to ˆS along the partial path, and
+h is the target-distance heuristic. Because p is ordered after f
+and c, it only breaks ties among partial paths with equal f and
+c. At the high level, CT nodes with equal SST are ranked by
+(d, q): d is the number of distinct conflicting assigned-agent
+pairs, and q counts visits to unassigned-agent starts up to and
+
+
+5
+Algorithm 1 FOCBS.
+1: Input: G, assigned agents (A, s, g), starts ˆS = {ˆsj}m
+j=1
+2: Output: solution (πA, πU), or INSTANCEINFEASIBLE
+3: Initialize unconstrained N0 with shortest paths for A
+4: if
+any
+root
+path
+is
+absent
+then
+return
+INSTANCEINFEASIBLE
+5: OPEN ←{N0}, ordered by SST
+6: while OPEN̸ = ∅do
+7:
+N ←OPEN .POP()
+8:
+if FINDCONFLICT(N.paths) returns conflict χ then
+9:
+C ←CBSCONSTRAINTS(χ)
+10:
+else
+11:
+Run FLOWORACLE(G, N.paths, TN, ˆS)
+12:
+if πU is returned then return (N.paths, πU)
+13:
+C ←BLOCKERCONSTRAINTS(returned blockers)
+14:
+end if
+15:
+for each constraint c ∈C do
+16:
+Copy N to N ′, add c, and replan agent a(c)
+17:
+if replanning succeeds then
+18:
+Update N ′.paths, SST, and tie-breaking keys
+19:
+Insert N ′ into OPEN
+20:
+end if
+21:
+end for
+22: end while
+23: return INSTANCEINFEASIBLE
+including each assigned agent’s last arrival:
+q =
+X
+ai∈A
+tlast
+i
+(πA
+N,i)
+X
+t=0
+1{πA
+N,i(t) ∈ˆS}.
+Neither tie-breaking key alters the SST-optimality guaran-
+tee. Each low-level invocation returns exactly one path of
+minimum last-arrival time under the current constraints, with
+LexA* selecting among equal-cost alternatives according to
+the stated low-level ordering. The remaining alternatives are
+not materialized as sibling CT nodes: CT children are created
+only by adding a CBS or flow-conflict constraint, after which
+replanning may select a different equal-cost path.
+B. Time-Expanded Network Construction
+For fixed A-paths πA
+N, the oracle uses a TEN [24], [25] with
+layers t = 0, . . . , TN and arcs between consecutive layers.
+Fig. 4 illustrates the construction. The part of the TEN that
+does not depend on the A-paths, called the skeleton, contains:
+• For each vertex-time pair (v, t), two nodes vin
+t , vout
+t
+and a unit-capacity, zero-cost arc vin
+t
+→vout
+t
+enforcing
+vertex capacity.
+• Wait arcs: vout
+t
+→vin
+t+1, capacity 1, cost 0.
+• Merge–split edge gadgets: For each edge e = {v, w} ∈E
+and interval [t, t+1], two auxiliary nodes ein
+t , eout
+t
+and five
+unit-capacity arcs [24], [25]:
+vout
+t
+→ein
+t ,
+wout
+t
+→ein
+t ,
+ein
+t →eout
+t
+,
+eout
+t
+→vin
+t+1,
+eout
+t
+→win
+t+1.
+For SMU, the shared central arc ein
+t →eout
+t
+has cost 1
+and the four attachment arcs cost 0, as in the distance-
+minimizing formulation of [24]. Moves v →w and
+w →v traverse the gadget between opposite endpoints
+and share its central capacity-1 arc, preventing simultane-
+ous opposite moves. Every move passes through a gadget.
+• Source arcs s+ →(ˆsj)in
+0 for each unassigned-agent start
+and sink arcs vout
+TN →s−for every v ∈V , all with unit
+capacity and zero cost. The sink arcs allow unassigned
+agents to choose their terminal vertices.
+Each A-path reserves its vertex at every time step, including
+its waits at the target through TN. The ordinary TEN removes
+the nodes of every reserved vertex-time pair (v, t) and their
+incident arcs. If ai traverses v →w during [t, t+1], the
+ordinary TEN also removes wout
+t
+→ein
+t , which would allow
+the opposite move w →v. The diagnostic TEN N diag keeps
+the whole skeleton but sets the capacity of each reserved
+vertex arc vin
+t
+→vout
+t
+and each such opposite-move arc to
+zero, labeling them by (ai, v, t) and (ai, v, w, t), respectively.
+Because reserved vertex-time pairs are removed or have zero
+capacity, a vertex reserved at TN cannot serve as a terminal
+vertex. For a fixed horizon, different A-paths change only
+arc capacities; therefore, the capacity of the same cut can be
+compared across A-paths.
+The construction gives a two-way correspondence between
+paths and flow. Sending one unit from each unassigned-agent
+start along its vertex, wait, and gadget arcs maps every U-
+path set in R(πA
+N) to a value-m integral flow of equal SMU
+cost. Vertex-capacity and central gadget arcs exclude vertex
+and edge conflicts, respectively, while reservations exclude
+conflicts with πA
+N.
+Conversely, the acyclic TEN allows every value-m integral
+flow to decompose into m unit s+–s−paths, which project
+onto G after deleting split and gadget nodes. Call an integral
+flow canonical if every gadget traversal exits at the endpoint
+opposite to its entry. The merge–split gadget also admits a
+same-endpoint traversal, or turnback, which projects to a wait.
+If a flow contains a turnback at v, the direct wait arc vout
+t
+→
+vin
+t+1 is unused; otherwise the unit vertex capacity at (v, t)
+would be exceeded. Replacing the turnback by this wait arc
+preserves feasibility and reduces its cost from 1 to 0. Repeating
+this replacement yields a canonical flow, whose cost equals
+the SMU of its projected paths. Every minimum-cost integral
+flow is therefore canonical, and the minimum flow cost equals
+the minimum SMU. Because unassigned agents may stop at
+any unreserved vertex, the horizon TN suffices for fixed A-
+paths: any U-path set over 0, . . . , TN can be extended by zero-
+cost waiting, and any longer conflict-free U-path set can be
+restricted to 0, . . . , TN without increasing SMU.
+The oracle uses successive shortest path (SSP) [37] on
+a TEN of O(LN) vertices and arcs, where LN = (|V | +
+|E|)(TN + 1). One oracle call takes O(LN + mLN log LN)
+time using at most m reduced-cost Dijkstra searches with
+binary heaps.
+C. Flow-Conflict Branching
+As Remark 1 shows, mutually conflict-free A-paths may
+leave no U-paths. An oracle failure rules out only the current
+
+
+6
+(a) Problem
+(b) Flow solving
+Fig. 4.
+TEN for fixed A-paths. (a) Instance and U-paths. (b) TEN with
+reserved nodes and opposite-move arcs removed. Phase 1 inserts zero-cost
+waiting paths at unreserved starts; Phase 2 augments the remaining flow.
+Vertex-splitting and merge–split gadget nodes are omitted for clarity.
+(a) Problem
+(b) Flow-conflict branching
+Fig. 5.
+Partial illustration of flow-conflict branching. (a) Instance and final
+feasible paths. (b) Root A-paths have SST = 4; “infeasible” means that no
+conflict-free U-paths exist under these A-paths. Only the two min-cut vertex
+blockers at t = 1 (a1 at v3 and a2 at v4) and their CBS children are shown;
+FOCBS branches on every branchable blocker in the cut. In each CT node N,
+πA
+N denotes its stored A-paths and πU
+N the U-paths returned by the oracle.
+A-paths, not every A-path set satisfying the node’s constraints;
+stopping the search or pruning the node may discard all
+feasible plans below it. FOCBS therefore extracts from the
+failure the assigned-agent reservations that must change.
+FOCBS branches when assigned agents conflict with each
+other or when the oracle cannot find conflict-free paths for
+all unassigned agents. FLOWORACLE constructs the ordinary
+TEN from its inputs and invokes BZ-SSP (Algorithm 2) for
+routing. If BZ-SSP cannot find conflict-free paths for all
+unassigned agents, FLOWORACLE builds the diagnostic TEN
+and computes a maximum flow on it. The source-reachable
+set in the residual network of this maximum flow defines a
+minimum s+–s−cut [37]; every labeled zero-capacity arc in
+this cut is a blocker. FLOWORACLE returns the blockers from
+the min-cut. Algorithm 1 converts these blockers into new CBS
+constraints through BLOCKERCONSTRAINTS.
+A blocker is branchable unless it is a t=0 vertex blocker,
+which the starts fix, or a reservation that the current branch
+already forbids. For each branchable blocker, FOCBS creates a
+CBS child that forbids it: a vertex blocker yields the constraint
+(ai, v, t), and an edge blocker forbids the traversal (ai, v, w, t).
+By Lemma 2, every feasible plan under the current constraints
+releases at least one of these blockers; hence, the children
+together cover all such plans. Releasing one blocker need not
+restore feasibility, since another reservation or cut may remain;
+each child is therefore processed by the same CBS–oracle
+procedure. If no branchable blocker remains, the same lemma
+shows that no feasible plan satisfies the node’s constraints, and
+the node is discarded.
+To express this feedback explicitly, let B be the branchable
+blocker set and xb ∈{0, 1} indicate whether a candidate A-
+path set retains the agent-specific vertex occupancy or edge
+traversal labeled by b. Every feasible completion under the
+node constraints must satisfy
+_
+b∈B
+(xb = 0)
+⇐⇒
+X
+b∈B
+xb ≤|B| −1.
+This is a nogood constraint: the blocking reservations cannot
+all be retained together, as in logic-based and combinatorial
+Benders feedback [34], [35]. FOCBS enforces it through CBS
+children, each imposing one xb = 0; these children may
+overlap. A minimum-capacity cut need not yield an inclusion-
+minimal or minimum-cardinality blocker set.
+Fig. 5 illustrates this process. At the root, a1 enters v3 and
+a2 enters v4 at t = 1. The unassigned agent u1 at v3 can
+neither stay nor move to v1 or v4, and moving to v6 only
+postpones the conflict because a1 and a2 reach v6 and v7
+at t = 2. Thus, no U-paths exist although SST = 4. The
+min-cut includes the two vertex blockers shown in the figure,
+(a1, v3, 1) and (a2, v4, 1). In child Nb1, a1 waits one step at
+v1, u1 moves to v4 after a2 leaves it, and the oracle returns a
+plan with SST = 5 and SMU = 1.
+With m = 0, every oracle call succeeds trivially, and
+FOCBS reduces to CBS over assigned agents. CBM [25] also
+combines CBS with min-cost flow, but its teams are routed
+to prescribed target sets; FOCBS lets targetless agents stop
+at any unreserved vertex and turns their routing failures into
+constraints on assigned agents.
+D. BZ-SSP Acceleration
+Under fixed A-paths, an unassigned agent whose start is
+never reserved can wait in place at zero cost, yet plain SSP
+still spends one shortest-path search on it. Batched zero-cost
+SSP (BZ-SSP) exploits these unreserved starts, as illustrated
+in Fig. 4(b). Algorithm 2 first inserts zero-cost wait-in-place
+flows for these starts, then runs SSP only for the remaining
+flow units on the residual TEN.
+In Algorithm 2, FLOWINFEASIBLE means that the given
+TEN has no flow of value m; FLOWORACLE then extracts
+blockers from the min-cut as described in Section III-C.
+Phase 1 (line 3) inserts a zero-cost partial flow, after which
+Phase 2 (lines 5–9) runs SSP for the remaining m−k0 units
+on the full residual TEN, allowing warm-started paths to be
+rerouted; Proposition 3 establishes optimality. During TEN
+construction, we mark each vertex reserved at any time on
+
+
+7
+Algorithm 2 BZ-SSP Routing Subroutine.
+1: Input: TEN N(πA, TN), starts ˆS = {ˆsj}m
+j=1
+2: Output: U-path set πU, or FLOWINFEASIBLE
+3: Add zero-cost waits for each ˆsj unreserved on [0, TN]
+4: k0 ←number of inserted paths; potentials ϕv ←0
+5: for i = 1 to m −k0 do
+6:
+P ←shortest s+–s−path under reduced costs cϕ
+7:
+if P does not exist then return FLOWINFEASIBLE
+8:
+Update potentials; augment along P
+9: end for
+10: return Decompose the value-m flow as πU
+[0, TN]. With this reservation lookup, Phase 1 takes O(m +
+k0TN) time and replaces k0 Dijkstra searches. In Phase 2,
+each Dijkstra search terminates early once s−is settled.
+E. Theoretical Analysis
+Proposition 2 (CT cost and horizon monotonicity). Suppose
+each CT node stores, for every assigned agent, a path with
+minimum last-arrival time under that agent’s constraints. Each
+child inherits its parent’s constraints and adds a new constraint
+on an assigned agent. Along any CT branch, the assigned
+agents’ last-arrival times, SST, and TN are nondecreasing.
+Every node also satisfies TN ≤SST(πA
+N).
+Proof. Each A-path stored at N has minimum last-arrival time
+under its constraints. Thus, for any A-path set ¯πA satisfying
+the constraints at N,
+tlast
+i
+(¯πA
+i ) ≥tlast
+i
+(πA
+N,i),
+∀ai ∈A,
+T(¯πA) ≥TN.
+(12)
+The second inequality follows by taking the maximum over
+agents in the first. A child’s paths also satisfy its parent’s
+constraints; therefore, (12) shows that each assigned agent’s
+last-arrival time and the horizon cannot decrease from parent
+to child. Summing the last-arrival times shows that SST
+cannot decrease either. Finally, TN is the maximum of these
+nonnegative times and SST(πA
+N) is their sum; hence TN ≤
+SST(πA
+N).
+■
+All A-paths wait after their last arrival, and unassigned
+agents may stop at any unreserved vertex. Consequently, for
+every feasible complete plan ¯π whose A-paths satisfy the
+constraints at N, the restriction of ¯π to time steps 0, . . . , TN is
+conflict-free and induces a value-m flow on the skeleton over
+layers 0, . . . , TN, with capacities determined by ¯πA on these
+time steps. Reservations and waits after TN lie outside these
+layers and cannot change the capacity of any cut in them.
+Lemma 1 (Oracle correctness). For fixed conflict-free A-paths
+πA ∈A, the flow oracle returns U-paths in R∗(πA), or
+correctly reports R(πA) = ∅.
+Proof. The construction in Section III-B reduces U-path plan-
+ning to a min-cost flow problem whose minimum cost equals
+the minimum SMU. Integral capacities guarantee an integral
+optimum [37], whose canonical decomposition lies in R∗(πA).
+If the flow problem has no solution, then R(πA) = ∅.
+■
+(a)
+(b)
+(c)
+(d)
+(e)
+(f)
+Fig. 6.
+Six experimental maps: (a) empty-32-32, an open 32×32 grid; (b)
+random-32-32-20, a 32×32 grid with 20% random obstacles; (c) room-32-
+32-4, a 32×32 grid with room partitions at four-cell intervals; (d) warehouse-
+10-20-10-2-1, containing a 10×20 array of 10×2 shelf blocks with one-cell
+internal aisles; (e) empty-16-16, an open 16×16 grid; and (f) warehouse-
+small-20-11, a custom 20×11 warehouse with six five-cell shelf blocks.
+Proposition 3 (BZ-SSP optimality preservation). If a flow of
+value m exists in the given TEN, BZ-SSP returns one of
+minimum cost; otherwise, it reports that no such flow exists.
+Proof. The initial k0 wait paths form a feasible zero-cost
+flow, which is minimum-cost for value k0 because all original
+arc costs are nonnegative. Their reverse arcs also have zero
+cost; thus all initial residual arc costs are nonnegative. SSP
+continues on the full residual network, allowing rerouting and
+preserving minimum cost at each flow value [37]. If SSP finds
+no augmenting path before reaching m, the required flow value
+cannot be achieved.
+■
+Lemma 2 (Blocker validity). Consider a CT node N with
+mutually conflict-free A-paths πA
+N ∈A. Suppose no conflict-
+free U-paths exist under these A-paths, i.e., R(πA
+N) = ∅.
+For every assigned agent, the path stored at N satisfies the
+node constraints and has minimum last-arrival time under
+those constraints. Let S be the source-reachable side after
+max flow. Let B be the branchable labeled blockers in δ+(S).
+Every feasible complete plan whose A-paths satisfy the current
+branch constraints releases at least one blocker in B. Thus
+branching on all b ∈B is a valid disjunction. If B = ∅, no
+feasible complete plan has A-paths satisfying the constraints
+at N.
+Proof. Let cN be the capacities at N. Since the TEN under πA
+N
+has no flow of value m, cN(δ+(S)) < m. For contradiction,
+suppose a feasible complete plan ¯π whose A-paths satisfy
+the constraints at N retains every blocker in B. By the
+horizon invariant (12), T(¯πA) ≥TN. The restriction property
+stated above therefore implies that ¯πU|0:TN induces a value-m
+flow on the skeleton over layers 0, . . . , TN, with capacities ¯c
+determined by ¯πA|0:TN . Hence ¯c(δ+(S)) ≥m.
+Now compare the capacities of the arcs in δ+(S). Structural
+capacities are independent of the A-paths, and an arc already
+having unit capacity under cN cannot gain capacity. The
+t=0 vertex reservations are fixed by the initial configuration.
+Therefore, a cut arc can gain capacity only if a labeled zero-
+capacity reservation at N is released. Every such releasable
+reservation belongs to B: fixed t=0 vertex reservations have
+been discarded, and a reservation already forbidden by a
+branch constraint cannot occur in πA
+N. Since ¯π retains every
+blocker in B, no cut arc gains capacity, and thus ¯c(δ+(S)) ≤
+cN(δ+(S)). Hence
+m ≤¯c(δ+(S)) ≤cN(δ+(S)) < m,
+
+
+8
+0.00
+0.20
+0.40
+0.60
+0.80
+1.00
+Success Rate
+empty-32-32
+0.00
+0.20
+0.40
+0.60
+0.80
+1.00
+random-32-32-20
+0.00
+0.20
+0.40
+0.60
+0.80
+1.00
+room-32-32-4
+0.00
+0.20
+0.40
+0.60
+0.80
+1.00
+warehouse-10-20-10-2-1
+0.25
+0.50
+0.75
+ALR
+10
+−3
+10
+−1
+10
+1
+Runtime (s)
+0.25
+0.50
+0.75
+ALR
+10
+−3
+10
+−1
+10
+1
+0.25
+0.50
+0.75
+ALR
+10
+−3
+10
+−1
+10
+1
+0.25
+0.50
+0.75
+ALR
+10
+−3
+10
+−1
+10
+1
+FOCBS
+CBS-UA
+PIBT
+MACGA
+LaCAM
+Fig. 7. Success rate and median runtime over solved instances as unassigned-agent load increases; runtime is shown on a logarithmic scale.
+a contradiction. Thus some blocker must be released, proving
+the disjunction and the case B = ∅.
+■
+The following termination result applies only to feasible
+instances. The value C∗serves only as an existential bound in
+the proof and need not be known or used by FOCBS; when
+Acomp = ∅, FOCBS is not guaranteed to terminate.
+Theorem 1 (Sequential optimality of FOCBS). For a MAPF-
+UA instance on a finite graph, if Acomp̸ = ∅, FOCBS termi-
+nates and returns a sequentially optimal solution in the sense of
+Definition 2. For the returned solution ˆπ, the SMU guarantee is
+conditional on ˆπA: FOCBS guarantees SMU(ˆπ) = Q(ˆπA), but
+not ˆπA ∈arg minπA∈A∗Q(πA). Thus, it does not guarantee
+global lexicographic optimality.
+Proof. Fix π∗A ∈A∗and any π∗U ∈R(π∗A), and let π∗=
+(π∗A, π∗U). Call a CT node compatible when π∗A satisfies
+its constraints; the root is compatible. At every compatible
+node, applying the horizon invariant (12) with ¯πA = π∗A gives
+tlast
+i
+(πA
+N,i) ≤tlast
+i
+(π∗A
+i
+) for every ai, and hence SST(πA
+N) ≤
+C∗and TN ≤T(π∗A) ≤C∗. A standard CBS split preserves
+at least one compatible child. At a node with πA
+N ∈A and
+R(πA
+N) = ∅, Lemma 2, applied to π∗, shows at least one flow-
+conflict child remains compatible. Until a solution is returned,
+OPEN contains a compatible node of cost at most C∗.
+The compatible-node invariant ensures that best-first search
+never expands a node with key greater than C∗before
+returning a solution. Although horizons may grow along a
+CT branch, every node expanded before that return satisfies
+TN ≤SST(πA
+N) ≤C∗. Therefore, every generated vertex or
+edge constraint refers to an agent, graph element, and time step
+in a finite set bounded by C∗. Since every child adds a new
+constraint, only finitely many nodes of cost at most C∗can
+be generated. This finite set cannot be expanded indefinitely;
+thus, the search must return after finitely many expansions a
+node N with πA
+N ∈A, R(πA
+N)̸ = ∅, and SST(πA
+N) ≤C∗.
+Feasibility implies πA
+N ∈Acomp. With SST(πA
+N) ≤C∗and
+the definition of C∗, this gives SST(πA
+N) = C∗and hence
+πA
+N
+∈A∗. Lemma 1 gives πU
+N
+∈R∗(πA
+N), establishing
+sequential optimality.
+■
+IV. EXPERIMENTS
+The scalability experiment increases unassigned-agent load,
+and the fixed-density experiment varies the proportions of as-
+signed agents and unassigned agents. Ablation studies evaluate
+flow-conflict branching, BZ-SSP, and tie-breaking, followed by
+simulation and physical-robot validation.
+A. Experimental Settings
+1) Instances: Fig. 6 shows the four standard MAPF maps
+used in the scalability experiment [4] (an open grid, random
+obstacles, bottleneck rooms, and warehouse aisles) and the
+smaller open grid and custom warehouse used in the fixed-
+density experiment. Assigned-agent start–target pairs come
+from the standard even and random scenarios, and unassigned-
+agent starts are sampled without replacement from the remain-
+ing traversable vertices. All solvers receive the same seeded
+instances.
+2) Methods: The scalability experiment compares FOCBS
+with CBS-UA and the fast yielding baselines PIBT, MACGA,
+and LaCAM [8], [17]–[19]. CBS-UA runs CBS on all agents,
+and each unassigned agent may stop at any vertex that sat-
+isfies its constraints. CBS-UA minimizes SST but does not
+optimize SMU. For PIBT, MACGA, and LaCAM, unassigned
+agents wait by default and yield with the lowest priority. The
+yielding baselines do not guarantee sequential optimality. The
+fixed-density experiment additionally distinguishes CBS-static,
+which fixes unassigned agents as obstacles; LCBS, our joint
+lexicographic CBS baseline for MAPF-UA, which adapts the
+lexicographic bi-objective framework of [30], places all agents
+in one constraint tree, and globally minimizes (SST, SMU);
+CBS-SSP, a two-stage baseline with the same sequential ob-
+jective as FOCBS; and FOCBS-noTB, which removes only the
+start-avoiding tie breaker. CBS-SSP first obtains SST-optimal
+A-paths with CBS0, which runs CBS on assigned agents only,
+and then calls an SSP oracle once to minimize SMU. CBS-
+SSP stops if no U-paths exist.
+3) Metrics and Platform: We report success rate, median
+runtime over solved instances (interpreted jointly with success
+
+
+9
+E 8
+E 12
+E 16
+E 20
+R 6
+R 8
+R 10
+R 12
+CBS-UA
+empty-32-32
+E 8
+E 12
+E 16
+E 20
+R 10
+R 14
+R 18
+R 22
+random-32-32-20
+E 4
+E 6
+E 8
+E 10
+R 4
+R 6
+R 8
+R 10
+room-32-32-4
+E 20
+E 25
+E 30
+E 35
+R 10
+R 12
+R 14
+R 16
+warehouse-10-20-10-2-1
+0.05
+0.35
+0.65
+0.95
+ALR
+E 8
+E 12
+E 16
+E 20
+R 6
+R 8
+R 10
+R 12
+FOCBS
+0.05
+0.35
+0.65
+0.95
+ALR
+E 8
+E 12
+E 16
+E 20
+R 10
+R 14
+R 18
+R 22
+0.05
+0.35
+0.65
+0.95
+ALR
+E 4
+E 6
+E 8
+E 10
+R 4
+R 6
+R 8
+R 10
+0.05
+0.35
+0.65
+0.95
+ALR
+E 20
+E 25
+E 30
+E 35
+R 10
+R 12
+R 14
+R 16
+0
+25
+50
+75
+100
+Success rate (%)
+(a)
+10
+−4
+10
+−2
+1
+60
+Wall-clock time (s)
+0
+25
+50
+75
+100
+All instances solved (%)
+empty-32-32
+10
+−4
+10
+−2
+1
+60
+Wall-clock time (s)
+random-32-32-20
+10
+−4
+10
+−2
+1
+60
+Wall-clock time (s)
+room-32-32-4
+10
+−4
+10
+−2
+1
+60
+Wall-clock time (s)
+warehouse-10-20-10-2-1
+FOCBS
+CBS-UA
+PIBT
+MACGA
+LaCAM
+(b)
+Fig. 8.
+Scalability results by assigned-agent load and time budget. (a) Success rate by scenario type (E: even; R: random) and assigned-agent count. (b)
+Cumulative percentage of all 3,800 instances per map solved within each wall-clock time budget; failed instances remain in the denominator, and the time
+axis is logarithmic.
+rate), SST, and SMU. Objective values are compared on map-
+specific common solved sets (Table I). CBS-static is excluded
+from the objective-value comparison because fixing unas-
+signed agents forces SMU = 0. Benchmarks use Ubuntu 24.04
+with an Intel Core i9-14900K and 64 GB RAM. All meth-
+ods are implemented in C++ and run single-threaded; PIBT,
+MACGA, and LaCAM are our reimplementations adapted to
+MAPF-UA. The scalability and fixed-density experiments use
+a 60-s limit; the BZ-SSP ablation below uses a 120-s limit to
+retain enough jointly solved warehouse pairs.
+B. Scalability with Increasing Unassigned-Agent Load
+We fix the assigned-agent count n and add unassigned
+agents to increase ALR from 0.05 to 0.95 on the four standard
+maps. Optimal CBS becomes rapidly more expensive as n
+increases. To keep assigned-agent search tractable and isolate
+the effect of the unassigned-agent count m, we select four
+values of n per map and scenario type for which CBS0 solves
+all 25 seeds with m = 0 within a 10-s per-instance limit. Each
+map–ALR setting combines the four assigned-agent counts
+with 25 even and 25 random seeds, giving 200 instances per
+method and 76,000 runs in total.
+CBS-UA places both agent groups in one constraint tree,
+so adding unassigned agents increases the burden of conflict
+resolution. Aggregated over all tested loads, the success rate
+of CBS-UA is at most 43.9% on any map (Fig. 7). FOCBS
+confines CBS search to assigned agents and routes unassigned
+agents through the flow oracle, achieving overall success rates
+of 94.1–100% across the four maps. The median runtime of
+FOCBS over solved instances also grows more gradually with
+unassigned-agent count.
+PIBT, MACGA, and LaCAM return solutions faster than
+FOCBS, but achieve lower overall success rates on the three
+obstacle maps (73.4–91.5% across the tested loads; Figs. 7
+and 8(b)). On instances solved by both methods, their SST
+exceeds that of FOCBS by 2.0–27.0%, and their mean SMU is
+2.9–5.9 times that of FOCBS. Under the tested assigned-agent
+loads, FOCBS finds globally SST-optimal solutions within
+1 s for the vast majority of instances on the empty, random,
+and room maps, whereas the warehouse map requires longer
+runtimes.
+Fig. 8(a) shows that the success rate of CBS-UA de-
+clines with increasing unassigned-agent count at every tested
+assigned-agent count. FOCBS maintains higher success rates
+under the corresponding settings, showing that the advan-
+tage over joint search holds across different assigned-agent
+loads. In the random warehouse scenarios, FOCBS solves all
+25 instances with 10 assigned agents and 5,404 unassigned
+agents, indicating that FOCBS scales well with the number of
+unassigned agents.
+On the warehouse map, the success rate of FOCBS begins
+to decline at lower densities as the assigned-agent count
+increases. Assigned-agent paths reserve space-time resources
+in the TEN, restricting the space available for unassigned
+agents to yield. Even when the assigned-agent load keeps CBS
+
+
+10
+0.00
+0.20
+0.40
+0.60
+0.80
+1.00
+Success Rate
+empty-16-16
+0.00
+0.20
+0.40
+0.60
+0.80
+1.00
+warehouse-small-20-11
+4/60
+24/40
+44/20
+64/0
+Agents n/m
+10−4
+10−2
+100
+102
+Runtime (s)
+3/30
+13/20
+23/10
+33/0
+Agents n/m
+10−4
+10−2
+100
+102
+CBS-static
+CBS-UA
+LCBS
+CBS-SSP
+FOCBS
+FOCBS-noTB
+Fig. 9. Success rate (top) and median runtime over solved instances (bottom,
+log scale) at ALR = 0.25. Each setting has 25 even and 25 random instances;
+n/m denotes the numbers of assigned agents and unassigned agents, respec-
+tively. No runtime is plotted when none are solved.
+search tractable, increasing the number of assigned agents
+can make unassigned-agent routing through the TEN more
+difficult.
+C. Effect of Agent Composition at Fixed Density
+The composition experiment fixes ALR = 0.25 on empty-
+16-16 and warehouse-small-20-11 (n + m = 64 and 33).
+With starts fixed, unassigned agents are reassigned in steps
+of five. The experiment covers 20 compositions and six meth-
+ods, totaling 6,000 runs. Because CBS-based search becomes
+rapidly harder as the number of agents grows, small maps
+and relatively low density allow all methods to solve enough
+common instances for quality comparison.
+Fig. 9 shows that FOCBS substantially outperforms CBS-
+UA and LCBS when unassigned agents predominate. At ware-
+house n/m = 13/20, FOCBS solves 48 of 50 instances, while
+CBS-UA and LCBS solve at most nine. FOCBS exploits the
+asymmetry between the two agent types by routing unassigned
+agents through the flow oracle, reducing the combinatorial
+burden on CBS. As the proportion of assigned agents in-
+creases, CBS search becomes a common bottleneck for all
+three methods, making instances harder to solve and narrowing
+the performance gap.
+The low success rate of CBS-static in the small warehouse
+highlights the need to let unassigned agents yield in narrow
+aisles. CBS-SSP also benefits from separating the two agent
+groups and nearly matches FOCBS at ALR = 0.25, where the
+first A-path set is usually completable; Section IV-D evaluates
+flow-conflict branching under higher loads.
+The comparison with LCBS evaluates the tradeoff between
+the sequential and global lexicographic objectives. Both meth-
+ods attain the same optimal SST on the common solved
+sets in Table I. FOCBS solves 2.4 times as many instances,
+and the median paired runtime ratio tLCBS/tFOCBS is 25.7
+on instances solved by both methods. LCBS achieves lower
+mean SMU because it searches over alternative SST-optimal
+assigned-agent paths; FOCBS minimizes SMU for the selected
+assigned-agent paths. The results support the practical value
+0.25
+0.50
+0.75
+ALR
+0.00
+0.20
+0.40
+0.60
+0.80
+1.00
+Success Rate
+room-32-32-4
+0.25
+0.50
+0.75
+ALR
+0.00
+0.20
+0.40
+0.60
+0.80
+1.00
+warehouse-10-20-10-2-1
+FOCBS lower
+FOCBS boundary
+FOCBS-H lower
+FOCBS-H boundary
+Fig. 10.
+Success rates of FOCBS and FOCBS-H. “Lower”/“boundary”
+denote the two smaller/larger assigned-agent loads: n = {18, 20}/{22, 24}
+for room (both scenario types), {50, 55}/{60, 65} for warehouse-even, and
+{45, 50}/{55, 60} for warehouse-random. Only seeds solved by the 10-s
+CBS0 probe with only assigned agents (m = 0, 25 seeds per setting) are
+plotted.
+of the sequential objective: FOCBS retains globally optimal
+SST while accepting additional unassigned-agent movement
+for faster solving and higher success rates.
+CBS-UA also attains lower mean SMU on the two small
+maps because its joint search tends to select A-paths that
+avoid unassigned agents; on all four maps of the scalability
+experiment, its mean SMU exceeds that of FOCBS.
+D. Ablation Experiments and Runtime Analysis
+1) Flow-Conflict
+Branching:
+To
+isolate
+flow-conflict
+branching, we compare FOCBS with FOCBS-H. When no
+collision-free U-paths exist under the current A-paths, FOCBS
+branches and FOCBS-H prunes the node. Both variants disable
+the tie breaker and use the same seeds solved by CBS0.
+Fig. 10 shows that flow-conflict branching improves success
+on both maps. Scarce free space makes unassigned-agent rout-
+ing more sensitive to the selected assigned-agent paths, so the
+first conflict-free A-path set often admits no U-paths. Instead
+of pruning such a node, flow-conflict branching uses the min
+cut to locate the A-path reservations that block unassigned
+agents and constrains only those agents, so CBS revises the
+responsible A-paths without losing SST optimality. Among the
+recorded instances whose first oracle call is infeasible, FOCBS
+recovers a solution within 60 s in 203 of 242 room instances
+(83.9%) and 80 of 482 warehouse instances (16.6%). On
+room, the gain grows with density; on warehouse, it narrows
+markedly above ALR = 0.55, where the success rates of both
+variants decline together.
+On one room-32-32-4 instance (n = 18, m = 596), delaying
+a single A-path by one step resolves the flow conflict; FOCBS
+solves it in 0.39 s, whereas FOCBS-H fails within 60 s.
+2) BZ-SSP: We compare full FOCBS with FOCBS-noBZ,
+which disables only the BZ-SSP warm start. The experiment
+uses the four standard maps, ALR ∈{0.10, 0.95}, four
+assigned-agent loads per map, and 25 even scenarios per map–
+ALR–load setting: 800 paired instances with a 120-s limit for
+both variants. Table II reports median end-to-end wall-clock
+runtimes over jointly solved pairs.
+BZ-SSP accelerates FOCBS on all four maps at both tested
+densities (Table II), with an overall median paired speedup
+of 1.54 [IQR: 1.32–2.02]. Plain SSP performs a shortest-path
+search even for an unassigned agent that can wait at its start.
+
+
+11
+TABLE I
+SOLUTION QUALITY ON COMMON SOLVED SETS
+Map
+Common set
+Common mean SST
+Mean SMU
+CBS-UA
+LCBS
+CBS-SSP
+FOCBS
+FOCBS-noTB
+empty-16-16
+145/650
+106.30
+5.19
+4.39
+20.21
+6.14
+20.21
+warehouse-small-20-11
+64/350
+54.86
+8.50
+7.06
+13.88
+9.00
+13.88
+empty-32-32
+1668/3800
+226.82
+20.35
+—
+—
+19.56
+60.66
+warehouse-10-20-10-2-1
+162/3800
+1236.12
+50.93
+—
+—
+49.01
+171.58
+Rows 1–2 use the five-method fixed-density common sets; rows 3–4 use the CBS-UA/FOCBS/FOCBS-noTB common sets from the scalability experiment.
+Bold marks the lowest mean SMU. Common sets are biased toward easier instances. CBS-SSP and FOCBS-noTB return the same A-paths and SMU.
+TABLE II
+MEDIAN END-TO-END FOCBS RUNTIMES WITH AND WITHOUT BZ-SSP
+Map
+ALR Solved
+Time (s)
+Speedup [IQR]
+noBZ FOCBS
+empty-32-32
+0.10 100/100 0.030
+0.019 1.51 [1.43–1.58]
+0.95 100/100 0.272
+0.141 1.91 [1.69–2.19]
+random-32-32-20
+0.10 100/100 0.020
+0.016 1.27 [1.20–1.33]
+0.95 100/100 0.242
+0.160 1.51 [1.34–1.76]
+room-32-32-4
+0.10 100/100 0.015
+0.012 1.25 [1.21–1.30]
+0.95
+96/98
+0.149
+0.090 1.65 [1.47–2.08]
+warehouse-10-20-10-2-1
+0.10
+99/99
+4.735
+1.088 3.88 [3.50–4.61]
+0.95
+64/65
+80.23
+48.55 1.72 [1.49–1.98]
+Times are medians over jointly solved pairs; Solved is noBZ/FOCBS out of
+100. Speedup is paired tnoBZ/tFOCBS; brackets report the interquartile
+range (IQR).
+BZ-SSP inserts zero-cost waiting flows in a batch, eliminating
+those searches while allowing subsequent rerouting in the
+residual network. Both variants return identical SST and SMU
+on every jointly solved pair, confirming that the measured
+acceleration preserves solution quality.
+3) Start-Avoiding Tie-Breaking: FOCBS and FOCBS-noTB
+differ only in the start-avoiding tie breaker. TB reduces mean
+SMU by 35.1–71.4% across the four common sets in Table I,
+with unchanged SST and similar success rates and runtimes
+in Fig. 9. An assigned-agent path that visits an unassigned
+agent’s start forces that unassigned agent to move. Among
+equal-cost choices, TB favors paths with fewer such visits,
+reducing the need for yielding before the flow oracle plans
+unassigned-agent paths.
+4) Computational Cost: The near-one mean oracle-call
+counts on three maps in Table III indicate that FOCBS usually
+completes unassigned-agent routing with a single call. FOCBS
+invokes the oracle only after finding mutually conflict-free
+assigned-agent paths, avoiding repeated flow computations
+during most of the CBS search. Consequently, even on the
+random map, where assigned-agent search requires more CT
+expansions, only 0.64% of expansions invoke the oracle.
+The additional cost in difficult instances is concentrated
+in flow computation and diagnosis. On room-32-32-4, the 28
+timed-out runs account for 64.0% of oracle calls because infea-
+sibility repeatedly triggers assigned-agent replanning and TEN
+reconstruction. On the warehouse map, the timed-out runs
+contribute only 9.8% of oracle calls but 93.2% of diagnostic
+time, indicating expensive diagnoses rather than frequent calls.
+4/60
+24/40
+44/20
+Agents n/m
+10
+−2
+10
+−1
+10
+0
+10
+1
+10
+2
+TEN Share (%)
+empty-16-16
+3/30
+13/20
+23/10
+Agents n/m
+10
+−2
+10
+−1
+10
+0
+10
+1
+10
+2
+warehouse-small-20-11
+Fig. 11.
+Median TEN share of FOCBS runtime at fixed ALR = 0.25. For
+each solved instance, tTEN/(tCBS +tTEN) includes all oracle construction,
+solving, and extraction work. The dashed line marks 50%.
+At ALR = 0.95 (m ≈5,400), increasing n from 20 to 35 in
+even scenarios raises the median flow-solving time from 28.0
+to 48.6 s, whereas the median CBS time stays below 0.3 s.
+Fig. 11 supports the efficiency of routing unassigned agents
+through the flow oracle. As the proportion of assigned agents
+increases at fixed density, CBS accounts for more runtime
+while flow computation remains inexpensive on the tested
+small maps. For solved empty-16-16 instances, from n/m =
+4/60 to 34/30, median CBS time rises from 0.11 to 103.22 ms,
+while median TEN time increases by less than 1 ms. The
+runtime growth mainly comes from the larger assigned-agent
+search. In one random-32-32-20 instance, CBS plans 12 as-
+signed agents in 0.173 s, while a single TEN call routes
+766 unassigned agents in 0.174 s. On the other maps of the
+scalability experiment, flow computation instead dominates
+runtime (Table III).
+E. Execution Feasibility and Fleet Efficiency
+We validate FOCBS path executability in a ROS 2/Gazebo
+warehouse simulation and on three robots in a chemical
+laboratory. For each batch, FOCBS plans paths for assigned
+robots and unassigned robots. An action dependency graph
+(ADG) [38] converts these plans into asynchronous scheduling
+constraints, while the ROS navigation stack handles continu-
+ous navigation. Robustness to localization errors and motion
+uncertainty is beyond this study.
+1) Warehouse Simulation: Fig. 12 shows the ROS 2/Gazebo
+simulation on a 20×11 grid with 18 mobile robots and 40
+workstations; planning uses an Intel Core i9-14900K CPU.
+The 10 task sequences (115 batches, 1,000 navigation tasks)
+cover five assigned-robot load levels, with approximately 25–
+90% of robots assigned navigation tasks per batch and the
+
+
+12
+TABLE III
+FOCBS SEARCH STATISTICS AND RUNTIME BREAKDOWN IN THE SCALABILITY EXPERIMENT
+Search statistics
+Share of cumulative wall-clock time (%)
+Map
+Runs
+(timeouts)
+CT expansions
+Median / P95
+Oracle calls
+Mean per run
+CBS
+search
+TEN
+construction
+TEN flow
+solving
+Flow-conflict
+diagnosis
+Other
+empty-32-32
+3,800 (0)
+1 / 12
+1.000
+4.0
+35.3
+57.5
+0.0
+3.3
+random-32-32-20
+3,800 (0)
+6 / 294
+1.024
+46.7
+10.4
+36.3
+5.6
+1.0
+room-32-32-4
+3,800 (28)
+2 / 63
+3.999
+1.9
+4.0
+29.9
+63.4
+0.8
+warehouse-10-20-10-2-1
+3,800 (225)
+2 / 36
+1.050
+1.1
+4.7
+71.0
+22.7
+0.5
+Parentheses give timeout counts; P95 is the 95th percentile. For each map, time shares are cumulative stage time divided by cumulative runtime. CBS search
+includes conflict detection. TEN construction and flow solving exclude diagnosis. Flow-conflict diagnosis includes diagnostic TEN construction,
+maximum-flow solving, and blocker extraction; Other includes path extraction and remaining work.
+(a)
+(b)
+Fig. 12. Warehouse simulation in ROS 2. (a) Gazebo simulation scene. (b)
+Robot paths visualized in RViz.
+Parking point
+Workstation
+(a)
+2 m
+(b)
+(c)
+(d)
+2 m
+FOCBS: 84 actual trajectories
+4 task scripts / 40 batches
+Robot 1
+Robot 2
+Robot 3
+(e)
+CBS+Parking
+FOCBS
+0
+300
+600
+900
+1200
+Travel (m)
+1013.31
+599.61
+−40.8%
+−80.5% unassigned travel
+Assigned
+Unassigned
+(f)
+Fig. 13. Real-robot validation. (a) Laboratory platform. (b) ROS map with
+workstation and parking targets. (c), (d) Schematics of FOCBS yielding and
+CBS+Parking, respectively, with blue disks for assigned robots and gray disks
+for unassigned robots. (e) Recorded FOCBS trajectories across all batches. (f)
+Measured fleet travel per method, split by per-batch assignment status. Dashed
+blue circles and yellow squares denote workstation and parking targets.
+remainder being unassigned robots. All task sequences were
+completed, demonstrating coordinated execution of both robot
+types. The mean and maximum runtimes per planning call are
+0.0031 and 0.029 s, respectively.
+2) Physical-Robot Experiment: Fig. 13(a) and (b) show the
+three-robot chemical laboratory platform and occupancy map,
+respectively. Planning runs on an Intel Core i7-13650HX CPU.
+The ROS 1 robots communicate with the FOCBS server via
+MQTT, using FOCBS paths as preferred global references and
+eband for local planning. The evaluation covers mobile-base
+navigation and excludes chemical experiments and reagent
+handling by robotic arms.
+On this platform, leaving unassigned robots in place as static
+obstacles blocks passages between workstations and causes
+tasks to fail. FOCBS allows these robots to yield as needed
+and stop after clearing the assigned robots’ paths (Fig. 13(c)).
+CBS+Parking sends them to predefined parking areas, using
+the robots’ charging stations in this experiment (Fig. 13(d)).
+Parking areas do not obstruct traffic and are typically farther
+from the workstations. Both methods complete the same four
+task sequences, each comprising 10 consecutive batches, with
+65 navigation tasks between workstations in total. One to three
+robots receive tasks per batch. Comparisons are made over
+complete sequences, and travel is grouped by each robot’s
+assignment status in the corresponding batch.
+FOCBS completes all 40 batches without observed inter-
+robot collisions, with mean and maximum planning times
+of 0.067 and 1.365 s, respectively. Fig. 13(e) shows the 84
+recorded movement trajectories, each covering one robot’s
+movement within one batch.
+Fig. 13(f) shows a 40.8% reduction in fleet travel, with sav-
+ings in every sequence. Most savings come from unassigned
+robots, whose total travel decreases by 80.5%: they wait when
+they do not obstruct task execution and, when yielding is
+required, stop after clearing the path without continuing to a
+parking area. Assigned-robot travel also decreases by 20.2%.
+Because each batch inherits the preceding terminal positions, a
+robot that remains near the workstations after yielding travels
+less on its next assigned task than one departing from a parking
+area. The mean batch completion time, measured until all
+assigned robots reach their goals, also decreases by 14.7%.
+V. CONCLUSION
+This article studied MAPF-UA, which arises when robots
+with and without assigned tasks share a workspace. We estab-
+lished an asymmetric decomposition and proposed FOCBS,
+
+
+13
+which searches over assigned agents with CBS, routes unas-
+signed agents with a min-cost flow oracle, and converts routing
+failures into assigned-agent constraints through flow-conflict
+branching. For feasible instances on finite graphs, FOCBS
+terminates with a sequentially optimal solution. Benchmark
+results show that FOCBS scales well with the number of
+unassigned agents at fixed assigned-agent load, and ablation
+studies confirm the benefits of flow-conflict branching, BZ-
+SSP, and start-avoiding tie-breaking. Laboratory experiments
+show that yielding as needed reduces fleet travel by 40.8%
+relative to parking-based coordination.
+Several directions merit further study. FOCBS minimizes
+SMU only for the selected SST-optimal assigned-agent paths.
+Efficiently exploring alternative SST-optimal A-path sets may
+further reduce SMU. Combinatorial search over assigned
+agents limits scalability as tasks increase, and repeated di-
+agnosis and TEN recomputation dominate hard instances on
+bottleneck maps; bounded-suboptimal search and incremental
+TEN updates may reduce these costs. Finally, the episode-level
+objective ignores how terminal locations affect future tasks,
+which motivates terminal-aware planning in lifelong settings.
+REFERENCES
+[1] K. Azadeh, R. De Koster, and D. Roy, “Robotized and automated
+warehouse systems: Review and recent developments,” Transp. Sci.,
+vol. 53, no. 4, pp. 917–945, Jul.–Aug. 2019.
+[2] Y. Lian, Q. Yang, W. Xie, and L. Zhang, “Cyber-physical system-
+based heuristic planning and scheduling method for multiple automatic
+guided vehicles in logistics systems,” IEEE Trans. Ind. Informat., vol. 17,
+no. 11, pp. 7882–7893, Nov. 2021.
+[3] J. Zhou, M. Luo, L. Chen, Q. Zhu, S. Jiang, F. Zhang, W. Shang, and
+J. Jiang, “A multi-robot–multi-task scheduling system for autonomous
+chemistry laboratories,” Digit. Discov., vol. 4, no. 3, pp. 636–652, Mar.
+2025.
+[4] R. Stern, N. R. Sturtevant, A. Felner, S. Koenig, H. Ma, T. T. Walker,
+J. Li, D. Atzmon, L. Cohen, T. K. S. Kumar, E. Boyarski, and R. Bart´ak,
+“Multi-agent pathfinding: Definitions, variants, and benchmarks,” in
+Proc. Int. Symp. Combinatorial Search (SoCS), vol. 10, no. 1, 2019,
+pp. 151–158.
+[5] J. Li, A. Tinka, S. Kiesel, J. W. Durham, T. K. S. Kumar, and S. Koenig,
+“Lifelong multi-agent path finding in large-scale warehouses,” in Proc.
+AAAI Conf. Artif. Intell., vol. 35, no. 13, 2021, pp. 11 272–11 281.
+[6] A. Felner and R. Stern, “Multi-agent path finding with unassigned agents
+(MAPFUA),” in Proc. AAAI Conf. Artif. Intell., vol. 40, no. 46, 2026,
+pp. 39 691–39 698.
+[7] J. Yu, “Intractability of optimal multirobot path planning on planar
+graphs,” IEEE Robot. Autom. Lett., vol. 1, no. 1, pp. 33–40, Jan. 2016.
+[8] G. Sharon, R. Stern, A. Felner, and N. R. Sturtevant, “Conflict-based
+search for optimal multi-agent pathfinding,” Artif. Intell., vol. 219, pp.
+40–66, Feb. 2015.
+[9] E. Boyarski, A. Felner, R. Stern, G. Sharon, D. Tolpin, O. Betzalel,
+and E. Shimony, “ICBS: Improved conflict-based search algorithm for
+multi-agent pathfinding,” in Proc. Int. Joint Conf. Artif. Intell. (IJCAI),
+2015, pp. 740–746.
+[10] J. Li, D. Harabor, P. J. Stuckey, A. Felner, H. Ma, and S. Koenig, “Dis-
+joint splitting for multi-agent path finding with conflict-based search,”
+in Proc. Int. Conf. Autom. Plan. Sched. (ICAPS), vol. 29, no. 1, 2019,
+pp. 279–283.
+[11] J. Li, A. Felner, E. Boyarski, H. Ma, and S. Koenig, “Improved heuristics
+for multi-agent path finding with conflict-based search,” in Proc. Int.
+Joint Conf. Artif. Intell. (IJCAI), 2019, pp. 442–449.
+[12] J. Li, D. Harabor, P. J. Stuckey, H. Ma, G. Gange, and S. Koenig,
+“Pairwise symmetry reasoning for multi-agent path finding search,” Artif.
+Intell., vol. 301, Dec. 2021, Art. no. 103574.
+[13] J. Lee, J. Park, B.-M. Jeong, D.-S. Jang, and H.-L. Choi, “In-depth
+cluster conflict-based search for multi-agent path finding,” IEEE Trans.
+Autom. Sci. Eng., vol. 23, pp. 12 034–12 051, 2026.
+[14] M. Barer, G. Sharon, R. Stern, and A. Felner, “Suboptimal variants
+of the conflict-based search algorithm for the multi-agent pathfinding
+problem,” in Proc. Int. Symp. Combinatorial Search (SoCS), 2014, pp.
+19–27.
+[15] J. Li, W. Ruml, and S. Koenig, “EECBS: A bounded-suboptimal search
+for multi-agent path finding,” in Proc. AAAI Conf. Artif. Intell., vol. 35,
+no. 14, 2021, pp. 12 353–12 362.
+[16] Z. Ren, S. Rathinam, and H. Choset, “A bounded sub-optimal approach
+for multi-agent combinatorial path finding,” IEEE Trans. Autom. Sci.
+Eng., vol. 22, pp. 7590–7605, 2025.
+[17] K. Okumura, M. Machida, X. D´efago, and Y. Tamura, “Priority inher-
+itance with backtracking for iterative multi-agent path finding,” Artif.
+Intell., vol. 310, Sep. 2022, Art. no. 103752.
+[18] K. Okumura, “Engineering LaCAM*: Towards real-time, large-scale,
+and near-optimal multi-agent pathfinding,” in Proc. Int. Conf. Auton.
+Agents Multiagent Syst. (AAMAS), 2024, pp. 1501–1509.
+[19] A. Pertzovsky, R. Stern, R. Zivan, and A. Felner, “Multi-agent corridor
+generating algorithm,” in Proc. Int. Joint Conf. Artif. Intell. (IJCAI),
+2025, pp. 240–247.
+[20] J. Xin, Y. Duan, H. Zhu, and J. Liang, “Acceptance-rejection sampling-
+guided discrete RRT for multiagent path finding,” IEEE Trans. Ind.
+Informat., vol. 22, no. 1, pp. 207–218, Jan. 2026.
+[21] G. Sartoretti, J. Kerr, Y. Shi, G. Wagner, T. K. S. Kumar, S. Koenig,
+and H. Choset, “PRIMAL: Pathfinding via reinforcement and imitation
+multi-agent learning,” IEEE Robot. Autom. Lett., vol. 4, no. 3, pp. 2378–
+2385, Jul. 2019.
+[22] L. Chen, Y. Wang, Z. Miao, Y. Mo, M. Feng, Z. Zhou, and H. Wang,
+“Transformer-based imitative reinforcement learning for multirobot path
+planning,” IEEE Trans. Ind. Informat., vol. 19, no. 10, pp. 10 233–
+10 243, Oct. 2023.
+[23] L. Chen, Y. Wang, Y. Mo, Z. Miao, H. Wang, M. Feng, and S. Wang,
+“Multiagent path finding using deep reinforcement learning coupled with
+hot supervision contrastive loss,” IEEE Trans. Ind. Electron., vol. 70,
+no. 7, pp. 7032–7040, Jul. 2023.
+[24] J. Yu and S. M. LaValle, “Multi-agent path planning and network
+flow,” in Algorithmic Foundations of Robotics X, ser. Springer Tracts
+in Advanced Robotics.
+Berlin, Heidelberg: Springer, 2013, vol. 86, pp.
+157–173.
+[25] H. Ma and S. Koenig, “Optimal target assignment and path finding for
+teams of agents,” in Proc. Int. Conf. Auton. Agents Multiagent Syst.
+(AAMAS), 2016, pp. 1144–1152.
+[26] J. Yu and S. M. LaValle, “Optimal multirobot path planning on graphs:
+Complete algorithms and effective heuristics,” IEEE Trans. Robot.,
+vol. 32, no. 5, pp. 1163–1177, Oct. 2016.
+[27] E. Lam, P. Le Bodic, D. Harabor, and P. J. Stuckey, “Branch-and-cut-
+and-price for multi-agent path finding,” Comput. Oper. Res., vol. 144,
+Aug. 2022, Art. no. 105809.
+[28] Z. A. Ali and K. Yakovlev, “Improved anonymous multi-agent path
+finding algorithm,” in Proc. AAAI Conf. Artif. Intell., vol. 38, no. 16,
+2024, pp. 17 291–17 298.
+[29] Z. Yao, W. Wang, and Y. Cai, “Decomposing the multi-agent pathfinding
+problem for large agents: Accelerating solving without compromising
+solvability,” IEEE Trans. Autom. Sci. Eng., vol. 23, pp. 1994–2019, 2026.
+[30] Z. Zhao, S. Li, S. Liu, M. Zhou, X. Li, and X. Yang, “Lexicographic
+dual-objective path finding in multi-agent systems,” IEEE Trans. Autom.
+Sci. Eng., vol. 22, pp. 6223–6233, Mar. 2025.
+[31] Z. Ren, S. Rathinam, and H. Choset, “A conflict-based search framework
+for multiobjective multiagent path finding,” IEEE Trans. Autom. Sci.
+Eng., vol. 20, no. 2, pp. 1262–1274, Apr. 2023.
+[32] N. Gabay, J. Morag, A. Felner, and R. Stern, “The reachability objective
+in multi-agent path finding,” in Proc. 25th Int. Conf. Auton. Agents
+Multiagent Syst. (AAMAS), 2026, pp. 1165–1173.
+[33] J. F. Benders, “Partitioning procedures for solving mixed-variables
+programming problems,” Numer. Math., vol. 4, pp. 238–252, 1962.
+[34] J. N. Hooker and G. Ottosson, “Logic-based Benders decomposition,”
+Math. Program., vol. 96, no. 1, pp. 33–60, 2003.
+[35] G. Codato and M. Fischetti, “Combinatorial Benders’ cuts for mixed-
+integer linear programming,” Oper. Res., vol. 54, no. 4, pp. 756–766,
+2006.
+[36] L. R. Ford, Jr. and D. R. Fulkerson, “Maximal flow through a network,”
+Canad. J. Math., vol. 8, pp. 399–404, 1956.
+[37] R. K. Ahuja, T. L. Magnanti, and J. B. Orlin, Network Flows: Theory,
+Algorithms, and Applications.
+Englewood Cliffs, NJ, USA: Prentice
+Hall, 1993.
+[38] W. H¨onig, S. Kiesel, A. Tinka, J. W. Durham, and N. Ayanian,
+“Persistent and robust execution of MAPF schedules in warehouses,”
+IEEE Robot. Autom. Lett., vol. 4, no. 2, pp. 1125–1131, Apr. 2019.

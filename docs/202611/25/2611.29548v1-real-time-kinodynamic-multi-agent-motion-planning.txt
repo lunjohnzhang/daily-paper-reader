@@ -1,0 +1,1408 @@
+Title: Real-Time Kinodynamic Multi-Agent Motion Planning
+
+URL Source: https://arxiv.org/pdf/2611.29548v1
+
+Published Time: Tue, 24 Nov 2026 03:34:08 GMT
+
+Number of Pages: 28
+
+Markdown Content:
+> 1
+
+# Real-Time Kinodynamic Multi-Agent Motion Planning 
+
+Jiarui Li, Runyu Zhang, and Gioele Zardini 
+
+Abstract —Coordinating large robot fleets, from warehouses to quadrotor swarms, requires collision-free trajectories that satisfy dynamic constraints and stay within speed and acceleration bounds. Existing kinodynamic multi-agent planners enforce these bounds during the search or through trajectory optimization 
+
+after it, which limits fleet size and speed. We present Tickwise Actions to Kinodynamic Trajectories (TAKT), a framework that accounts for the dynamics before the search and reduces planning to a lattice search for double-integrator robots. TAKT analytically bounds the clearance lost when a discrete plan is smoothed and reserves this margin on the lattice. A closed-form convolution provably converts any valid plan into dynamically feasible trajectories with continuous-time collision avoidance. For robots spanning many lattice vertices, we introduce a diamond formulation that permits one-tick sideways yielding and adapt the Multi-Agent Path Finding (MAPF) solvers PIBT and LaCAM to it. With 50 robots, our planners run over 2,000 times faster than the strongest baseline in 2D halls and over 100 times in 3D, with comparable or lower makespan and cost. They plan about a thousand robots in seconds in 2D, and tens of seconds in 3D, and replan up to a thousand robots in real time. 
+
+Index Terms —Multi-robot systems, kinodynamic motion plan-ning, Multi-Agent Path Finding, trajectory smoothing, collision avoidance, real-time planning 
+
+I. I NTRODUCTION 
+
+# LARGE teams of robots that share a workspace are central to applications ranging from automated warehouse ful-fillment [1], [2] and autonomous intersection management [3] to coordinated quadrotor swarms [4], [5], with commercial facilities deploying hundreds of robots in a single shared workspace [1]. In these settings, each robot must navigate from its start position to its goal without colliding with static obstacles or other robots. Physical execution further requires that the motions obey the robot dynamics and actuation limits, which defines the Kinodynamic Multi-Agent Motion Planning Problem (KMAMPP). A solution assigns one time-parametrized trajectory to each robot. The trajectories must be conflict-free , so that robot bodies remain disjoint from obstacles and one another at every instant, and dynamically feasible , so that the robot dynamics and actuation limits are satisfied [6]. In practice, the planning runtime governs both the fleet size that can be deployed and how quickly the fleet responds to 
+
+The authors are with the Laboratory for Information and Decision Sys-tems, Massachusetts Institute of Technology, Cambridge, MA, USA (e-mails: {jiarui01, runyuzha, gzardini}@mit.edu). This work was supported by Prof. Zardini’s grant from the MIT Amazon Science Hub, hosted in the Schwarzman College of Computing. Runyu Zhang was supported by the MIT Postdoctoral Fellowship Program for Engineering Excellence. 
+
+29.1 ms computation time 
+
+(a) (b) 
+
+Fig. 1: Online reaction of the TAKT planner to a no-fly zone. Twenty-four simulated Crazyflie quadrotors cross an open space, and the lines trace their reference trajectories. (a) At time te, a cubic no-fly zone appears at the center (red). The trajectories planned before te pass through it. (b) After a computation time of 29.1 ms, the quadrotors follow new reference trajectories around the cube. The quadrotors meshes are enlarged 3.5 times for visibility. change. First, in offline planning, i.e., before execution begins, the computational burden grows with the number of robots, so the available planning time caps the fleet size that can be coordinated. Second, a sufficiently fast planner can update the trajectories while the robots keep moving (Fig. 1), provided that each update returns within the lead time before it is executed. Such real-time planning [7], [8] tightens the time budget further as the fleet grows. Existing kinodynamic multi-agent planners remain several orders of magnitude slower than such time budgets for large fleets. Joint methods explore the combined state space of the fleet through sampling [9], [10] or optimize continuous trajectories under pairwise collision constraints [11]. Both couple inter-robot coordination with dynamics-constrained motion synthesis, so the state dimension and the number of collision constraints grow with every robot, which restricts these planners to relatively small teams [12]. By contrast, solvers for the related problem of MAPF scale to thousands of agents. Standard MAPF coordinates point agents on a graph through synchronized moves and waits, avoiding simultaneous vertex occupancy and opposing edge arXiv:2611.29548v1 [cs.RO] 22 Nov 2026 2
+
+traversals [13]. Within this abstraction, PIBT constructs joint moves through priority inheritance and backtracking [14], and LaCAM embeds this efficient successor generation in a complete configuration search that has solved instances with thousands of agents in tens of seconds [15], [16]. Its solutions, however, are discrete schedules that ab-stract away robot-body geometry and dynamics, and not the continuous, dynamically feasible trajectories required by the KMAMPP. Several planners build on MAPF to solve the KMAMPP and differ in where they enforce dynamic feasibility. One class incorporates the dynamics during the search: db-CBS and db-LaCAM [12], [17] run MAPF search over kinodynamic motion primitives, while K-CBS [18] co-ordinates single-robot kinodynamic planners within Conflict-Based Search (CBS). Searching over higher-dimensional kin-odynamic states and primitives is expensive, however, which limits scalability to tens of robots [12]. A second class enforces the dynamics after the discrete search through continuous post-processing. MAPF/C+POST [4] constructs a discrete schedule and then solves constrained trajectory optimization problems within safe corridors, and Park et al. [19] additionally guar-antee that these problems are feasible, reporting an average planning time of 6.4 s for 64 robots. Because postprocessing can reduce obstacle clearance and inter-robot separation, these pipelines must enforce continuous-time collision constraints during trajectory optimization, which takes several minutes for hundreds of robots [4]. In both classes, executable motion thus requires additional computation, either to generate and evaluate kinodynamic motions during the search or to solve trajectory optimization problems after it. As the fleet grows, this computation limits how much of the speed and scalability of MAPF carries over to kinodynamic planning, particularly within the tighter time budgets of real-time planning. We resolve this bottleneck by accounting for the robot dy-namics before the discrete search. Specifically, we analytically bound the clearance lost when a discrete plan is reconstructed into continuous trajectories under the prescribed speed and acceleration caps, and we reserve the corresponding margin in the discrete search. A closed-form reconstruction, applied independently to each robot, then converts any valid discrete plan into smooth, dynamically feasible trajectories that are provably conflict-free in continuous time. This approach needs neither kinodynamic search nor trajectory optimization. The discrete search still ranges over synchronized moves and waits only, so the speed of MAPF solvers carries over, and any discrete solver that returns valid plans becomes a certified kinodynamic planner. 
+
+A. Statement of Contribution 
+
+This paper presents Tickwise Actions to Kinodynamic Tra-jectories (TAKT), a framework that certifies dynamic feasibil-ity and continuous-time collision avoidance through discrete coordination, together with two fast planners built on it. TAKT brings kinodynamic multi-agent motion planning to real-time speeds for fleets of hundreds of robots and scales to more than a thousand robots, more than an order of magnitude beyond the largest fleets solved by existing baselines. We model the robots as equal-radius closed balls in 2D and 3D with double-integrator dynamics and common speed and acceleration caps. Our contributions are threefold. First, we formulate TAKT as a pipeline of three stages, namely Discretization , Discrete Coordination , and Continuous Reconstruction (Section IV). Discretization embeds a lattice in the workspace, reserves a certified clearance radius around each robot, and reduces the KMAMPP to a discrete search problem (Problem IV.1). Discrete Coordination solves this problem with synchronized moves and waits, and Continu-ous Reconstruction filters the motion of each robot into a smooth trajectory. We prove that every valid discrete plan reconstructs into conflict-free trajectories that satisfy the speed and acceleration caps, independently of the discrete solver (Theorem VII.1). We also derive sufficient clearance con-ditions under which a discrete plan exists, both at a fixed lattice resolution and under lattice refinement (Theorem VII.2 and Corollaries VII.2 and VII.3). Second, we introduce a diamond formulation of the discrete problem and two planners that solve it. On a fine lattice, a robot spans many vertices, and a Euclidean separation rule can prevent it from yielding sideways in the same tick in which another robot advances. The diamond formulation restores this one-tick sideways yielding, and we derive a sharp condition on the diamond size that guarantees the Euclidean separa-tion required by reconstruction (Section V). We then adapt PIBT and LaCAM to this formulation through backtracking over simultaneous blockers, priority reshuffling in stationary groups, Euclidean candidate ordering, and memory-efficient goal-distance queries, which yields TAKT-PIBT and TAKT-LaCAM (Section VI). With 50 robots, TAKT-LaCAM is 2,200 to 2,600 times faster than MAPF/C+POST [4] in four 2D halls and 105 to 415 times faster on three 3D maps, with comparable or lower makespan and cost (Section IX-B). Both planners compute trajectories for about a thousand robots in seconds in 2D and in tens of seconds in 3D (Section IX-C), and ablation studies isolate the effect of each design ele-ment (Section IX-D). In physics simulation, fleets of up to 1,082 differential-drive robots and 1,010 quadrotors track the planned trajectories without collisions (Section IX-E). Third, we develop two paradigms for real-time replanning under online changes to goals and to the environment (Sec-tion VIII). Whole-fleet replanning computes a complete new plan and, in our experiments, returns within 500 ms for up to 763 robots in an empty hall and 335 quadrotors around a central pillar. Incremental replanning extends the plan with TAKT-PIBT by one configuration per tick, faster than the robots execute it, for up to 1,018 robots and 671 quadrotors on the same maps (Section IX-F). 
+
+Organization: Section II reviews related work, and Sec-tion III states the problem. Section IV presents the TAKT framework, Section V the diamond formulation, and Sec-tion VI the two planners. Section VII establishes the guar-antees, Section VIII presents real-time planning, Section IX reports the experiments, and Section X concludes the paper. 3
+
+II. R ELATED WORK 
+
+We review kinodynamic motion planning, MAPF, and meth-ods that connect them. Here we use path to denote a geometric route without timestamps, and trajectory to denote a time-parameterized motion. 
+
+A. Kinodynamic Motion Planning 
+
+Kinodynamic planning searches for trajectories that sat-isfy dynamic constraints. Sampling-based methods such as kinodynamic rapidly exploring random trees (RRT) [20] and stable sparse RRT (SST) [10] generate candidate motions by integrating sampled controls through the robot dynamics. Optimization-based methods optimize a parameterized trajec-tory subject to dynamic constraints, as in polynomial and minimum-snap trajectory generation [21]. Conflict-free way-points alone do not ensure continuous-time safety. Collision avoidance must be enforced along the trajectory or established by a post-hoc separate verification. Multi-robot extensions either plan jointly or coordinate separate robot plans. Joint methods explore the combined state space through cooperative sampling [9] or optimize all trajectories under pairwise separation constraints, using methods such as sequential convex programming [11]. These approaches couple the robots directly, so the dimension of the search space or the number of separation constraints grows with every added robot, which restricts these planners to relatively small teams [12]. Prioritized planning coordinates separate plans by planning robots sequentially, with each avoiding the trajectories of higher-priority robots [22], [23]. Dynamic feasibility then depends on the single-robot planner. While avoiding direct coupling, the trajectories fixed for higher-priority robots can leave a later robot without a feasible trajectory [23]. Real-time planners replan while the robot moves. Each replan starts from the state that the robot will reach after a lead time and must return within that lead time, resulting in higher runtime requirements [7], [8]. Reported planning times of centralized kinodynamic planners range from seconds for tens of robots to minutes for hundreds [4], [19]. Centralized kinodynamic planners account for dynamics and collision avoidance through the states, controls, or trajectory constraints of every robot. The resulting computational burden limits both the fleet size and the speed of replanning, which motivates solving the coordination problem on a simplified motion model. 
+
+B. Multi-Agent Path Finding on Graphs 
+
+MAPF serves as an abstraction of such a coordination problem on graphs. In standard discrete-time MAPF, agents move along an edge or wait at a vertex in each synchronized step. Plans avoid simultaneous occupancy of a vertex and opposite traversal of an edge [13]. This model abstracts away robot-body geometry and differential constraints. CBS resolves conflicts through a high-level tree of con-strained single-agent searches [24], while M* expands the joint search where agents interact [25]. PIBT constructs one joint move at a time, in which a blocked agent passes its priority to the agent in its way [14]. LaCAM embeds such successor generation in a complete search over configurations and has solved instances with ten thousand agents [15]. Closed-loop approaches repeatedly plan from the observed configuration and commit the next joint move [26]–[28]. Large-agent MAPF models footprints spanning multiple vertices [29], while multi-dependency PIBT handles moves blocked by several agents [30]. 
+
+C. From Discrete Coordination to KMAMPP 
+
+Standard MAPF discarded robot-body geometry, inter-step motion, and dynamic constraints, which are inevitable for solving KMAMPP, for better scalability. Two lines of work bridge the two fields. One line retains kinodynamic reasoning during the search. K-CBS coordinates single-robot kinodynamic planners within CBS [18]. db-CBS and db-ECBS search precomputed prim-itives with bounded discontinuities and remove those dis-continuities through joint trajectory optimization [17], [31]. db-LaCAM propagates controls from applicable primitives and coordinates the resulting motions through a kinodynamic extension of PIBT within LaCAM, with reported experiments reaching 50 robots [12]. Precomputed primitives encode local dynamics in advance, but the search still carries kinodynamic states and validates candidate motions. Because dynamics enter the search directly through the state and transition representations, coordinating these higher-dimensional kino-dynamic states limits scalability to tens of robots. A second line constructs dynamically feasible trajectories 
+
+after discrete coordination. MAPF/C+POST constructs safe corridors from a discrete schedule and optimizes one trajectory per robot within them [4]. Park et al. [19] additionally guar-antee feasibility of the resulting optimization problems. These pipelines preserve obstacle clearance and inter-robot separa-tion through continuous trajectory constraints, so executable motion still requires solving expensive post-hoc constrained optimization problems, limiting scalability. 
+
+D. Summary and Positioning 
+
+The challenge addressed here is to retain simple discrete co-ordination while obtaining smooth, conflict-free motion under given dynamic limits through direct reconstruction. TAKT framework establishes the reconstruction guarantee 
+
+before search and makes continuous feasibility a property of any discrete plan. At a chosen lattice resolution, the prescribed speed and acceleration caps and reconstruction kernel fix the tick duration, filter window, and clearance certificate. The search then coordinates only synchronized axial moves and waits. Every valid plan reconstructs into smooth, collision-free trajectories satisfying the dynamic constraints through independent closed-form convolutions. This guarantee is in-dependent of the discrete solver, and reconstruction requires neither trajectory optimization nor collision repair. Building on this framework, we develop two fast discrete planners whose efficiency enables real-time planning for fleets of up to a thousand robots. 4
+
+III. P ROBLEM STATEMENT 
+
+A. Workspace, Obstacles, and Robot Bodies 
+
+In this section, we formalize the workspace, the robot model, and the planning problem. Let d ∈ { 2, 3} denote the workspace dimension. Throughout, ∥·∥ 2 and ∥·∥ 1 denote the Euclidean and Manhattan norms on Rd, and dist 2(p, A ) = inf z∈A ∥p − z∥2 is the Euclidean distance from a point p to a nonempty set A. The workspace W ⊂ Rd is a compact set with nonempty interior int W. The static obstacles form a closed set O ⊆ W. The forbidden set C collects the obstacles and every point outside the workspace interior, and the clearance cl( p) of a point is its distance to this set, that is, 
+
+C = O ∪ (Rd \ int W), cl( p) = dist 2(p, C). (1) The set C is closed and nonempty, so the distance in Eq. (1) is attained at a point of C, and the clearance function is 1-Lipschitz, 
+
+|cl( p) − cl( q)|≤ ∥ p − q∥2 for all p, q ∈ Rd. (2) The N ≥ 1 robots are closed balls of common radius r > 
+
+0, and the position of a robot is that of its center. A robot centered at p thus occupies Br (p) = {z ∈ Rd : ∥z − p∥2 ≤ r}.
+
+A robot of another shape can be represented by its smallest enclosing ball. Because the bodies and the forbidden set are closed, intersection tests reduce to strict distance comparisons, 
+
+Br (p) ∩ C = ∅ ⇐⇒ cl( p) > r, (3) 
+
+Br (p) ∩ B r (q) = ∅ ⇐⇒ ∥ p − q∥2 > 2r. (4) By Eq. (3), the free space, i.e., the set of centers for which the body avoids the forbidden set, is F = {p ∈ Rd : cl( p) > r }.
+
+B. Robot Dynamics 
+
+We model each robot as a fully actuated double integrator in Rd with bounded speed and acceleration. Let xi(t) ∈ Rd be the center of robot i at time t, let wi(t) ∈ Rd be its velocity, and let ai(t) ∈ Rd be its acceleration input. The dynamics are 
+
+˙xi(t) = wi(t), ˙wi(t) = ai(t),
+
+∥wi(t)∥2 ≤ v, ∥ai(t)∥2 ≤ amax . (5) The caps v > 0 and amax > 0 are given independently and are common to all robots. A trajectory that satisfies these dynamics and caps is called admissible , as formalized next. 
+
+Definition III.1 (Admissible trajectory) . A trajectory 
+
+x: [0 , T ] → Rd is admissible if x ∈ C1([0 , T ]; Rd), its derivative ˙x is absolutely continuous, ∥ ˙x(t)∥2 ≤ v for every 
+
+t ∈ [0 , T ], and ∥¨x(t)∥2 ≤ amax almost everywhere. The double integrator is a planning abstraction, and Sec-tion IX-E shows that differential-drive robots and quadrotors track the resulting trajectories with standard controllers. 
+
+C. Configurations and Conflict-Free Configurations 
+
+Definition III.2 (Fleet configuration) . A configuration of the 
+
+N labeled robots is an ordered tuple Q = ( p1, . . . , p N ) ∈
+
+(Rd)N , where pi is the center of robot i.
+
+Definition III.3 (Conflict-free configuration) . A configura-tion Q = (p1, . . . , p N ) is conflict-free if cl( pi) > r and 
+
+∥pi − pj ∥2 > 2r for every i and every j̸ = i. The set of conflict-free configurations is denoted by Qfree ⊆ (Rd)N .Conflict freedom is a condition on the physical bodies. Sec-tion IV introduces a stricter condition for lattice configurations, called validity , in which a certificate radius rε > r replaces r.
+
+D. The Motion Planning Problem 
+
+An instance of the planning problem is a tuple I =(W, O, r, v, a max , S, G, η ), in which S = (s1, . . . , s N ) ∈Qfree is the start configuration, G = ( g1, . . . , g N ) ∈ Q free is the goal configuration, and η ≥ 0 is a small endpoint tolerance. Robot i starts within η of si and must come to rest within η
+
+of gi.
+
+Problem III.1 (Kinodynamic Multi-Agent Motion Planning Problem) . Given an instance I, find a finite horizon T > 0
+
+and admissible trajectories (Definition III.1) x1, . . . , x N on 
+
+[0 , T ] such that, for every robot i,
+
+∥xi(0) − si∥2 ≤ η, ∥xi(T ) − gi∥2 ≤ η, 
+
+˙xi(0) = ˙ xi(T ) = 0 , (6) and, for every t ∈ [0 , T ] and every j̸ = i,
+
+cl( xi(t)) > r, ∥xi(t) − xj (t)∥2 > 2r. (7) We define the margin of a solution X = ( x1, . . . , x N ) as the smallest amount by which the inequalities in Eq. (7) hold over the whole horizon, 
+
+μX = min { min  
+
+> i
+
+min  
+
+> t∈[0 ,T ]
+
+(cl( xi(t)) − r),
+
+min  
+
+> i<j
+
+min  
+
+> t∈[0 ,T ]
+
+(∥xi(t) − xj (t)∥2 − 2r)}, (8) where the second inner minimum is omitted when N = 1 .Every solution has margin μX > 0, since each minimum in Eq. (8) is attained on the compact horizon [0 , T ], at a time at which the strict inequalities of Eq. (7) hold. Intuitively, the margin measures how much clearance a solution leaves beyond the physical minimum. It drives the existence results of Section VII, where a discrete plan is shown to exist whenever the margin exceeds the combined lattice approximation error and certificate inflation (Theorem VII.2 and Corollary VII.2). Problem III.1 asks for a feasible motion, and we compare solutions of the same instance using two metrics. The arrival time τi(X) is the earliest time after which robot i remains at 
+
+xi(T ) for the rest of the horizon. The makespan is defined as max i τi(X). The cost of a solution integrates a quadratic running cost over the horizon, 
+
+J(X) = 
+
+> N
+
+X
+
+> i=1
+
+Z T
+
+> 0
+
+(qp ∥xi(t) − xi(T )∥22 + qv ∥ ˙xi(t)∥22
+
++ ra ∥¨xi(t)∥22) dt, 
+
+(9) 5
+
+with weights qp, q v , r a ≥ 0 that are not all zero. The three terms penalize the state deviation (xi − xi(T ), ˙xi) from rest at the final position and the input ai = ¨ xi of Eq. (5), as in linear-quadratic control [32], [33]. This paper targets feasible solutions of Problem III.1 at speed and at scale, and Section IX reports the makespan and the cost of the solutions obtained. IV. TAKT F RAMEWORK AND CONSTRUCTION 
+
+A. Pipeline Overview 
+
+In this section, we present the TAKT framework, which co-ordinates the robots on a lattice and obtains dynamic feasibility afterwards from a fixed filter whose effect on the clearance is bounded before the search. Its pipeline comprises three stages (Fig. 2). Discretization places a lattice in the workspace and sets the timing and clearance requirements according to the speed and acceleration limits and the chosen smoothing filter. 
+
+Discrete Coordination plans synchronized moves and waits on this lattice, maintaining the required obstacle clearance and inter-robot separation at every step. Continuous Reconstruction 
+
+filters each robot’s motion independently, using a common kernel, to produce smooth, conflict-free trajectories within the speed and acceleration caps. The guarantee holds for every valid discrete plan, allowing PIBT [14], LaCAM [15], or another discrete solver. 
+
+B. Discretization 
+
+We discretize the workspace using a lattice of pitch ε > 0.Fix an origin o ∈ Rd and an orthonormal frame e1, . . . , e d.All coordinates and Manhattan norms below are expressed in this frame. 
+
+Definition IV.1 (Lattice vertices and elementary moves) . For a pitch ε > 0, the lattice, the move set, and the tick duration are 
+
+Lε = o + εZd, M = {0, ±εe 1, . . . , ±εe d}, ∆t = ε/v. (10) Two vertices are axial neighbors when their difference is one of the 2d nonzero displacements ±εe a. An elementary move is a displacement in M, and the zero displacement is a wait. A tick is a time interval of duration ∆t. A lattice configuration is a configuration in the sense of Definition III.2 whose positions all belong to Lε.TAKT temporarily relaxes the acceleration cap: each robot either moves to an axial neighbor at speed v or waits, with instantaneous velocity changes between ticks. The pitch may be much smaller than the robot diameter, so that a body spans many lattice vertices. Continuous Reconstruction (Section IV-D) restores dynamic feasibility by convolving each stop-and-go trajectory with a common kernel ϕ. The kernel is symmetric and nonnega-tive, has unit integral, and is supported on [−Tf /2, T f /2] ,where Tf > 0 is the filter duration. We use the box kernel throughout this paper. Lemma IV.1 bounds the acceleration of the reconstructed trajectory by cϕv/T f , with cϕ = 2 for the box kernel. Given the acceleration cap amax , the following definition selects the shortest filter duration that satisfies this bound and spans an even number of ticks. 
+
+Definition IV.2 (Filter width and duration) . The target dura-tion, the filter width, and the filter duration are 
+
+Tacc = cϕvamax 
+
+, W = 2 ⌈ Tacc 
+
+2∆ t ⌉, Tf = W ∆t. (11) The width is the smallest even number of ticks whose duration reaches the target, so Tacc ≤ Tf < T acc + 2∆ t. A longer filter duration would also satisfy the acceleration cap, but it would enlarge the clearance reserve introduced next and delay the motion, so we select the minimum duration in Definition IV.2. Discrete coordination accounts for the clearance needed by reconstruction through the following certificate radius. 
+
+Definition IV.3 (Certificate radius) . For a filter duration Tf ,the certificate radius is 
+
+r2 
+
+> ε
+
+= r2 + ε2/4 + κϕv2T 2f . (12) The required clearance at a lattice vertex p is cl( p) > r ε,and the required separation of simultaneous positions p, q is 
+
+∥p − q∥2 > 2rε.Here, κϕ denotes the normalized variance of the kernel, defined by 
+
+σ2 
+
+> ϕ
+
+= R s2ϕ(s) ds = κϕT 2f . (13) For the box kernel, κϕ = 1 /12 . Intuitively, the tick reserve 
+
+ε2/4 covers the motion between two ticks, and the smoothing reserve κϕv2T 2f covers the deviation introduced by filtering, so that validity at the ticks implies conflict freedom of the reconstructed trajectories (Theorem VII.1). In the 2D exper-iments of Section IX, r = 0 .5 m, v = 1 m/s, ε = 0 .101 m, and Tf = 0 .606 s give rε = 0 .532 m, so the two reserves add 3.2 cm to the robot radius. In the 3D experiments, r = 0 .2 mgives rε = 0 .237 m. The reference graph retains the vertices with the required obstacle clearance and connects them by elementary moves. 
+
+Definition IV.4 (Reference vertices and reference graph) . The reference vertex set and the reference graph are 
+
+Vε = {p ∈ Lε : cl( p) > r ε}, Gε = ( Vε, E ε), (14) 
+
+Eε = {{ p, q } : p, q ∈ Vε, q − p ∈ M} . (15) The Discrete Coordination stage then operates on Gε,scheduling synchronized elementary moves with the pairwise separation required by the certificate radius rε.
+
+C. Discrete Coordination 
+
+The Discrete Coordination stage returns a synchronized sequence of lattice configurations Q0: K = (Q0, . . . , Q K ),where Qk = ( pk 
+
+> 1
+
+, . . . , p kN ) holds the positions of the robots at tick k. Between consecutive ticks, each robot executes an elementary move over [k∆t, (k + 1)∆ t], either traveling at constant velocity (pk+1  
+
+> i
+
+− pki )/∆t ∈ { 0, ±ve a} to an axial neighbor or waiting at rest, that is, 
+
+{pki , p k+1  
+
+> i
+
+} ∈ Eε (0 ≤ k < K, 1 ≤ i ≤ N ), (16) 6          
+
+> (a) KMAMPP Instance
+> Problem III.1
+> (b) Discretization
+> Section IV-B, Problem IV.1
+> (c) Discrete Coordination
+> Sections IV-C, V and VI
+> (d) Continuous Reconstruction
+> Section IV-D
+> ε, r εGε
+> ∆tϕ, T f
+> rt
+> ∥˙xi∥2
+> vamax
+> start goal
+> Tf
+> rrε
+> εv
+> 010 20 t/ ∆t
+> ˆx1
+> ˙ˆx1
+> ¨ˆx1
+> v
+> 010 20 t/ ∆t
+> ˜x1
+> ˙˜x1
+> ¨˜x1
+> v/ 2
+> amax
+
+Fig. 2: The TAKT pipeline. (a) Disc robots travel between starts and goals in a continuous workspace, at rest at both ends and within the speed and acceleration caps. (b) Discretization keeps the lattice vertices whose clearance exceeds the certificate radius rε. (c) Discrete Coordination returns axial moves and waits with disjoint certificate balls at every tick. Each robot’s velocity is a square wave. (d) Continuous Reconstruction pads each plan with waits and filters it with a common kernel ϕ.The resulting trajectories are smooth, collision-free, and satisfy the dynamic constraints. and every tick configuration satisfies the clearance and sepa-ration conditions in Definition IV.3: 
+
+pki ∈ Vε, pki − pkj 2 > 2rε (i̸ = j, 0 ≤ k ≤ K). (17) These conditions are imposed at the ticks only, and Theo-rem VII.1 extends them to continuous time. The configurations satisfying both conditions form the reference configuration set 
+
+Qε = {(p1, . . . , p N ) ∈ V Nε :
+
+∥pi − pj ∥2 > 2rε ∀i < j }. (18) The goal of Discrete Coordination is a sequence of such configurations from the start to the goal. This problem admits a large-agent MAPF (LA-MAPF) formulation [29] with conflicts defined at ticks. At a reference vertex p, a robot occupies the closed ball Brε (p), and two robots have a conflict when these balls intersect at the same tick, i.e., when their centers are at distance at most 2rε.
+
+Definition IV.5 (Valid configurations and plans) . A lattice configuration is valid if it belongs to Qε. A plan Q0: K is valid if every configuration is valid and every transition satisfies Eq. (16). The Discrete Coordination stage starts and ends at the an-chor configurations Sε = ( sε
+
+> 1
+
+, . . . , s εN ) and Gε = ( gε
+
+> 1
+
+, . . . , g εN )
+
+in Qε, which satisfy ∥sεi − si∥2 ≤ η and ∥gεi − gi∥2 ≤ η
+
+for every i. The resulting LA-MAPF instance is Iε =(Gε, r ε, S ε, G ε).
+
+Problem IV.1 (Discrete Coordination Problem) . Given Iε,find an integer K ≥ 0 and a valid plan Q0: K with Q0 = Sε
+
+and QK = Gε.We refer to Problem IV.1 as the reference problem , since any solver that returns valid plans can be used within TAKT. In this paper, we solve it with the diamond formulation of Section V and the two planners of Section VI.                         
+
+> W= 2 waits W= 2 waits
+> Tf= 2∆ t
+> t/ ∆te1
+> e2
+> vv
+> 012345678
+> Raw pulses ˙ˆxFiltered velocity ˙˜x
+> (a) Box averaging of axis pulses
+> x1/ε x2/ε
+> t= 3∆ tt= 4∆ t
+> sg
+> 1122ˆx˜x=ϕ∗ˆx
+> (b) Reconstructed path
+
+Fig. 3: Exact box-filter reconstruction of four axis moves with filter width W = 2 . (a) The raw velocity pulses and their box averages, with the inserted waits (green) and the filter window at t = 4∆ t (blue). (b) The stop-and-go trajectory and its box average, which is piecewise quadratic. 
+
+D. Continuous Reconstruction 
+
+A solution of Problem IV.1 defines a stop-and-go tra-jectory for each robot, which passes through the tick posi-tions p0 
+
+> i
+
+, . . . , p Ki at the times k∆t. Its velocity is a square wave, with a pulse ±ve a of duration ∆t for each move and a zero-velocity interval for each wait. Continuous Reconstruc-tion applies the kernel ϕ of Section IV-B as a low-pass filter that averages these pulses over a window of duration Tf . The filtered velocity is determined by the time spent moving in each signed direction within the window, in analogy with pulse-width modulation, and it lies in the convex hull of 
+
+{0, ±ve a : a = 1 , . . . , d }. Figure 3 shows the pulses, the filtered velocities, and the reconstructed paths in a planar example. 
+
+Definition IV.6 (Padded reconstruction) . Let Q0: K be a valid plan in the sense of Definition IV.5. Prepend and append W
+
+waits to the position sequence of each robot, which gives the duration Tp = ( K +2 W )∆ t = K∆t+2 Tf . Let ˆxi be the stop-and-go trajectory of the padded sequence of robot i, extended 7
+
+Algorithm 1 Pipeline of the TAKT framework                                               
+
+> Require: Instance Iof Problem III.1; lattice pitch ε > 0; discrete solver S
+> Ensure: Trajectories ˜x1, . . . , ˜xN
+> 1: (ϕ, c ϕ, κ ϕ)←KERNEL SELECTION // box kernel, Eq. (13)
+> 2: ▷Definitions IV.2 and IV.3
+> 3: (Tacc ,∆t, W, T f, r ε)←COMPUTE PARAMETER (I, ε, c ϕ, κ ϕ)
+> 4: Iε←DISCRETIZATION (I, r ε)
+> 5: Q0: K←DISCRETE COORDINATION (Iε)
+> 6: for all robots ido
+> 7: ˆxi←PADDING (p0: Ki, W, ∆t)
+> 8: ˜xi←ϕ∗ˆxi// Definition IV.6
+> 9: return (˜ x1, . . . , ˜xN)
+
+constantly outside [0 , T p]. The reconstructed trajectory is 
+
+˜xi(t) = ( ϕ ∗ ˆxi)( t) = R Tf /2  
+
+> −Tf/2
+
+ϕ(s)ˆ xi(t − s) ds, (19) where t ∈ [0 , T p]. Every robot uses the same kernel, width, padding, and clock. The padded waits ensure that the reconstructed trajectories start and end at rest at the endpoints of the plan. For a > 0
+
+write Ba(s) = a−11[−a/ 2,a/ 2] (s). The box kernel is ϕ = BTf .With the primitive F ′ 
+
+> i
+
+= ˆ xi,
+
+˜xi(t) = [ Fi(t + Tf /2) − Fi(t − Tf /2)] /T f , (20) so each reconstructed trajectory consists of O(K + W )
+
+quadratic pieces. The coefficients are obtained directly from prefix integrals of the stop-and-go trajectory, so reconstruction can be computed independently for each robot in parallel. 
+
+Lemma IV.1 (Regularity and derivative bounds of the re-construction) . Let ˆx be the stop-and-go trajectory of a robot and ˜x = ϕ ∗ ˆx its box reconstruction. Then ˜x is C1, ˙˜x is absolutely continuous, and 
+
+˙˜x(t) 2 ≤ v for all t, 
+
+¨˜x(t) 2 ≤ cϕvTf
+
+= 2vTf
+
+almost everywhere . (21) When Tf ≥ Tacc , ˜x is admissible in the sense of Defini-tion III.1. 
+
+Proof sketch. The reconstructed velocity ϕ ∗ ˙ˆx is a convex average of raw velocities of norm at most v, so it stays in the ball of radius v and is continuous. For the box kernel it equals the difference quotient (ˆ x(t + Tf /2) − ˆx(t − Tf /2)) /T f , which is 2v/T f -Lipschitz because ˆx is v-Lipschitz. Definition IV.2 guarantees Tf ≥ Tacc , so every reconstruc-tion of Definition IV.6 is admissible. Algorithm 1 summarizes the entire pipeline. V. D IAMOND FORMULATION FOR DISCRETE 
+
+COORDINATION 
+
+In this section, we introduce a diamond formulation of Problem IV.1 that supports one-tick sideways yielding. Lattice-aligned diamond footprints define pairwise conflicts through the Manhattan norm and enforce the Euclidean separation 2rε
+
+required by Definition IV.3.               
+
+> ABAB
+> (a) Euclidean rule: √26 ε > 2rε>√20 ε
+> ABAB
+> (b) Diamond rule: ∥(6 ,1) ∥1=∥(5 ,2) ∥1= 7 >6
+
+Fig. 4: One-tick sideways yield under the Euclidean and diamond rules. Robot A moves one cell to the right while robot B moves one cell upward. Panels (a) and (b) each show the configuration before and after the tick. 
+
+A. Motivation for Diamond Footprints 
+
+PIBT [14] is widely used in MAPF for its speed. It coor-dinates one joint move at a time through priority inheritance and backtracking. A blocked agent asks the agent in its way to yield and passes on its priority, and this request propagates through the resulting dependencies. Yielding is straightforward in standard MAPF, where each agent occupies a single vertex. When robots span several lattice vertices, however, the conflict geometry determines which responses are available. Figure 4 illustrates this effect on a schematic example in which two robots stand side by side, robot A moves one cell to the right, and robot B yields by moving one cell up. The center offset loses one vertex along A’s direction of motion and gains one vertex sideways. Under the Euclidean rule in Fig. 4(a), the robots are discs of radius r = 2 ε, and Eq. (12) gives rε ≈ 2.36 ε for the box kernel with W = 4 . In lattice units, the simultaneous moves change the center offset as (5 , 1) −→ (4 , 2) , √26 ε > 2rε >√20 ε, so the pair satisfies the separation of Eq. (17) before the move and violates it after the move. Robot B’s sideways step does not compensate for the reduced axial separation. Robot B can retreat to the right to preserve the separation, but it remains in front of A and may be blocked by another robot. A two-tick alternative is for B to move upward while A
+
+waits, then for both robots to advance to the right. However, coordinating such multi-step maneuvers increases the search effort, since each robot has (2 d+1) L possible action sequences over L ticks, and one sequence can cause conflicts with several robots [30], [34]. Under the diamond rule (Fig. 4(b)), a single perpendic-ular step restores separation and supports the response in one tick, avoiding multi-tick maneuvers. The lattice pitch is 
+
+ε = √2 r/ 3, so diamonds of axial radius three cells enclose the same discs, and two diamonds are disjoint exactly when the Manhattan distance of their centers exceeds six cells. The same simultaneous moves give (6 , 1) −→ (5 , 2) , ∥(6 , 1) ∥1 =
+
+∥(5 , 2) ∥1 = 7 > 6, so the Manhattan distance is unchanged and the diamonds remain disjoint. The certified construction below selects the diamond size to guarantee the Euclidean sep-aration required by reconstruction. The diamond rule admits 8                           
+
+> hnε r
+> Dn
+> BrDm∗
+> Brε
+> (a) d= 2 :n= 2 ,W= 6 ,m∗= 3
+> nε =√2r,h=m∗εrh
+> Br
+> Dn=Dm∗
+> (b) d= 3 :m∗=nh=nε =√3r
+
+Fig. 5: The physical ball Br (orange), the enclosing diamond 
+
+Dn (dashed), and the planning diamond Dm∗ (solid). (a) An inflated planar footprint. The certificate ball of radius rε (red, dashed) extends past the footprint near the midpoints of its edges. (b) The case m∗ = n in three dimensions, in which the two footprints coincide and Br is inscribed in the octahedron. fewer configurations than the Euclidean rule, and a robot at the minimum permitted separation can still yield sideways within one tick. Section IX-D measures the effect. 
+
+B. Aligned Footprints and One-Tick Yielding 
+
+Definition V.1 (Enclosing and planning diamonds) . Fix an integer n ≥ 1 and tie the pitch to the robot radius, 
+
+nε = √d r, ε(n) = 
+
+√d r n , ∆t(n) = ε(n)
+
+v . (22) For an integer k ≥ 1, the diamond of axial radius kε around a vertex p is the cross-polytope Dk(p) = {z ∈ Rd :
+
+∥z − p∥1 ≤ kε }, a diamond for d = 2 and an octahedron for d = 3 . For each robot we distinguish the following two diamonds: The enclosing diamond of a robot at p is Dn(p), the smallest lattice-aligned diamond containing its body. Discrete Coordination uses a planning diamond Dm(p), with integer 
+
+m ≥ n.The planning diamond contains the enclosing diamond. For a given problem with fixed robot sizes, the size of the enclosing diamond is fixed, and the resolution integer n sets the pitch ε. Given n, the footprint integer m ≥ n sets the planning diamond’s axial radius mε and determines the pairwise conflict rule. The geometric relationship is shown in Fig. 5. The certificate ball of radius rε need not lie inside the planning diamond. The pairwise diamond condition at a tick requires the planning diamonds to be disjoint. The triangle inequality and the midpoint of the centers give 
+
+Dm(p) ∩ D m(q) = ∅ ⇐⇒ ∥ p − q∥1 > 2mε. (23) Let a = ( p − q)/ε ∈ Zd denotes the relative lattice offset. We obtain 
+
+∥p − q∥1 > 2mε ⇐⇒ ∥ a∥1 ≥ 2m + 1 (24) 
+
+Lemma V.1 (One-tick sideways yield) . Let two robots sit at 
+
+p and q with q − p = (2 m + 1) εe a. If during one tick the first robot moves to p′ = p + εe a and the second to q′ = q ± εe b
+
+with b̸ = a, then their planning diamonds remain disjoint. 
+
+Proof sketch. The offset after the tick is (q′ − p′)/ε =2m e a ±eb, whose Manhattan norm is 2m+1 , so the planning diamonds are disjoint by Eq. (24). In words, a robot at the minimum permitted axial separation can step aside in the same tick in which the other robot advances. 
+
+C. Alignment and Euclidean Separation 
+
+Discrete Coordination requires every pair of robots to have Euclidean center separation greater than 2rε at each tick (Eq. (17)). We now derive the exact condition under which disjoint planning diamonds guarantee this separation. For an integer s ≥ 0, write s = dq + j with 0 ≤ j < d .The smallest squared Euclidean norm of an integer offset with Manhattan norm at least s is 
+
+Md(s) := min 
+
+> a∈Zd:∥a∥1≥s
+
+∥a∥22
+
+= ( d − j)q2 + j(q + 1) 2 = s2 + j(d − j)
+
+d ,
+
+(25) attained exactly by the offsets whose coordinate magnitudes differ by at most one and sum to s.
+
+Theorem V.1 (Sharp diamond certificate) . Let ε = √d r/n 
+
+for an integer n ≥ 1, let m ≥ n be an integer, and let j =(2 m + 1) mod d. Every pair of lattice vertices with disjoint planning diamonds obeys 
+
+∥p − q∥22 ≥ ε2Md(2 m + 1) . (26) Disjoint planning diamonds guarantee ∥p − q∥2 > 2rε for every pair of lattice vertices if and only if 
+
+4[ m(m + 1) − n2] + 1 − d + j(d − j) > 4dκ ϕW 2. (27) 
+
+Proof sketch. A permitted pair has ∥a∥1 ≥ 2m+1 by Eq. (24), so Eq. (25) gives Eq. (26), and the offsets that attain the minimum also attain the bound. The alignment ε = √d r/n 
+
+turns the threshold (2 rε)2 into ε2(4 n2/d + 1 + 4 κϕW 2), and comparing it with ε2Md(2 m + 1) gives Eq. (27). In words, disjoint planning diamonds certify the Euclidean separation exactly when the footprint integer m is sufficiently large relative to the resolution integer n and the filter width W .For the box kernel, κϕ = 1 /12 , and Eq. (27) reduces to 
+
+6[ m(m + 1) − n2] > W 2 (d = 2) ,
+
+4[ m(m + 1) − n2] − 2 + j(3 − j) > W 2 (d = 3) , (28) with j = (2 m + 1) mod 3 in three dimensions. With the parameters of the 2D experiments in Section IX, n = 7 and 
+
+W = 6, the first condition holds at m = n = 7, since 
+
+6 [7 ·8−72] = 42 > 36 , so disjoint enclosing diamonds already guarantee the separation. With n = 8 and W = 10 in 3D, the second condition first holds at m = 9 .
+
+Remark V.1 (The role of alignment) . Figure 6 compares two pairs of disjoint enclosing diamonds for the box kernel with 
+
+W = 2 . In (a), ε = √2 r gives the closest permitted offset 
+
+(1 , 2) , with center distance √5 ε > 2rε. In (b), ε = 4 √2 r/ 3
+
+permits the offset (1 , 1) , with center distance √2 ε < 2rε.9               
+
+> pq
+> (a) Aligned
+> ε=√2r
+> ∥p−q∥2>2rεpq(b) Misaligned
+> ε= 4 √2r/ 3
+> ∥p−q∥2<2rε
+
+Fig. 6: Aligned and misaligned enclosing diamonds for the same robot radius and the box kernel with W = 2 , drawn at the same scale. Blue diamonds enclose the orange robot bodies. Red dashed circles are certificate balls, whose overlap in (b) is shaded. Both diamond pairs are disjoint. Thus disjoint misaligned diamonds can fail the required Eu-clidean separation. 
+
+D. Parameter Selection and Footprint Inflation 
+
+Among the footprint integers that satisfy Theorem V.1, smaller ones admit more vertices near obstacles and more joint moves. We therefore select the smallest certified footprint integer m∗.
+
+Definition V.2 (Certified footprint selection) . The least certi-fied footprint integer at resolution n and width W is 
+
+m∗(n, W ) = min {m ∈ Z≥n : ε2Md(2 m + 1) > 4r2 
+
+> ε
+
+},
+
+(29) with r2 
+
+> ε
+
+= r2 + ε2 
+
+> 4
+
++ κϕv2T 2f . Substituting the aligned pitch Eq. (22) into Definition IV.2 gives 
+
+W (n) = 2 ⌈ cϕv2 n
+
+2amax 
+
+√d r ⌉, Tf = W (n)∆ t(n). (30) The construction uses m = m∗(n) := m∗(n, W (n)) .The set in Eq. (29) is nonempty, so m∗ is well defined, and m∗(n, W ) does not decrease as W grows. If m∗ = n,the enclosing diamond itself serves as the planning diamond. Otherwise, the footprint is inflated. 
+
+Remark V.2 (Resolution and footprint inflation) . For fixed speed and acceleration caps, Equation (30) shows that W
+
+grows linearly with n, up to integer rounding. At m∗ = n,the left side of Eq. (27) therefore grows linearly in n and the right side quadratically, so a sufficiently fine lattice re-quires m∗ > n . A lower acceleration cap increases W (n) and can require inflation even at coarse resolutions. Figure 7 compares the resolutions n = 2 and n = 6 in the plane under the same caps, for the box kernel and amax =√2 v2/r , which give Tacc = √2 r/v and W (n) = 2 ⌈n/ 2⌉.The coarse resolution selects the enclosing diamond m∗ = 2 ,and the fine resolution selects the inflated footprint m∗ = 7 at the same filter duration. With m = m∗(n), the diamond vertex set, the diamond graph that it induces in Gε, and the configuration set are 
+
+VD = {p ∈ Vε : Dm(p) ∩ C = ∅}, GD = Gε[VD ], (31) 
+
+QD = {Q ∈ V ND : Dm(pi) ∩ D m(pj ) = ∅ ∀i < j }, (32) A free planning diamond does not imply cl( p) > r ε, so VD
+
+keeps both conditions.                                         
+
+> pq
+> (a) n= 2 ,W= 2 ,m∗= 2
+> pqh
+> (b) n= 6 ,W= 6 ,m∗= 7
+> (a) (b) Filter duration Tf
+> √2r/v √2r/v
+> Half-width h√2r7√2r/ 6
+> r2
+> ε/r 231 /24 85 /72
+> Closest offset aand ∥a∥22(3 ,2) and 13 (8 ,7) and 113
+> Certificate threshold (2 rε/ε )231 /385
+
+Fig. 7: Two resolutions with the same physical limits and filter duration, drawn at the same scale. Orange discs are robot bodies, red dashed circles are certificate balls, solid outlines are planning diamonds, and the dashed diamond in (b) is the enclosing diamond. The finer resolution in (b) requires footprint inflation. 
+
+Proposition V.1 (Euclidean clearance of diamond plans) . With 
+
+m = m∗(n), QD ⊆ Q ε. Every sequence of configurations in 
+
+QD that satisfies Eq. (16) is therefore a valid plan in the sense of Definition IV.5. 
+
+Proof. By Eq. (31), every center lies in Vε. By Eq. (29) and Theorem V.1, every pair has Euclidean separation greater than 2rε. Both conditions of Eq. (17) therefore hold. 
+
+E. Discrete Coordination with Planning Diamonds 
+
+The planning diamonds give a restricted form of Prob-lem IV.1. With endpoints Sε, G ε ∈ Q D , the corresponding instance is ID = ( GD , Dm, S ε, G ε).
+
+Problem V.1 (Discrete Coordination with planning diamonds) .
+
+Given ID , find an integer K ≥ 0 and a valid plan Q0: K with 
+
+Qk ∈ Q D for every 0 ≤ k ≤ K, Q0 = Sε, and QK = Gε.By Proposition V.1, every solution of Problem V.1 also solves Problem IV.1. The simultaneous elementary moves de-fine the configuration graph used by the solvers in Section VI. 
+
+Definition V.3 (Configuration graph) . The configuration graph is the finite directed graph HD = ( QD , TD ) whose vertices are the valid diamond configurations and whose edges are the valid joint moves, 
+
+TD = {(Q, Q ′) ∈ Q 2 
+
+> D
+
+: qi − pi ∈ M ∀ i}, (33) for Q = ( p1, . . . , p N ) and Q′ = ( q1, . . . , q N ).A solution of Problem V.1 is a path from Sε to Gε in HD .VI. PIBT AND LACAM FOR DISCRETE COORDINATION 
+
+In this section, we solve Problem V.1 with adaptations of PIBT [14] and LaCAM [15]. As in MAPF, the adapted PIBT serves as the configuration successor generator, and the adapted LaCAM calls it internally. Our adaptations handle 10 
+
+simultaneous blockers, reshuffle priorities in stationary groups, and reuse backward A* searches for exact goal distances. We denote by TAKT-PIBT and TAKT-LaCAM the two planners obtained when the adapted PIBT and the adapted LaCAM, respectively, serve as the discrete solver in Algorithm 1 with the diamond formulation. 
+
+A. PIBT with Diamond Conflicts 
+
+We retain the priority inheritance and backtracking of PIBT [14]. In standard MAPF, a target vertex is blocked by at most one agent. By contrast, a target diamond can intersect the current diamonds of up to 3d undecided robots (Lemma VI.2), which become simultaneous blockers whose responses can conflict across branches. Our generator therefore backtracks over their joint target assignments within the same tick. Repeated generator calls give the discrete solver of TAKT-PIBT. The candidates of robot i are the vertices it can reach in one elementary move, 
+
+C(i) = {pi + δ : δ ∈ M , p i + δ ∈ VD }, (34) including the wait pi. Algorithm 2 first checks any fixed targets Π, which the configuration search of Section VI-B prescribes, for membership in C(i) and pairwise diamond nonintersection. I NITIALIZE TARGETS fixes those targets and leaves the remaining robots undecided. SELECT ROOT chooses the highest-priority undecided robot 
+
+ρ. R ESPOND searches its candidates and the responses of all blocking robots, using the order in Section VI-C. Each tentative target is checked against all fixed and tentative targets. The routine returns a status s and tentative assignments 
+
+T . A fresh budget B bounds all candidate attempts for that root, including recursive calls and retries. 
+
+Lemma VI.1 (Validity of generated successors) . Start from 
+
+Q ∈ Q D with no fixed targets. For every priority order, every candidate order, and every budget B ≥ 1, Algorithm 2 termi-nates and returns a configuration Q′ ∈ Q D with qi − pi ∈ M 
+
+for every robot i.
+
+Proof sketch. Every candidate attempt is charged to the budget and at most N root searches are opened, so the call terminates. Without fixed targets, every undecided robot can wait without conflicting with any committed target, and every committed search and every fallback preserves this property. A tentative target is accepted only when it is separated from every decided target, so the committed targets stay pairwise separated and 
+
+Q′ ∈ Q D .In words, the generator never returns an invalid configura-tion. 
+
+B. LaCAM Configuration Search 
+
+LaCAM searches HD using the dual-level configuration search of [15], with Algorithm 2 as its successor generator. Its constraints fix individual robot moves, and the generator fills the remaining assignments. A failed call under a partial constraint leaves its descendants available for exploration. 
+
+Algorithm 2 PIBT successor generation for diamonds                                                   
+
+> Require: Valid configuration Q; priority order ≺; budget B; fixed targets Π, possibly empty
+> Ensure: Valid successor Q′, or failure
+> 1: if not CHECK FIXED (Q, Π)then return failure
+> 2: Q′←INITIALIZE TARGETS (Q, Π)
+> 3: while some robot is undecided do
+> 4: ρ←SELECT ROOT (Q′,≺)
+> 5: (s, T )←RESPOND (Q, Q ′,[ρ], B )
+> 6: if s= success then
+> 7: Q′←COMMIT TARGETS (Q′, T )
+> 8: else
+> 9: DISCARD TARGETS (T)
+> 10: if Π̸=∅then return failure
+> 11: Q′←COMMIT WAIT (Q, Q ′, ρ )
+> 12: return Q′
+
+When all moves are fixed, C HECK FIXED tests the complete assignment exactly, independently of the response budget. 
+
+Proposition VI.1 (Completeness on HD ). Given sufficient time and memory, TAKT-LaCAM returns a solution of Prob-lem V.1 whenever HD contains a path from Sε to Gε.
+
+Proof sketch. The graph HD is finite, and the search removes a node only after its constraint tree is exhausted, so it visits every configuration reachable from Sε. At each explored configuration, the constraint tree enumerates every complete assignment of the N elementary moves, and a fully constrained generator call tests each assignment exactly, so every valid joint move is eventually found. 
+
+C. Candidate Ordering and Priority Reshuffling 
+
+Candidate Ordering – Following [14], let Di(p) =dist GD (p, g εi ) be the goal distance in moves, ignoring other robots. Each nonzero axial move changes lattice parity and hence a finite goal distance by exactly one. We try improving moves with Di(q) = Di(pi) − 1, ordered by increasing 
+
+∥q − gεi ∥22; the wait; and retreats with Di(q) = Di(pi) + 1 .A seeded random rank breaks remaining ties. All candidates remain available for backtracking and undergo the same dia-mond conflict checks. 
+
+Priority Reshuffling – In PIBT and LaCAM, the priority of a robot determines how freely it moves. The priorities are initialized with the distance to the goal, so that robots far from their goals are processed first. Subsequent equal increments preserve their relative order, so a group of mutually blocked robots can keep the same initiating robot tick after tick and remain stationary. We resolve such situations with a simple priority reshuffling mechanism, which cyclically rotates the priorities within the group and thereby changes the initiating robot. A robot is stationary when it has remained away from its goal without moving for F ticks, where F ≈ 6r/ε is the number of ticks needed to travel three body diameters. Two stationary robots are connected when ∥pi − pj ∥1 ≤ (2 m+2) ε,the separation at which their next moves could create aconflict, and each connected component with at least two robots forms a stationary group. Within each group, the second robot receives the highest priority, the previous initiating robot 11   
+
+> gx0
+> (a) Backward BFS from g:302 vertices, all distances final
+> gx0
+> (b) Backward A* toward x0:107 settled and 42 tentative vertices
+
+Fig. 8: First-query comparison of goal-rooted searches, where 
+
+x0 is the queried vertex. (a) Backward BFS expands by distance from g and assigns every discovered vertex closer than x0. (b) Backward A* orders expansion by Eq. (35), which concentrates the explored region near routes to x0.receives the lowest priority, and the remaining priorities shift cyclically. The rotated robots restart their count of stationary ticks. Reshuffling occurs whenever LaCAM creates a new node and at every tick of TAKT-PIBT. 
+
+D. Exact Goal Distances with Retained Backward A* 
+
+Precomputing full tables of the exact goal distances requires 
+
+N |VD | entries. Standard PIBT spreads this computation across queries using lazy backward breadth-first search (BFS). Its distance storage can nevertheless become a memory bottleneck on the fine lattices used by TAKT. We instead keep a backward A* search from each goal on GD and resume it on demand. For a goal g, the first queried vertex x0 fixes the heuristic. The search expands vertices in nondecreasing order of 
+
+f (s) = ˜dg (s) + hx0 (s), hx0 (s) = ∥s − x0∥1
+
+ε , (35) where ˜dg (s) is the tentative path length from g to s. The Manhattan heuristic directs the initial search toward x0. A query resumes the search until its vertex has been settled and expanded, and subsequent queries retain the same heuristic, settled distances, and frontier. The heuristic is consistent with unit-cost axial moves, and a suspended search resumes with its queues and stored values unchanged. Every completed query therefore returns the exact goal distance Di at the queried vertex, independently of the order and timing of the queries. Figure 8 compares the first query with that of backward BFS and shows the memory reduction. 
+
+E. Computational Cost 
+
+Diamond conflicts can be checked using nearby robots only. The following bound limits the number of immediate blockers of one target. 
+
+Lemma VI.2 (Number of blocking robots) . In a valid diamond configuration, at most 3d robots have planning diamonds that intersect the planning diamond at a given target. 
+
+Proof sketch. The centers of the blocking robots lie within Manhattan distance 2h of the target and are pairwise more than 2h apart, where h = mε . The open Manhattan balls of radius h around them are disjoint and lie in the Manhattan ball of radius 3h around the target, whose volume is 3d times theirs. Recursive dependencies may still involve many robots, so the budget B remains necessary to bound the search effort. Two targets can conflict only if their current robot positions are within Euclidean distance (2 m+2) ε. A spatial hash rebuilt at each tick collects these neighbors. The packing argument also bounds each neighbor list by a constant γ depending only on the dimension d. Given the priority order and goal distances, one generator call costs 
+
+O(N + N γ + N Bγ ) (36) for the hash, the neighbor lists, and at most N B candidate attempts, each checking O(γ) neighbors. Sorting the priorities costs O(N log N ), and priority reshuffling visits each neighbor list once. For a fixed budget B, one generator call therefore costs O(N log N ) given the goal distances, independently of the number of lattice vertices. Note that Eq. (36) bounds a single generator call, and that TAKT-LaCAM may invoke the generator several times at one configuration. VII. G UARANTEES AND RESOLUTION 
+
+Sections IV to VI reduce the KMAMPP to discrete coordi-nation and reconstruct smooth trajectories from the resulting plans. In this section, we establish two properties in opposite directions. First, soundness states that every solution of the reference problem (Problem IV.1) reconstructs into a solution of the original problem (Problem III.1). Second, existence 
+
+states that a solution of Problem III.1 with sufficient margin implies that Problem IV.1 has a solution. Most of the analysis concerns the reference problem and is therefore independent of the discrete solver, and the results for the diamond formulation (Problem V.1) are stated separately. 
+
+A. Continuous Soundness 
+
+Theorem VII.1 (Continuous soundness) . For any valid plan 
+
+Q0: K of the reference problem, its reconstructed trajectories 
+
+˜x1, . . . , ˜xN of Definition IV.6 are conflict-free throughout 
+
+[0 , T p], with Tp = (K + 2 W )∆ t. Each trajectory is C1,has absolutely continuous velocity, and satisfies the speed cap 
+
+˙˜xi(t) 2 ≤ v. The trajectories start at Q0 and end at QK ,with zero velocity at both endpoints. If Tf ≥ Tacc , they also satisfy the acceleration cap and are admissible. Under this condition, the reconstruction of a solution of Problem IV.1 solves Problem III.1. 
+
+Proof. Let z = ˆ xi −c for a fixed c ∈ C , with (L, R ) = ( v, r ε),or let z = ˆ xi − ˆxj , with (L, R ) = (2 v, 2rε). In both cases, 
+
+z is L-Lipschitz and affine on each tick, and its values at the ticks have norm greater than R by Eq. (17). For a point 
+
+z(s) = (1 − θ)a + θb between consecutive tick values a and b,the identity ∥z(s)∥22 = (1 −θ) ∥a∥22 +θ ∥b∥22 −θ(1 −θ) ∥a − b∥22
+
+and ∥a − b∥2 ≤ L∆t give ∥z(s)∥22 > R 2−L2∆t2/4. Let Z, Z ′
+
+be independent random variables with density ϕ. The variance identity and the Lipschitz bound give 
+
+E ∥z(t − Z)∥22 − ∥ E z(t − Z)∥22
+
+= 12 E ∥z(t − Z) − z(t − Z′)∥22 ≤ L2σ2
+
+> ϕ
+
+.12 
+
+Since E z(t−Z) = ( ϕ∗z)( t), we obtain ∥(ϕ ∗ z)( t)∥22 > R 2 −
+
+L2(∆ t2/4 + σ2
+
+> ϕ
+
+), and the right-hand side equals r2 in the first case and 4r2 in the second by Eq. (12). In the first case, (ϕ ∗
+
+z)( t) = ˜ xi(t) − c, and taking c as a point of C nearest to ˜xi(t)
+
+gives cl(˜ xi(t)) > r . In the second case, the common kernel gives (ϕ ∗ z)( t) = ˜ xi(t) − ˜xj (t), so ∥˜xi(t) − ˜xj (t)∥2 > 2r.Lemma IV.1 supplies the regularity and the derivative bounds. For t ≤ Tf /2 and for t ≥ Tp − Tf /2, the padded waits make 
+
+ˆxi constant on the kernel window, so ˜xi rests at p0 
+
+> i
+
+and at pKi ,which gives the endpoint conditions. In words, validity at the ticks alone certifies the continuous motion, whichever discrete solver produced the plan. 
+
+Corollary VII.1 (Certified pipeline output) . Every discrete plan produced within Algorithm 1 by either solver of Sec-tion VI reconstructs into an admissible, conflict-free motion from Sε to its final configuration QK , at rest at both ends. If 
+
+QK = Gε, the motion solves Problem III.1. 
+
+Proof. The selected filter duration enforces the acceleration cap. By Lemma VI.1 and the definition of HD , every returned plan is a diamond plan. By Proposition V.1, every diamond plan is a valid reference plan, so Theorem VII.1 applies. Together, Theorem VII.1 and Corollary VII.1 establish that the pipeline never returns an unsafe or dynamically infeasible motion. Neither result guarantees that a discrete plan exists. The next two subsections establish sufficient conditions for such plans to exist. 
+
+B. Existence on the Reference Graph 
+
+We next ask when a continuous solution can be represented by a valid solution of Problem IV.1. The axial moves and waits have velocities in U = conv {0, ±ve a : a = 1 , . . . , d } = {u :
+
+∥u∥1 ≤ v}. Any continuous solution satisfying the Euclidean speed cap can be slowed by a common factor √d so that its velocities lie in U. This slowdown preserves clearances and simultaneous separations. A greedy lattice tracker then stays within dε of each slowed reference position at every tick. The following theorem gives a sufficient clearance condition for the tracked configurations to form a solution of Problem IV.1. 
+
+Theorem VII.2 (Existence on the reference graph) . Suppose Problem III.1 has a solution X from S to G of makespan T
+
+and margin μX ≥ μ > 0. Fix a lattice of pitch ε containing the prescribed endpoints S and G, and a positive even filter width W with its associated certificate radius rε. If 
+
+2dε + 2( rε − r) < μ, (37) then Problem IV.1 has a solution from S to G. One such plan has reconstructed duration at most 
+
+√d T + (2 W + d + 1)∆ t. (38) When Tf ≥ Tacc , its reconstruction solves Problem III.1. 
+
+Proof. Set yi(t) = xi(min {t/ √d, T }) and tk = k∆t. Since 
+
+∥u∥1 ≤ √d ∥u∥2, the slowed solution satisfies ∥ ˙yi∥1 ≤ v,so ∥yi(tk+1 ) − yi(tk)∥1 ≤ ε. Starting at p0 
+
+> i
+
+= si, each robot maintains pki − yi(tk) 1 ≤ dε . The error e = yi(tk+1 ) − pki
+
+satisfies ∥e∥1 ≤ (d + 1) ε. If ∥e∥1 > dε , some coordinate of e exceeds ε in absolute value, and the elementary move toward yi(tk+1 ) along this coordinate reduces ∥e∥1 by ε.Otherwise the robot waits. At tick K0 = ⌈√d T / ∆t⌉, the slowed solution has reached G. Since pK0 
+
+> i
+
+and gi are lattice vertices at Manhattan distance at most dε , each robot reaches its goal in at most d further moves, each of which reduces this distance. At every tick, Eq. (2) and the margin of X give 
+
+cl( pki ) ≥ r + μ − dε and pki − pkj 2 ≥ 2r + μ − 2dε , which exceed rε and 2rε by Eq. (37). The plan is therefore valid. It has at most K0 +d ticks with K0∆t < √d T +∆ t, and the 2W
+
+padded waits give Eq. (38). When Tf ≥ Tacc , Theorem VII.1 applies to its reconstruction. In words, a discrete plan exists whenever the continuous solution has more margin than the lattice tracking error 2dϵ 
+
+plus the certificate inflation 2( rϵ − r), at the price of a slowdown by a factor of at most √d.
+
+C. Resolution under the Acceleration Cap 
+
+We now study how the condition of Theorem VII.2 behaves under refinement, i.e., as ϵ → 0 under the given speed and acceleration caps. We first establish the limits of the parameters selected by the construction. Write 
+
+racc =
+
+s
+
+r2 + κϕc2
+
+> ϕ
+
+v4
+
+a2max 
+
+. (39) 
+
+Proposition VII.1 (Parameter limits under refinement) . As 
+
+ε → 0 with the selected filter width, Tf → Tacc and rε → racc .Under the aligned diamond construction, the selected footprint satisfies 
+
+m∗(n)
+
+n → racc 
+
+r , m ∗(n)ε(n) → √d r acc , as n → ∞ . (40) 
+
+Proof sketch. The filter-width rounding error is less than 
+
+2∆ t, hence Tf → Tacc and the certificate radius tends to 
+
+racc . The diamond limit follows from the sharp footprint-selection condition, which brackets m∗ within one unit of pn2 + dκ ϕW 2.In words, refinement removes the tick reserve but not the smoothing reserve, which the acceleration cap sets through Tacc . The reference certificate radius tends to racc ,while the diamond’s axial radius tends to √d r acc , which makes it the smallest enclosing diamond for the racc ball. 
+
+Corollary VII.2 (Reference plans under refinement) . Suppose Problem III.1 has a solution X of makespan T with margin 
+
+μX > 2( racc − r). Then, for every sufficiently fine lattice containing S and G, Problem IV.1 has a solution under the selected filter width. One such plan has reconstructed duration at most √d T + 2 Tf + ( d + 1)∆ t, and its reconstruction solves Problem III.1. 
+
+Proof. The left side of Eq. (37) tends to 2( racc − r) < μ X .Therefore the finite-resolution condition eventually holds, and the selected duration also enforces the acceleration cap. Apply Theorem VII.2. 13 TAKT-LaCAM (Ours) TAKT-PIBT (Ours) MAPF/C+POST K-CBS Joint SST Empty hall Central cylinder 3×3 blocks Rack hall Warehouse blocks Warehouse racks                    
+
+> Success (%) 050 100 050 100 050 100 050 100 050 100 050 100 Runtime (s) 0.1 110 100 0.1 110 100 0.1 110 100 0.1 110 100 0.1 110 100 0.1 110 100 Makespan 12341234242411.5 211.5 Cost 20 40 60 80 100 2420 40 60 80 100 123420 40 60 80 100 2420 40 60 80 100 2420 40 60 80 100 11.5 22.5 20 40 60 80 100 11.5 2
+> Number of robots 𝑁
+
+Fig. 9: Comparison with baselines in 2D on the six maps of the top row. Rows: success rate, runtime, and makespan and cost relative to the free-space lower bounds (dotted line at one). Lines show the median over the solved instances and bands the 25th to 75th percentile. Joint SST solves no instance. The diamond problem imposes additional restrictions, and a stronger margin ensures both obstacle clearance of the entire footprint and pairwise footprint separation. 
+
+Corollary VII.3 (Diamond plans under refinement) . Suppose Problem III.1 has a solution X with margin 
+
+μX > 2( √d r acc − r).
+
+Then, for all sufficiently large n for which the lattice of pitch ε(n) contains S and G, Problem V.1 has a solution with the selected planning diamonds. Its reconstruction solves Problem III.1. 
+
+Proof sketch. Set h = m∗(n)ε(n). By Proposition VII.1, h →√d r acc , and a planning diamond lies inside the Euclidean ball of radius h about its center. The tracked plan behind Theorem VII.2 keeps obstacle clearance at least r + μX − dε 
+
+and pairwise separation at least 2r + μX − 2dε , which exceed the diamond thresholds h and 2h once 2dε + 2( h − r) < μ X .The stated margin makes this inequality hold for all sufficiently large n.The additional factor √d in the diamond result reflects the enclosing diamond. The increase from r to racc reflects the smoothing reserve. With the caps of the experiments in Section IX, racc = 0 .527 m for r = 0 .5 m in 2D and 
+
+racc = 0 .231 m for r = 0 .2 m in 3D, so the smoothing reserve costs about 3 cm of clearance in the limit. Instances below the stated margin thresholds may still have valid plans. Together, these results close the argument for the implemented pipeline. Under the margin condition of Corollary VII.3, a diamond plan exists on every sufficiently fine lattice containing the endpoints. Given sufficient time and memory, TAKT-LaCAM finds such a plan (Proposition VI.1). Theorem VII.1 certifies its continuous reconstruction once a discrete plan is found. VIII. R EAL -T IME PLANNING 
+
+Algorithm 1 returns a reference trajectory for every robot, with position, velocity, and acceleration at all times, which a low-level controller on the robot tracks at high frequency. When goals or workspace conditions change during execution, the planner must update these trajectories, and we call the time that an update takes its computation time . Because planning takes time, a replan starts from the state of the fleet at a lead time in the future, and it must return within this lead time [7], [8]. In this section, we present two paradigms for real-time planning with TAKT. The lead time that the fleet can afford differs between the two paradigms, so each paradigm has its own criterion for real-time planning. 
+
+Definition VIII.1 (Real-time planning) . Replanning is real-time when its computation time is at most 500 ms (2 Hz) under whole-fleet replanning (Section VIII-A) or one tick ∆t per decision cycle under incremental replanning (Section VIII-B). 14 
+
+The whole-fleet criterion lies within the 0.1–1 s cycles of existing single-robot planners [35]–[39]. Robots track the com-mitted motion while a replacement is computed. Incremental replanning has no trajectory beyond the supplied configura-tions and must append one configuration per tick: 101 ms in our 2D experiments and 43 ms in 3D. 
+
+A. Whole-Fleet Replanning 
+
+This paradigm is the default setting for the planner-controller interaction [7], [8], [35]. When an update is needed at time t, the planner computes a complete replacement plan from a future configuration on the current discrete plan. The existing and replacement sequences are joined at that configuration and reconstructed with the same filter, while the robots continue executing the committed motion. Figure 1 shows an example with 24 quadrotors. After the no-fly zone appears, TAKT computes new reference trajectories for all robots within 30 ms, and the controllers then switch to the new trajectories. Figures 9 and 11 show that in the 2D experiments, TAKT-PIBT produces complete trajectories within 500 ms, in the median over 20 instances, for up to around 750 robots in the empty hall and up to 200 robots in the hall with three racks. The incremental paradigm extends real-time planning to larger fleets by using the one-step structure of PIBT. 
+
+B. Incremental Replanning 
+
+This paradigm rests on two observations. First, by Eq. (19), the reference position ˜xi(t), velocity ˙˜xi(t), and acceleration 
+
+¨˜xi(t) that a controller needs at time t depend on the discrete motion only up to t + Tf /2, so the reference trajectory can be constructed on demand as execution advances. Second, unlike LaCAM, PIBT has a closed-loop structure and constructs its solution one configuration at a time [26], [27]. In every tick, the paradigm therefore runs one decision cycle , which reads the changes that arrived since the last cycle, calls Algorithm 2 once, and appends the returned configuration to the discrete motion, which stays at least Tf /2 ahead of the execution. A change in the problem simply enters the next decision cycle. Since each cycle computes one configuration in place of the entire plan, the paradigm meets the one-tick criterion for fleets for which a complete replan takes longer than 500 ms (Section IX-F). Moreover, every appended configuration is valid by Lemma VI.1, so the executed motion remains the reconstruction of a valid plan, and the guarantee of Theorem VII.1 holds. IX. E XPERIMENTAL EVALUATION 
+
+We evaluate TAKT-PIBT and TAKT-LaCAM through baseline comparisons (Section IX-B), scalability tests (Sec-tion IX-C), ablations (Section IX-D), and physics simulations of trajectory tracking and online replanning (Sections IX-E and IX-F) in 2D and 3D. Baseline comparisons cover up to 100 robots, the largest fleet size solved by a baseline; scalability tests reach approximately a thousand robots. TAKT-LaCAM (Ours) TAKT-PIBT (Ours) MAPF/C+POST K-CBS Open volume Central pillar Shelf volume  
+
+> Success (%) 050 100 050 100 050 100 Runtime (s) 0.1 110 100 0.1 110 100 110 100 Makespan 24624246Cost 20 40 60 80 100 24620 40 60 80 100 24620 40 60 80 100 246
+> Number of robots 𝑁
+
+Fig. 10: Comparison with baselines in 3D. Rows and conven-tions as in Fig. 9. 
+
+A. Experimental Setup 
+
+Instances – The 2D instances use the six maps in the top row of Fig. 9. Four are halls of 105.5 m by 105.5 m: an empty hall, a hall with a central cylinder, a hall with a 3 × 3 array of blocks, and a hall with three racks (the rack hall). Two are warehouses of 183 m by 183 m, one with blocks (the block warehouse) and one with racks (the rack warehouse), whose aisles are 3 m wide. The robots are discs with r = 0 .5 m, 
+
+v = 1 m/s, and amax = 3 .5 m/s 2. The 3D instances use the three volumes in the top row of Fig. 10: an open cube of side 8.5 m (the open volume), a cube of side 8.8 m with a central pillar of 2 m by 2 m (the central pillar volume), and a room of 13.7 m by 13.7 m by 4.8 m that holds 25 shelves separated by aisles of 1.46 m (the shelf volume). The robots are spheres with r = 0 .2 m, v = 1 m/s, and amax = 5 m/s 2, an acceleration cap below gravity. Every instance draws its start and goal positions at random. For the baseline comparisons (Figs. 9 and 10), we evaluate fleet sizes N ∈ { 2, 5, 10 , 20 , 30 , . . . , 100 }, with 20 instances per map and fleet size. For the scalability evaluation (Figs. 11 and 12), we increase the fleets to approximately 1,000 robots. 
+
+TAKT Settings – We reconstruct with the box kernel and select the parameters by Definition V.2. In 2D experiments, 
+
+n = 7 gives ε = 0 .101 m, ∆t = 0 .101 s, W = 6 , and m∗ = 7 .In 3D experiments, n = 8 gives ε = 0 .043 m, ∆t = 0 .043 s, 
+
+W = 10 , and m∗ = 9 . The endpoint tolerance is η = 0 .09 min 2D and η = 0 .05 m in 3D. 
+
+Baselines – We compare with three planners that generate 15 TAKT-LaCAM (Ours) TAKT-PIBT (Ours) Empty hall Central cylinder 3×3 blocks Rack hall Warehouse blocks Warehouse racks Success (%) 050 100 050 100 050 100 050 100 050 100 050 100 Runtime (s) 0.2 0.5 0.2 0.5 120.2 0.5 120.2 0.5 1250.5 1250.5 12510 Makespan 11.5 12311.5 224123246Cost 400 600 800 11.5 400 600 800 11.5 2400 600 800 11.5 2400 600 800 123400 600 800 11.5 2400 600 800 12 
+
+> Number of robots 𝑁
+
+Fig. 11: Scalability of the TAKT planners in 2D. TAKT-LaCAM (Ours) TAKT-PIBT (Ours) Open volume Central pillar Shelf volume Success (%) 050 100 050 100 050 100 Runtime (s) 0.2 0.5 12510 20 0.5 12510 20 12510 20 50 Makespan 24682460510 15 Cost 400 600 800 0510 400 600 800 0510 400 600 800 0510 15  
+
+> Number of robots 𝑁
+
+Fig. 12: Scalability of the TAKT planners in 3D. Rows and conventions as in Fig. 9. trajectories for double-integrator robots without offline pre-computation. Methods such as db-CBS and db-LaCAM [12], [17] rely on precomputed primitive libraries, and thus fall outside this evaluation setting. (i) MAPF/C+POST [4] plans a discrete schedule with ECBS [40] on a grid of pitch 3r
+
+under generalized conflicts, optimizes one trajectory per robot inside safe corridors, and stretches the time axis until the dynamic constraints hold. We run the authors’ implementation TAKT-PIBT, default TAKT-PIBT, Euclidean rule Rack hall Warehouse racks Success (%) 20 40 60 80 100 050 100 20 40 60 80 100 050 100  
+
+> Number of robots 𝑁
+
+Fig. 13: Effect of the diamond conflict rule. Success rate of TAKT-PIBT under the diamond rule and under the Euclidean rule. with MATLAB. (ii) K-CBS [18] plans each robot with a kinodynamic tree search and resolves the collisions between robots through the constraint tree of CBS. (iii) Joint SST runs the SST planner [10] in the composite state space of the fleet. We run K-CBS and joint SST from the benchmark suite released with db-CBS [17]. Joint SST enters the 2D comparison only. 
+
+Protocol – All methods plan the same instances under the same speed and acceleration caps, on one laptop with an Apple M3 Pro processor and 36 GB of memory. Every instance has a time limit of 300 s. A run succeeds when it returns, within its limit, trajectories that solve Problem III.1. 
+
+Metrics – We report four measures. The success rate is the percentage of instances that a method solves. The runtime is the planning time of a solved instance. For TAKT it covers all three stages in Section IV-A. For MAPF/C+POST it excludes the start-up of MATLAB. The makespan and the cost are those of Section III-D, the cost with unit weights qp = qv = ra = 1 .We divide both by a lower bound of the instance, in which 16 TAKT-PIBT, default TAKT-PIBT, no reshuffling TAKT-LaCAM, default TAKT-LaCAM, no reshuffling Rack hall Warehouse racks Success (%) 400 600 800 050 100 400 600 800 050 100  
+
+> Number of robots 𝑁
+
+Fig. 14: Effect of priority reshuffling. Success rate with and without the reshuffling of Section VI-C on the instances of Fig. 11. every robot travels alone on the straight line from its start to its goal, without obstacles and under the same caps. The bound of the makespan is the largest minimum travel time over the robots, ∥gi − si∥2 /v + v/a max for robot i, and the bound of the cost is the sum of the minimum costs of the robots, which we compute numerically. Every curve shows the median over the instances that a method solves, with a band from the 25th to the 75th percentile, and it is drawn where the method solves at least 20 % of the instances. 
+
+B. Comparison with Kinodynamic Planners 
+
+Figures 9 and 10 show the comparisons with baselines in both 2D and 3D. 
+
+Success and Runtime – Both TAKT planners solve every instance on every map. With 100 robots, the median runtime of TAKT-LaCAM is 0.1 s in the empty hall, 0.4 s in the two warehouses, and 1.2 s in the shelf volume, and TAKT-PIBT is faster on every map. The baselines stop at small fleets, at a size that depends on the map. MAPF/C+POST solves every instance of the four halls up to 40 robots and none beyond 60 robots, and in the two warehouses it solves none beyond 20 robots. In 3D, it solves 8 to 12 of the 20 instances of each map with 50 robots and at most 2 with 100 robots. K-CBS solves instances with 10 or more robots only in the empty hall and in the hall with a central cylinder, and joint SST solves none. Where a baseline succeeds, both TAKT planners are or-ders of magnitude faster. In the empty hall with 50 robots, MAPF/C+POST takes 230 s and TAKT-LaCAM 0.09 s. At this fleet size, TAKT-LaCAM is 2,200 to 2,600 times faster in each of the four halls and 105 to 415 times faster on each of the three 3D maps. The speedup grows with the fleet size, since the runtime of both TAKT planners is almost flat while the runtime of MAPF/C+POST rises toward the time limit. 
+
+Solution Quality – In 2D, the makespan and the cost of the TAKT planners lie below those of both baselines in every panel of Fig. 9. In the empty hall with 50 robots, both TAKT planners reach 1.40 times the makespan bound and 1.27 times the cost bound, against 1.83 and 2.17 times for MAPF/C+POST. K-CBS lies at about four times both bounds where it succeeds. TAKT-PIBT, original order TAKT-LaCAM, original order Rack hall Warehouse racks Makespan ratio 11.2 1.4 1.6 1.8 11.2 1.4 1.6 1.8 Cost ratio 400 600 800 11.1 1.2 1.3 400 600 800 11.1 1.2 1.3  
+
+> Number of robots 𝑁
+
+Fig. 15: Effect of the candidate order. Makespan and cost under the candidate order of the original PIBT, relative to the default order on the same instance (dotted line at one), over the instances that both solve. TAKT-PIBT, default TAKT-PIBT, BFS fields TAKT-LaCAM, default TAKT-LaCAM, BFS fields Rack hall Warehouse racks Runtime (s) 0.2 0.5 12510 0.2 0.5 12510 Memory (GiB) 400 600 800 0.1 110 budget 400 600 800 0.1 110 budget  
+
+> Number of robots 𝑁
+
+Fig. 16: Effect of the retained distance search. Runtime and peak memory of the goal-distance computation over tested instances, with the retained backward A* and with backward BFS fields under a budget of 8 GB. In 3D, the solution quality of the TAKT planners is compa-rable with that of MAPF/C+POST in the open volume and the central pillar volume. In the shelf volume, both TAKT planners lead at every fleet size, and with 50 robots their makespan is 21 % shorter and their cost 38 % lower. Overall, both TAKT planners solve every instance on every map within seconds, where the baselines stop at small fleets and take up to three orders of magnitude longer. Their solution quality leads on every 2D map and in the shelf volume in 3D, and it is comparable with that of MAPF/C+POST on the other two 3D maps. 
+
+C. Scalability 
+
+Figures 11 and 12 show the TAKT planners on fleets that are about ten times larger than those of the comparison. The 17     
+
+> Planned path Executed path Ball of radius rPositions at the same time
+> (a)
+> (b) 50 m
+> (b)
+> (c) 1 m
+> (c)
+> 1 cm 5.8 mm planned executed
+> (d)
+> (e) 2 m
+> (e)
+> (f) 50 cm
+> (f)
+> 5 cm 1.8 cm planned executed
+
+Fig. 17: Simulated robots executing plans of TAKT-LaCAM in the physics simulator ARGoS [41]. Top: 1,082 RB-1 Base robots in the rack warehouse. Bottom: 1,006 Crazyflie quadrotors around the central pillar. (a), (d) The fleet, with one enlarged dot per robot. (b), (e) The regions marked in (a) and (d), in which each robot lies inside the ball of radius r around its planned position. In (b), the white dot of a base is its tracked point. (c), (f) The windows marked in (b) and (e), labeled with the largest distance between the planned and the executed position at the same time. largest fleets hold 762 to 1,082 robots in 2D and about 1,000 robots in 3D. 
+
+2D Instances – The TAKT planners plan a thousand robots within seconds. In the empty hall, both planners solve every instance with 1,018 robots, with a median runtime of 0.7 s. The runtime is longest in the rack warehouse, where TAKT-LaCAM plans 1,082 robots in 8.7 s and solves 19 of the 20 instances. TAKT-PIBT solves every instance of the four halls, and in the hall with 3 × 3 blocks and in the rack hall it is two to three times faster than TAKT-LaCAM. The makespan and the cost grow with the fleet size on every map, since the robots wait for one another more often. In the empty hall, the makespan grows from 1.5 to 1.8 times its bound between 254 and 1,018 robots. In the rack warehouse, it grows from 1.5 times its bound with 271 robots to 3.5 times for TAKT-PIBT and 4.6 times for TAKT-LaCAM with 1,082 robots. 
+
+3D Instances – In the open volume, both planners solve every instance and plan 673 robots in about 0.7 s. In the central pillar and the shelf volume, TAKT-PIBT plans fleets of this size within about 2 s and TAKT-LaCAM within about 13 s. With about 1,000 robots, the runtime and the makespan rise on all three maps. In the open volume, TAKT-PIBT then needs 26 s, and the makespan grows from 2.7 to 8.9 times its bound. In the shelf volume with nearly a thousand robots, TAKT-PIBT solves 16 of the 20 instances. The footprint inflation of Remark V.2 contributes to this rise. Under the cap of 5 m/s 2, the certified footprint integer 
+
+m∗ = 9 exceeds n = 8 , and the planning diamonds of 1,000 robots cover about 21 % of the lattice vertices. In 2D, m∗ = n
+
+and no inflation occurs. Overall, the TAKT planners plan about a thousand robots in 0.7 s in the empty hall, in up to 8.7 s in the rack warehouse, and in tens of seconds on the 3D maps. 
+
+D. Ablation Studies 
+
+In this subsection, we change one design element at a time and plan the 2D instances with both planners. We report each ablation on the rack hall and the rack warehouse. 
+
+Diamond Conflict Rule – We replace the diamond conflict test of Eq. (32) with the Euclidean separation ∥pi − pj ∥2 >
+
+2rε of Eq. (17). According to Proposition V.1, the Euclidean rule admits every configuration that the diamond rule admits, so the planners search a larger set of configurations. However, as shown in Fig. 13, the success rate falls significantly. On the instances with 50 robots, TAKT-PIBT solves 8 of the 20 instances in the rack hall and 10 in the rack warehouse under the Euclidean rule. With 100 robots, it solves none and one. Under the diamond rule, it solves all of these instances. The Euclidean rule admits additional configurations in which an axially aligned pair can be too close for a simultaneous advance and sideways step to preserve pairwise separation. The diamond rule excludes these configurations, and a robot at the minimum permitted separation can still yield sideways within one tick (Lemma V.1). 18          
+
+> (a)
+> keep-out region 5 m 0200 400
+> Execution time (s)
+> 0.1 110 100
+> Time (ms)
+> region new goals 3.9 ms tick, 101 ms
+> (b)
+> 400 800
+> Robots N
+> 0.01 1100
+> Time (ms)  tick, 101 ms
+> Rack hall, 2D
+> (c)
+> 500 1000
+> Robots N
+> tick, 101 ms
+> Empty hall, 2D
+> (d)
+> 350 700
+> Robots N
+> tick, 43 ms
+> Central pillar, 3D
+> (e)
+> One cycle Median over 2 s Incremental cycle Whole-fleet replan Criterion: one tick Criterion: 500 ms
+
+Fig. 18: Real-time planning. (a) One incremental session with 771 simulated RB-1 Base robots in the rack hall, 4 s after a keep-out region appears. The robots that are inside or about to enter the region are halted (red discs), and the goals inside it are suspended (red squares). (b) Computation time of every decision cycle of this session, with the interval of the region shaded. (c)–(e) Computation time against the fleet size, over ten sessions per fleet. Lines show the median and bands the 25th to 75th percentile. Dotted lines mark the real-time criterion of each paradigm (Section VIII). 
+
+Priority Reshuffling – Without the reshuffling of Sec-tion VI-C, both planners lose most instances on the two maps shown in Fig. 14. In the rack hall, TAKT-PIBT solves 35 and 40 % of the instances at the two smaller fleet sizes and none at the two larger ones, while TAKT-LaCAM shows a similar decline. In the rack warehouse, TAKT-PIBT solves no instances and TAKT-LaCAM solves only one of 80. In the failed runs, stationary groups repeatedly retain the same initiating robot. Priority reshuffling changes the initiating robot and enables different yielding attempts. 
+
+Candidate Order – The original PIBT [14] orders the im-proving moves of a robot by a random tie order alone, and Section VI-C orders them by the Euclidean distance to the goal. With the original order, the cost and the makespan rise on both maps and at every fleet size (Fig. 15). In the rack hall, the cost rises by 12 to 22 % and the makespan by 9 to 20 %. In the rack warehouse, the cost rises by 10 to 22 % and the makespan by 21 to 60 %. Among the improving moves, the Euclidean order prefers the move closest to the goal. A robot therefore alternates between the axes, and its reconstructed trajectory approaches the straight line. 
+
+Exact Goal Distances – We replace the retained backward A* of Section VI-D with the lazy backward BFS of the original PIBT, under a memory budget of 8 GB. Both computations return the same distances, and they differ in memory and time (Fig. 16). In the rack hall with 771 robots, the BFS fields take 3.1 GB, and the retained search takes 0.1 GB under TAKT-PIBT and 0.3 GB under TAKT-LaCAM. The median runtime in the rack hall grows by a factor of 3.4 to 4.4 for TAKT-PIBT and of 1.5 to 2.1 for TAKT-LaCAM. In the rack warehouse, the BFS fields exceed the memory budget at the two largest fleet sizes, and both planners then fail on every instance. The retained search takes at most 1.2 GB there. 
+
+E. Execution by Simulated Robots 
+
+A plan of TAKT keeps the balls of radius r around the planned positions clear of the obstacles and of one another TABLE I: Tracking of TAKT-LaCAM trajectories by the simulated robots. Tracking error e at the 99th percentile and at its maximum. Reach: largest distance from a planned position to a point of the robot body. Gap: smallest distance between two bodies and between a body and an obstacle.                          
+
+> Platform Ne99 emax Reach rGap (cm) (cm) (cm) (cm) (cm) Bodies Obstacle RB-1 Base 381–1,082 0.53 0.72 46.4 50 15.5 10.7 Crazyflie 2.x 331–1,010 1.4 5.0 11.1 20 32.8 18.5
+
+(Theorem VII.1). A robot therefore executes its trajectory without collisions when its body stays inside the ball of radius 
+
+r around its planned position. We test this condition on a differential-drive base and on a quadrotor, each of which tracks its trajectory with a standard off-the-shelf controller. 
+
+Platforms – In 2D, every robot is a simulated Robotnik RB-1 Base, a differential-drive base with a body radius of 25.75 cm, planned with r = 50 cm. In 3D, every robot is a simulated Crazyflie 2.x quadrotor [42] with a body radius of 6.1 cm, planned with r = 20 cm. The RB-1 Base tracks its trajectory through a layered PI controller [43], and the quadrotor through the PX4 autopilot [44]. 
+
+Results – We execute six 2D and six 3D plans of TAKT-LaCAM from Section IX-C, with 331 to 1,082 robots. Fig-ure 17 shows one fleet of each platform, and Table I gives the measurements. Tracking errors are on the millimeter scale for the bases and the centimeter scale for the quadrotors (Fig. 17(c) and (f)). In every fleet, the tracking error stays within 0.72 cm for the bases and 5.0 cm for the quadrotors. Every point of a robot body therefore stays inside the ball of radius r around its planned position, with at least 3.6 cm to spare for a base and 8.9 cm for a quadrotor. In every run, every body stays at least 10.7 cm away from the other bodies and from the obstacles. 19 
+
+F. Real-Time Planning 
+
+We now run the two paradigms of Section VIII while the fleet moves and its task changes to demonstrate the real-time planning performance. The runs test temporary keep-out regions (also called no-fly zones in 3D, as in Fig. 1) and reassignment of every robot’s goal (Fig. 18(a)). We measure the computation time of each paradigm and compare it with its criterion of Section VIII, which is 500 ms for a whole-fleet replan and one tick for an incremental decision cycle. 
+
+Sessions – The fleets hold 100 to 771 robots in the rack hall, 254 to 1,018 robots in the empty hall, and 100 to 671 quadrotors in the central pillar volume. Each fleet runs ten sessions per paradigm, in which the changes occur at random times. The measured computation time covers one complete replan under whole-fleet replanning and every decision cycle under incremental replanning. 
+
+Whole-Fleet Replanning – The computation time of whole-fleet replanning grows with fleet size (Fig. 18(c)–(e)). The replans meet the 500 ms criterion for up to 200 robots in the rack hall, 763 robots in the empty hall, and 335 quadrotors in the central pillar volume. The longest replan takes 0.36 s, 0.46 s, and 0.44 s for these three fleets. 
+
+Incremental Replanning – Every decision cycle of every session returns within its tick. The incremental paradigm therefore extends real-time planning from 200 to 771 robots in the rack hall, from 763 to 1,018 robots in the empty hall, and from 335 to 671 quadrotors in the central pillar volume. In 2D, the tick lasts 101 ms, and the longest cycles are those that read a change (Fig. 18(b)). They take 4.9 ms for 771 robots in the rack hall and 7.0 ms for 1,018 robots in the empty hall. A cycle takes 0.4 ms and 0.3 ms on average for these two fleets, so the planner computes the motion about 250 and 330 times faster than the robots execute it. In 3D, the tick lasts 43 ms. The cycle that reads a new no-fly zone takes 28 to 34 ms for 100 to 671 quadrotors, of which 28 to 32 ms are spent processing the zone at every fleet size. A cycle takes 0.5 ms on average for 335 quadrotors and 1.0 ms for 671 quadrotors, so the planner computes the motion about 90 and 44 times faster than the quadrotors execute it. Overall, TAKT achieves real-time whole-fleet replanning for hundreds of robots and, under the stricter one-tick criterion, scales real-time incremental replanning to fleets of a thousand robots. X. C ONCLUSION AND FUTURE WORK 
+
+In this paper we presented TAKT, a framework that certifies continuous dynamic feasibility through discrete coordination for the KMAMPP. TAKT bounds the clearance lost during continuous trajectory reconstruction before the search begins, and reserves that clearance margin on the workspace lattice. A closed-form convolution, applied independently to each robot, then converts synchronized lattice moves and waits into smooth trajectories that avoid collisions and satisfy the speed and acceleration caps. This soundness guarantee holds for every valid discrete plan, so any discrete solver that returns valid plans becomes a certified kinodynamic planner. Our analysis also establishes sufficient clearance conditions under which a valid discrete plan exists at a fixed lattice resolution and under lattice refinement. To coordinate robots that span multiple lattice vertices, we introduced a diamond formulation whose conflict rule supports sideways yielding in a single tick while guaranteeing the Euclidean separation required by reconstruction. We adapted PIBT and LaCAM to this dia-mond formulation by backtracking over simultaneous blockers, reshuffling priorities in stationary groups, ordering candidate moves by Euclidean distance to the goal, and querying exact goal distances with retained backward A* searches. With 50 robots, the resulting planners ran more than three orders of magnitude faster than the strongest baseline in the 2D halls and more than two orders of magnitude faster on the 3D maps, with comparable or lower makespan and cost. The planners computed complete trajectories for about a thousand robots in seconds in 2D and in tens of seconds in 3D, and simulated differential-drive robots and quadrotors tracked these trajectories without collisions. TAKT also replanned in real time under online changes to goals and keep-out regions. Replanning the complete fleet returned within 500 ms for hundreds of robots, and incremental replanning extended real-time planning to fleets of up to a thousand robots by computing one configuration per tick. Future work includes tighter certificates and conflict rules for narrower passages and denser fleets; incorporating track-ing uncertainty and communication delays, with hardware validation; and co-designing lattice resolution, reconstruction kernels, and dynamic caps to optimize clearance, runtime, and solution quality [45]. ACKNOWLEDGMENT 
+
+We would like to thank Dr. Keisuke Okumura for providing suggestions for this project. REFERENCES [1] P. R. Wurman, R. D’Andrea, and M. Mountz, “Coordinating hundreds of cooperative, autonomous vehicles in warehouses,” AI Magazine , vol. 29, no. 1, pp. 9–9, 2008. [2] R. D’Andrea, “Guest editorial: A revolution in the warehouse: Aretrospective on Kiva Systems and the grand challenges ahead,” IEEE Trans. Autom. Sci. Eng. , vol. 9, no. 4, pp. 638–639, 2012. [3] L. Chen and C. Englund, “Cooperative intersection management: A survey,” IEEE Trans. Intell. Transp. Syst. , vol. 17, no. 2, pp. 570–586, 2016. [4] W. Hönig, J. A. Preiss, T. K. S. Kumar, G. S. Sukhatme, and N. Ayanian, “Trajectory planning for quadrotor swarms,” IEEE Trans. Robot. , vol. 34, no. 4, pp. 856–869, 2018. [5] J. A. Preiss, W. Hönig, G. S. Sukhatme, and N. Ayanian, “Crazyswarm: A large nano-quadcopter swarm,” in IEEE Intl. Conf. on Robotics and Automation (ICRA) , 2017, pp. 3299–3304. [6] B. Donald, P. Xavier, J. Canny, and J. Reif, “Kinodynamic motion planning,” Journal of the ACM , vol. 40, no. 5, pp. 1048–1066, 1993. [7] E. Frazzoli, M. A. Dahleh, and E. Feron, “Real-time motion planning for agile autonomous vehicles,” Journal of Guidance, Control, and Dynamics , vol. 25, no. 1, pp. 116–129, 2002. [8] K. Hauser, “On responsiveness, safety, and completeness in real-time motion planning,” Autonomous Robots , vol. 32, no. 1, pp. 35–48, 2012. [9] D. Le and E. Plaku, “Cooperative multi-robot sampling-based motion planning with dynamics,” in Intl. Conf. on Automated Planning and Scheduling (ICAPS) , vol. 27, 2017, pp. 513–521. [10] Y. Li, Z. Littlefield, and K. E. Bekris, “Asymptotically optimal sampling-based kinodynamic planning,” Intl. J. of Robotics Research , vol. 35, no. 5, pp. 528–564, 2016. 20 
+
+[11] F. Augugliaro, A. P. Schoellig, and R. D’Andrea, “Generation of collision-free trajectories for a quadrocopter fleet: A sequential convex programming approach,” in IEEE/RSJ Intl. Conf. on Intelligent Robots and Systems (IROS) , 2012, pp. 1917–1922. [12] A. Moldagalieva, K. Okumura, A. Prorok, and W. Hönig, “db-LaCAM: Fast and scalable multi-robot kinodynamic motion planning with discontinuity-bounded search and lightweight MAPF,” in Intl. Conf. on Automated Planning and Scheduling (ICAPS) , vol. 36, no. 1, 2026, pp. 738–746. [13] R. Stern, N. R. Sturtevant, A. Felner, S. Koenig, H. Ma, T. T. Walker, J. Li, D. Atzmon, L. Cohen, T. K. S. Kumar, E. Boyarski, and R. Bartak, “Multi-agent pathfinding: Definitions, variants, and benchmarks,” Intl. Symp. on Combinatorial Search (SoCS) , pp. 151–158, 2019. [14] K. Okumura, M. Machida, X. Défago, and Y. Tamura, “Priority inheri-tance with backtracking for iterative multi-agent path finding,” Artificial Intelligence , vol. 310, p. 103752, 2022. [15] K. Okumura, “Lacam: Search-based algorithm for quick multi-agent pathfinding,” in AAAI Conf. on Artificial Intelligence , vol. 37, no. 10, 2023, pp. 11 655–11 662. [16] ——, “Improving lacam for scalable eventually optimal multi-agent pathfinding,” arXiv preprint arXiv:2305.03632 , 2023. [17] A. Moldagalieva, J. Ortiz-Haro, M. Toussaint, and W. Hönig, “db-CBS: Discontinuity-bounded conflict-based search for multi-robot kinody-namic motion planning,” in IEEE Intl. Conf. on Robotics and Automation (ICRA) , 2024, pp. 14 569–14 575, arXiv:2309.16445. [18] J. Kottinger, S. Almagor, and M. Lahijanian, “Conflict-based search for multi-robot motion planning with kinodynamic constraints,” in 
+
+IEEE/RSJ Intl. Conf. on Intelligent Robots and Systems (IROS) , 2022, pp. 13 494–13 499, arXiv:2207.00576. [19] J. Park, J. Kim, I. Jang, and H. J. Kim, “Efficient multi-agent trajectory planning with feasibility guarantee using relative Bernstein polynomial,” in IEEE Intl. Conf. on Robotics and Automation (ICRA) , 2020, pp. 434– 440, arXiv:1909.10219. [20] S. M. LaValle and J. J. Kuffner, “Randomized kinodynamic planning,” 
+
+Intl. J. of Robotics Research , vol. 20, no. 5, pp. 378–400, 2001. [21] D. Mellinger and V. Kumar, “Minimum snap trajectory generation and control for quadrotors,” in IEEE Intl. Conf. on Robotics and Automation (ICRA) , 2011, pp. 2520–2525. [22] M. Erdmann and T. Lozano-Pérez, “On multiple moving objects,” 
+
+Algorithmica , vol. 2, no. 1–4, pp. 477–521, 1987. [23] M. ˇCáp, P. Novák, A. Kleiner, and M. Selecký, “Prioritized plan-ning algorithms for trajectory coordination of multiple mobile robots,” 
+
+IEEE Trans. Autom. Sci. Eng. , vol. 12, no. 3, pp. 835–849, 2015, arXiv:1409.2399. [24] G. Sharon, R. Stern, A. Felner, and N. R. Sturtevant, “Conflict-based search for optimal multi-agent pathfinding,” Artificial Intelligence , vol. 219, pp. 40–66, 2015. [25] G. Wagner and H. Choset, “Subdimensional expansion for multirobot path planning,” Artificial Intelligence , vol. 219, pp. 1–24, 2015. [26] J. Li, A. Zanardi, F. Pecora, R. Zhang, and G. Zardini, “Fico: Finite-horizon closed-loop factorization for unified multi-agent path finding,” 
+
+arXiv preprint arXiv:2511.13961 , 2025. [27] J. Li, F. Pecora, R. Zhang, and G. Zardini, “Adaptive-horizon conflict-based search for closed-loop multi-agent path finding,” IEEE Robotics and Automation Letters , vol. 11, no. 9, pp. 10 505–10 512, 2026, arXiv:2602.12024. [28] J. Li, R. Zhang, and G. Zardini, “Certificate-driven closed-loop multi-agent path finding with inheritable factorization,” in IEEE Conf. on Decision and Control (CDC) , 2026, in press. arXiv:2604.00428. [29] J. Li, P. Surynek, A. Felner, H. Ma, T. K. S. Kumar, and S. Koenig, “Multi-agent path finding for large agents,” in AAAI Conf. on Artificial Intelligence , vol. 33, no. 1, 2019, pp. 7627–7634. [30] Z. Jiang, Y. Zhang, R. Veerapaneni, and J. Li, “Planning over MAPF agent dependencies via multi-dependency PIBT,” arXiv preprint arXiv:2603.23405 , 2026, accepted to IEEE/RSJ IROS 2026. [31] A. Moldagalieva, J. Ortiz-Haro, and W. Hönig, “db-ecbs: Interaction-aware multirobot kinodynamic motion planning,” IEEE Trans. Robot. ,vol. 42, pp. 244–260, 2025. [32] R. E. Kalman, “Contributions to the theory of optimal control,” Boletín de la Sociedad Matemática Mexicana , vol. 5, pp. 102–119, 1960. [33] D. E. Kirk, Optimal control theory: an introduction . Mineola, NY: Dover Publications, 2004, reprint of the 1970 Prentice-Hall edition. [34] E. Yukhnevich and A. Andreychuk, “Enhancing PIBT via multi-action operations,” in AAAI Conf. on Artificial Intelligence , vol. 40, no. 35, 2026, pp. 29 865–29 873. [35] T. Kunz, U. Reiser, M. Stilman, and A. Verl, “Real-time path planning for a robot arm in changing environments,” in IEEE/RSJ Intl. Conf. on Intelligent Robots and Systems (IROS) , 2010, pp. 5906–5911. [36] M. Werling, J. Ziegler, S. Kammel, and S. Thrun, “Optimal trajectory generation for dynamic street scenarios in a Frenét frame,” in IEEE Intl. Conf. on Robotics and Automation (ICRA) , 2010, pp. 987–993. [37] K. Mohta, M. Watterson, Y. Mulgaonkar, S. Liu, C. Qu, A. Makineni, K. Saulnier, K. Sun, A. Zhu, J. Delmerico, K. Karydis, N. Atanasov, G. Loianno, D. Scaramuzza, K. Daniilidis, C. J. Taylor, and V. Kumar, “Fast, autonomous flight in GPS-denied and cluttered environments,” J. of Field Robotics , vol. 35, no. 1, pp. 101–120, 2018. [38] S. Petti and T. Fraichard, “Safe motion planning in dynamic envi-ronments,” in IEEE/RSJ Intl. Conf. on Intelligent Robots and Systems (IROS) , 2005, pp. 2210–2215. [39] P. Leven and S. Hutchinson, “A framework for real-time path planning in changing environments,” Intl. J. of Robotics Research , vol. 21, no. 12, pp. 999–1030, 2002. [40] M. Barer, G. Sharon, R. Stern, and A. Felner, “Suboptimal variants of the conflict-based search algorithm for the multi-agent pathfinding problem,” in Intl. Symp. on Combinatorial Search (SoCS) , vol. 5, no. 1, 2014, pp. 19–27. [41] C. Pinciroli, V. Trianni, R. O’Grady, G. Pini, A. Brutschy, M. Brambilla, N. Mathews, E. Ferrante, G. Di Caro, F. Ducatelle, M. Birattari, L. M. Gambardella, and M. Dorigo, “ARGoS: A modular, parallel, multi-engine simulator for multi-robot systems,” Swarm Intelligence , vol. 6, no. 4, pp. 271–295, 2012. [42] W. Giernacki, M. Skwierczy´ nski, W. Witwicki, P. Wro´ nski, and P. Kozierski, “Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering,” in Intl. Conf. on Methods and Models in Automation and Robotics (MMAR) , 2017, pp. 37–42. [43] A. De Luca, G. Oriolo, and C. Samson, “Feedback control of anonholonomic car-like robot,” in Robot Motion Planning and Control ,ser. Lecture Notes in Control and Information Sciences, J.-P. Laumond, Ed. Springer, 1998, vol. 229, pp. 171–253. [44] L. Meier, D. Honegger, and M. Pollefeys, “PX4: A node-based mul-tithreaded open source robotics framework for deeply embedded plat-forms,” in IEEE Intl. Conf. on Robotics and Automation (ICRA) , 2015, pp. 6235–6240. [45] G. Zardini, N. Lanzetti, M. Pavone, and E. Frazzoli, “Analysis and control of autonomous mobility-on-demand systems,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 5, no. 1, pp. 633–658, 2022. [46] J. Panerati, H. Zheng, S. Zhou, J. Xu, A. Prorok, and A. P. Schoellig, “Learning to fly—a gym environment with PyBullet physics for rein-forcement learning of multi-agent quadcopter control,” in IEEE/RSJ Intl. Conf. on Intelligent Robots and Systems (IROS) , 2021, pp. 7512–7519. 21 
+
+APPENDIX APROOFS 
+
+This appendix provides full proofs of the results sketched in the main text, together with the auxiliary lemmas they use. The subsections follow the order of the paper. 
+
+A. Regularity of the Reconstruction Proof of Lemma IV.1. The weak derivative of ˜x is ϕ ∗ ˙ˆx, a convex average of velocities that lie in the Euclidean ball of radius v. A convex average stays in the ball, which proves the Euclidean speed bound. For a plan satisfying Eq. (16), the raw velocity is almost everywhere an axis pulse of magnitude v or zero, so it lies in the Manhattan ball of radius v and so does its convex average. Translations of ϕ are continuous in L1 and 
+
+˙ˆx is bounded, so ϕ ∗ ˙ˆx is continuous, which gives ˜x ∈ C1 and makes the speed bounds hold at every time. For the box kernel, 
+
+˙˜x(t) = ˆx(t + Tf /2) − ˆx(t − Tf /2) 
+
+Tf
+
+,
+
+so the Lipschitz bound on ˆx gives 
+
+˙˜x(t) − ˙˜x(s) 2 ≤ 2vTf
+
+|t − s|.
+
+The reconstructed velocity is therefore Lipschitz and hence absolutely continuous, and its almost-everywhere derivative has norm at most 2v/T f . When Tf ≥ Tacc the acceleration bound cϕv/T f = 2 v/T f is at most amax , which together with the C1 regularity, the absolute continuity of the velocity, and the speed bound gives admissibility. 
+
+B. Diamond Geometry 
+
+Lemma A.1 supplies the minimum used in Theorem V.1. Lemma A.2 shows that the footprint selection of Definition V.2 is well defined and is used again in Appendix A-D. 
+
+Proof of Lemma V.1. The offset after the tick is (q′ − p′)/ε =2m e a ±eb, whose Manhattan norm is 2m+1 , so the planning diamonds at p′ and q′ are disjoint by Eq. (24). During the stop-and-go motion within the tick, both robots move at speed 
+
+v along their axes, so the relative offset in lattice units is 
+
+(2 m + 1 − α)ea ± αe b for 0 ≤ α ≤ 1. Its Manhattan norm is 
+
+2m + 1 for every α, so the planning diamonds remain disjoint throughout the tick. 
+
+Lemma A.1 (Minimum norm of an integer offset) . For an integer s ≥ 0 with s = dq + j and 0 ≤ j < d , the minimum 
+
+Md(s) in Eq. (25) equals (d − j)q2 + j(q + 1) 2 = ( s2 +
+
+j(d − j)) /d , and it is attained exactly by the offsets whose coordinate magnitudes differ by at most one and sum to s.
+
+Proof of Lemma A.1. If the sum of the coordinate magnitudes exceeds s, decreasing a positive magnitude by one reduces the squared norm and keeps the sum at least s, so a minimizer has sum exactly s. At sum s, two magnitudes u ≥ w + 2 can be replaced by u−1 and w+1 , which decreases the squared norm by 2( u − w − 1) > 0. A minimizer therefore has magnitudes that differ by at most one. Exactly j of them equal q + 1 
+
+and the others equal q, which gives (d − j)q2 + j(q + 1) 2, and substituting q = ( s−j)/d gives (s2 +j(d−j)) /d . Conversely, every offset with magnitudes that differ by at most one and sum to s attains this value. 
+
+Proof of Theorem V.1. A permitted pair has ∥a∥1 ≥ 2m + 1 
+
+by Eq. (24), so Lemma A.1 gives Eq. (26), and the balanced offsets of the lemma attain the bound. The implication there-fore holds for every pair exactly when 
+
+ε2Md(2 m + 1) > 4r2 
+
+> ε
+
+.
+
+The alignment ε = √d r/n and Eqs. (12) and (13) give 
+
+(2 rε)2/ε 2 = 4 n2/d +1+4 κϕW 2, so the excess of the smallest permitted squared offset over this threshold is 
+
+Md(2 m + 1) − ( 4n2
+
+d + 1 + 4 κϕW 2)= 4[ m(m + 1) − n2] + 1 − d + j(d − j)
+
+d − 4κϕW 2,
+
+(41) which is positive exactly under Eq. (27). 
+
+Lemma A.2 (Existence and monotonicity of the footprint integer) . For every integer n ≥ 1 and every positive even 
+
+W , the set in Eq. (29) is nonempty, so m∗(n, W ) exists, and every integer m ≥ m∗(n, W ) belongs to the set. Moreover, 
+
+m∗(n, W ) does not decrease as W grows. 
+
+Proof. By Eq. (41), an integer m ≥ n belongs to the set exactly when Eq. (27) holds. From m to m + 1 the term 
+
+4m(m+1) on the left side of Eq. (27) grows by 8( m+1) , while 
+
+j(d−j) stays between 0 and 2, so the left side increases strictly and without bound with m. The set is therefore nonempty and contains every integer above its least element, and the search that tests Eq. (27) at m = n, n + 1 , . . . stops at m∗(n, W ).The right side of Eq. (27) increases with W , so m∗(n, W )
+
+does not decrease as W grows. 
+
+C. Successor Generation and Configuration Search 
+
+The proof of Lemma VI.1 refers to the response search of Appendix B-C and to the direct commitment of Ap-pendix B-D. Lemma A.4 proves the bound on the neighbor lists used in Eq. (36). 
+
+Proof of Lemma VI.1. Every candidate attempt is charged to the budget, the budget bounds the attempts of the search for one root, and at most N searches are opened, so the algorithm terminates. We claim that, throughout the call, every undecided robot can wait without conflicting with any committed target. The claim holds before the first search of a tick, because without fixed targets the only committed targets are the direct com-mitments of Appendix B-D, each of which is separated from every current position and from every possible target of every other robot. Suppose the claim holds when the search for a root begins. If the search succeeds, every undecided robot whose position conflicted with a target assigned in it was placed on the agenda of Appendix B-C and decided before R ESPOND 
+
+returned success, and every robot assigned its own position is separated from every undecided position because Q is valid. If the search is abandoned, only the root is committed, at its own 22 
+
+position, which is separated from every undecided position because Q is valid. In both cases the claim holds when the next search begins. Every candidate lies in VD and differs from the position of its robot by an element of M. A tentative target is accepted only when it is separated from every decided target, so the committed targets are pairwise separated at all times. By the claim, the wait of a root is separated from every target committed before its search, it has no blocking robots because 
+
+Q is valid, and every target committed after it is checked against it. The wait therefore succeeds whenever the root reaches it, so a search can fail only through the budget, and the root is then committed at its position, which is legal by the claim. Every robot is decided when the tick ends, and Q′
+
+is valid. 
+
+Proof of Proposition VI.1. There are at most |VD |N config-urations and at most (2 d + 1) N joint moves from each. Removing the invalid configurations and transitions leaves a finite graph, and the search, which removes a node only after its constraint tree is exhausted [15], visits every reachable vertex of it. A constraint tree that fixes one more move at each level enumerates the same finite move set at full depth. A failed generator call under a partial constraint does not affect the argument, because the fully constrained leaves are still tested exactly, and heuristic successors generated at shallower levels are added earlier and are not required. 
+
+Lemma A.3 (Exactness of the retained search) . Every com-pleted query for robot i returns the exact goal distance Di at the queried vertex, independently of the order and timing of the queries. 
+
+Proof of Lemma A.3. The heuristic is consistent, because 
+
+|hx0 (s) − hx0 (s′)|≤ 1 for axial neighbors s and s′ and every edge costs one, so f does not decrease along a shortest path from g. The two queues pop entries in nondecreasing f .Suppose some vertex were settled above its true distance, and let s be the first such vertex in pop order. Let u be the first vertex on a shortest path from g to s that was not settled before 
+
+s. The predecessor of u on that path was settled with its exact distance, so its expansion stored ˜dg (u) = D(u) and queued u
+
+at f (u) = D(u) + hx0 (u) ≤ D(s) + hx0 (s) < ˜dg (s) + hx0 (s).Every entry below the f -value of s was popped before s, so u
+
+was settled before s, which contradicts its choice. Suspending the search after a settled and expanded query and resuming it later leaves the queues and the stored values unchanged, so the popped vertices form the sequence of one uninterrupted search with the fixed target x0.
+
+Proof of Lemma VI.2. For Euclidean conflicts, the positions in conflict with a target t lie within 2rε of t and are pairwise more than 2rε apart. The open balls of radius rε around them are disjoint and lie in the ball of radius 3rε around 
+
+t, whose volume is 3d times theirs. For diamond conflicts, the same argument applies to the open Manhattan balls of radius h around the positions, which are disjoint and lie in the Manhattan ball of radius 3h around t.The packing argument uses the axial radius h = m∗ε and remains valid when m∗ > n , because a larger footprint also enlarges the separation of the positions. 
+
+Lemma A.4 (Bounded neighbor lists) . In a configuration of 
+
+Qε, at most 7d robots lie within Euclidean distance 2rε + 2 ε
+
+of any point. In a configuration of QD with h = m∗ε, at most 
+
+(4 √d + 1) d robots lie within Euclidean distance 2h + 2 ε of any point. The neighbor lists of Appendix B-D therefore have length at most a constant γ that depends only on d.
+
+Proof. In Qε, the robots within 2rε + 2 ε of a point z are pairwise more than 2rε apart, so the open balls of radius rε
+
+around them are disjoint. Since ε ≤ 2rε by Eq. (12), these balls lie in the ball of radius 3rε+2 ε ≤ 7rε around z, and comparing volumes bounds their number by 7d. In QD , validity gives pairwise Manhattan separation greater than 2h, so the open Manhattan balls of radius h around the robots within 2h + 2 ε
+
+of z are disjoint. Since ε ≤ h, the Euclidean ball of radius 
+
+2h + 2 ε ≤ 4h around z lies in the Manhattan ball of radius 
+
+4√d h , so these disjoint Manhattan balls lie in the Manhattan ball of radius (4 √d + 1) h around z, and comparing volumes bounds their number by (4 √d + 1) d.
+
+D. Existence and Resolution 
+
+The proof of Proposition VII.1 uses Lemma A.2, and the proof of Corollary VII.3 reuses the plan constructed in the proof of Theorem VII.2. 
+
+Proof of Proposition VII.1. By Definition IV.2, Tacc ≤ Tf <Tacc +2∆ t with ∆t = ε/v , so Tf → Tacc as ε → 0. In Eq. (12) the tick reserve ε2/4 vanishes and κϕv2T 2f → κϕv2T 2acc =
+
+κϕc2
+
+> ϕ
+
+v4/a 2max , so rε → racc by Eq. (39). For the diamond limit Eq. (40), write A = n2 + dκ ϕW 2
+
+with W = W (n). By Lemma A.2, m∗ exists. The term 1 −
+
+d + j(d − j) in Eq. (27) equals 0 or −2 for d ∈ { 2, 3},so the condition implies m(m + 1) > A and is implied by 
+
+m(m + 1) > A + 1 /2. The least integer m∗ therefore satisfies 
+
+√A − 12 < m ∗ ≤ √A + 1 ,
+
+where the upper bound uses n ≤ √A when m∗ = n and the failure of the condition at m∗ − 1 otherwise. Multiplying by 
+
+ε = √d r/n and using W ε = vT f gives 
+
+m∗ε = √d (r2 + κϕv2T 2f )1/2 + O(ε),
+
+which tends to √d r acc because Tf → Tacc by Definition IV.2. Dividing by nε = √d r gives the ratio in Eq. (40). 
+
+Proof of Corollary VII.3. Set h = m∗(n)ε(n). The parameter limits give h → √d r acc and rε → racc , so h > rε at sufficiently fine resolution. A planning diamond lies inside the Euclidean ball of radius h about its center. Hence a lattice vertex with obstacle clearance greater than h is admitted, and two centers separated by more than 2h have disjoint diamonds. The tracker used for Theorem VII.2 has clearance at least 
+
+r + μX − dε and pairwise separation at least 2r + μX − 2dε .Both exceed the required diamond thresholds when 
+
+2dε + 2( h − r) < μ X .23 
+
+TABLE II: The box and triangular kernels with filter duration 
+
+Tf . The polynomial degrees refer to stop-and-go trajectories. The derivative bounds hold for any v-Lipschitz path.                          
+
+> Box Triangular
+> ϕ(s)on its support 1/T f2
+> Tf(1 −2|s|
+> Tf)
+> κϕ=σ2
+> ϕ/T 2f1/12 1/24
+> Trajectory C1, quadratic pieces C2, cubic pieces Acceleration bound 2v/T fa.e. 4v/T f
+> Acceleration constant cϕ24
+> Jerk bound —16 v/T 2fa.e.
+
+The stated margin makes this inequality true for all sufficiently large n. Thus the tracked plan lies in QD . The selected width gives Tf ≥ Tacc , so Theorem VII.1 makes its reconstruction a solution of Problem III.1. APPENDIX BDETAILS OF THE PIPELINE MODULES 
+
+This appendix specifies the parts of the modules that Al-gorithm 1 and Sections IV to VI leave out. Each subsection covers one module, in the order of Algorithm 1. 
+
+A. Reconstruction Kernels 
+
+The kernel ϕ of Section IV-B is symmetric and nonnegative, has unit integral, and is supported on [−Tf /2, T f /2] . The box kernel is used throughout the paper. This subsection gives the constants of the triangular kernel, a second member of the class, whose trajectories have continuous acceleration. 
+
+Triangular kernel: The triangular kernel is BTf /2 ∗BTf /2,with (cϕ, κ ϕ) = (4 , 1/24) . With F ′ = ˆ x, G′ = F , and c =
+
+Tf /2, its reconstruction is 
+
+˜x(t) = G(t + c) − 2G(t) + G(t − c)
+
+c2 , (42) which consists of cubic pieces. Two box averages give 
+
+¨˜x(t) = ˆx(t + c) − 2ˆ x(t) + ˆ x(t − c)
+
+c2 ,
+
+which is continuous and has norm at most 2vc/c 2 = 4 v/T f ,so ˜x ∈ C2. Its almost-everywhere derivative has norm at most 4v/c 2 = 16 v/T 2f . Table II lists the constants of both kernels. Under the same speed and acceleration caps, the triangular kernel has twice the target duration Tacc and twice the limiting squared smoothing reserve κϕv2T 2acc , since κϕc2
+
+> ϕ
+
+equals 1/3 for the box kernel and 2/3 for the triangular kernel. At the same filter duration, the triangular kernel has half the variance. The certificate condition Eq. (27) for the triangular kernel reads 12[ m(m + 1) − n2] > W 2 for d = 2 and 
+
+2(4[ m(m + 1) − n2] − 2 + j(3 − j)) > W 2 for d = 3 .
+
+B. Vertex Admission and Endpoint Anchors 
+
+The vertex set VD of Eq. (31) tests both the radial condition 
+
+cl( p) > r ε and the footprint condition Dm(p) ∩ C = ∅ at every vertex, because a free planning diamond does not imply 
+
+cl( p) > r ε. The inradius of the planning diamond Dm(p) is 
+
+h/ √d, so a ball of radius ϱ around p lies in the footprint exactly when ϱ ≤ h/ √d. With h = mε , r = nε/ √d, and 
+
+vT f = W ε , the certificate ball of radius rε is contained in the planning diamond exactly when 
+
+m2ε2
+
+d ≥ r2 
+
+> ε
+
+= ε2( n2
+
+d + 14 + κϕW 2),
+
+that is, when m2 ≥ n2 + d/ 4 + dκ ϕW 2. The pair certificate of Theorem V.1 does not require this containment. In Fig. 7(a), 
+
+m∗ = 2 satisfies the certificate, and containment would require 
+
+m ≥ 3. In Fig. 7(b), containment holds. When containment fails, the point z = p + λ(1 , . . . , 1) /√d with h/ √d < λ < r ε
+
+lies outside Dm(p) at distance λ < r ε from p, so an obstacle at z leaves Dm(p) free and violates cl( p) > r ε. The pair certificate compares two lattice centers, whereas an obstacle point need not be a lattice center, and the vertex set VD of Eq. (31) therefore requires both conditions for every footprint integer. Let S = (s1, . . . , s N ) and G = (g1, . . . , g N ) be the requested start and goal configurations and let η ≥ 0 be the tolerance. The start anchor configuration Sε = ( sε
+
+> 1
+
+, . . . , s εN )
+
+and the goal anchor configuration Gε = (gε
+
+> 1
+
+, . . . , g εN ) are lattice configurations in QD that satisfy 
+
+∥sεi − si∥2 ≤ η, ∥gεi − gi∥2 ≤ η for every i. (43) The vertices sεi and gεi are the start anchor and the goal anchor of robot i. The tolerance absorbs only the offset between a requested endpoint and the lattice. Every point lies within √d ε/ 2 = dr/ (2 n) of a lattice vertex, so η is of the order of one pitch, and it decreases as the resolution n grows. In our experiments, η is 9 cm for robots of radius 50 cm in workspaces of more than 100 m across in 2D, and 5 cm for robots of radius 20 cm in 3D. The displacement of an endpoint is therefore negligible at the scale of the task, and the anchors coincide with the requested endpoints for every practical purpose. Since η is part of the instance, the reconstruction of a plan between the anchors meets the endpoint conditions of Problem III.1 exactly. The candidate anchors of an endpoint are the admitted vertices within the tolerance η of it, listed by increasing displacement. Two endpoints in the same configuration interact when some pair of their candidates has intersecting planning diamonds. Each connected group of interacting endpoints is assigned jointly by backtracking over its candidate lists, so that the selected configuration lies in QD .
+
+C. Response Search and Rollback 
+
+RESPOND in Algorithm 2 keeps an agenda of the robots that must respond to the tentative targets of the current branch. The blocking robots of a target are placed at the front of the agenda in the priority order, each is resolved fully before the next, and a robot that another branch has decided in the meantime is skipped, with its target constraining every later choice. The candidate orders, the distances, and the priority order are frozen for the tick. A call of R ESPOND that returns failure has undone every tentative assignment it made, so the branch of its caller is restored to the state before that call, and the caller tries its next candidate. When the budget is 24 
+
+exhausted, the interruption propagates to the root without local cleanup, and the root then discards every tentative assignment of its search and marks those robots undecided. The same budget counts the attempts of all branches of the search for one root, so trying another root target does not refresh the budget. 
+
+D. Neighbor Queries and Direct Commitment 
+
+One call of Algorithm 2 tests every candidate target against the positions and the targets of the other robots, and testing all pairs of robots would cost O(N 2) per tick. Conflicts are local, because a target lies within one pitch of its robot, so only robots within a fixed distance of each other can conflict. The generator uses this locality in two ways. Neighbor queries restrict every conflict test to a list of nearby robots, whose length is bounded by a constant (Lemma A.4). Direct commitment assigns robots that have no other robot near their preferred move before any search starts, so the response search of Appendix B-C runs only where robots interact. Together they give the cost Eq. (36) of one generator call, which is linear in N apart from the sort of the priorities. Two vertices are in diamond conflict when their planning diamonds intersect, as defined in Problem V.1. A pair in diamond conflict has ∥p − q∥1 ≤ 2h by Eq. (23), and 
+
+∥p − q∥2 ≤ ∥ p − q∥1, so the pair lies within the Euclidean conflict radius R = 2 h = 2 m∗ε. Under the Euclidean rule of the ablation in Section IX-D, the conflict radius is R = 2 rε.A target lies within ε of its robot. The targets of two robots can therefore conflict only when the robots are within R + 2 ε
+
+of each other, and the current position or a target of another robot can conflict with a candidate t only when that robot lies within R + ε of t. The neighbor list of a robot holds the robots within R + 2 ε of its position, and the blocking robots of a target are found in the neighbor list of the robot that proposes it. A spatial hash with cells of side R + 4 ε is rebuilt at every tick, and a query for the robots within a radius scans the 3d cells around the query point. Before the searches of a tick, a robot with no other robot within R + 4 ε of its first candidate is committed to that candidate directly. The query radius covers R + ε, so the committed target is separated from the current position and from every possible target of every other robot. Fixed targets are committed before this step and remain fixed throughout the call, so the direct commitment considers undecided robots only. 
+
+E. Priority Updates, Tie Orders, and TAKT-PIBT Initialization and node state: Each search node retains a priority πi, a rank βi, a wait counter ωi, and a candidate tie order for every robot. The scheduling key is (πi, β i). At the initial node, πi = Di(sεi )/N , βi = i, and ωi = 0 . The tie order of a robot is a permutation of M that breaks the ties left by the candidate order of Section VI-C. 
+
+Updates after a joint move: On the edge from a node to a child, πi increases by one when robot i ends away from its goal and is replaced by its fractional part when it ends at the goal. The counter ωi is set to zero when robot i moved on the edge or ends at its goal and increases by one otherwise. The updated triples are the state of the child before rotation. 
+
+Stationary-group rotation: At the child configuration, robot i is stationary when it is away from its goal and ωi ≥ F ,where 
+
+F = max {1, ⌊ 3τI
+
+∆t ⌉} = max {1, ⌊ 6rε ⌉} (44) is the number of ticks in three interaction times τI = 2 r/v ,rounded down to the nearest integer. Each stationary group of Section VI-C, with its members a0, . . . , a λ−1 listed in the current priority order, passes the key of ak to ak+1 and the key of aλ−1 to a0, and the wait counters of the rotated robots are set to zero. The child’s priority order places robots away from their goals first, breaking ties by decreasing πi and then by decreasing βi. The ranks remain a permutation, so the order is total, and it is frozen for the node. Repeated rotations of an unchanged group give every member the leading key once in 
+
+λ rotations, so the group obtains a different initiating robot. 
+
+Tie orders and revisits: A new node receives seeded tie orders, which every constrained generator call at that node uses. A configuration reached again keeps the node and the state of its first visit, so repeated calls and revisits at one configuration use consistent choices. 
+
+TAKT-PIBT: The generator used tick by tick without the configuration search differs in three respects. A scheduling age replaces the priority. It starts at zero, increases by one in every tick that the robot ends away from its goal, and is reset to zero when the robot ends at its goal. The rank and the wait counter are updated by the same rules after every tick, and the stationary groups of the current configuration are rotated at the start of the next tick. The tie order of a robot is redrawn every τ ticks, where τ is one interaction time τI
+
+rounded to a whole number of ticks, so the ranking of tied moves is constant within a window, and all attempts within a single tick share the same tie order. 
+
+F. Retained Backward A* Implementation 
+
+The search of a goal g stores the tentative distance ˜dg (s)
+
+of every discovered vertex and expands vertices in the order of f in Eq. (35). An axial move changes hx0 by exactly one and costs one, so the f -value of a discovered neighbor equals the f -value of its parent or exceeds it by two. The open list therefore consists of two first-in-first-out queues, one for the 
+
+f -value being expanded and one for that value plus two. A popped vertex is settled when ˜dg (s) + hx0 (s) equals the f -value of its queue, and a stale entry is skipped. A query resumes popping vertices until the queried vertex has been settled and expanded, and the remaining entries of both queues are retained as the frontier. The first query location x0 remains fixed for the life of the search, so later queries change only where the search pauses. The tentative distances and settled bits of a search are stored sparsely, in pages allocated when a vertex of the page is first discovered, so the storage of a search grows with the region it has explored. When the admitted vertices form one rectangle, 
+
+Di(q) equals the Manhattan distance ∥q − gεi ∥1 /ε , because a monotone lattice path between two vertices of a rectangle stays inside the rectangle, and this formula replaces the search. 25 
+
+APPENDIX CEXPERIMENT DETAILS 
+
+This appendix gives the details of the experiments of Sec-tion IX. Its subsections cover the simulated platforms and their controllers, the execution of the two replanning paradigms of Section VIII, and further measurements of the real-time sessions. 
+
+A. Simulated Platforms and Tracking Controllers 
+
+Differential-Drive Base – A differential-drive robot moves along its heading on two driven wheels. Each base tracks its trajectory with a point at a distance b > 0 ahead of the wheel axle. The velocity of this point is an invertible function of the forward speed and the turn rate, so a proportional feedback on the point, with the planned velocity as feedforward, drives it onto any planned trajectory at an exponential rate [43]. The feedback stays defined at rest, which suits planned motions that include waits. The axle midpoint lies at the distance b
+
+behind the tracked point, so a robot stays inside the disc of radius r around its planned position whenever b, the tracking error, and the radius of the robot body sum to less than r.The simulator of the Robotnik RB-1 Base takes the mass of 27.25 kg, the yaw inertia of 1.10 kg m 2, the wheel radius of 7.62 cm, and the track of 43.6 cm from the manufacturer’s robot description. It limits each wheel to 27.27 rad/s and each motor to 9.17 N m and 250 W, assumes that the wheels do not slip, and integrates the fleet every 1 ms. Every robot tracks its trajectory with the point b = 20 cm ahead of its axle, a feedback gain of 8 s −1, and the planned velocity read 0.015 s ahead. Inverting the kinematics of that point gives the forward speed and the turn rate, and hence the two wheel-speed setpoints. A proportional-integral loop on each wheel, with gains of 5 N m s/rad and 50 N m/rad, sets the motor torque. Each robot starts at rest with the tracked point on its start position and its heading along its first move. 
+
+Quadrotor – Each simulated Crazyflie 2.x is a rigid body driven by four rotors with the parameters of gym-pybullet-drones [46]: a mass of 27 g, a thrust-to-weight ratio of 2.25, and up to 0.149 N per rotor. The simulator integrates the fleet every 1 ms. Every quadrotor tracks its trajectory with a cascaded controller based on the PX4 autopilot [44]. Position and velocity loops with gains of 6 s −1 and 12 s −1 correct the planned velocity and acceleration, which enter as feed-forward [21]. The commanded acceleration and gravity define the thrust vector, with the tilt limited to 0.5 rad, and an attitude loop with gains of 1600 s −2 and 80 s −1 aligns the quadrotor with this thrust vector at a fixed heading. Definition IV.6 gives the planned velocity and acceleration in closed form, so the controller reads the planned acceleration 0.06 s ahead and each quadrotor tilts in time for every acceleration change. Fixed-pitch rotors bound the downward acceleration of a quadrotor by gravity, which is the reason for the cap of 5 m/s 2 in the 3D instances. 
+
+Fleets – Table I reports the largest errors and the smallest gaps over twelve fleets, six per platform, with the simulated states sampled every 10 ms. The tracking is uniform across the       
+
+> jtTf
+> λktJJ+1
+> lead time L∆t
+> committed decided during tick ktfree
+
+Fig. 19: Lead time of the incremental paradigm for W = 6 and 
+
+⌈λ/ ∆t⌉ = 1 . The dots are the configurations of the padded sequence at their times j∆t. At the clock time t, inside tick kt,the reconstruction averages the stop-and-go trajectory over the window of duration Tf around t (light blue), and the controller reads it a look-ahead λ ahead (dark blue). Until the tick ends, the robots need the configurations up to the frontier J. The planner decides the configuration J + 1 during this tick, L
+
+ticks before the stop-and-go trajectories reach it, and every later configuration is free. fleets. The 99th-percentile error lies between 0.48 and 0.53 cm for the bases and between 1.0 and 1.4 cm for the quadrotors. 
+
+B. Execution of the Replanning Paradigms 
+
+This subsection specifies how the sessions of Section IX-F execute the two paradigms of Section VIII. 
+
+Lead Time – Let P 0, P 1, . . . be the padded sequence of configurations of Definition IV.6, which the stop-and-go trajec-tories ˆxi pass at the times j∆t. By Eq. (19), the reconstruction at a time t depends on ˆxi over the window [t − Tf /2, t + Tf /2] 
+
+only. A tracking controller may also read its reference a look-ahead λ ≥ 0 ahead of the clock. During the tick kt = ⌈t/ ∆t⌉,the robots therefore need the sequence up to the index 
+
+J = kt + W
+
+2 + ⌈ λ
+
+∆t ⌉, (45) which we call the frontier (Fig. 19). The configurations up to the frontier are committed, and every later configuration can still change. A planner that decides the configuration P J+1 
+
+during this tick decides every configuration 
+
+L = W
+
+2 + 1 + ⌈ λ
+
+∆t ⌉ (46) ticks before the stop-and-go trajectories reach it. The duration 
+
+L∆t is the lead time [7] of the incremental paradigm. It is the sum of half a filter duration, one tick of computation, and the look-ahead rounded up to whole ticks. By Definition IV.2, half a filter duration lies within one tick of cϕv/ (2 amax ),which for the box kernel is the time v/a max in which a robot at speed v stops under the acceleration cap. The lead time therefore follows from the dynamics of the robots, and it does not depend on the fleet size. The controllers of Appendix C-A read their references 0.015 s and 0.06 s ahead, so the lead time is L = 5 ticks, or 0.51 s, in 2D and L = 8 ticks, or 0.35 s, in 3D. 
+
+Changes – A session starts from the anchor configuration Sε
+
+and receives changes at times that it does not know in advance. A new goal gives a robot i a new goal anchor gεi ∈ VD . A 
+
+keep-out region is a closed set R ⊂ W that appears at one 26 
+
+Algorithm 3 Decision cycle of the incremental paradigm                                                                                             
+
+> Require: Committed sequence P0: J; goals Gε; regions R; halted robots H; priority order ≺; budget B; changes Esince the last cycle
+> Ensure: Committed configuration PJ+1
+> 1: for all changes in E, in order of arrival do
+> 2: if new goal gof robot ithen
+> 3: gεi←gand reset the scheduling state of robot i
+> 4: else if region Rappears then
+> 5: R ← R ∪ { R}
+> 6: add to Hevery robot iwith a vertex pji/∈VD(R)for some kt−W/ 2≤j≤J
+> 7: else if region Ris removed then
+> 8: R ← R \ { R}and release the robots that Rhalted
+> 9: restrict C(i)to the wait for every i∈H
+> 10: remove from C(i),i / ∈H, the moves that leave VD(R)for some
+> R∈ R or conflict with a robot of H
+> 11: PJ+1 ←GENERATOR (PJ,≺, B, ∅)// Algorithm 2
+> 12: commit PJ+1 and update ≺// Appendix B-E
+
+time and is removed at a later time. While it exists, R acts as an additional obstacle. We write VD (R) ⊆ VD for the vertices that pass the two admission tests of Appendix B-B when R is added to the obstacles. 
+
+Whole-Fleet Replanning – On a change, the session selects a splice index Js ahead of the frontier. The planner then treats 
+
+P Js as a new start configuration and computes a replacement plan, with the new goals and on the vertices VD (R), and the result replaces the current plan from Js on. The time from the change to the splice is the lead time of the whole-fleet paradigm, and the planner must return within it. The session places Js at twice the computation time of the initial plan ahead of the frontier. The robots follow the previous plan until the splice. 
+
+Incremental Replanning – The incremental paradigm runs one decision cycle per tick, listed in Algorithm 3. A cycle reads the changes that arrived since the last cycle, calls Algorithm 2 once from the frontier configuration P J , and commits the result as P J+1 . A change takes effect when the stop-and-go trajectories reach the first configuration decided with it, which occurs between (L + 1)∆ t and (L + 2)∆ t after the change arrives. The planner must supply one configuration per tick. Lemma VI.1 holds for every budget B ≥ 1, because a robot that is not yet decided can always wait. The cycle uses this property to keep its pace. It stops the root loop of Algorithm 2 at a wall-clock budget below the tick duration, and the robots that are not yet decided wait in that tick. 
+
+New Goal – A new goal changes the candidate order of its robot (Section VI-C) from the next cycle on. The scheduling state of the robot is reset as on an arrival at a goal (Ap-pendix B-E). The retained search of Section VI-D starts a backward A* from the new goal at the first distance query of the robot, so a new goal requires no distance field over the lattice. 
+
+Keep-Out Region – When a region R appears, the vertices outside VD (R) are removed from the lattice. The motion of every robot is committed up to the frontier. A robot is halted 
+
+when one of the vertices that still enter its reconstruction, from the index kt−W/ 2 to the frontier, lies outside VD (R). A halted robot waits from the frontier on and holds its position until the region is removed, as a robot stopped for maintenance would. Every other robot loses the candidates of Eq. (34) that lie outside VD (R) or conflict with the held position of a halted robot, and it keeps the wait. The goal of a robot is suspended 
+
+when the region removes the goal or cuts it off. Such a robot is scheduled as a robot at its goal until the removal, so it waits and yields to the others. The goal distances of the remaining robots are searched on the reduced lattice. Under the whole-fleet paradigm, the halting rule applies to the vertices from the index Js − W/ 2 to Js.
+
+Certified Execution – The guarantee of Corollary VII.1 extends to the motion that the robots execute. 
+
+Proposition C.1 (Certified execution under changes) . Under the incremental paradigm, for every sequence of changes and every wall-clock budget, the committed configurations form a diamond plan from Sε, and the reference trajectories of the robots are its reconstruction. The planned motion is therefore admissible and conflict-free at all times. 
+
+Proof. Every candidate set contains the wait, and the proof of Lemma VI.1 uses no other candidate. The lemma therefore gives P j+1 ∈ Q D and elementary moves for every committed index j, and the sequence is a valid plan by Proposition V.1. At every time the robots need the sequence up to the frontier only, so their reference trajectories are the reconstruction of the committed sequence, and Theorem VII.1 applies. Under the whole-fleet paradigm, the retained part of the plan and the new plan are valid and share P Js , so the same argu-ment certifies the planned motion, and a change takes effect at the splice. A keep-out region adds one guarantee. A robot that is not halted has every vertex from the index kt − W/ 2
+
+on in VD (R), the committed ones by the halting test and the later ones by the restriction of its candidates. From the time at which the region takes effect, its reconstruction averages these vertices only. The obstacle part of Theorem VII.1, applied with 
+
+R added to the obstacles, then shows that every robot that is not halted keeps a clearance above r from R until the region is removed. 
+
+C. Real-Time Sessions 
+
+Fleets and Changes – The fleets are instances of Sec-tion IX-C, and the fleets of 100 and 200 robots are the first 100 and 200 robots of such instances. Each of the ten instances of a fleet has one script of changes with random times, and both paradigms follow the same scripts. In the rack hall and in the empty hall, a band of 18.4 m by 10 m appears during the motion and stands for one to two minutes, and every robot later receives its start position as its new goal. In the rack hall, the band closes one of the two aisles between the racks. In the central pillar volume, a box of 2 m by 2 m over the full height stands against one side of the pillar for 8 to 40 s, and every quadrotor later receives its start position as its new goal. The whole-fleet sessions plan and replan with TAKT-PIBT. Each session advances the clock of the fleet by one tick per committed configuration and measures the computation 27 73 of the 86 affected robots cross the region area           
+
+> Without the region
+> (a)
+> None of the 31 rerouted robots enters the region
+> With the region
+> (b)
+> 0.0 0.5 1.0 1.5
+> Time since the region appears (s)
+> 0.0 0.5 1.0
+> Speed (m/s)
+> region appears takes effect 0.61 s all at rest 0.98 s
+> Speed of the halted robots (c)
+> rerouted (31) halted (44) goal suspended (11) suspended goals other robots when the region appears 30 s later keep-out region
+
+Fig. 20: Reaction to a keep-out region in the incremental session of Fig. 18(a) with 771 simulated RB-1 Base robots in the rack hall, in which the region appears at 60 s. (a), (b) Paths, over the 30 s after the region appears, of the 86 robots that the region affects, in the same session without and with the region. (c) Speed of the halted robots, with the time at which the region takes effect and the time at which all of them are at rest. TABLE III: Computation times against the fleet size, ten sessions per row. Incremental paradigm: mean, 99th percentile, and longest decision cycle, against a tick of 101 ms in 2D and 43 ms in 3D. Whole-fleet paradigm: initial plan, and mean and longest replan over the replans after a new keep-out region, after its removal, and after new goals, against the criterion of 0.5 s.                                                                                                    
+
+> Map NIncremental cycle (ms) Whole-fleet (s) Mean 99th Longest Initial Mean Longest Rack hall 100 0.04 0.36 2.8 0.07–0.09 0.07 0.19 Rack hall 200 0.09 0.67 3.4 0.17–0.22 0.15 0.36 Rack hall 385 0.19 0.82 3.7 0.41–0.50 0.38 0.74 Rack hall 578 0.30 1.15 4.2 0.76–0.88 0.66 1.21 Rack hall 771 0.41 1.33 4.9 1.21–1.39 1.03 1.83 Empty hall 254 0.05 0.08 3.3 0.12–0.13 0.09 0.14 Empty hall 509 0.12 0.19 4.2 0.21–0.24 0.16 0.26 Empty hall 763 0.21 0.35 5.6 0.35–0.40 0.26 0.46 Empty hall 1,018 0.31 0.62 7.0 0.52–0.55 0.41 0.79 Pillar 100 0.11 0.73 29.5 0.04–0.09 0.07 0.19 Pillar 200 0.24 1.32 30.5 0.11–0.19 0.12 0.30 Pillar 335 0.48 2.35 33.4 0.22–0.38 0.22 0.44 Pillar 671 0.98 3.95 34.1 0.77–1.29 0.50 1.38
+
+time of every decision cycle and replan on the laptop of Section IX-A. 
+
+Computation Time per Change and Budgets – For each change, we report the computation time of the first configura-tion that accounts for it. Under the incremental paradigm, it is the time of one decision cycle of Algorithm 3, including the processing of the change. Under the whole-fleet paradigm, it is the time of one replan, which prepares the instance of the robots that are not halted and runs the planner on it. The wall-clock budget of a cycle is 80 ms in 2D and 35 ms in 3D. When less than 20 ms in 2D or 10 ms in 3D remain before the end of the tick, the robots whose candidate order has not yet been computed rank their candidates by the Manhattan distance to the goal in that tick, which requires no distance query and keeps the configuration valid. 
+
+Computation Times – Table III gives the mean and the TABLE IV: Reaction to the changes in the sessions with 200 robots, ten sessions per row, with the same changes under both paradigms. Computation time: that of the first configuration that accounts for a new keep-out region or for the new goals. Effect: time from the appearance of a keep-out region to the time at which it takes effect.                 
+
+> Paradigm Computation time (ms) Effect Keep-out New goals (s) 2D, incremental 2.0–3.4 0.04–0.06 0.62–0.69 2D, whole-fleet 57–261 146–359 0.94–1.10 3D, incremental 29.3–30.5 0.07–0.79 0.39–0.43 3D, whole-fleet 117–143 83–304 0.62–0.77
+
+longest computation times of the fleets in Fig. 18(c)–(e). At every fleet size, the mean decision cycle takes at most 1 ms and the 99th percentile at most 4 ms, against ticks of 101 ms and 43 ms. The longest cycles are those that read a new keep-out region or its removal. In 3D, the processing of a new no-fly zone consists mostly of the construction of its lattice vertices, and the generator decides every quadrotor within the rest of the 43 ms tick. Under the whole-fleet paradigm, every session splices three replans into the motion, one per change, and Table III reports these 30 replans per fleet. In every session, the fleet comes to rest. 
+
+Time to Take Effect – Table IV compares the two paradigms on the sessions with 200 robots. Under the incremental paradigm, a keep-out region takes effect between (L + 1)∆ t
+
+and (L+2)∆ t after it appears at every fleet size, which is 0.62 to 0.69 s in the rack hall and 0.39 to 0.43 s in the central pillar volume. Under the whole-fleet paradigm, every replan after a new region returns before its splice, and the region takes effect at the splice, 0.9 to 1.1 s after it appears in the rack hall and 0.6 to 0.8 s after it appears in the central pillar volume. 
+
+Reaction to a Keep-Out Region – Figure 20 shows the session of Fig. 18(a) and (b) with 771 robots, executed by the RB-1 Base models of Section IX-E. In the same session 28 
+
+without the region, 73 robots pass through the area of the band in the 30 s after it appears. With the region, the planner halts the 44 robots whose committed configurations meet the band, suspends the goals of 11 additional robots, and routes 31 robots around the band. The band takes effect 0.61 s after it appears, and the halted robots are at rest 0.98 s after it appears. From the time at which the band takes effect, no robot outside the halted set enters the band, and the closest body stays 32 cm away from it. 
+
+Execution by Simulated Robots – The RB-1 Base and Crazyflie models of Section IX-E executed six recorded ses-sions with their controllers unchanged. The six sessions are one session per paradigm and dimension with 200 robots and the incremental sessions with 771 robots and 335 quadrotors. The tracking errors stay within 0.72 cm for the bases and 5.1 cm for the quadrotors, and no unhalted robot enters the region after it takes effect. Under the incremental paradigm, the halted robots come to rest within 0.98 s in 2D and 1.03 s in 3D.

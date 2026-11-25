@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-24</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-25</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 0 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 19 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>0</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>0</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>8</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-24 04:48:12 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-25 03:33:56 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,7 +69,7 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日无新推荐，系统未产出可展示论文。</p>
+<p>今天筛选了 19 篇论文，其中精读 8 篇、速读 11 篇，重点集中在多智能体路径规划（MAPF）与工业 AGV 调度方向。最值得看的是两篇满分工作：一篇解决带转向约束的可扩展迭代 MAPF，另一篇用惰性优先级搜索把连续时间 MAPF 接到工业 AGV 车队协同上。普通读者可先读这两篇建立主线，再速读“松散邻近约束就让无标签 MAPF 变难”的复杂性结论和“学习动力系统做协同移动操作”一文补充视野。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -78,12 +78,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">8 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Scalable Iterative Multi-Agent Path Finding under Turn Constraints">Scalable Iterative Multi-Agent Path Finding under Turn Constraints</span></li><li><span class="dpr-home-dashboard-paper-title" title="Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy Priority-Based Search">Bridging Continuous-Time MAPF and Industrial AGV Fleet Coordination with Lazy Priority-Based Search</span></li><li><span class="dpr-home-dashboard-paper-title" title="Asymmetric Decomposition for Multi-Agent Path Finding with Unassigned Agents">Asymmetric Decomposition for Multi-Agent Path Finding with Unassigned Agents</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>8</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -91,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">0 篇</strong>
+    <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p class="dpr-home-dashboard-empty">今日暂无推荐。</p>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Cooperative Mobile Manipulation using Learned Dynamical Systems">Cooperative Mobile Manipulation using Learned Dynamical Systems</span></li><li><span class="dpr-home-dashboard-paper-title" title="Hybrid Optimization-Generative Motion Planning for Multiagent Affine Formations">Hybrid Optimization-Generative Motion Planning for Multiagent Affine Formations</span></li><li><span class="dpr-home-dashboard-paper-title" title="Even Loose Proximity Constraints Make Makespan-optimal Unlabeled Multi-agent Pathfinding Hard">Even Loose Proximity Constraints Make Makespan-optimal Unlabeled Multi-agent Pathfinding Hard</span></li></ul>
   </div>
-
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>11</strong></span></div>
 </section>
 </div>
 

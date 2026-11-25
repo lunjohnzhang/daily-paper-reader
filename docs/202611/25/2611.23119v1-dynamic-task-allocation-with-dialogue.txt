@@ -1,0 +1,462 @@
+Title: Dynamic Task Allocation with Dialogue
+
+URL Source: https://arxiv.org/pdf/2611.23119v1
+
+Published Time: Wed, 18 Nov 2026 03:45:15 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Dynamic Task Allocation with Dialogue 
+
+Matthew Groholski, Weiwei Gu, and Nakul Gopalan 
+
+School of Computing and Augmented Intelligence Arizona State University Tempe, AZ, USA 
+
+{mgrohols, weiweigu, ngopala6 }@asu.edu 
+
+Abstract —Effective multi-agent collaboration requires agents to adapt task allocation as goals and responsibilities evolve. Prior task-allocation frameworks often assume static goals, full observability, or rely on large language models (LLMs) without explicit, verifiable beliefs about task allocation or intent. These assumptions limit their applicability to real-world collaboration, where agents often lack full information about each other’s actions, progress, or local environment. To support dynamic task allocation under partial observability, we introduce acommunication-augmented Bayesian task-allocation framework. Our agent uses dialogue to reduce uncertainty about the envi-ronment and collaborators, while keeping decisions grounded in explicit probabilistic beliefs. We evaluate our framework in an Overcooked domain extended with dynamically arriving tasks under both full and partial object-space observability. Our communication agent consistently outperforms a vanilla LLM agent in both settings. Additionally, our framework performs comparably to a non-communicating task-allocation baseline under full observability, but substantially outperforms it under partial observability as task complexity increases by an average speed up of 0.585 and completes on average 18 timesteps faster. These results indicate that our agent is more efficient in dynamic task allocation than baselines in partially observable environments, and that communication is important as available information decreases. 
+
+Index Terms —multi-agent collaboration, task allocation, human-robot dialogue, partial observability, Bayesian inference, large language models 
+
+I. I NTRODUCTION 
+
+Humans often collaborate in environments where goals, responsibilities, and progress constantly evolve, from cooking in a kitchen to performing symphonies [1]. In these set-tings, collaborators must continually coordinate how duties are distributed and updated over time, a process known as 
+
+dynamic task allocation . In a busy kitchen, for example, cooks redistribute tasks such as preparation, cooking, plating, and serving based on workload and individual progress. Dialog is one of the most common modalities for this coordination, enabling collaborators to communicate progress, negotiate responsibilities, and maintain a shared understanding of the task [2, 3, 4, 5], as shown in Figure 1. Effective human-agent collaboration therefore requires artificial agents that can use dialog to perform dynamic task allocation, reasoning about collaborators’ goals, actions, and progress to adapt responsibilities as an interaction unfolds [6]. Prior work has used reinforcement learning and large lan-guage models (LLMs) to develop collaborative agents [7, 8, 9, 10]. However, many approaches assume static goals, prior knowledge about collaborators, and full observability [11, 12], limiting their applicability to settings where goals and re-sponsibilities constantly change or the environment is only partially observable. Such settings are common in real-world collaboration, where agents must reason under uncertainty about both the task and their collaborators. We address this challenge by developing an agent that maintains belief states over the environment and collaborators, enabling dynamic task allocation under partial observability, evolving tasks, and no prior knowledge of partners. Building on Wu et al. [11], our agent reasons about unobserved objects, updates task allocations from new evidence, and exchanges task-relevant information beyond direct observation with dia-log. Together, these mechanisms support long-horizon collab-orative planning under uncertainty about both the environment and other agents’ behavior. Our contributions are: 1) We introduce a language-lifted agent that maintains beliefs over unobserved state and incorporates natural-language communication as probabilistic evidence for task-allocation inference. 2) We introduce a novel framework for evaluating dynamic multi-agent task allocation with dynamically arriving tasks under both full and partial object-space observabil-ity, implemented within the Overcooked environment. II. R ELATED WORKS 
+
+A. Multi-Agent Planning 
+
+Significant work in multi-agent planning has studied how agents coordinate task allocation with collaborators [13, 14, 15]. Ad hoc teamwork studies the setting where agents need to coordinate with previously unseen teammates without prior agreement on a joint policy [13, 14, 15]. Wu et al. [11] introduce Bayesian Delegation to update task allocations in collaboration, which decomposes tasks into subtasks and uses inverse planning to infer a collaborator’s latent subtask alloca-tion. Ying et al. [12] extend this line to partially observable set-tings by combining recursive Theory of Mind reasoning with communication for human-agent collaboration. However, these prior methods assume fixed goal specifications [11, 12, 13, 14, 15] and do not work when goals are continually evolving. In contrast, our agent performs dynamic task allocation through natural-language dialog in partially observable environments without prior knowledge of the collaborator’s behavior. arXiv:2611.23119v1 [cs.CL] 17 Nov 2026 (a) Timestep 1 (b) Timestep 2 (c) Timestep 3 
+
+Fig. 1: Two humans communicating to coordinate a shared goal, with each human’s current belief about their assigned task shown in the gray thought bubble. (a) The human in maroon asks the human in gold to pass a tomato while both are working on the same salad task. (b) A new order for a burger arrives. (c) The human in gold reassigns responsibilities to divide the work more efficiently, delegating the salad to the human in maroon and taking on the burger itself. 
+
+B. Human-Agent Dialogue 
+
+Researchers have long studied how to build collaborative agents that use dialogue [9, 12, 16, 17, 18, 19]. Chai et al. [20] describe dialogue as a form of interaction through which humans communicate task-relevant knowledge to embodied agents. Prior works also develop agents that actively ask for help when the agent is stuck [17] or uncertain about the task [18, 19]. Beyond help-seeking, recent work has incorporated dialogue into collaborative task reasoning, using language models to infer collaborators’ mental states or gen-erate coordinated actions [9, 12, 16]. In our setting, dialogue is used to communicate task-relevant information and provide evidence for deciding future actions. 
+
+C. LLM-based Planning 
+
+LLMs have been increasingly studied for generating plans and coordinating agents [21, 22, 23]. Liu et al. [9] propose an LLM-based hierarchical language agent for real-time human-AI coordination by combining language-based intention rea-soning with reactive execution. Sun et al. [10] show that LLM agents struggle with active collaboration and continuous adaptation by introducing a benchmark for evaluating LLM-based multi-agent systems on collaborative tasks. Furthermore, Valmeekam et al. [24] show that LLMs perform poorly as autonomous long-horizon planners, but can provide useful heuristic guidance for other planners. In our approach, the LLM is used to interpret dialogue as task-relevant evidence for an explicit multi-agent planning procedure. III. M ETHODOLOGY 
+
+A. Preliminaries 
+
+Wu et al. [11] formulate collaborative task allocation as a multi-agent Markov decision process (MMDP), in which agents share a known static goal and infer which sub-task each collaborator is pursuing. Given an interaction history H0: T
+
+containing the states and joint actions observed from timestep 
+
+0 through T , and letting ta denote the set of feasible task allocations, Wu et al. [11] infer the most likely allocation as 
+
+ta ∗ = arg max  
+
+> ta ∈ta
+
+P (ta | H0: T ). (1) In this formulation, the task allocation is computed with fully observed joint actions, which is not accessible when the collaborator’s actions, progress, or environment are not visible. 
+
+B. Decentralized POMDP 
+
+To account for this partial observability, we extend the formulation of Wu et al. [11] into a decentral-ized partially observable Markov decision process (Dec-POMDP ) with sub-tasks [25], defined by the tuple <n, S, A1...n , T, O, O, R, h, b 0, T >, where n, S, A, T , R,and T are defined by Wu et al. [11]. The joint observation space is O = o1 × · · · × on, with O(o | s) the probability of joint observation o ∈ O given state s; the horizon h is 
+
+tmax timesteps completed; and b0 ∈ ∆( S) is the initial state distribution at t = 0 .
+
+C. Language Lifted Planner 
+
+To model dialogue interactions, we add communication to each agent’s observation history. Each agent maintains a belief distribution over task allocations and broadcasts a message when this belief is sufficiently uncertain; Fig. 2a shows an example dialogue. The agent estimates uncertainty over the current task allocation using Shannon entropy [26] and communicates when this entropy exceeds a predefined threshold; details are provided in Appendix A. The observation history H0: T is a sequence of tuples containing the agent’s observation st, joint action at, and joint utterance zt over all timesteps, denoted as H0: T =
+
+{(zt, at, s t)}Tt=0 . We compute the posterior in Equation 1 by weighting each task allocation according to both the observed action likelihood and utterance likelihood: 
+
+P (ta |H0: T ) ∝ P (ta )
+
+> T
+
+Y
+
+> t=0
+
+P (at | st, ta ) P (zt | ta ). (2) The terms P (ta ) and P (at | st, ta ) are the task allocation prior and joint action likelihood, respectively, as defined by Wu et al. [11]. The joint utterance likelihood P (zt | ta ) is computed directly from the LLM’s output token probabilities for each agent’s utterance. Details can be found in Appdx. A. (a) (b) 
+
+Fig. 2: (a) An example of utterances between two agents. The agent circled in blue communicates its belief that both agents are currently collaborating to chop the lettuce. The agent circled in purple communicates its belief that it is cooking the potato while the other agent is chopping the lettuce. (b) Example of an agent’s beliefs over the unobserved state space. In this example, the agent’s latent propositions include object existence and object creation. 
+
+D. Partial Observability 
+
+Our formulation can be extended into a partially observable setting. Each agent maintains a belief state, and the interaction history becomes H0: T = {(zt, at, o t, b t)}Tt=0 , where unob-served actions are denoted ∅, ot is the agent’s observation at timestep t, and bt is its belief over the unobserved state. To better approximate Q-values under partial observability, each agent maintains a belief over latent propositions p de-scribing traits of the unobserved portions of the environment (Figure 2b), updated at each timestep as: 
+
+P (p | oT , H 0: T −1) ∝
+
+
+
+ϕ(p)
+
+bjT −1(p) , bjT −1(p)̸ = 0 ,
+
+0, otherwise ,
+
+(3) where ϕ(p) combines evidence extracted from the current observation, the previous joint action aT −1, and the previous observation oT −1 with the agent’s inferred task allocation to estimate propositions that cannot be directly observed. The full derivation is provided in Appendix A. Accordingly, Equation 2 is further extended with an obser-vation likelihood term: 
+
+P (ta | H0: T ) ∝ P (ta )
+
+> T
+
+Y
+
+> t=0
+
+P (at | ot, b t, ta ) P (zt | ta )
+
+× P (ot, | at−1, o t−1, b t−1, ta ),
+
+(4) The details for the terms of this equation can be found in Appdx. A. Together, these mechanisms allow the agent to perform dy-namic task allocation under partial observability by maintain-ing explicit beliefs over both collaborator task allocation and the unobserved environment, while using dialogue to reduce uncertainty as tasks and goals evolve. Detailed descriptions and derivations can be found in Appdx. A. IV. R ESULTS 
+
+A. Domain 
+
+We extend the Overcooked environment introduced by Wu et al. [11] with dynamic goal setting, where tasks are re-vealed incrementally during execution rather than fixed at the start. We also introduce partially observable settings in which collaborators’ actions or local environments are not accessible to the agent. This environment allows us to test agents’ reasoning and communication abilities on dynamic goals under different levels of uncertainty. Additional details can be found in Appdx. D. 
+
+B. Baselines 
+
+We compare against baselines suited to each observability setting. Under full observability, we adapt the task-allocation algorithm of Wu et al. [11] to support dynamic task arrivals, modifying it to replan as the task queue changes over an episode. Under partial observability, a setting we introduce for this domain, we use an ablation of our own method with communication removed, isolating the contribution of explicit communication when agents lack full environmental knowledge. In both settings we also compare against a vanilla LLM agent, following the LLM-based agents benchmarked by Sun et al. [10], which receives the same observability-appropriate information but selects actions directly, without the additional mechanisms in our methodology. 
+
+C. Metrics 
+
+We evaluate performance using timestep difference, ∆t =
+
+TM − TB (negative values favor the communication agent M
+
+over baseline B), and speedup, TB /T M − 1 (positive values favor M ), following Ying et al. [12]. We report the mean and standard error (SE) of each metric across runs. (a) Comm vs. LLM (b) Comm vs. Non-Comm 
+
+Fig. 3: Communication agent performance relative to the two baselines under full observability. Error bars show standard error.  
+
+> (a) Comm vs. LLM (b) Comm vs. Non-Comm
+
+Fig. 4: Communication agent performance relative to the two baselines under partial observability. Error bars show standard error. 
+
+D. Experimental Results 
+
+We evaluate full and partial observability separately, varying task queue length and layout within each setting; full experi-mental parameters are reported in Appendix D. 
+
+1) Full Observability: As shown in Fig. 3a, the communi-cation agent consistently outperforms the vanilla LLM agent across both layouts, with the largest speedups at the queue length of one and diminishing gains as queue length increases. As shown in Fig. 3b, our agent is comparable to the non-communicative baseline across most conditions. Because both agents observe the full object space, the non-communication agent already has access to much of the information commu-nication would otherwise convey, limiting its added benefit. 
+
+2) Partial Observability: The communication agent con-sistently outperforms the vanilla LLM agent, with gains again largest at a queue length of one (Fig. 4a). However, communication now yields a clear advantage over the non-communication baseline (Fig. 4b). This advantage generally grows with queue length and is most pronounced in the asymmetric layout at a queue length of three. With less available knowledge, communication is more important to close the information gap between the agents. V. D ISCUSSION 
+
+Our results show that explicit task allocation and commu-nication provide structure that a vanilla LLM agent lacks: the LLM baseline fails to complete any configuration, while our agent succeeds across observability settings. The value of communication depends on observability. Under full observability, our agent performs similarly to the non-communication baseline because agents can infer collab-orators’ tasks from visible actions. Under partial observability, communication becomes increasingly important, especially as queue length grows, because actions alone no longer reveal enough about collaborators’ tasks or progress. VI. L IMITATIONS 
+
+Our work has two main limitations. First, our communi-cation mechanism is deliberately narrow: utterances convey task-allocation intent but not richer beliefs, questions, negoti-ation, or repair, and the entropy-based speaking trigger may not reflect what a collaborator already knows. Second, our experiments are limited in scale, with one environment family, two layouts, short task queues, two baselines, and six runs per configuration, and they assume known task types, a fixed agent set, and reliable cost-free communication. VII. C ONCLUSION 
+
+We introduce a Bayesian task allocation algorithm for dy-namically arriving tasks and partial object-space observability, using language as probabilistic evidence within an explicit inference procedure. Our results show that this framework enables stronger dynamic task allocation under partial observ-ability than the baselines, and that communication becomes more important as available information decreases. REFERENCES 
+
+[1] A. P. Melis and D. Semmann, “How is human coopera-tion different?” Philosophical Transactions of the Royal Society B: Biological Sciences , vol. 365, no. 1553, pp. 2663–2674, 2010. [2] R. Klimoski and S. Mohammed, “Team mental model: construct or metaphor?” Journal of Management , vol. 20, no. 2, pp. 403–437, 1994. [3] H. H. Clark, Using language . Cambridge university press, 1996. [4] T. L. Griffiths, F. Lieder, and N. D. Goodman, “Rational use of cognitive resources: Levels of analysis between the computational and the algorithmic,” Topics in cognitive science , vol. 7, no. 2, pp. 217–229, 2015. [5] F. Lieder and T. L. Griffiths, “Resource-rational analysis: Understanding human cognition as the optimal use of limited computational resources,” Behavioral and brain sciences , vol. 43, p. e1, 2020. [6] S. Nikolaidis and J. Shah, “Human-robot teaming using shared mental models,” ACM/IEEE HRI , 2012. [7] K. M. Collins, I. Sucholutsky, U. Bhatt, K. Chandra, L. Wong, M. Lee, C. E. Zhang, T. Zhi-Xuan, M. Ho, V. Mansinghka, A. Weller, J. B. Tenenbaum, and T. L. Griffiths, “Building machines that learn and think with people,” Nature Human Behaviour , vol. 8, no. 10, pp. 1851–1863, 2024. [8] V. V. Unhelkar, S. Li, and J. A. Shah, “Decision-making for bidirectional communication in sequential human-robot collaborative tasks,” Proceedings of the 2020 ACM/IEEE International Conference on Human-Robot Interaction , pp. 329–341, 2020. [9] J. Liu, C. Yu, J. Gao, Y. Xie, Q. Liao, Y. Wu, and Y. Wang, “Llm-powered hierarchical language agent for real-time human-ai coordination,” arXiv , 2023. [10] H. Sun, S. Zhang, L. Niu, L. Ren, H. Xu, H. Fu, F. Zhao, C. Yuan, and X. Wang, “Collab-overcooked: Benchmarking and evaluating large language models as collaborative agents,” arXiv , 2025. [11] S. A. Wu, R. E. Wang, J. A. Evans, J. B. Tenenbaum, D. C. Parkes, and M. Kleiman-Weiner, “Too many cooks: Bayesian inference for coordinating multi-agent collabo-ration,” Topics in Cognitive Science , vol. 13, no. 2, pp. 414–432, 2021. [12] L. Ying, K. Jha, S. Aarya, J. B. Tenenbaum, A. Tor-ralba, and T. Shu, “Goma: Proactive embodied coopera-tive communication via goal-oriented mental alignment,” 
+
+arXiv , 2024. [13] P. Stone, G. Kaminka, S. Kraus, and J. Rosenschein, “Ad hoc autonomous agent teams: Collaboration without pre-coordination,” in Proceedings of the AAAI conference on artificial intelligence , vol. 24, no. 1, 2010, pp. 1504– 1509. [14] S. Barrett, P. Stone, S. Kraus, and A. Rosenfeld, “Learn-ing teammate models for ad hoc teamwork,” in AAMAS Adaptive Learning Agents (ALA) Workshop , 2012, pp. 57–63. [15] J. G. Ribeiro, C. Martinho, A. Sardinha, and F. S. Melo, “Assisting unknown teammates in unknown tasks: Ad hoc teamwork under partial observability,” arXiv , 2022. [16] A. Yu, C. Li, L. Macesanu, A. Balaji, R. Ray, R. Mooney, and R. Mart´ ın-Mart´ ın, “Mixed-initiative dia-log for human-robot collaborative manipulation,” arXiv ,2025. [17] S. Tellex, R. A. Knepper, A. Li, D. Rus, and N. Roy, “Asking for help using inverse semantics,” in Robotics: Science and Systems , 2014. [Online]. Available: https://api.semanticscholar.org/CorpusID:3020962 [18] W. Gu, S. Kondepudi, A. Gupta, L. Huang, and N. Gopalan, “Continual robot skill and task learning via dialogue,” 2026. [Online]. Available: https://arxiv.org/abs/2409.03166 [19] A. Z. Ren, A. Dixit, A. Bodrova, S. Singh, S. Tu, N. Brown, P. Xu, L. Takayama, F. Xia, J. Varley, Z. Xu, D. Sadigh, A. Zeng, and A. Majumdar, “Robots that ask for help: Uncertainty alignment for large language model planners,” 2023. [20] J. Y. Chai, Q. Gao, L. She, S. Yang, S. Saba-Sadiya, and G. Xu, “Language to action: Towards interactive task learning with physical agents,” in Proceedings of the Twenty-Seventh International Joint Conference on Artificial Intelligence, IJCAI-18 .International Joint Conferences on Artificial Intelligence Organization, 7 2018, pp. 2–9. [Online]. Available: https://doi.org/10.24963/ijcai.2018/1 [21] H. Zhang, W. Du, J. Shan, Q. Zhou, Y. Du, J. B. Tenenbaum, T. Shu, and C. Gan, “Building cooperative embodied agents modularly with large language models,” 
+
+arXiv , 2023. [22] Z. Mandi, S. Jain, and S. Song, “Roco: Dialectic multi-robot collaboration with large language models,” arXiv ,2023. [23] M. Ahn, A. Brohan, N. Brown, Y. Chebotar, O. Cortes, B. David, C. Finn, C. Fu, K. Gopalakrishnan, K. Haus-man, A. Herzog, D. Ho, J. Hsu, J. Ibarz, B. Ichter, A. Irpan, E. Jang, R. J. Ruano, K. Jeffrey, S. Jesmonth, N. J. Joshi, R. Julian, D. Kalashnikov, Y. Kuang, K.-H. Lee, S. Levine, Y. Lu, L. Luu, C. Parada, P. Pastor, J. Quiambao, K. Rao, J. Rettinghouse, D. Reyes, P. Ser-manet, N. Sievers, C. Tan, A. Toshev, V. Vanhoucke, F. Xia, T. Xiao, P. Xu, S. Xu, M. Yan, and A. Zeng, “Do as i can, not as i say: Grounding language in robotic affordances,” arXiv , 2022. [24] K. Valmeekam, M. Marquez, S. Sreedharan, and S. Kambhampati, “On the planning abilities of large lan-guage models-a critical investigation,” Advances in neu-ral information processing systems , vol. 36, pp. 75 993– 76 005, 2023. [25] D. V. Pynadath and M. Tambe, “The communicative multiagent team decision problem:analyzing teamwork theories and mo dels,” 2002. [26] C. E. Shannon, “A mathematical theory of communica-tion,” The Bell system technical journal , vol. 27, no. 3, pp. 379–423, 1948. APPENDIX 
+
+EXTENDED METHOLODGY 
+
+This appendix provides the full formulations for the utter-ance policy, the joint utterance likelihood, the belief update over latent propositions, and the partially observable likelihood terms introduced in Section III. 
+
+A. Utterance Policy 
+
+An agent communicates whenever the Shannon entropy of its task allocation belief exceeds a fraction of the maximum possible entropy [26]: 
+
+− X
+
+> ta ∈ta
+
+P (ta | H0: T ) ln P (ta | H0: T ) ≥ ϵ ln |ta |, (5) where ϵ ∈ [0 , 1] controls the utterance threshold (Sec-tion III-C). 
+
+B. Utterance Likelihood 
+
+The joint utterance likelihood P (zt | ta ) used in Equation 2 (Section III-C) is computed as 
+
+P (z | ta )= Y
+
+> i:Ti∈ta
+
+(
+
+1, if zi = ∅,
+
+Q|zi|− 1 
+
+> j=0
+
+P (zi,j | ta, z i,<j ), otherwise ,
+
+(6) where zi = ∅ indicates that agent i did not produce an utterance. In the latter case, the token probabilities are obtained directly from the output logits of the LLM. 
+
+C. Belief Update Derivation 
+
+This subsection provides the full derivation of the belief update introduced in Section III-D (Equation 3), extending the formulation from Sections III-A and III-C to environments with partially observable object spaces. An agent cannot directly observe the complete state of the environment and must reason about objects that may exist outside its field of view; each agent therefore maintains probabilistic beliefs over latent propositions describing the hidden region of the environment, recursively updated using both environmental observations and communication from its collaborator. 
+
+1) Belief Representation and Initialization: We partition the object space into three regions: Si, the region observable to agent i; Sj , the region observable only to agent j; and Ss,the shared divider region visible to both agents. Since the contents of Sj are not observable, agent i maintains beliefs over propositions describing its state. A proposition p is a Boolean statement describing a latent property of Sj — for example, whether an ingredient or action object exists within 
+
+Sj , or whether an object was created within Sj .At each timestep T , agent i maintains a belief distribution over every proposition p, defined as the posterior probability 
+
+bjT (p) = 
+
+(
+
+P (p | oT ) if T = 0 ,P (p | oT , H 0: T −1) otherwise , (7) where oT denotes the observation at timestep T , and 
+
+H0: T −1 =
+
+n
+
+(zt, a it, o t, b jt )
+
+oT −1
+
+> t=0
+
+is the interaction history consisting of communicated utterances zt, agent i’s actions 
+
+ait, observations ot, and beliefs bjt from previous timesteps. The initial beliefs are constructed from two environment assumptions: every task is completable, and every ingredient initially present is associated with a dispenser. Consequently, any object that is not directly observed must either lie within 
+
+Sj or have an unknown location. For each ingredient xm ∈ X,the initial belief over its presence in the hidden region is 
+
+bj
+
+> 0
+
+(xm) = P (xm ∈ Sj 
+
+> 0
+
+| o0)=
+
+
+
+1 if xm ∈ X0 \ (Si 
+
+> 0
+
+∪ Ss 
+
+> 0
+
+),
+
+0 if xm /∈ X0,binit otherwise .
+
+Since no actions have yet been performed at the initial timestep, the probability that any object was created within the hidden region is initialized to zero, 
+
+bj
+
+> 0
+
+
+
+C(xm, S jT ) > C (xm, S jT −1)
+
+
+
+= 0 .
+
+Similarly, for every ingredient initially present, the belief over the location of its corresponding dispenser is 
+
+bj
+
+> 0
+
+(d(x0)) = P (d(x0) ∈ Sj 
+
+> 0
+
+| o0)=
+
+(
+
+1 if d(x0) /∈ (Si 
+
+> 0
+
+∪ Ss 
+
+> 0
+
+),
+
+0.5 otherwise .
+
+and beliefs over action objects are initialized the same way: for every action object y ∈ Y ,
+
+bj
+
+> 0
+
+(y) = P (y ∈ Sj 
+
+> 0
+
+| o0) = 
+
+(
+
+1 if y / ∈ (Si 
+
+> 0
+
+∪ Ss 
+
+> 0
+
+),
+
+0.5 otherwise .
+
+2) Posterior Belief Update: At every subsequent timestep, agent i updates its beliefs using newly observed evidence and the utterance produced by agent j. Since agent i has complete knowledge of its own actions and their deterministic effects, any change in the observation that its own action cannot explain must have resulted from agent j, and therefore provides evidence about Sj . We isolate this information with an evidence extraction function E(oT , a iT −1, o T −1) = e,where e is obtained by comparing the expected observation after executing aiT −1 with the actual observation oT .The belief over every proposition is updated by combining two complementary sources of information: the likelihood of the proposition given the observed evidence, and the likeli-hood of the proposition implied by the communicated task allocation. The posterior belief is 
+
+P (p|oT , H 0: T −1) ∝
+
+
+
+P (p|e, o T −1, H 0: T −2)
+
+× P
+
+> ta ∈ta
+
+P (zjT −1|ta )
+
+× P (p|ta, o T −1, H 0: T −2)
+
+bjT −1(p) if bjT −1(p)̸ = 0 ,
+
+0 otherwise ,
+
+(8) where P (p|e, o T −1, H 0: T −2) is the proposition likelihood conditioned on the extracted evidence, P (zjT −1|ta ) is the likelihood of the communicated utterance under a candidate task allocation, P (p|ta, o T −1, H 0: T −2) is the proposition like-lihood implied by the task allocation, and bjT −1(p) is the prior belief from the previous timestep. 
+
+3) Evidence-Conditioned Likelihood: The observation like-lihood is grounded in the deterministic dynamics of the envi-ronment: since only agent j can explain changes inconsistent with agent i’s own action, each observed state transition pro-vides evidence about the hidden environment. We categorize this evidence into four types — an object was picked up, set down, delivered, or no observable evidence occurred — and each type updates only the propositions directly affected by the transition, leaving all remaining propositions at their previous belief. When an object disappears from the observable region without being removed by agent i, agent i infers that agent 
+
+j picked up the object within Sj ; the picked-up object must therefore have existed within the hidden region immediately before the action, and no object could have been created during the same timestep: 
+
+P (p|epick up , o T −1, H 0: T −2)=
+
+
+
+1 if p states that the picked-up object exists, 
+
+0 if p is a creation proposition, 
+
+bjT −1(p) otherwise .
+
+(9) A newly observed object indicates that agent j produced the object within the hidden region before placing it into the observable space. Because the environment dynamics are known, the agent can infer the ingredients, action objects, and dispensers required to construct the newly observed object. Let Xx denote the intermediate objects consumed during construction, Yx the action objects required by the recipe, 
+
+Dx the dispensers for ingredients not directly observed being collected, and X′ 
+
+> x
+
+the objects that could subsequently be produced from the newly observed object: 
+
+P (p|eset down , o T −1, H 0: T −2)=
+
+
+
+1 if p is about y, y ∈ Yx,
+
+1 if p is about d(x), d (x) ∈ Dx,
+
+0 if p states that the set-down object exists, 
+
+0 if p is about x, x ∈ Xx ∪ X′
+
+> x
+
+,
+
+0 if p is a creation proposition ,bjT −1(p) otherwise .
+
+(10) Delivery evidence is treated analogously to set-down evi-dence: delivering an object reveals the recipe that must have been executed within the hidden region to produce it, so the same inferred ingredients, action objects, and dispensers update the proposition likelihood: 
+
+P (p|edeliver , o T −1, H 0: T −2)=
+
+
+
+1 if p is about y, y ∈ Yx,
+
+1 if p is about d(x), d (x) ∈ Dx,
+
+0 if p states that the delivered object exists, 
+
+0 if p is about x, x ∈ Xx ∪ X′
+
+> x
+
+,
+
+0 if p is a creation proposition ,bjT −1(p) otherwise ,
+
+(11) and when no evidence is observed, every proposition retains its previous belief: 
+
+P (p|enone , o T −1, H 0: T −2) = bjT −1(p). (12) 
+
+4) Task-Allocation-Conditioned Likelihood: While environ-mental evidence provides information about actions that have already occurred, communication provides information about actions an agent intends to perform in the future. Because completing a task requires the necessary prerequisite objects, an utterance describing a task allocation implicitly conveys information about the hidden environment: for example, if agent j communicates that it will independently prepare a dish, agent i can infer that the ingredients, action objects, and dispensers required for that task are available within Sj .As in Section III-C, we estimate the likelihood of an utterance under a candidate task allocation using the output logits of a large language model, 
+
+P (zjT −1 | ta ) =  
+
+> |zjT−1|
+
+Y
+
+> l=0
+
+P (zl | ta, z <l ), (13) where zl denotes the l-th generated token and z<l the preced-ing tokens. Given a task allocation, agent i can infer the objects that must already exist within the hidden region for the communicated plan to be feasible; because the environment dynamics are known, these prerequisite objects also reveal the intermediate objects, action objects, and dispensers required to produce them. Let Xta denote the intermediate objects consumed while constructing the prerequisite objects implied by the task allocation, Yta the corresponding action objects, and Dta the dispensers associated with ingredients not directly observed being collected: 
+
+P (p|ta, o T −1, H 0: T −2)=
+
+
+
+1 if p is about y, y ∈ Yta ,
+
+1 if p is about d(x), d (x) ∈ Dta ,
+
+1 if p is about x and x is a prerequisite for ta, 
+
+0 if p is about x, x ∈ Xta ,
+
+0 if p is a creation proposition ,bjT −1(p) otherwise .
+
+(14) This likelihood captures the information conveyed by com-munication independently of the environmental observations; during the posterior update, it is combined with the observation likelihood to produce a belief distribution that reflects both the agent’s observed behavior and its communicated intentions. 
+
+D. Partially Observable Likelihood Terms 
+
+Under partial observability (Section III-D), the joint action likelihood in Equation 4 is defined as 
+
+P (at|ot, b t, ta )= Y
+
+> i:Ti∈ta
+
+(
+
+1 if ait = ∅,
+
+exp( βQ ∗Ti (ot, b t, a it)) otherwise ,
+
+(15) where ait = ∅ signifies that agent i’s action at timestep t is unobserved; the latter case is defined by Wu et al. [11]. The observation likelihood is defined as 
+
+P (ot | bt, at−1, o t−1, ta )= Y
+
+> i:Ti∈ta
+
+
+
+1, if ait̸ = ∅,
+
+1
+
+V ∗Ti (ot, b t−1) , otherwise. (16) If an agent’s action is directly observed (ait̸ = ∅), that component of the observation is treated as fully explained by the task allocation and assigned likelihood 1. Otherwise, the likelihood is approximated using the inverse of the estimated value function under task Ti, reflecting the intuition that observations corresponding to higher-value states are more likely under the agent’s latent task. EXTENDED RESULTS 
+
+a) Task arrival.: Agents are tasked with completing N
+
+tasks within a horizon of tmax timesteps. Tasks are revealed incrementally, and agents do not know the complete task set in advance, although they know the set of possible task types. At each timestep, a new task is revealed with probability r
+
+until all N tasks have been revealed. To maintain continuous availability of work, at least one task remains active in the task queue until all tasks have been completed. (a) Fully Observable (b) Partially Observable 
+
+Fig. 5: Agent 1’s observation of the same environment state under full and partial observability. The task queue is displayed at the bottom. Under full observability, Agent 1 observes the entire object space, including Agent 2. Under partial observability, Agent 1 observes only its partition and the shared counter space. 
+
+b) Experimental setup.: We evaluate task queue lengths of 1, 2, and 3 on both the symmetric (Figure 6a) and asymmetric (Figure 6b) layouts, under both full and partial observability. Tasks are randomly sampled from six task types. Each experimental variation is run six times, with each run using a different sampled task sequence, and each run is capped at 300 timesteps.  
+
+> (a) Symmetric Layout (b) Asymmetric Layout
+
+Fig. 6: (a) Each agent has access to all action objects and fresh ingredient dispensers, allowing experiments with agents of even capabilities. (b) Each agent has access to different action objects and a fresh ingredient dispenser, allowing experiments with uneven capabilities. 
+
+c) Hyperparameters.: All experiments use the hyperpa-rameters β = 1 .3, ϵ = 0 .7, r = 0 .025 , α = 0 .01 , and τ = 2 .We adopt β = 1 .3 from Wu et al. [11]. We set r = 0 .025 to reduce the likelihood that new tasks appear at the beginning of each timestep, while the remaining hyperparameters are fixed across all experiments.

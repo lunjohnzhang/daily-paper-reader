@@ -1,0 +1,890 @@
+Title: Coordination of Heterogeneous Teams with Uncertain Task Requirements
+
+URL Source: https://arxiv.org/pdf/2611.21828v1
+
+Published Time: Wed, 18 Nov 2026 01:14:48 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+> Proceedings of Machine Learning Research vol vvv:1–24, 2026
+
+## Coordination of Heterogeneous Teams with Uncertain Task Requirements 
+
+Jongann Lee JONGANN 2@ ILLINOIS .EDU 
+
+Melkior Ornik MORNIK @ILLINOIS .EDU 
+
+University of Illinois Urbana-Champaign, Urbana, IL, USA, 61801 
+
+Abstract 
+
+Coordinating a team of heterogeneous agents to complete tasks with unknown requirements is a challenging multi-agent planning problem. Agents differ in their ability to discover task require-ments and in their ability to engage tasks, so the planner must coordinate task discovery, execution, and staging. This paper introduces a hierarchical planner that uses a graph neural network policy to assign actions to agents, then finds a path to the action’s location using a shortest-path algorithm. The central part of our approach is the CAAT graph, which is a graph representation of the planning context consisting of the agents, tasks, capabilities, and actions. We demonstrate that our learned planner can jointly coordinate a heterogeneous team to simultaneously discover task requirements and complete tasks in a shorter time compared to baselines that optimize task discovery and task engagement independently. Furthermore, we show that our policy can zero-shot plan on out-of-distribution settings by training only on an outdoor map then transferring without finetuning to an indoor map with more agents, tasks, and capabilities than seen during training. Code is available at 
+
+> https://github.com/jongann-lee/Heterogeneous_Capability_Planning/tree/submission1
+
+.
+
+Keywords: Multi-Agent Planning, Uncertain Planning, Graph Learning, Graph Neural Networks, Reinforcement Learning 
+
+1. Introduction 
+
+Envision a scenario where satellite imagery has identified threats at known locations across moun-tainous terrain. A heterogeneous team is tasked with eliminating these threats. Although the target locations are known, the capabilities required to eliminate each target remain uncertain. Some members possess specialized engagement capabilities but have limited vision, like a bomb defuser wearing a bulky mask. Others are lightly equipped scouts; they can identify threats from distant viewpoints by traveling to vantage points (like the top of a hill), but cannot eliminate them. Commit-ting an agent to an incompatible task can result in its loss, hampering the team’s ability to complete the objective. Coordinating both task requirement discovery and task engagement presents numerous chal-lenges. Attackers have to choose between moving to a known task far away or a closer unknown task. Scouts have to consider the utility of revealing a task with respect to the current attacker states. Hybrid scout-attackers can either reveal unknown task requirements or complete a known compat-ible task. Thus, coordinating such a heterogeneous team requires more than optimizing the scouts and workers independently. Previous research has largely focused on coordinating a homogeneous team with identical task requirements (Choi et al., 2009; Liu and Shell, 2011). More recently, multi-agent planning methods that consider different agent capabilities and unknown task requirements have been proposed (Long and Liang, 2026; Meighan et al., 2026; Rossano et al., 2026). However, no previous work has built  
+
+> © 2026 J. Lee & M. Ornik. arXiv:2611.21828v1 [cs.MA] 16 Nov 2026 LEE ORNIK
+
+a multi-agent planner that can accommodate a varying set of capabilities (including the ability to scout) and uncertain task requirements that are revealed by sending a scout to a location that can see that task. Our approach is to create a graph representation of the planning context, which is then used by a graph neural network (GNN) policy to allocate agents to actions. We introduce CAAT graph , a graph comprising agent, task, capability, and action nodes that captures the key decision-making variables and their relations. The action nodes represent four types of actions: execute task, observe, stage, and wait and gives the planner a consistent set of actions on different maps and at different time steps. Using the CAAT graph as the representation allows a pretrained policy to transfer to a different map with new agent, task, and capability settings without any retraining. Our planner is hierarchical; the GNN planner specifies the action and a low level path planner finds the shortest path to that action’s location. We pretrain the GNN policy on a large set of simulated rollouts on a single map using reinforcement learning (RL). Our contributions are as follows: 1. We define the heterogeneous team multi-robot task allocation (MRTA) problem with uncer-tain task requirements. Our problem is an extension of MRTA in two parts: (i) a capability 
+
+that each agent can possess and that each task requires but is unknown a priori; (ii) a visibility mapping that defines the set of nodes from which the task requirement can be observed. 2. We create a graph representation of the planning context called the CAAT graph, which pro-vides a consistent set of inputs and actions for the planner. Experimental results demonstrate that using the CAAT graph enables a pretrained GNN policy to zero-shot transfer to out-of-distribution configurations and maps. 3. We show that our method achieves a lower problem completion time than a baseline that opti-mizes scouting and task execution independently, demonstrating that our policy successfully exploits the benefits of jointly coordinating task requirement discovery and task execution. 
+
+2. Related Work 
+
+Multi-Robot Task Allocation (MRTA): The goal of MRTA is to coordinate a team of agents to complete a set of tasks while minimizing the cost (Gerkey and Mataric, 2004). Many solutions to MRTA have been proposed, including optimization-based approaches (Koes et al., 2005; Liu and Shell, 2011; Shorinwa et al., 2023), auction-based approaches (Gerkey and Mataric, 2002; Choi et al., 2009), and heuristics (Parker, 1998). More recently, deep learning has been applied to MRTA using attention mechanisms, GNNs, and RL (Paul et al., 2022; Wang et al., 2022; Altundas et al., 2025). Typically, a GNN processes a graph of agents and tasks to create an embedding, which is then used by a decoder to create a probability distribution of tasks for each agent. The policy is pretrained on a large set of sampled rollouts using RL. While these approaches are not directly applicable to our problem, our method builds on the previously established GNN + decoder + RL method. 
+
+Watchman Routing Problem (WRP): The scout’s objective in our problem is to observe all of the tasks on the map. WRP is a closely related problem, where the objective is to find the shortest path on which every node is observed at least once (Chin and Ntafos, 1986). WRP on grid maps has been solved by formulating it as a search problem on a tree then using A∗ with a heuristic (Seiref et al., 2020; Livne et al., 2023). These methods are too narrowly focused on just scouting; we use this method as part of our baseline and demonstrate that our method is better than it.      
+
+> 2COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS
+
+Heterogeneous Team MRTA with Uncertain Task Requirements: Recent works have studied coordinating a heterogeneous team for MRTA with uncertain task requirements. IAOM uses a GNN with RL to coordinate a homogeneous team of robots to solve a variant of MRTA with an unknown number of robots required per task (Long and Liang, 2026). AURA is an auction based method that coordinates a team of search robots and debris robots to complete a heterogeneous set of search and debris tasks (Rossano et al., 2026). Beck et al. (2016) alternates search-route and rescue-schedule optimization using sampled task realizations for search and rescue. None of the previous works consider hybrid agents capable of both scouting and engaging tasks, variations in visibility, and a variable number of capabilities. 
+
+3. Problem Formulation 
+
+Our problem is motivated by the problem of coordinating a team of agents with different capabilities to complete a set of tasks with unknown requirements that are revealed by the scout agents. We formulate the problem of heterogeneous team MRTA with uncertain task requirements . A directed, weighted graph G = ( V, E) represents a map, with node v ∈ V for location, and e ∈ E indicating traversability between two nodes. Let c(v1, v 2), (v1, v 2) ∈ E be the traversal time of an edge. We define the visibility map vis( v) ⊂ V as the set of nodes visible from node v (Lee and Ornik, 2026). Both c(v1, v 2) and vis( v) are known a priori. The traversal time is directional; e.g. traveling uphill from node v1 to v2 takes longer than traveling downhill from v2 to v1.There are multiple agents Ai, 1 ≤ i ≤ Na and multiple tasks Tj , 1 ≤ j ≤ Nt. Tasks are stationary and their locations are known. Agents traverse from node v1 to node v2 along an edge, with their traversal time corresponding to the traversal cost of the edge c(v1, v 2). Two or more agents can occupy the same node simultaneously. We define a set of capabilities Ck ∈ C , 0 ≤ k ≤ Nc. Intuitively, a capability corresponds to the 
+
+trait that an agent needs to have to complete a task. The requirement of a task C(Tj ) ∈ C\{ C0}
+
+is the capability required to complete task Tj . The task requirements are initially unknown with the prior probability of Tj requiring Ck being p(C(Tj ) = Ck). An agent can possess multiple capabilities C(Ai) ⊂ C . Our problem is an ST-SR-TA MRTA problem (Gerkey and Mataric, 2004). C0 represents the scout capability. It is only given to agents, and only agents with C0 can observe an unknown task’s required capability within their current visibility vis( v). Upon reaching a node, a scout instantly reveals the exact capability requirements of all tasks visible from that node at no additional observation cost. We assume that this information is instantly available to all agents. An agent completes a task if it reaches it and possesses the capability required by the task. An agent can only be assigned to complete a task if its requirements are known and possessed by the agent. The objective is to minimize the makespan: the time to complete all the tasks. 
+
+4. Method 
+
+The problem as defined in Section 3 consists mainly of two parts: task requirement discovery and task execution. Each part by itself has an optimal solution: discovering all of the task requirements is equivalent to WRP (Livne et al., 2023) and task execution once the task requirements are known is a well defined optimization problem (Koes et al., 2005). The difficulty is in combining both: task requirements should be discovered in a way that reduces task execution time, non-scout agents should move to staging locations to quickly engage newly scouted tasks, and hybrid agents have to 
+
+> 3
+
+LEE ORNIK Coordination of Heterogeneous Teams with Uncertain Task Requirements  Agent  Action  Task  Capability 
+
+(b) Graph Transformer Policy 
+
+> Input CAAT Graph
+
+(a) CAAT Graph  
+
+> Metric Terrain Map
+> A₁ T₁
+
+(c) REINFORCE Training         
+
+> Sample a Mission
+> Graph Transformer Policy
+> CAAT Graph + HGT
+> T₂
+> A₂
+> Heterogeneous Graph Transformer
+> Neighbor embeddings + edge embeddings
+> Neighborhood attention
+> Update node embedding
+> Path to Action Location
+> Uses the shortest path
+> A₃ T₃
+> CAAT Graph
+> Actions: Execute Task / Observe / Stage / Wait + Capability Nodes
+> T₁
+> K₁
+> Play out an Episode
+> Replan when new events occur
+> Learned Graph Embeddings
+> A₁
+> Calculate the Reward
+> I
+> Makespan M • Oracle Makespan M*• Incomplete tasks I
+> R = −(M/M *− 1) − λ IC₁
+> T₂
+> K₃
+> T₃
+> K₂ A₂
+> C₂
+> Decoder → Agent-Action Score
+> K₁ K₂ K₃ K₄ K₅ K₆
+> ×A₁
+> ×A₂
+> ×A₃
+> Stochastic softmax (training)• Deterministic max (evaluation)
+> A₃ Update Policy with REINFORCE
+
+ℒ = −(R − b) log π  θ
+
+> EMA of reward b • Entropy of policy H
+
+− βH(π ) θC₃ 
+
+Figure 1: We solve the heterogeneous team MRTA with uncertain task requirements by creating a graph representation of the planning context called CAAT graph. A GNN then learns graph embeddings on the CAAT graph and a decoder outputs a probability distribution of actions for each agent. The policy is pretrained with RL using simulated rollouts. determine when to scout and when to engage a known task. While the problem can be formulated as a centralized partially observable Markov decision process (POMDP), getting an optimal POMDP solution is intractable due to the large state space. Our solution to the problem defined in Section 3 is a hierarchical planner as outlined in Figure 1. A high-level GNN planner decides which action each agent should take. As the input for this planner, we create a graph representation of the planning context called the CAAT graph . Once an action has been assigned, the agent’s path to the action’s location is determined using a shortest path algorithm such as A∗. The agents follow their planned paths until an agent completes its intended action or an unknown task requirement is revealed, at which point the planner replans. This hierarchy reduces the decision space that must be learned and preserves the shortest path optimality for routing. The GNN planner is pretrained on simulated rollouts using RL. 
+
+4.1. CAAT Graph 
+
+The Capability-Agent-Action-Task graph, or CAAT graph, represents the planning context at a given time. It consists of four types of nodes and three types of edges as seen in Figure 1. Its goal is to provide a consistent and compressed representation of the situation and actions. We explain the CAAT graph by following its creation step by step as in Figure 2. First, we extract the agents and tasks from a given timestep of the problem. Every task is con-nected to every agent with a travel time edge. A connection via a travel time edge represents a connection that may be traversed by an agent. The edge feature is the shortest path travel time, which is then normalized using z-score normalization. The task features are the position (normal-ized to [0 , 1] 2) and two Boolean variables: task completion and whether the required capability is 
+
+4COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS Building the CAAT graph  Agent  Action  Task  Capability 
+
+(1) Extract agents and tasks  (2) Add Capability nodes        
+
+> Problem Map Capability Edge
+> Keep agents and tasks k₁ 1
+> 1
+> T₁: k₁ ½
+> A₁ ½
+> k₂ T₂: ?
+> What does the edge mean?
+> Agent: has capability; edge weight = 1
+> Known Task: capability requirement; edge weight =1
+> Unknown task: possible requirement; edge weight = prior
+> ??
+> ?
+> ?
+> region where task can be seen
+> ?unknown task
+
+(3) Add the 4 Types of Actions        
+
+> 1Add wait and execute 2Add observe
+> EEWW
+> Task Semantics Edge: What task is this action related to?
+> 3Add stage
+> EW
+> ?
+> Agent with scout capability
+> ?
+> Solid lines record travel time.
+> ?
+> Add execute task action for known tasks. Wait action is not connected by edges.
+> ?O
+> S
+> S
+> S
+> ?O
+> ?O
+> Add observe action for unknown tasks. Add both single-task stages and two-task stages.
+> Non-wait actions are connected to all agents and tasks using the travel time edge. We omit some of them for reducing visual clutter.
+> ?O?
+
+Figure 2: An illustration of how the CAAT graph is made. See Subsection 4.1 for more details. known. The agent features are the Boolean indicating whether the agent is alive, remaining transit time, a Boolean indicating whether the agent has the scout capability C0, and the agent’s position (normalized). We then add capabilities as graph nodes. Each capability is a node, and it is connected to agents and tasks via a capability edge. If an agent has a capability, then it is connected via a capability edge (with edge weight 1) to the corresponding capability node. Tasks with known requirements are also connected to their corresponding capability node with a capability edge of weight 1. For a task Tj
+
+with unknown requirements, the capability edge connects all of the possible requirements with the prior p(C(Tj ) = Ck) as the edge weight. Representing capabilities as nodes allows a pretrained GNN policy to accept additional capabilities without changing the model dimensions. The scout capability is an exception; it is encoded as an agent feature. Finally, we add four types of actions to the graph. 1. Wait: remain at the current location. 2. Execute: go to a known task. 3. Observe: reach the closest suitable location to observe a subset of unknown tasks. 4. Stage: position near unknown tasks in anticipation of their requirements being revealed. Each action is connected to its relevant tasks via a task semantics edge. Each action is also connected to all agents and all tasks via a travel time edge. The wait action is the exception: it is not connected to any other node since it is not related to any task and does not have a location on the map. More details are in Appendix 8.1. 
+
+4.2. Heterogeneous Graph Transformer Policy 
+
+At each planning decision, we use a GNN to create embeddings of the CAAT graph. A brief introduction to GNNs and the Graph Attention Network (GAT) is in Appendix 8.2. We choose 
+
+5LEE ORNIK 
+
+the heterogeneous graph transformer (HGT) as the GNN architecture. The CAAT graph has four different types of nodes and three different types of edges, so our HGT uses a different linear transformation for each direction of each edge type, which we denote as a relation type r = (source node type, edge label, destination node type). Details on the HGT can be found in Appendix 8.3. The decoder computes a score η for each agent–action pair, then assigns actions to agents using the score. Using the final agent embedding xout (Ai), final action embedding xout (Kn) and the corresponding travel-time edge embedding zin , the score is 
+
+η(Ai, K n) = fθ (xout (Ai)∥xout (Kn)∥zin ) , (1) where fθ is an MLP scorer and ∥ denotes concatenation. Incompatible pairs such as (non-scout agent, observe) and (known task, agent without requirement) are assigned η(Ai, K n) = −∞ .The actions are sequentially assigned to agents. At assignment step s, let Fs contain the feasible and unassigned (agent, action) pairs. The score defines the probabilities of selecting each pair using softmax: 
+
+ps(Ai, K n) = exp ( η(Ai, K n)) 
+
+X 
+
+> (Aj,K m)∈F s
+
+exp ( η(Aj , K m)) , (Ai, K n) ∈ F s. (2) Actions that share the same location are merged to form one destination and the probability of selecting it is the sum of the probabilities of the component actions. During training, the decoder samples an agent and destination using these probabilities; during evaluation, it selects the feasible agent–destination pair with the highest probability. After each selection, the assigned agent and action are removed Fs+1 = Fs\{ (Ai, K n) : Ai = A∗ or Kn = K∗}. Selection continues until no feasible pair remains. Additional decoder details are provided in Appendix 8.3. 
+
+4.3. Policy Pretraining 
+
+We pretrain the neural policy πθ using a large number of simulated rollouts. During the rollout, the policy πθ assigns agents to actions, and the agents follow the shortest path to the action’s location. They continue on the path until an unknown task requirement is revealed, a task is completed, or an agent reaches its destination, at which point the planner replans. The rollout ends either when all tasks are complete, or when all agents select wait and the rollout stalls. At the end of each rollout, we calculate the rollout reward by comparing it to the oracle , an optimal planner that knows the ground-truth task requirements. The primary component in the reward is the regret which is the makespan of our policy’s rollout M divided by the makespan of the oracle M ∗. We add a penalty term for the number of incomplete tasks I to discourage stalling, with λI as the hyperparameter. 
+
+R = −
+
+ MM ∗ − 1
+
+
+
+− λI I (3) Like previous works (Kool et al., 2019), we use the REINFORCE algorithm (Williams, 1992) to update the weights. To further stabilize training, we use an exponential moving average b of the reward as a baseline (Sutton and Barto, 1998). An entropy term H(πθ) is also added to encourage the policy to explore (Haarnoja et al., 2018). The weights are updated using the following loss: 
+
+L = −(R − b) log πθ − βH (πθ). (4) Additional details on policy pretraining and the oracle are in Appendix 8.4 and 8.5.      
+
+> 6COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS
+
+5. Experiments 
+
+5.1. Experiment Setup Maps. We use three maps in our experiments: WV, WA, and KTH. WV and WA are outdoor maps of locations in the US states of West Virginia and Washington, and are created using the topography data from OpenTopography (U.S. Geological Survey, 2024). The maps are discretized into a 64 × 64 grid graph. The traversal cost is calculated using Tobler’s hiking function with road edges having 40% lower traversal cost (Tobler, 1993). The visibility is modeled using viewshed analysis (Toma et al., 2026). The KTH map is an indoor map of a building at KTH Royal Institute of Technology (Ho et al., 2025). It is also discretized into a grid; its traversal cost is the edge length and the visibility is modeled using line of sight. WV is used as the training map, WA is used as the in-distribution test map, and KTH is used as the out-of-distribution test map with 4.6 times as many nodes compared to WV or WA. 
+
+Capabilities, Agents, and Tasks. We pretrain our policy on the WV map with 3–6 agents and 5–9 randomly placed tasks. There are 3 non-scout capabilities, and they are assigned randomly such that all capabilities are matched with at least one agent. All agents start at the same node. For testing, we use a fixed suite of capabilities, agents, and tasks for each map. All maps have three sets of agent capabilities and three sets of task requirements for each number of agents Na and tasks Nt.For WV and WA, 3 ≤ Na ≤ 6 and 5 ≤ Nt ≤ 9 so there are a total of 12 agent configurations and 15 task configurations. We test every pair of agent and task configurations, resulting in a total of 180 test problems per map for WV and WA. The KTH map is tested with 8 agents and 14 tasks for a total of 9 problems. 
+
+Baselines. We compare the performance of CAAT Graph + HGT with three baselines. The ‘or-acle’ is an optimal planner that knows all of the task requirements, and its makespan is the lowest achievable makespan for a given problem. ‘Scout then engage’ first discovers all of the task require-ments using an optimal WRP planner, then uses the oracle to execute all of the tasks. ‘Engage while scout’ uses the same WRP planner to coordinate scouts and simultaneously assigns non-scouts to execute known tasks using the oracle. Additional details on the baselines are in Appendix 8.5. 
+
+Pretraining. Our policy is pretrained on 12,800 sampled rollouts on the WV map. On a desktop with an NVIDIA RTX 5090 GPU, pretraining takes approximately 8 hours. Once pretrained, we freeze all policy weights and do not finetune them during evaluation. Additional experimental settings are provided in Appendix 8.6. 
+
+5.2. Results 
+
+This subsection compares the performance of each policy on each map. We choose to compare regret MM ∗ rather than makespan because a problem with more agents and fewer tasks requires less time to complete regardless of policy. We first evaluate on the training map WV, to evaluate whether our policy learns to plan effectively within the training domain. We then evaluate on unseen maps WA and KTH. WA introduces a different map with a different starting position, but follows the same terrain traversal rule, viewshed visibility, and the same ranges of capability, agent and task counts. The KTH map has the largest deviations, with a different traversal model, different visibility, and a larger number of capabilities, agents, and tasks. 
+
+> 7
+
+LEE ORNIK Agents:          
+
+> A0: {0,1}
+> A1: {2}
+> A2: {3}
+> Tasks
+> Roads
+> High
+> Height
+> Low
+> 3.0
+> Regret (makespan / oracle)
+> 2.5
+> 2.0
+> 0.5
+> 1.0
+> 1.5
+> 0.0
+> T: 2
+> A0–A2
+> 1.81
+> 11 wins
+> WV - training
+> T: 3
+> T: 3
+> T: 1
+> T: 1
+> T: 2
+> 1.73
+> 1.43
+> 26 wins 143 wins
+> Agents:
+> A0: {0,1}
+> A1: {2}
+> A2: {3}
+> Tasks
+> Roads
+> High
+> Height
+> Low
+> 3.0
+> Regret (makespan / oracle)
+> 2.5
+> 2.0
+> 0.5
+> 1.0
+> 1.5
+> 0.0
+> WA - test (in-distribution)
+> A0–A2
+> T: 3
+> T: 3
+> T: 2
+> T: 1
+> T: 1
+> T: 2
+> 1.80
+> Scout Then Engage
+> Engage While Scout
+> CAAT Graph + HGT
+> 1.72
+> 1.37
+> 3 wins 18 wins 159 wins
+> KTH- test (out-of-distribution)
+> T: 1 T: 1 T: 4 T: 2 T: 3 T: 4 T: 5
+> T: 2
+> A0–A7
+> T: 5
+> T: 3
+> T: 3
+> T: 4
+> T: 2
+> T: 1
+> Agents:
+> A0: {0,1}
+> A1: {0,2}
+> A2: {1}
+> A3: {2}
+> A4: {3,4}
+> A5: {4,5}
+> A6: {1,3,5}
+> A7: {2,3,4}
+> Tasks
+> 3.0
+> Regret (makespan / oracle)
+> 2.5
+> 2.0
+> 0.5
+> 1.0
+> 1.5
+> 0.0
+> 2.20 2.17
+> 1.90
+> 1 win 1 win 7 wins
+
+Figure 3: Each column represents results from one map. WV is the training map, WA is the in-distribution test map, and KTH is the out-of-distribution test map. The bar graph in the middle is the average regret across all scenarios and the bottom diagram shows which policy (excluding oracle) had the lowest regret for each test problem. The average regret of each policy is shown in Figure 3. On all three maps our pretrained CAAT Graph + HGT has a lower regret compared to the two baselines. On the WV and WA maps, our method results in 17 .3% and 20 .3% lower average regret respectively compared to the best baseline, demonstrating that our method can jointly coordinate task requirement discovery and task comple-tion. Even on the KTH map, which is an unseen map with more agents, tasks and capabilities than seen during training, the pretrained CAAT Graph + HGT results in a 12 .4% lower regret compared to the best baseline. The results on the KTH map show that our method zero-shot transfers to out-of-distribution settings without any finetuning. Furthermore, our method is better than both baselines for more than 77% of the test problems regardless of the test map, demonstrating that it is able to improve across a wide range of problems. Next, we examine an actual planning decision produced by our method. Figure 4 shows a planning decision on WV with 4 agents and 8 tasks (2 completed, 2 known but incomplete, 4 unknown). In the middle of the map, agents 1 and 3 are close to known task 1 and unknown task 3. Both agents have the capability required to complete task 1, so both of them get a large score for completing task 1. However, only agent 1 has the scout capability, so agent 3’s score for completing task 1 is higher, and our method assigns executing task 1 to agent 3 and assigns agent 1 to observe task 3. This intuitively makes sense: if both agents can complete task 1, but only one can observe task 3, then the scout should go observe. At the bottom, agents 0 and 2 are close to two unknown tasks. Therefore, agent 0 with the scout capability gets large scores for observing task 4 or task 5 and agent 2 gets large scores for staging for those two tasks. These decisions show that our method makes intuitively correct decisions for the given context of the problem. 
+
+8COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS T6: 2 T3: ? T2: 1 T1: 2 T8: 2 T5: ? T4: ? T7: ? A0 A1 A2 A3                                                               
+
+> Low High Height
+> Action Logit Softmax Chosen
+> Observe T5 (44, 10) 3.12 57.09% Yes
+> Observe T4 (45, 4) 2.65 35.73% No Observe T4,T5 (60, 5) 0.86 5.99% No Observe T3 (21, 55) -1.98 0.35% No
+> A0 ·{0,1}
+> Action Logit Softmax Chosen
+> Execute T1 (33, 33) 4.15 66.96% No
+> Observe T3 (21, 55) 3.28 27.89% Yes
+> Execute T8 (43, 49) 1.28 3.76% No Observe T5 (44, 10) -0.63 0.56% No
+> A1 ·{0,2}
+> Action Logit Softmax Chosen
+> Stage T4,T5 (48, 6) -2.91 14.54% Yes
+> Stage T5 (52, 13) -2.99 13.34% No Stage T5 (53, 14) -3.16 11.30% No Stage T4 (60, 3) -3.39 8.95% No
+> A2 ·{1,3}
+> Action Logit Softmax Chosen
+> Execute T1 (33, 33) 4.37 97.85% Yes
+> Execute T8 (43, 49) 0.38 1.81% No Stage T3 (19, 55) -3.36 0.04% No Stage T3,T7 (34, 55) -3.36 0.04% No
+> A3 ·{2,3}
+> Task label = ID: type; ? = unknown
+> West Virginia (WV): CAAT Graph + HGT
+> t = 4758.6 (28% of run) ·4/8 revealed
+> Top 4 action candidates per agent
+> Live tasks Completed Source Roads
+
+Figure 4: A planning decision on WV (left) and the top 4 actions for each agent (right). 15 24 36 54 80 112 
+
+Number of agents × number of tasks 
+
+> 0.1 110 100
+> Average replan time (s)
+> 1.18 s
+> 56.22 s
+> 32.18 s
+
+Average replanning time 
+
+CAAT Graph + HGT Engage While Scout Scout Then Engage Figure 5: Average time per planning decision. The average time per planning decision with respect to the product NaNt is plotted in Figure 5. Note that most of the data comes from WV and WA with 4k nodes, but the data for NaNt = 112 
+
+comes from the larger KTH with 18k nodes. Engage while scout is consistently the slowest planner. Scout then engage is faster than our method at low NaNt but gets significantly slower as the number of agents and tasks increases. In the KTH test, our method plans in just 1.18 seconds, compared to 32.18 and 56.22 seconds for the baselines. This speedup is achieved by replacing the baselines’ combinatorial search over the task assignment and visitation sequences with a neural policy πθ that assigns high level actions on the CAAT graph. 
+
+5.3. Ablation 
+
+Map Default Dot-product score Max normalization No position Single-task staging Single-task staging + No position No staging WV 1.43 1.65 1.42 1.51 1.63 1.46 1.74 WA 1.37 1.59 1.40 1.51 1.57 1.38 1.68 KTH 1.90 2.99 1.96 2.11 2.10 2.08 2.19 
+
+Table 1: Average regret M/M ∗ for the default configuration and ablations. We present a comprehensive ablation study by modifying various elements of our method. The results of the ablations are in Table 1. We modify the following parameters. 
+
+Dot product Score: A simple way to score a pair of embeddings is to use their dot product. In this test we replace the MLP scorer with a dot product score η(Ai, K n) = xout (Ai) · xout (Kn). The result is higher regret on all three maps, with especially higher regret on KTH. A possible factor is that the dot product decoder doesn’t use zin directly when outputting the score η. We therefore conclude that using the dot product scorer degrades our method and especially degrades its ability to transfer to unseen maps and settings. 
+
+Max Normalization: Another common strategy for normalizing a set of real numbers is to divide by the maximum absolute value. For travel time, max normalization has the additional benefit of mapping non-negative travel times to [0 , 1] while preserving zero. In this test the travel time on the CAAT graph is normalized by dividing by the largest travel time in the graph. Using max 
+
+9LEE ORNIK 
+
+normalization yields marginally better results on WV but marginally worse results on WA and KTH compared to using z-score normalization. Therefore, we use z-score normalization instead of max normalization for the travel time edges. 
+
+No Position: The high level decision of assigning actions to agents should only depend on the travel time between the various nodes. Removing the position could potentially make our method more robust by avoiding the possibility of overfitting to a single map. However, the results in Table 1 show that removing the position features increases the regret across all maps. This refutes the hypothesis that removing position will lead to a more robust planner. 
+
+Staging: How much of the efficiency comes from the ability to stage? In this test ‘single-task staging’ creates staging actions for single tasks; ‘no staging’ means no staging actions are in the CAAT graph. Only having staging for a single task results in higher regret compared to having both single task and two task staging. Interestingly, the performance with only single task staging actually improves when the position is also removed as a feature. Removing the staging actions entirely significantly increases the average regret, as the planner is no longer able to send non-scouts to wait close to unknown tasks. Both our policy without staging and ‘engage while scout’ simultaneously coordinate scouts and non-scouts using observation and execution actions. Our policy achieves comparable regret on WV and KTH and slightly lower regret on WA, demonstrating that it learns coordination competitive with a baseline even without staging. 
+
+6. Limitations 
+
+Our planner assumes that the tasks’ locations are known in advance. In a multi-agent planning prob-lem with uncertain task requirements the location of the task may also be uncertain. Additionally, our method is a centralized planner that assumes perfect communication and instant relay of newly acquired information. A decentralized method would be more robust to faulty communication and would scale better with a larger number of agents. 
+
+7. Conclusion 
+
+In this paper, we considered the heterogeneous team multi-robot task allocation problem with uncer-tain task requirements. To solve it, we created a graph representation of the planning context called CAAT (Capability-Agent-Action-Task) graph that captures the key decision-making variables and provides a consistent set of actions on different maps and settings. Our hierarchical planner assigns actions to agents by processing the CAAT graph using a graph neural network, and then gener-ates the path to the action’s location using a shortest-path algorithm. Our method outperformed two baselines which optimize task discovery and task execution independently, showing that it ef-ficiently coordinates task discovery, execution and staging for unknown tasks. Furthermore, our policy trained on an outdoor map transferred without finetuning to a larger indoor map with more agents, tasks, and capabilities than seen during training while still outperforming the baselines. 
+
+Acknowledgments 
+
+This work is supported by the Office of Naval Research grant no. N-00014-25-1-2369 and Office of Naval Research grant no. N-00014-25-1-2519.      
+
+> 10 COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS
+
+Generative AI has been used to conduct literature search, to write code, to create figures, and to proofread the manuscript. 
+
+References 
+
+Batuhan Altundas, Shengkang Chen, Shivika Singh, Shivangi Deo, Minwoo Cho, and Matthew Gombolay. Heterogeneous graph transformers for simultaneous mobile multi-robot task alloca-tion and scheduling under temporal constraints. In Advances in Neural Information Processing Systems (NeurIPS) , 2025. Zolt´ an Beck, Luke Teacy, Alex Rogers, and Nicholas R. Jennings. Online planning for collaborative search and rescue by heterogeneous robot teams. In International Conference on Autonomous Agents and Multiagent Systems (AAMAS) , 2016. Wei-Pang Chin and Simeon Ntafos. Optimum watchman routes. In Annual Symposium on Compu-tational Geometry , 1986. Han-Lim Choi, Luc Brunet, and Jonathan P. How. Consensus-based decentralized auctions for robust task allocation. IEEE Transactions on Robotics (T-RO) , 25(4):912–926, 2009. Brian Gerkey and Maja Mataric. Sold!: Auction methods for multirobot coordination. IEEE Trans-actions on Robotics and Automation , 18(5):758–768, 2002. Brian Gerkey and Maja Mataric. A formal analysis and taxonomy of task allocation in multi-robot systems. The International Journal of Robotics Research (IJRR) , 23:939–954, 2004. Justin Gilmer, Samuel S. Schoenholz, Patrick F. Riley, Oriol Vinyals, and George E. Dahl. Neu-ral message passing for quantum chemistry. In International Conference on Machine Learning (ICML) , 2017. Tuomas Haarnoja, Aurick Zhou, Pieter Abbeel, and Sergey Levine. Soft Actor-Critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor. In International Confer-ence on Machine Learning (ICML) , 2018. Cherie Ho, Seungchan Kim, Brady Moon, Aditya Parandekar, Narek Harutyunyan, Chen Wang, Katia Sycara, Graeme Best, and Sebastian Scherer. MapEx: Indoor structure exploration with probabilistic information gain from global map predictions. In IEEE International Conference on Robotics and Automation (ICRA) , 2025. Mary Koes, Illah Nourbakhsh, and Katia Sycara. Heterogeneous multirobot coordination with spa-tial and temporal constraints. In AAAI Conference on Artificial Intelligence , 2005. Wouter Kool, Herke Van Hoof, and Max Welling. Attention, learn to solve routing problems! In 
+
+International Conference on Learning Representations (ICLR) , 2019. Jongann Lee and Melkior Ornik. Navigating in uncertain environments with heterogeneous visibil-ity. In IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2026. Lantao Liu and Dylan A. Shell. Assessing optimal assignment under uncertainty: An interval-based algorithm. The International Journal of Robotics Research (IJRR) , 30(7):936–953, 2011.  
+
+> 11 LEE ORNIK
+
+Yaakov Livne, Dor Atzmon, Shawn Skyler, Eli Boyarski, Amir Shapiro, and Ariel Felner. Optimally solving the multiple watchman route problem with heuristic search. In International Conference on Autonomous Agents and Multiagent Systems (AAMAS) , 2023. Qingyang Long and Liping Liang. IAOM: An intention-aware optimization model with GNN-based policy learning for dynamic multi-robot cooperative task allocation. IEEE Robotics and Automation Letters (RA-L) , 11(8):9120–9127, 2026. Andrew Meighan, Hyungsub Kim, and Or Dantsker. HALO: Heterogeneous allocation via local-ized observations for the vehicle routing problem. In IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2026. Lynne E. Parker. ALLIANCE: An architecture for fault tolerant multirobot cooperation. IEEE Transactions on Robotics and Automation , 14(2):220–240, 1998. Steve Paul, Payam Ghassemi, and Souma Chowdhury. Learning scalable policies over graphs for multi-robot task allocation using capsule attention networks. In International Conference on Robotics and Automation (ICRA) , 2022. Ben Rossano, Jaein Lim, and Jonathan P. How. Uncertainty-aware multi-robot task allocation with strongly coupled inter-robot rewards. In IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2026. Shawn Seiref, Tamir Jaffey, Margarita Lopatin, and Ariel Felner. Solving the watchman route problem on a grid with heuristic search. In International Conference on Automated Planning and Scheduling (ICAPS) , 2020. Ola Shorinwa, Ravi N. Haksar, Patrick Washington, and Mac Schwager. Distributed multirobot task assignment via consensus ADMM. IEEE Transactions on Robotics (T-RO) , 39(3):1781–1800, 2023. Richard S. Sutton and Andrew G. Barto. Reinforcement Learning: An introduction , volume 1. MIT press, Cambridge, 1998. Waldo Tobler. Three presentations on geographical analysis and modeling: Non-isotropic geo-graphic. Technical Report 93-1, National Center for Geographic Information and Analysis, 1993. Laura Toma, Yi Zhuang, William Richard, and Markus Metz. R.viewshed - grass 8.5 documen-tation, Apr 2026. URL https://grass.osgeo.org/grass-stable/manuals/r. viewshed.html .U.S. Geological Survey. 1 meter Digital Elevation Models (DEMs), 2024. USGS National Map 3DEP Downloadable Data Collection: U.S. Geological Survey. Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin. Attention is all you need. In Advances in Neural Information Processing Systems (NeurIPS) , 2017. Petar Veliˇ ckovi´ c, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Lio, and Yoshua Bengio. Graph attention networks. In International Conference on Learning Representations (ICLR) , 2018. 
+
+> 12
+
+COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS 
+
+Zheyuan Wang, Chen Liu, and Matthew Gombolay. Heterogeneous graph attention networks for scalable multi-robot scheduling with temporospatial constraints. Autonomous Robots , 46(1):249– 268, 2022. Ronald J Williams. Simple statistical gradient-following algorithms for connectionist reinforcement learning. Machine Learning , 8(3):229–256, 1992. 
+
+13 LEE ORNIK 
+
+8. Appendix 
+
+8.1. Additional Detail on the CAAT Graph Agent node features. Each agent node Ai has an input feature vector x(Ai) ∈ R5. It contains a Boolean indicating whether the agent is alive, remaining transit time, a Boolean indicating whether it possesses the scout capability C0, and its two-dimensional position normalized to [0 , 1] 2. The remaining transit time is needed because replanning may occur while the agent is traversing an edge. In that case, the agent first finishes its committed edge, then follows its newly assigned path. The remaining transit time is normalized in the same way as the travel time edge. The agent’s other capabilities are represented by its connections to capability nodes. 
+
+Task node features. Each task node Tj has an input feature vector x(Tj ) ∈ R4. It contains the task’s two-dimensional position normalized to [0 , 1] 2, a Boolean indicating whether the task has been completed, and a Boolean indicating whether its required capability is known. The required capability or its prior is represented by capability edges. The evaluated architecture retains agent-alive and task-completion indicators inherited from an earlier problem formulation. The alive indicator is constant in the present setting, while the completion indicator distinguishes completed tasks retained in the graph. Both dead agents and completed tasks are kept in the CAAT graph. 
+
+Action node features. Each action node Kn has an input feature vector x(Kn) ∈ R4, whose entries correspond to execute, observe, staging, and wait, in that order. Execute, observe, and wait actions have value 1 in their corresponding entry and 0 elsewhere. The staging entry is 0.5
+
+for a single-task stage and 1 for a two-task stage, with the other entries set to 0. This encoding distinguishes both the action type and the number of tasks associated with a staging action. 
+
+Capability node initialization. Capability nodes represent Ck ∈ C\{ C0} and share a learned 128-dimensional initial embedding. The scout capability C0 is encoded as an agent feature. 
+
+Edge details. Travel-time edges connect agent–task, agent–action, and action–task pairs with fi-nite corresponding travel times, excluding the wait action. At each planning decision, the traversal times are z-score normalized using the mean and standard deviation pooled across all valid travel time edges. This normalization gives maps with different traversal-time scales similarly scaled edge features. A travel-time edge does not imply that the agent can select the action; capability restric-tions are enforced by the decoder. 
+
+Observation sets. For each non-task node of the map, we use the visibility map vis( v) to identify the subset of tasks with unknown requirements that can be observed from that node. Nodes with identical nonempty subsets form an observation set. Each set is represented by one observation action in the CAAT graph. Its task semantic edges connect it to the corresponding unknown tasks. For each agent, the destination is the node in the selected set with the minimum traversal time from that agent’s planning position. 
+
+Staging candidates. The staging action positions an agent near tasks whose required capabilities remain unknown. For each such task, we include up to two non-task nodes with the shortest traversal times to that task. We also construct staging locations for pairs of unknown tasks. Let d(v, T j )
+
+denote the directed shortest traversal time from node v to task Tj . For each pair (Tj , T k), we select a non-task node minimizing max {d(v, T j ), d (v, T k)}. To limit the number of pair actions, we rank      
+
+> 14 COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS
+
+feasible pairs by max {d(Tj , T k), d (Tk, T j )} and retain up to n pairs, where n is the number of remaining unknown tasks. 
+
+8.2. Introduction to GNNs and Graph Transformers 
+
+Since our neural policy takes a graph as input, we utilize a graph neural network (GNN), also known as message passing neural network (MPNN) (Gilmer et al., 2017). A message passing neural network is a type of neural network that creates embeddings on graphs using repeated message passing layers. Let G = ( V, E) be a graph, and let N (u) denote the set of neighborhood nodes for node u ∈ V .Additionally, let xu and euv be the features of node u and edge (u, v ) respectively. A MPNN layer is defined as 
+
+hu = ϕ
+
+xu, M 
+
+> v∈N (u)
+
+ψ(xu, xv, euv )
+
+ (5) where ϕ, ψ are MLPs, and L is a permutation invariant aggregator operator such as mean or max. Intuitively, a node u updates its representations by creating a message using its neighbors’ embed-ding as ψ(xu, xv, euv ) and aggregating it with its own representation. A graph attention network (GAT) is a type of MPNN that uses multi-head self-attention (Vaswani et al., 2017) to create the message (Veliˇ ckovi´ c et al., 2018). A GAT layer with K heads is the fol-lowing: 
+
+hu = Kk=1 σ
+
+ X 
+
+> v∈N (u)
+
+αkuv W kxv
+
+ (6) where represents concatenation, σ is an activation function such as ReLU, αkuv is the normalized attention coefficient for head k, and W k is the corresponding learnable linear transformation. 
+
+8.3. Additional Details on the HGT 
+
+Before message passing, separate MLPs project agent, task, and action features into a common hidden dimension d, with parameters shared among nodes of the same type. Capability nodes start from the shared learned embedding described in Appendix 8.1. Let xu denote the embedding of the current node u, Nr(u) denote the incoming neighbors of node u under directed relation r, and R(u)
+
+denote its possible incoming relation types. For attention head k, we define 
+
+sr,k uv = (W r,k Q xu)⊤(W r,k K xv)
+
+√dk
+
+, v ∈ N r(u) (7) where dk is the dimension of each attention head, and W are learned matrices. For travel-time edges, an MLP ϕe is shared across all layers and all travel-time edges and produces the edge embedding 
+
+zuv = ϕe(euv ). (8) A graph transformer uses a weighted sum of the neighbors’ messages as the final message. Table 2 summarizes the neighbor weights and messages for the edge types. 
+
+> 15
+
+LEE ORNIK 
+
+Edge type Neighbor weight Message from v ∈ N r (u)
+
+Travel Time αr,k uv = softmax v∈N r (u)
+
+ sr,k uv + ( br,k )⊤zuv 
+
+ vr,k uv = W r,k V xv + W r,k E zuv 
+
+Task Semantic αr,k uv = softmax v∈N r (u)
+
+ sr,k uv 
+
+ vr,k uv = W r,k V xv
+
+Capability–Agent αr,k uv = softmax v∈N r (u)
+
+ sr,k uv 
+
+ vr,k uv = W r,k V xv
+
+Capability–Task puv = p(C(Tj ) = Ck) W rV xv
+
+Table 2: Neighbor weights and message values for each edge family. The message mru for node u for relation type r is defined below. 
+
+mru =
+
+P  
+
+> v∈N r(u)
+
+puv W rV xv for capability–task relations ,W rO
+
+ Kk=1 
+
+P  
+
+> v∈N r(u)
+
+αr,k uv vr,k uv 
+
+
+
+otherwise .
+
+(9) The node embedding is updated by the following message passing mechanism: 
+
+hu = LayerNorm τ (u)
+
+
+
+xu + ϕτ (u)
+
+
+
+xu, r∈R (u)mru
+
+ 
+
+, (10) where τ (u) denotes the node type and ϕτ (u) is a node type specific MLP. Each layer updates all node types simultaneously from the incoming embeddings. The messages from each relation are concatenated in a fixed order for each node type. If the neighborhood for a particular relation is empty, then its message is a zero vector. Agents, tasks, actions, and capabilities have Rτ = 3 , 6, 5, 2 incoming relation slots, respectively. Thus, the input dimension of ϕτ is (1 + Rτ )d. The wait node has no incoming messages and is updated using its own embedding. 
+
+Architecture settings. Table 3 specifies the network dimensions. Each MLP contains two linear layers with GELU between them. The agent, task, and action input encoders additionally apply LayerNorm after the second linear layer. The MLP decoder concatenates the final agent embedding, action embedding, and their 32-dimensional travel-time embedding. Its input dimension is therefore 
+
+2d + 32 = 288 , and its scalar output is the agent–action logit. 
+
+Probabilities of actions with the same location. Different actions on the CAAT graph can point to the same location, such as staging actions associated with different tasks. The probability of assigning agent Ai to that location is the sum of the probabilities of all feasible actions that lead to it. Let K(v) denote these actions for location v. At assignment step s, the resulting probability is 
+
+qs(Ai, v ) = X
+
+> Kn∈K (v),(Ai,K n)∈F s
+
+ps(Ai, K n). (11) Actions at the same location share unit assignment capacity, so selecting that location removes all of them from subsequent assignment steps. 
+
+16 COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS 
+
+Component Specification Hidden node dimension d = 128 
+
+Message-passing layers 3
+
+Attention heads 4 per attention relation; dk = 32 
+
+Agent input encoder 5 → 128 → 128 
+
+Task input encoder 4 → 128 → 128 
+
+Action input encoder 4 → 128 → 128 
+
+Capability initialization Shared learned vector in R128 
+
+Travel-time encoder 1 → 32 → 32 
+
+Node-update MLP 128(1 + Rτ ) → 512 → 128 
+
+Agent–action decoder MLP 288 → 64 → 1
+
+Dropout 0
+
+Table 3: HGT dimensions. Arrows denote linear layer dimensions. 
+
+8.4. Additional Details on Policy pretraining Batched policy updates. The batched training implementation collects B episodes before each optimizer update. The EMA baseline b is held fixed throughout the batch. For episode e with return 
+
+Re, we compute ae = Re − b and standardize these advantages across the full optimizer batch: 
+
+bae = ae − ¯aσa
+
+, ¯a = 1
+
+B
+
+> B
+
+X
+
+> e=1
+
+ae, σ2 
+
+> a
+
+= 1
+
+B
+
+> B
+
+X
+
+> e=1
+
+(ae − ¯a)2. (12) Since b is shared by all episodes, centering cancels this offset. Let me be the number of replanning decisions in episode e. At decision t, Ue,t is a random sequential assignment with conditional distribution πθ(Ge,t ), and ue,t is the sample. We write 
+
+πθ(ue,t | Ge,t ) = Pr θ(Ue,t = ue,t | Ge,t ) for the probability of that realization. The batch loss is 
+
+Lbatch = − 1
+
+B
+
+> B
+
+X
+
+> e=1
+
+1
+
+memeX
+
+> t=1
+
+[bae log πθ(ue,t | Ge,t ) + βH (Ue,t | Ge,t )] , (13) where H(Ue,t | Ge,t ) is the entropy of the conditional assignment distribution. Averaging within each episode prevents episodes with more replanning events from receiving proportionally greater weight. Note that all decisions for episode e receive the same advantage ˆae regardless of the timestep 
+
+t.
+
+8.5. Baseline Planners 
+
+The three baselines use two shared solvers: a WRP solver for discovering task requirements and an oracle solver for executing tasks with known requirements. 
+
+WRP solver. The WRP solver coordinates a set of scouts to minimize the time of the final require-ment revelation. Let U be the set of tasks with unknown requirements and let O(v) ⊆ U contain those visible from node v according to vis( v). For at most 12 unknown tasks, each scout searches augmented states (v, S ), where v is its current map node and S ⊆ U contains the tasks observed 
+
+17 LEE ORNIK 
+
+along its route. Each map edge (v, v ′) defines the transition 
+
+(v, S ) c(v,v ′)
+
+−−−−→ (v′, S ∪ O(v′)) , (14) where c(v, v ′) is the traversal cost. For scout Ai starting at vi, let Di(v, S ) denote the shortest travel time from the initial state (vi, O (vi)) to (v, S ). Dijkstra’s algorithm determines the minimum time to observe an assigned subset B ⊆ U as 
+
+qi(B) = min 
+
+> v,S B⊆S
+
+Di(v, S ). (15) The condition B ⊆ S allows a route to observe additional tasks. A subset assignment dynamic program partitions U among the scouts to minimize the final reveal time. It uses Equation 16 below, with qi replacing ℓi and the scouts replacing the execution agents. Above 12 unknown tasks, each observation task is independently assigned to the scout that can observe it earliest, without accounting for other tasks assigned to that scout. Each scout’s covering route is then found using weighted A*. The optimality of this assignment is no longer guaranteed. 
+
+Oracle solver. Given a set of tasks with known requirements and a set of agents, the oracle solver finds a minimum-makespan assignment and independently executable routes. For agent Ai, Dijk-stra’s algorithm searches augmented states (v, S ), where v is the current map node and S is the set of tasks completed along the route. Traversing an edge incurs its directed travel time. Entering a compatible task adds it to S, whereas entering an incompatible task is prohibited. Minimizing over terminal nodes gives ℓi(S), the shortest route from the agent’s starting position that completes exactly S. Unreachable or incompatible subsets have infinite cost, and ℓi(∅) = 0 .Let T be the set of tasks to complete, and let Mi(U ) be the minimum makespan for assigning exactly U ⊆ T to the first i agents (agent order is fixed). The assignment dynamic program uses the Bellman recurrence 
+
+Mi(U ) = min  
+
+> S⊆U
+
+max {Mi−1(U \ S), ℓ i(S)} , (16) with M0(∅) = 0 and M0(U ) = ∞ for nonempty U . The resulting makespan is MNa (T ). This process yields each agent’s assignment, task order, and path. When replanning during transit, both solvers use the next arrival node as the agent’s starting position and add the remaining edge traversal time to the cost of any nonempty assigned subset. The agent finishes traversing its current edge before following the new path. 
+
+Oracle baseline. The oracle baseline applies the oracle solver once to all agents and tasks using the ground-truth requirements. Its makespan M ∗ is used to normalize the learned policy’s rollout reward and evaluation results. 
+
+Scout Then Engage. This policy plans in two phases. First, all scout-capable agents, including hybrids, use the WRP solver to reveal every unknown task requirement, while non-scout agents wait. Once every remaining requirement is known, the policy applies the oracle solver once to all living agents and remaining tasks using the revealed requirements, then follows the resulting execution plan.      
+
+> 18 COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS
+
+Engage While Scout. This policy runs the WRP solver for a scouting group and the oracle solver for an execution group. The scouting group reveals unknown requirements, while the execution group completes known incomplete tasks supported by at least one of its agents. Both groups act simultaneously, and their plans are recomputed at every replanning event. The policy uses only revealed requirements and provides no staging actions. The two solvers optimize their respective subproblems independently. Pure scouts join the scouting group, and non-scout agents join the execution group. A heuristic assigns hybrid agents according to the current known task demand. For each non-scout capability 
+
+Ck, let dk be the number of known incomplete tasks requiring Ck and sk the number of living non-scout agents possessing Ck. The initial capability deficit is 
+
+gk = max {0, d k − sk}. (17) Among the remaining hybrids, we select the agent possessing the largest number of capabilities with a positive deficit, breaking ties uniformly at random. For each capability possessed by that agent, its deficit is reduced by one. Selection repeats until all deficits are zero or no remaining hybrid can reduce a deficit. Selected hybrids join the execution group; the remaining hybrids join the scouting group while unknown requirements remain, and otherwise wait. 
+
+8.6. Additional Details on Experiments Pretraining settings. Table 4 lists the RL hyperparameters. Ablations use the same training bud-get and RL hyperparameters, changing only the components specified in Section 5.3. For each configuration, we evaluate the checkpoint with the highest mean reward over an optimizer batch.               
+
+> Parameter Value Optimizer Adam Learning rate 3×10 −4
+> Episodes per optimizer update 32
+> Number of simultaneous simulations 8
+> Entropy coefficient β0.01
+> EMA baseline decay 0.95
+> Incompletion penalty λI10
+> Gradient norm clipping threshold 1
+> Training episodes 12 ,800
+
+Table 4: RL training hyperparameters used by the default policy and reported ablations. During training, task locations are sampled uniformly without replacement from map nodes ex-cluding the source. Task requirements are sampled independently using a uniform distribution. An agent possesses a non-scout capability Ck with independent probability 0.5, and the scout capabil-ity C0 with independent probability 0.25 . If no agent possesses capability Ck after this process, an agent is randomly sampled and given this capability. All agents start at node (0 , 0) on WV. 
+
+Evaluation scenarios. The test suites combine three agent profiles with three task profiles for each (Na, N t). Tables 5 and 6 summarize the agent and task profiles, respectively. WV and WA test suites are identical except for the source node: (0 , 0) for WV and (63 , 63) for WA. At each 
+
+3 ≤ Na ≤ 6 and 5 ≤ Nt ≤ 9 we test all 9 pairs of agent–task profiles, resulting in 180 total test  
+
+> 19 LEE ORNIK
+
+scenarios. KTH uses the same agent and task profiles, with Na = 8 and Nt = 14 for a total of 9 test scenarios.         
+
+> Agent profile Design Specialist Agents with few capabilities. Balanced hybrid Agents with 2–3 capabilities, including hybrid scouts that can both observe and execute tasks. Scout redundant Approximately half the agents have C0, more than the other profiles which have 25% −33% .
+
+Table 5: Agent profiles used in the test suites.     
+
+> Task profile Design Balanced Spatially dispersed tasks with approximately balanced requirement counts. Skewed Spatially dispersed tasks with requirements dominated by one capability on WV and WA, and two on KTH. Clustered Tasks concentrated in multiple spatial clusters, with balanced requirements.
+
+Table 6: Task profiles used in the test suites. 
+
+Result aggregation. Average regret for a given map is the equally weighted mean of the individual scenario’s regret M/M ∗. The error bars show the standard deviation of all the regrets for a given policy and map. 
+
+Planning decision time measurements. All runtime measurements were collected on the RTX 5090 desktop. The learned policy and its routing use the GPU; the classical solvers run on the CPU. The time measured is the time to generate a path for all agents using the current simulation state. For our method, this includes CAAT graph creation, HGT processing, decoder action assignment, and shortest path calculation. Offline map preparation and episode initialization are excluded. 
+
+8.7. Additional Results 
+
+Tables 7–9 report regret by the number of agents and tasks for each map. Figure 6 shows the results for every individual scenario. Tables 10–12 report regret by agent and task profiles. 
+
+> 20
+
+COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS 
+
+Agents Tasks Scout then Engage Engage While Scout CAAT Graph + HGT 3 5 1.641 ± 0.234 1.654 ± 0.198 1.234 ± 0.123 
+
+6 1.605 ± 0.207 1.458 ± 0.218 1.306 ± 0.203 
+
+7 1.726 ± 0.425 1.714 ± 0.459 1.380 ± 0.358 
+
+8 1.839 ± 0.344 1.756 ± 0.426 1.622 ± 0.322 
+
+9 1.730 ± 0.122 1.443 ± 0.187 1.302 ± 0.190 
+
+4 5 1.634 ± 0.214 1.619 ± 0.101 1.172 ± 0.123 
+
+6 1.698 ± 0.187 1.761 ± 0.391 1.432 ± 0.364 
+
+7 1.821 ± 0.129 1.744 ± 0.520 1.610 ± 0.317 
+
+8 1.749 ± 0.323 1.761 ± 0.317 1.533 ± 0.290 
+
+9 1.664 ± 0.160 1.617 ± 0.332 1.325 ± 0.217 
+
+5 5 1.790 ± 0.131 1.608 ± 0.159 1.100 ± 0.057 
+
+6 1.904 ± 0.338 1.943 ± 0.450 1.478 ± 0.419 
+
+7 2.024 ± 0.295 1.949 ± 0.296 1.681 ± 0.277 
+
+8 1.977 ± 0.357 1.831 ± 0.201 1.651 ± 0.271 
+
+9 1.796 ± 0.269 1.696 ± 0.257 1.346 ± 0.179 
+
+6 5 1.812 ± 0.129 1.608 ± 0.154 1.102 ± 0.065 
+
+6 1.921 ± 0.345 1.898 ± 0.409 1.490 ± 0.411 
+
+7 2.014 ± 0.304 1.892 ± 0.344 1.850 ± 0.538 
+
+8 2.058 ± 0.409 1.866 ± 0.295 1.620 ± 0.319 
+
+9 1.862 ± 0.265 1.682 ± 0.296 1.363 ± 0.192 
+
+Table 7: Regret M/M ∗ on WV by number of agents and tasks. Entries show the mean ± standard deviation over the nine agent–task profile combinations. 
+
+21 LEE ORNIK 
+
+Agents Tasks Scout Then Engage Engage While Scout CAAT Graph + HGT 3 5 1.716 ± 0.246 1.454 ± 0.234 1.285 ± 0.192 
+
+6 1.779 ± 0.193 1.671 ± 0.139 1.219 ± 0.157 
+
+7 1.652 ± 0.249 1.600 ± 0.269 1.282 ± 0.158 
+
+8 1.701 ± 0.308 1.611 ± 0.285 1.374 ± 0.236 
+
+9 1.616 ± 0.233 1.513 ± 0.181 1.312 ± 0.302 
+
+4 5 1.712 ± 0.149 1.591 ± 0.202 1.309 ± 0.272 
+
+6 1.754 ± 0.220 1.806 ± 0.202 1.292 ± 0.152 
+
+7 1.660 ± 0.113 1.738 ± 0.288 1.329 ± 0.268 
+
+8 1.758 ± 0.277 1.754 ± 0.452 1.390 ± 0.233 
+
+9 1.785 ± 0.097 1.864 ± 0.472 1.384 ± 0.269 
+
+5 5 1.897 ± 0.213 1.788 ± 0.214 1.314 ± 0.225 
+
+6 1.866 ± 0.258 1.680 ± 0.264 1.289 ± 0.138 
+
+7 1.816 ± 0.228 1.764 ± 0.173 1.479 ± 0.232 
+
+8 1.946 ± 0.384 1.768 ± 0.302 1.523 ± 0.290 
+
+9 1.880 ± 0.281 1.836 ± 0.209 1.501 ± 0.253 
+
+6 5 1.922 ± 0.205 1.807 ± 0.181 1.321 ± 0.326 
+
+6 1.867 ± 0.258 1.742 ± 0.256 1.303 ± 0.117 
+
+7 1.846 ± 0.215 1.721 ± 0.133 1.455 ± 0.289 
+
+8 1.962 ± 0.378 1.768 ± 0.298 1.566 ± 0.314 
+
+9 1.908 ± 0.258 1.870 ± 0.188 1.503 ± 0.245 
+
+Table 8: Regret M/M ∗ on WA by number of agents and tasks. Entries show the mean ± standard deviation over the nine agent–task profile combinations. 
+
+Agents Tasks Scout Then Engage Engage While Scout CAAT Graph + HGT 8 14 2.171 ± 0.238 2.196 ± 0.282 1.903 ± 0.312 
+
+Table 9: Regret M/M ∗ on KTH by number of agents and tasks. Entries show the mean ± standard deviation over the nine agent–task profile combinations. 
+
+Agent profile Task profile Scout Then Engage Engage While Scout CAAT Graph + HGT Specialist Balanced 2.024 ± 0.405 1.752 ± 0.365 1.558 ± 0.493 
+
+Skewed 1.885 ± 0.276 1.670 ± 0.272 1.405 ± 0.314 
+
+Clustered 2.044 ± 0.314 1.726 ± 0.407 1.469 ± 0.394 
+
+Balanced hybrid Balanced 1.870 ± 0.245 1.728 ± 0.357 1.483 ± 0.350 
+
+Skewed 1.618 ± 0.240 1.850 ± 0.358 1.337 ± 0.229 
+
+Clustered 1.825 ± 0.164 1.813 ± 0.333 1.452 ± 0.314 
+
+Scout redundant Balanced 1.733 ± 0.257 1.720 ± 0.366 1.440 ± 0.347 
+
+Skewed 1.589 ± 0.198 1.537 ± 0.278 1.272 ± 0.208 
+
+Clustered 1.730 ± 0.221 1.729 ± 0.309 1.454 ± 0.339 
+
+Table 10: Regret M/M ∗ on WV by agent and task profiles. Entries show the mean ± standard deviation over the 20 agent–task count combinations. 
+
+22 COORDINATION OF HETEROGENEOUS TEAMS WITH UNCERTAIN TASK REQUIREMENTS 
+
+Agent profile Task profile Scout Then Engage Engage While Scout CAAT Graph + HGT Specialist Balanced 1.994 ± 0.321 1.730 ± 0.327 1.507 ± 0.295 
+
+Skewed 1.867 ± 0.264 1.586 ± 0.306 1.276 ± 0.241 
+
+Clustered 1.993 ± 0.303 1.753 ± 0.286 1.386 ± 0.318 
+
+Balanced hybrid Balanced 1.677 ± 0.198 1.809 ± 0.202 1.434 ± 0.251 
+
+Skewed 1.689 ± 0.242 1.647 ± 0.203 1.251 ± 0.154 
+
+Clustered 1.873 ± 0.079 1.799 ± 0.173 1.412 ± 0.211 
+
+Scout redundant Balanced 1.674 ± 0.194 1.698 ± 0.276 1.353 ± 0.221 
+
+Skewed 1.660 ± 0.223 1.633 ± 0.368 1.262 ± 0.194 
+
+Clustered 1.793 ± 0.210 1.802 ± 0.262 1.462 ± 0.274 
+
+Table 11: Regret M/M ∗ on WA by agent and task profiles. Entries show the mean ± standard deviation over the 20 agent–task count combinations. 
+
+Agent profile Task profile Scout Then Engage Engage While Scout CAAT Graph + HGT Specialist Balanced 2.479 2.284 2.184 
+
+Skewed 2.203 2.086 2.325 
+
+Clustered 2.470 2.131 1.723 
+
+Balanced hybrid Balanced 2.500 2.564 2.045 
+
+Skewed 2.096 2.319 2.362 
+
+Clustered 1.990 1.764 1.532 
+
+Scout redundant Balanced 1.875 2.131 1.627 
+
+Skewed 1.934 1.827 1.787 
+
+Clustered 1.990 2.656 1.545 
+
+Table 12: Regret M/M ∗ on KTH by agent and task profiles. Each entry is one scenario with eight agents and fourteen tasks. 
+
+23 LEE ORNIK 1 30 60 90 120 150 180 
+
+Scenario index 
+
+> 0.0 0.4 0.8 1.2 1.6 2.0
+> Regret  − 1
+
+WV (180 scenarios)       
+
+> 130 60 90 120 150 180
+
+Scenario index 
+
+WA (180 scenarios)     
+
+> 13579
+
+Scenario index 
+
+KTH (9 scenarios) 
+
+Oracle (0) Scout Then Engage Engage While Scout CAAT Graph + HGT 
+
+Figure 6: Individual-scenario results on WV, WA, and KTH, plotted as M/M ∗−1. At each scenario index, the three markers compare the policies on the same instance. The dashed line denotes the oracle. 
+
+24
