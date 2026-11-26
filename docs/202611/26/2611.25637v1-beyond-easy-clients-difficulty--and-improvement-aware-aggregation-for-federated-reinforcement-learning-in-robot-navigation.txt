@@ -1,0 +1,733 @@
+Title: Beyond Easy Clients: Difficulty- and Improvement-Aware Aggregation for Federated Reinforcement Learning in Robot Navigation
+
+URL Source: https://arxiv.org/pdf/2611.25637v1
+
+Published Time: Fri, 20 Nov 2026 02:16:44 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Beyond Easy Clients: Difficulty- and Improvement-Aware Aggregation for Federated Reinforcement Learning in Robot Navigation 
+
+## Ye Lin Tun a, Chu Myaet Thwal a, Eui-Nam Huh a and Choong Seon Hong a,∗
+
+> a
+
+Kyung Hee University, Republic of Korea 
+
+A R T I C L E I N F O 
+
+Keywords :Federated learning Reinforcement learning Navigation Aggregation Environment heterogeneity 
+
+A B S T R A C T 
+
+Federated reinforcement learning enables a fleet of robots to jointly learn a shared navigation policy without exchanging raw experience. In practice, however, the robots rarely operate in the same conditions: an open aisle is far easier to navigate than a cluttered room, and takes less learning to master. Standard federated aggregation rules ignore this. Uniform averaging weights every client equally, whether or not it is still learning, and weighting by episode return is worse, since easy environments permit high returns by construction. Both failures stem from what we call the plateau problem : once a client masters its environment, its updates carry little new information even though its reported return remains high. We propose FedDIA , which scores each client by how much its local training improves the global model it received, amplified by the difficulty of its environment. Difficulty is inferred from the model’s own performance, without requiring any description of the environment. Both signals are measured against the global model, so they are comparable across clients. On a mapless navigation task with eight heterogeneous clients, FedDIA reaches a mean success rate of 75 .5% across training and held-out environments, against 68 .7% for the strongest federated baseline. Its advantage holds when the models are transferred to hand-authored warehouse and living-space layouts, or when one of the clients is defective. 
+
+## 1. Introduction 
+
+Robots increasingly operate autonomously, from ware-houses and hospitals to homes and city streets. Reinforcement learning (RL) [1, 2, 3, 4] provides a way to learn the control policies they need through interaction rather than programming them in advance. Navigation is a common requirement in robotics: reaching a goal while avoiding obstacles. Learning it from onboard sensors [5, 6] avoids the hand-built maps and motion planners [7] that are hard to construct for unknown or changing environments. In practice, robots rarely operate under identical conditions: an open aisle, a cluttered room, and a narrow corridor each demand different behavior. A fleet deployed across such conditions spans environments of varying difficulty [8], and can improve faster by pooling experience than by learning alone [9]. With federated reinforcement learning (FRL) [10, 11], each robot or client trains locally and sends only its policy parameters to a server, which combines these updates into a shared policy. Since only parameters are shared, no client reveals the layout of its workplace. However, not every client’s update is equally valuable to the shared policy. A naive aggregation rule such as FedAvg [12] cannot distinguish whether a client is actively improving, and assigns equal weight to every update. A natural alternative is to weight each client by how well its policy performs [13, 14], treating a higher return as a sign of a better model. Yet this can make the problem worse. Clients in easy environments may master the task early in training, after which their local updates provide little new information even though their returns remain high. Weighting 
+
+> ∗
+
+Corresponding author  
+
+> yelintun@khu.ac.kr
+
+(Y.L. Tun); chumyaet@khu.ac.kr (C.M. Thwal);  
+
+> johnhuh@khu.ac.kr
+
+(E. Huh); cshong@khu.ac.kr (C.S. Hong) 
+
+by return then favors these saturated clients over clients in harder environments that are still improving. This creates a mismatch between a client’s absolute return and its actual contribution to the shared policy. An effective aggregation rule must therefore weight clients by how much their local training improves the shared policy, not by absolute return. Among clients that are still improving, it should also give greater weight to those in more difficult environments. To meet both requirements, we propose FedDIA , for Difficulty- and Improvement-aware Aggregation. It measures each client against the same baseline. Before training lo-cally, a client evaluates how well the shared policy (global model) performs in its environment, and evaluates its own updated policy after training. The difference between the two evaluations measures how much the client improves the shared policy. The initial evaluation also reveals how hard that environment is, without requiring environment metadata. A low initial return indicates that the shared policy struggles there. Since every client measures against the same policy, these signals are comparable across clients. FedDIA combines the two signals into a single aggregation weight that grows with client improvement and is amplified for harder environments. This amplification applies only when the client is improving, and a saturated client therefore receives no additional weight from environment difficulty. In summary, we make the following contributions: • We formalize the plateau problem in heterogeneous FRL, where clients in easy environments saturate early and subsequent local training yields little improvement despite persistently high returns. Uniform averaging treats these saturated clients equally with those still learning, and return-based weighting assigns them even higher weights. 
+
+Y. L. Tun et al.: Preprint Page 1 of 12 arXiv:2611.25637v1 [cs.RO] 19 Nov 2026 This mismatch between absolute return and actual contri-bution motivates the two requirements our method targets. • We propose FedDIA , which scores each client using two signals: the improvement its local training brings to the shared policy and the difficulty of its environment. The two signals are combined so that difficulty amplifies a client’s weight only when that client is still improving. Among those still improving, the ones in harder environments receive greater weight. Saturated clients are discounted regardless of their absolute return. • On a mapless navigation task with eight heterogeneous clients, FedDIA reaches a mean success rate of 75 .5% 
+
+across training and held-out environments, against 68 .7% 
+
+for the strongest federated baseline. Its advantage carries over to two hand-authored layouts built from industrial equipment and household furniture, evaluated without further training. FedDIA also maintains its performance when the client population includes a defective one. 
+
+## 2. Related Work 
+
+2.1. Federated Reinforcement Learning 
+
+Federated reinforcement learning enables multiple agents to collaboratively learn a shared policy while keeping their interactions and data decentralized. Zhuo et al. [10] intro-duced an early FRL approach in which two agents observe the same situations through different sensory windows and learn using a shared fusion head. Since then, FRL has been studied across a range of applications, with Qi et al. [11] providing a broad survey of the field. LFRL [9] and FGRL [15] investigate shared policy learning for robot navigation. Liang et al. [16] apply FRL to autonomous driving, while Chu et al. [14] study coordinated charging of plug-in electric vehicle fleets. In healthcare, Zhou et al. [17] learn treatment policies from offline clinical records. Tian et al. [18] extend FRL to predictive-maintenance policies for manufacturing. 
+
+2.2. Data and Environment Heterogeneity 
+
+In supervised federated learning, heterogeneity typically arises from non-independent and identically distributed (non-IID) client datasets [12, 19, 20, 21, 22, 23]. Common approaches address it through model personalization or local regularization to reduce client drift [24, 25]. In federated reinforcement learning, heterogeneity instead arises from differences in the environments in which clients interact. Although clients may share the same task, different environ-ment configurations lead to different dynamics and learning conditions. Jin et al. [8] show that averaging policies across heterogeneous environments converges to a solution whose suboptimality increases with the degree of heterogeneity. Existing approaches to environment heterogeneity can be broadly grouped into personalization, regularization, and aggregation. Our work follows the aggregation approach, focusing on how client updates are weighted at the server. 
+
+2.3. Personalization 
+
+The survey of Qi et al. [11] identifies personalized local updates as one approach to heterogeneous environments. Jin et al. [8] represent each environment with a low-dimensional vector while personalizing the embedding layers on a shared backbone. In FedFormer [26], no weights are averaged; instead, each agent learns contextual relationships with other agents to incorporate information relevant to its environment. Personalization therefore optimizes policies for individual environments, resulting in multiple client-specific policies rather than a single deployable policy [27, 28, 29, 30]. Applying the model to a new environment may require adapting its personalized component. In contrast, we target a single shared policy that clients improve collaboratively. 
+
+2.4. Regularization 
+
+Regularization constrains local training to limit how far a client’s update can drift from the global model [31, 32, 33]. FedKL [34] penalizes divergence from the global model’s output distribution, while FedProx [19], a representative ap-proach in supervised federated learning, penalizes divergence in the model weights. Both modify the local training process by adding a regularization term to the training loss. 
+
+2.5. Aggregation 
+
+Training a single shared policy raises the question of how client updates should be weighted during aggregation. Uni-form averaging (FedAvg [12]) weights every client equally and therefore ignores heterogeneity altogether. A natural refinement is to weight clients by measured performance. In supervised federated learning, FedLBW [35] and Fed-Nolowe [36] weight clients by validation loss. In the RL setting, ACWPA [13] weights clients using a softmax over their returns, while Chu et al. [14] combine reward and loss through an attention mechanism. Because these weights derive from absolute performance, however, they conflate environment difficulty with a client’s actual contribution. A client in an easy environment may maintain a high return and therefore a high aggregation weight even after its local training no longer improves the shared policy. Improvement-based weighting addresses part of this. FGRL [15] weights each client by the growth of its own performance between successive rounds. Yet this signal is self-referential in that each client’s growth is measured from its own prior model, giving clients different starting points. The resulting values are therefore not directly comparable across clients in different environments. Growth relative to oneself also carries no information about environment difficulty. Other approaches learn aggregation decisions or select clients. Using reinforcement learning, FedAA [37] derives aggregation weights from model-parameter distances and validation performance, while FAVOR [38] selects clients based on compressed model weights. FedPOHCS [39] instead scores and selects clients on their potential to improve and on how close their dynamics stay to the population average. To our knowledge, none of these methods weights clients by improvement measured on a common scale, or by how hard   
+
+> Y. L. Tun et al.: Preprint Page 2 of 12
+
+Figure 1: Federated reinforcement learning across heterogeneous environments. In each communication round 𝑘 , the server broadcasts the global model 𝜃 𝑘 to all 𝑁 clients. Each client trains the policy 𝜋 𝜃 𝑘 in its own environment 𝑖 , and returns the updated parameters 𝜃 𝑘 𝑖 . The server combines these into the next global model 𝜃 𝑘 +1 using aggregation weights {𝑤 𝑖 }.their environments are. FedDIA fills this gap by weighting each client by its improvement over a shared baseline ,making contributions comparable across clients. It further amplifies this weight for harder environments, with difficulty inferred from the same shared baseline and without requiring environment metadata. This combination directs aggregation toward the clients that are both improving and in the hardest environments. 
+
+## 3. Problem Formulation 
+
+3.1. Federated Reinforcement Learning Setup 
+
+We consider 𝑁 clients, where each client 𝑖 ∈ {1 , … , 𝑁 }
+
+operates in its own navigation environment 𝑖 . Each client’s task is modeled as a Markov decision process (MDP) [1] 
+
+(, , 𝑖 , , 𝛾 ), where  is the state space,  is the con-tinuous action space, 𝑖 is the transition function of 𝑖 ,
+
+ ∶  ×  → ℝ is the reward function, and 𝛾 ∈ [0 , 1) 
+
+is the discount factor. All clients share , , , and 𝛾 , and differ only in 𝑖 , which reflects the layout or obstacle density of each environment. The clients jointly train a shared policy 
+
+𝜋 𝜃 ∶  → , parameterized by 𝜃 , to maximize the expected discounted return in every environment, 
+
+𝐽 𝑖 (𝜃 ) = 𝔼 𝜋 𝜃 ,𝑖 
+
+[ ∞∑
+
+> 𝑡 =0
+
+𝛾 𝑡 (𝑠 𝑡 , 𝑎 𝑡 )
+
+]
+
+, (1) where 𝑠 𝑡 ∈  and 𝑎 𝑡 ∈  denote the state and action at step 𝑡 . We refer to 𝜋 𝜃 as the policy and 𝜃 as the model or, equivalently, its parameters .Training is organized into communication rounds indexed by 𝑘 , as illustrated in Figure 1. At each round, the server broadcasts the current global parameters 𝜃 𝑘 to all clients. Each client 𝑖 initializes from 𝜃 𝑘 , locally trains in 𝑖 , and sends the resulting local parameters 𝜃 𝑘 𝑖 to the server. The server aggregates the local parameters into the next global model via a weighted average: 
+
+𝜃 𝑘 +1 =
+
+> 𝑁
+
+∑
+
+> 𝑖 =1
+
+𝑤 𝑖 𝜃 𝑘 𝑖 ,
+
+> 𝑁
+
+∑
+
+> 𝑖 =1
+
+𝑤 𝑖 = 1 , 𝑤 𝑖 ≥ 0. (2) 10 20 30 40 50 60 
+
+> Round
+> 020 40 60 80 100
+> Success Rate (%)
+> Easy client (no obstacles) Hard client (dense obstacles)
+
+Figure 2: Training curves for one easy client (no obstacles) and one hard client (dense obstacles) under FedAvg [12] over three seeds. Shaded regions show standard deviation. The easy client’s success rate saturates near round 30, while the hard client continues to improve throughout training, illustrating the plateau problem: uniform averaging weights both clients equally, even though only one is still contributing new information. The choice of aggregation weights {𝑤 𝑖 } is the central design question addressed in this paper. Following prior work [34], only the actor (policy) parameters are aggregated, while critic networks remain local to each client. 
+
+3.2. The Plateau Problem 
+
+As training progresses, clients in easy environments con-verge rapidly, and their local policies reach near-maximum performance early in training. Once saturated, these clients continue to produce high episode returns, but their local updates carry minimal new information. The global model already performs well in their environment, and further local training yields negligible improvement. We refer to this as the plateau problem : a client has plateaued when additional local training no longer meaningfully advances the shared policy, as seen for the easy client in Figure 2. 
+
+Y. L. Tun et al.: Preprint Page 3 of 12 Figure 3: One communication round of FedDIA. The server broadcasts the global model 𝜃 𝑘 . Each client evaluates it before local training and its updated model after, obtaining returns 𝑟 pre  
+
+> 𝑖
+
+and 𝑟 post  
+
+> 𝑖
+
+. Both are sent to the server with updated parameters 
+
+𝜃 𝑘 𝑖 . From these, the server derives an improvement signal 𝑐 𝐼 𝑖 and a difficulty signal 𝑐 𝐷 𝑖 , combines them into a per-client score, and computes aggregation weights by softmax. Across the two example clients, a plateaued easy client receives low weight, while a still-improving hard client receives high weight. We formally define the intra-round improvement of client 
+
+𝑖 at round 𝑘 as 
+
+Δ𝑘 𝑖 = 𝑟 post  
+
+> 𝑖
+
+− 𝑟 pre  
+
+> 𝑖
+
+, (3) where 𝑟 pre  
+
+> 𝑖
+
+is the average episode return of the global model in 
+
+𝑖 before local training, and 𝑟 post  
+
+> 𝑖
+
+is the average episode return of the local model after training. A plateaued client therefore satisfies Δ𝑘 𝑖 ≈ 0 , indicating that local training produced no meaningful improvement over the global model. Under uniform averaging, plateaued easy clients con-tribute low-information updates yet receive the same aggre-gation weight as hard clients that are still actively learning. Under return-weighted aggregation, plateaued easy clients may receive even higher weights, because their absolute returns remain high after saturation. In both cases, the aggregation signal fails to distinguish between clients that are still improving the shared policy and those that have plateaued. These observations motivate a weighting scheme that (i) conditions on improvement rather than absolute return, and (ii) prioritizes harder environments among the clients that are still improving. 
+
+## 4. FedDIA 
+
+We propose FedDIA , a round-level client weighting scheme that meets both requirements. Figure 3 gives an overview of one communication round in which each client performs evaluation before and after local training. From these returns, the server computes difficulty- and improvement-aware aggregation signals. 
+
+4.1. Shared Baseline 
+
+At the start of round 𝑘 , each client 𝑖 evaluates the received global model 𝜃 𝑘 for 𝐸 episodes in its local environment 𝑖 ,obtaining the average episode return 𝑟 pre  
+
+> 𝑖
+
+. After 𝑇 timesteps of local training, the client evaluates the resulting model 
+
+𝜃 𝑘 𝑖 for another 𝐸 episodes, obtaining 𝑟 post  
+
+> 𝑖
+
+. The intra-round improvement Δ𝑘 𝑖 = 𝑟 post  
+
+> 𝑖
+
+− 𝑟 pre  
+
+> 𝑖
+
+, defined in (3), quantifies how much local training improved upon the global model. Because each client’s delta Δ𝑘 𝑖 is measured from the same baseline 𝜃 𝑘 ,their values are directly comparable across clients that train in different environments. A higher value indicates greater improvement over the shared model and should therefore receive a larger aggregation weight. The shared baseline also provides a measure of environment difficulty. Since every client obtains 𝑟 pre  
+
+> 𝑖
+
+by evaluating the same global model 𝜃 𝑘 ,any difference across clients reflects the environment rather than the model. This makes 𝑟 pre  
+
+> 𝑖
+
+a natural probe of difficulty. A lower value therefore indicates a harder environment, where the global model already performs poorly before any local training begins.   
+
+> Y. L. Tun et al.: Preprint Page 4 of 12
+
+4.2. Contribution Signals 
+
+We derive two normalized signals, an improvement signal 𝑐 𝐼 𝑖 from Δ𝑘 𝑖 and a difficulty signal 𝑐 𝐷 𝑖 from 𝑟 pre  
+
+> 𝑖
+
+. Both are computed using min-max normalization across clients, defined for any 𝑥 𝑖 as: 
+
+norm( 𝑥 𝑖 ) = 𝑥 𝑖 − min 𝑗 𝑥 𝑗 
+
+max 𝑗 𝑥 𝑗 − min 𝑗 𝑥 𝑗 
+
+, 𝑗 ∈ {1 , … , 𝑁 }. (4) 
+
+Improvement signal. A negative Δ𝑘 𝑖 carries no useful aggregation signal, so we clamp it to zero before normalizing: 
+
+𝑐 𝐼 𝑖 = norm (max(0 , Δ𝑘 𝑖 )). (5) This ensures 𝑐 𝐼 𝑖 = 0 exactly for any client that fails to improve. 
+
+Difficulty signal. We map a low pre-training return to high difficulty: 
+
+𝑐 𝐷 𝑖 = 1 − norm( 𝑟 pre  
+
+> 𝑖
+
+). (6) This formulation requires no explicit environment metadata such as obstacle counts or map complexity. Difficulty is measured entirely through the current capability of the shared policy, and adapts automatically as the global model improves. 
+
+4.3. Aggregation Rule 
+
+Simply rewarding hard-environment clients with higher weight, however, ignores whether those clients actually made progress. A plateaued hard-environment client might offer no more useful gradient signal than a plateaued easy client. We therefore treat environment difficulty not as a direct measure of contribution, but as a factor that amplifies the score of clients that are actively improving. This motivates the following aggregation score: 
+
+score 𝑖 = 𝑐 𝐼 𝑖 
+
+⏟⏟⏟
+
+> improvement
+
++ 𝛼 ⋅ 𝑐 𝐼 𝑖 ⋅ 𝑐 𝐷 𝑖 
+
+⏟⏞⏞⏟⏞⏞⏟ 
+
+> difficulty bonus
+
+= 𝑐 𝐼 𝑖 ⋅ (1 + 𝛼 ⋅ 𝑐 𝐷 𝑖 
+
+), (7) where 𝛼 ≥ 0 is the amplification coefficient, controlling the influence of environment difficulty on the score. Aggregation weights are then derived from scores via a softmax with temperature 𝜏 > 0:
+
+𝑤 𝑖 = exp (score 𝑖 ∕𝜏 )∑𝑁 𝑗 =1 exp (score 𝑗 ∕𝜏 ) . (8) 
+
+Improvement gate. If 𝑐 𝐼 𝑖 = 0 , then score 𝑖 = 0 , regardless of how hard the environment is. Under the softmax, such clients receive the minimum possible weight relative to any client that did improve, without requiring an explicit threshold. This satisfies requirement (i): aggregation weight is conditioned on intra-round improvement, rather than absolute return. When no client improves in a given round ( Δ𝑘 𝑖 ≤ 0 for all 𝑖 ), we fall back to uniform weights 𝑤 𝑖 = 1∕ 𝑁 .
+
+Algorithm 1 FedDIA — one communication round 
+
+Require: Global parameters 𝜃 𝑘 ; client environments 
+
+{𝑖 }𝑁 𝑖 =1 ; coefficient 𝛼 ; temperature 𝜏 ; local timesteps 𝑇 ;episodes 𝐸 
+
+Ensure: Updated global parameters 𝜃 𝑘 +1  
+
+> 1:
+
+Server: broadcast 𝜃 𝑘 to all clients  
+
+> 2:
+
+for Client 𝑖 = 1 , … , 𝑁 do in parallel  
+
+> 3:
+
+𝑟 pre  
+
+> 𝑖
+
+← Eval( 𝜃 𝑘 , 𝑖 , 𝐸 ) ⊳ pre-eval on global model  
+
+> 4:
+
+𝜃 𝑘 𝑖 ← Train( 𝜃 𝑘 , 𝑖 , 𝑇 ) ⊳ local training  
+
+> 5:
+
+𝑟 post  
+
+> 𝑖
+
+← Eval( 𝜃 𝑘 𝑖 , 𝑖 , 𝐸 ) ⊳ post-eval on local model  
+
+> 6:
+
+Send 𝑟 pre  
+
+> 𝑖
+
+, 𝑟 post  
+
+> 𝑖
+
+, 𝜃 𝑘 𝑖 to server  
+
+> 7:
+
+end for  
+
+> 8:
+
+Server: Δ𝑘 𝑖 ← 𝑟 post  
+
+> 𝑖
+
+− 𝑟 pre  
+
+> 𝑖
+
+for each 𝑖  
+
+> 9:
+
+if max 𝑖 Δ𝑘 𝑖 ≤ 0 then  
+
+> 10:
+
+𝑤 𝑖 ← 1∕ 𝑁 for each 𝑖 ⊳ uniform fallback  
+
+> 11:
+
+else  
+
+> 12:
+
+𝑐 𝐼 𝑖 ← norm(max(0 , Δ𝑘 𝑖 )) ⊳ (5)  
+
+> 13:
+
+𝑐 𝐷 𝑖 ← 1 − norm( 𝑟 pre  
+
+> 𝑖
+
+) ⊳ (6)  
+
+> 14:
+
+score 𝑖 ← 𝑐 𝐼 𝑖 ⋅ (1 + 𝛼 ⋅ 𝑐 𝐷 𝑖 ) ⊳ (7)  
+
+> 15:
+
+𝑤 𝑖 ← sof tmax(score , 𝜏 )𝑖 ⊳ (8)  
+
+> 16:
+
+end if  
+
+> 17:
+
+𝜃 𝑘 +1 ← ∑𝑁 𝑖 =1 𝑤 𝑖 𝜃 𝑘 𝑖 ⊳ (2)  
+
+> 18:
+
+return 𝜃 𝑘 +1 
+
+Difficulty amplification. When two clients improve equally, the one in the harder environment scores higher for any 𝛼 > 0. Min-max normalization places the easiest client at 𝑐 𝐷  
+
+> easy
+
+= 0 and the hardest at 𝑐 𝐷  
+
+> hard
+
+= 1 , so for equal 
+
+𝑐 𝐼 their score ratio is: 
+
+score hard 
+
+score easy 
+
+= 𝑐 𝐼 ⋅ (1 + 𝛼 ⋅ 1) 
+
+𝑐 𝐼 ⋅ (1 + 𝛼 ⋅ 0) = 1 + 𝛼. (9) At 𝛼 = 1 .0, the hardest client therefore receives a score twice that of the easiest. This satisfies requirement (ii): the preference for harder environments is built into the score structure. Algorithm 1 summarizes one communication round of FedDIA. 
+
+## 5. Experiments 
+
+5.1. Experimental Setup 
+
+Simulation Setup. We conduct all experiments in Isaac Lab [40, 41], a GPU-accelerated physics simulation frame-work. Each client controls a differential-drive robot navigat-ing a 5 m × 5 m square arena enclosed by solid walls. The task is mapless point-goal navigation in which the robot must reach a randomly placed goal using only its current sensor readings, with no map or prior knowledge of the environment. At the start of each episode, the robot and goal are initialized at random positions on opposite sides of the arena, with a uniformly sampled initial heading for the robot. The physics engine runs at 100 Hz, and the policy is executed once every four simulation steps, yielding a control frequency of 25 Hz (40 ms per decision step). An episode ends when the robot reaches the goal (within 0.20 m), collides with an obstacle       
+
+> Y. L. Tun et al.: Preprint Page 5 of 12 (a) Empty (b) Random (c) Grid (d) Mixed (e) Multi-gate
+
+Figure 4: Top-down view of the five obstacle modes. Empty , random and grid are used for training, while mixed and multi-gate 
+
+are held out for evaluation. Random obstacles are shown in blue and grid obstacles in red. The goal is the green marker. (minimum LiDAR reading below 0.12 m), or exhausts the step budget of 1000 steps (40 s). 
+
+Obstacle Configurations. Obstacles are cylindrical pillars (radius 0.15 m, height 0.5 m). Three obstacle modes are used during training: Empty — an open arena with no obstacles; 
+
+Random — 20 obstacles placed uniformly at random, re-sampled each episode; and Grid — 25 obstacles in a fixed 
+
+5×5 grid, static across episodes. Two held-out modes are reserved for evaluation: Mixed — 12 randomly placed and 16 grid-placed obstacles (28 total), combining the random 
+
+and grid configurations; and Multi-gate — three parallel walls spanning the arena, each with two traversable gaps. In all modes, obstacles are displaced at least 0.35 m from the robot and goal spawn positions to ensure feasible episodes. Figure 4 shows a top-down view of all five modes. 
+
+State Space. The observation vector 𝐬 𝑡 ∈ ℝ124 contains 120 LiDAR readings over 360° (3° resolution), each normalized by the maximum range of 5 m with out-of-range rays set to 1. The remaining four entries encode the goal and robot state: distance to goal , the Euclidean distance to the goal normalized by the arena diagonal ( 5√2 m); goal angle ,the angle to the goal as seen by the robot, computed as 
+
+atan2(Δ 𝑦, Δ𝑥 ) − 𝜓 𝑡 and normalized by 𝜋 after wrapping to 
+
+[− 𝜋, 𝜋 ], where 𝜓 𝑡 is the robot’s heading; linear velocity ,forward speed normalized by 0.22 m/s; and angular velocity ,rotation rate normalized by 2.0 rad/s. All entries are clamped to [−5 , 5] .
+
+Action Space. The action space is continuous and two-dimensional, consisting of linear velocity 𝑣 𝑡 ∈ [0 , 0.22] m∕s 
+
+and angular velocity 𝜔 𝑡 ∈ [−2 .0, 2.0] rad∕s . The actor outputs values in [−1 , 1] , which are linearly rescaled to each physical range. Since linear velocity is non-negative, the robot can only move forward or stop. 
+
+Reward. The per-step reward is the sum of six terms: 
+
+𝑟 𝑡 = 𝑟 goal + 𝑟 col + 𝑟 prog + 𝑟 step + 𝑟 fwd + 𝑟 smooth .
+
+The goal and collision terms are sparse, taking a nonzero value only when the robot reaches the goal or collides with         
+
+> Table 1
+> TD3 hyperparameters. Parameter Value Learning rate 3 × 10 −4
+> Replay buffer size 10 6
+> Batch size 1024 Discount factor 𝛾 0.995 Exploration noise 𝜎 0.3
+
+an obstacle: 
+
+𝑟 goal =
+
+{
+
+200 if 𝛿 𝑡 < 0.20 m ,
+
+0 otherwise, 
+
+𝑟 col =
+
+{
+
+−40 if 𝑑 min < 0.12 m ,
+
+0 otherwise, where 𝛿 𝑡 is the distance to goal at step 𝑡 and 𝑑 min is the minimum of the 120 LiDAR readings. The remaining four terms are dense, applied at every step: 
+
+𝑟 prog = 10 ⋅ (𝛿 𝑡 −1 − 𝛿 𝑡 ),𝑟 step = −0 .05 ,𝑟 fwd = 0 .25 ⋅ 𝑣 𝑡 ,𝑟 smooth = −0 .1 ⋅ |𝜔 𝑡 − 𝜔 𝑡 −1 |,
+
+where 𝑣 𝑡 and 𝜔 𝑡 are the linear and angular velocities at step 𝑡 .
+
+𝑟 prog rewards progress toward the goal; 𝑟 step penalizes each timestep to encourage efficiency; 𝑟 fwd encourages forward motion; and 𝑟 smooth penalizes abrupt changes in angular ve-locity between consecutive steps to promote smooth turning. The total reward is clipped to [−500 , 500] .
+
+Client Configuration. We use 𝑁 = 8 clients, each assigned a single obstacle mode for the duration of training. To reproduce the plateau scenario described in Section 3.2, in which a majority of clients converge early while a minority continue to offer meaningful learning signal, we assign four clients to empty , two to random , and two to grid .
+
+Local Training. Each client trains with TD3 [42], an off-policy actor-critic algorithm for continuous action spaces.   
+
+> Y. L. Tun et al.: Preprint Page 6 of 12
+
+Table 2 
+
+Success rate (%) across training and held-out environments. Each method is trained for 60 communication rounds and the resulting model is evaluated for 1000 episodes in every environment. Results are reported as mean ± standard deviation across three independent seeds. Best federated result per column in bold. Local trains each client alone with no aggregation and is reported as a non-federated reference. Training environments Held-out environments Method empty random grid mixed multi-gate Mean Local (Empty) 85 .9 ± 21 .3 11 .8 ± 2.7 0.0 ± 0.0 0.2 ± 0.2 2.4 ± 1.2 20 .1 ± 4.6
+
+Local (Random) 95 .6 ± 1.6 71 .2 ± 9.1 61 .1 ± 9.8 48 .3 ± 10 .2 67 .5 ± 12 .2 68 .8 ± 8.3
+
+Local (Grid) 53 .9 ± 20 .3 54 .7 ± 10 .8 41 .5 ± 24 .3 34 .3 ± 11 .5 48 .3 ± 7.5 46 .5 ± 14 .8
+
+FedAvg 99 .2 ± 0.7 73 .1 ± 2.1 61 .4 ± 12 .9 49 .4 ± 5.3 60 .2 ± 1.6 68 .7 ± 4.3
+
+Reward-Weighted 𝟗𝟗 .𝟗 ± 𝟎 .𝟏 64 .1 ± 3.0 35 .9 ± 1.8 33 .7 ± 0.6 55 .6 ± 3.3 57 .9 ± 1.5
+
+FGRL 98 .9 ± 0.6 63 .6 ± 3.0 32 .5 ± 9.0 31 .8 ± 5.0 54 .8 ± 7.0 56 .3 ± 4.6
+
+FedKL 99 .2 ± 0.5 72 .4 ± 5.4 58 .4 ± 15 .4 45 .4 ± 12 .2 59 .0 ± 6.5 66 .9 ± 7.9
+
+FedProx 99 .6 ± 0.3 73 .3 ± 3.0 56 .6 ± 5.8 43 .9 ± 5.9 64 .5 ± 3.1 67 .6 ± 3.4
+
+FedDIA 98 .5 ± 0.4 𝟕𝟕 .𝟒 ± 𝟓 .𝟓 𝟕𝟓 .𝟏 ± 𝟕 .𝟔 𝟓𝟗 .𝟕 ± 𝟑 .𝟕 𝟔𝟔 .𝟖 ± 𝟕 .𝟑 𝟕𝟓 .𝟓 ± 𝟑 .𝟓 
+
+Both the actor and critic are two-layer MLPs with 256 units per layer. As noted in Section 3.1, only the actor is aggregated, and the critic remains local throughout training. Key TD3 hyperparameters are listed in Table 1. 
+
+Federated Configuration. We train for 𝐾 = 60 com-munication rounds under three independent seeds. At each round, every client evaluates the received global model for 
+
+𝐸 = 200 episodes to obtain 𝑟 pre  
+
+> 𝑖
+
+, then trains locally for 
+
+𝑇 = 300 ,000 timesteps. It then evaluates the resulting local model for another 𝐸 = 200 episodes to obtain 𝑟 post  
+
+> 𝑖
+
+.Both are undiscounted episode returns, averaged over the 
+
+𝐸 evaluation episodes, with 𝛾 applying to local training only. Relative to baselines that weight clients by measured performance, the additional pre-training evaluation accounts for about 15% of round wall-clock time. FedDIA combines 
+
+𝑟 pre  
+
+> 𝑖
+
+and 𝑟 post  
+
+> 𝑖
+
+into an aggregation score (7) using amplification coefficient 𝛼 = 1 .0, then derives weights via softmax (8) with temperature 𝜏 = 1 .0.
+
+Baselines. We compare FedDIA against five federated base-lines: FedAvg [12] (uniform weights), Reward-Weighted 
+
+(weights proportional to average episode return), FGRL [15] (cross-round growth-based weights 1), FedKL [34] (KL-regularized local training 2), and FedProx [19] (proximal-regularized local training 3). We additionally report Local , a non-federated reference in which a client trains independently, without aggregation. We train one client in each of the three training environments. 
+
+Evaluation. We evaluate the resulting global model for 1000 episodes in each of the five obstacle modes described above: the three training modes ( empty , random , grid ) and            
+
+> 1Following the original work, FGRL also aggregates the critic and applies a soft local update ( 𝜆 = 0 .9).
+> 2KL divergence cannot be directly computed for TD3’s deterministic policy. We penalize the squared difference of actor outputs, which is proportional to the KL between the corresponding Gaussian exploration policies. We sweep and fix the coefficients ( 𝜆 1= 0 .1,𝜆 2= 1 .0).
+> 3We use a proximal coefficient of 𝜇 = 1 .0.10 20 30 40 50 60 Communication round 020 40 60 80 Success rate (%)
+> FedAvg Reward-Weighted FGRL FedKL FedProx FedDIA
+
+Figure 5: Success rate (%) of the global model over commu-nication rounds, averaged across the five environments (1000 episodes each). Shaded regions show one standard deviation over three seeds. two held-out modes ( mixed and multi-gate ). Our primary metric is success rate , the percentage of episodes where the robot reaches the goal without colliding. 
+
+Hardware. We run all experiments on a single machine equipped with an NVIDIA GeForce RTX 3090 (24 GB VRAM), an Intel Core i9-12900 (16 cores, 32 threads), and 32 GB of system memory. Training and evaluation both run inside a Docker container based on the Isaac Lab image. 
+
+5.2. Main Comparison 
+
+Table 2 reports success rate across all five environments. FedDIA attains the highest mean success rate ( 75 .5% against 
+
+68 .7% for FedAvg, the strongest federated baseline). Its margin is largest in grid , the hardest of the three training environments, and in mixed , the harder of the two held-out environments. In empty , every federated method is near ceiling and the differences between them are negligible. 
+
+Y. L. Tun et al.: Preprint Page 7 of 12 0 10 20 30 40 50 60             
+
+> Communication round
+> 0.05 0.10 0.15 0.20 0.25 0.30 0.35
+> Mean weight per client Reward-Weighted
+> 010 20 30 40 50 60
+> Communication round FGRL
+> 010 20 30 40 50 60
+> Communication round FedDIA empty (4 clients) random (2 clients) grid (2 clients) uniform (1/8)
+
+Figure 6: Aggregation weight received by a client in each environment group (averaged within the group) for one representative seed. The lines show a five-round moving average. The dashed line at 1∕8 = 0 .125 is the uniform weighting of FedAvg. Figure 5 tracks the same comparison across communica-tion rounds. FedDIA stays close to the baselines through the early rounds, and its margin widens toward the end. Weighting on the wrong signal can cost more than simply averaging: reward-weighted aggregation performs worse than FedAvg (mean success rate of 57 .9% against 68 .7% ). Easy environments permit high absolute returns by construction, so weighting by return favors the easy-environment clients and pulls the global model toward updates that carry little new information. The Local rows show the limits of training alone, except 
+
+Local (Random) , which reaches 68 .8% and matches FedAvg. Re-sampling its obstacles every episode gives it both an easy layout to start from and enough variety to perform well across our five evaluation environments. We attribute FedAvg’s result to the plateau of Section 3.2 rather than to a limitation of federation itself. Four of the eight clients train in empty , so uniform weighting assigns half of the aggregate to clients that have already converged, diluting the contribution of those still improving. FedDIA reweights toward those clients and gains 6.8 points over FedAvg. 
+
+5.3. Aggregation Weight Allocation 
+
+Figure 6 shows the average weight received by a client in each environment group during training. FedKL and FedProx are omitted since their weights are uniform, as in FedAvg. Reward-weighted aggregation favors the empty 
+
+clients throughout, holding their weight above the uniform level for the entire run, while the grid clients never rise above it. Absolute return is highest where the task is easiest, so weighting by return concentrates the global model on the environments that needed the least help. FGRL’s self-referential growth shrinks as training proceeds, and the separation between groups decays until all three settle at the uniform level. FedDIA makes improvements comparable across clients, and these improvements can therefore be rescaled each round, allowing the spread between clients to survive even as the improvements themselves shrink. Under FedDIA, the empty 
+
+clients receive above-uniform weight over the first few rounds, while the global model is still improving in every environment. They fall below uniform thereafter, as their improvements become smaller. The weight allocation in FedDIA is also considerably more dynamic than either baseline, responding 
+
+Table 3 
+
+Mean success rate (%) over the five evaluation environments for amplification coefficient 𝛼 . We use a smaller experiment setup with four clients (three empty , one grid ) trained for 30 communication rounds. All other settings are the same as in Section 5.1. Improvement only (𝛼 = 0 ) reduces the score to the improvement signal alone; Difficulty only replaces (7) with 
+
+score 𝑖 = 𝑐 𝐷 𝑖 . FedDIA uses 𝛼 = 1 .0 in all other experiments. Method 𝛼 Mean success rate Improvement only 0.00 29 .6 ± 7.5
+
+FedDIA 0.25 37 .2 ± 13 .1
+
+0.50 31 .3 ± 4.4
+
+0.75 31 .1 ± 5.3
+
+1.00 36 .4 ± 8.4
+
+1.25 22 .4 ± 2.4
+
+1.50 33 .8 ± 10 .9
+
+Difficulty only – 30 .6 ± 5.2
+
+to which clients improved in a given round. Relative to the baselines, FedDIA moves weight toward the harder environments and away from the easiest. 
+
+5.4. Score Ablation 
+
+Table 3 sweeps the amplification coefficient 𝛼 of (7) and isolates each of the two signals in turn. We use a smaller exper-iment setup with four clients rather than eight, three in empty 
+
+and one in grid , trained for 30 communication rounds instead of 60, with every other setting as in Section 5.1. Improvement only (𝛼 = 0 ) removes the difficulty bonus and weights clients by intra-round improvement alone, reaching 29 .6% . Difficulty only (score 𝑖 = 𝑐 𝐷 𝑖 ) removes the improvement signal instead, weighting clients by environment difficulty whether or not they are learning, reaching 30 .6% . Combining the two signals gives a higher mean success rate than either alone for five of the six 𝛼 values, including the default 𝛼 = 1 .0 at 36 .4% .
+
+5.5. Structured Obstacle Layouts 
+
+To test whether policies trained only against cylindrical pillars of a single radius transfer to obstacles of more realistic shape and varied size, we hand-author two layouts: a warehouse of industrial equipment and a living space of household furniture, both shown in Figure 7. We evaluate the 
+
+Y. L. Tun et al.: Preprint Page 8 of 12 Table 4                                                                                                             
+
+> Success, collision and timeout rates (%) in the two hand-authored layouts of Figure 7. The final models of Section 5.2 are evaluated without further training, under the same evaluation protocol. Best federated result per column in bold. Local is reported as a non-federated reference. Warehouse Living space Method success ↑collision ↓timeout ↓success ↑collision ↓timeout ↓
+> Local (Empty) 1.8 ± 0.668 .3 ± 50 .829 .9 ± 51 .23.8 ± 2.065 .0 ± 51 .431 .1 ± 53 .3
+> Local (Random) 38 .3 ± 7.614 .5 ± 8.447 .2 ± 11 .237 .1 ± 11 .07.0 ± 3.456 .0 ± 9.2
+> Local (Grid) 33 .0 ± 15 .511 .2 ± 1.955 .8 ± 14 .922 .6 ± 9.61.7 ± 0.475 .7 ± 9.2
+> FedAvg 49 .4 ± 4.832 .2 ± 3.018 .5 ± 2.461 .3 ± 3.512 .9 ± 4.725 .8 ± 1.8
+> Reward-Weighted 36 .1 ± 2.153 .0 ± 8.6𝟏𝟎 .𝟗 ±𝟗 .𝟔 52 .7 ± 7.035 .8 ± 12 .8𝟏𝟏 .𝟔 ±𝟖 .𝟑
+> FGRL 28 .7 ± 6.923 .2 ± 10 .448 .1 ± 17 .232 .5 ± 11 .1𝟓 .𝟐 ±𝟐 .𝟕 62 .4 ± 13 .9
+> FedKL 39 .7 ± 23 .8𝟏𝟔 .𝟐 ±𝟏𝟏 .𝟓 44 .1 ± 35 .343 .6 ± 27 .36.1 ± 6.350 .3 ± 33 .2
+> FedProx 50 .5 ± 5.033 .4 ± 14 .016 .2 ± 11 .661 .1 ± 11 .414 .8 ± 9.824 .1 ± 21 .3
+> FedDIA 𝟔𝟏 .𝟔 ±𝟑 .𝟔 20 .6 ± 5.017 .8 ± 1.7𝟕𝟒 .𝟖 ±𝟔 .𝟕 6.4 ± 2.118 .9 ± 6.7
+> (a) Warehouse
+> (b) Living space
+
+Figure 7: Hand-authored layouts, used for evaluation only: (a) a warehouse assembled from industrial equipment, and (b) a living space assembled from household furniture. The objects are fixed in both layouts and only the robot and goal spawn positions are re-sampled between episodes. same final models reported in Section 5.2, without any further training. Table 4 reports success, collision and timeout rates for each method in both layouts. FedDIA reaches the highest success rate in both, 61 .6% against FedProx’s 50 .5% in the warehouse and 74 .8% against FedAvg’s 61 .3% in the living space. Local (Random) , which matched FedAvg in Table 2, reaches only 38 .3% and 37 .1% here, against FedAvg’s 49 .4% 
+
+and 61 .3% . It did not transfer to unfamiliar obstacle shapes as well as FedAvg. FedDIA’s collision and timeout rates, however, are not the lowest in the table. This is because a policy can eliminate collisions by refusing to move, and timeouts by moving without regard for obstacles. Reward-Weighted, for example, has the fewest timeouts ( 10 .9% and 11 .6% ) and the highest collision rate among the federated baselines ( 53 .0% and 
+
+35 .8% ), trading one failure mode for the other. FedDIA avoids both extremes. 
+
+5.6. Robustness to a Defective Client 
+
+A deployed fleet cannot assume every robot is working properly. For example, a drive motor may fail on one wheel, so that the commanded action is no longer the motion the robot executes. The model that client produces therefore drifts away from any useful policy. The client keeps training and reporting, and its update is aggregated along with every other client’s. We simulate such a failure by replacing one client’s actions with uniform random values during training. We use the default configuration of Section 5.1 and make one of the two grid clients defective. In a federated setting the server does not know which client is defective, so any down-weighting has to emerge from the aggregation rule itself. Table 5 reports success rate with the defective client present. FedDIA maintains the highest performance at 75 .6% .Reward-weighted aggregation discounts the defective client automatically by weighting on return, and therefore does better than FedAvg’s uniform weighting in this setting. 
+
+5.7. Partial Client Participation 
+
+In a deployed fleet, not every client is available in every round. We therefore scale the number of clients to 
+
+40 (20 empty , 10 random , and 10 grid ) and sample 8 clients uniformly at random in each round. All other settings are unchanged. Figure 8 reports the result. FedDIA achieves a mean success rate of 42 .0% , compared with 33 .2% for FedAvg, and leads in each environment.   
+
+> Y. L. Tun et al.: Preprint Page 9 of 12
+
+Table 5 
+
+Success rate (%) with one defective client. One of the two grid clients has its actions replaced with uniform random values during training. Training and evaluation otherwise follow the clean setting of Table 2. Best result per column in bold. Training environments Held-out environments Method empty random grid mixed multi-gate Mean FedAvg 99 .0 ± 0.6 60 .5 ± 4.6 33 .6 ± 13 .7 33 .3 ± 5.1 48 .8 ± 10 .1 55 .0 ± 6.3
+
+Reward-Weighted 𝟗𝟗 .𝟓 ± 𝟎 .𝟓 71 .4 ± 2.9 56 .6 ± 4.6 45 .5 ± 3.5 61 .9 ± 6.4 67 .0 ± 2.8
+
+FGRL 74 .2 ± 17 .8 43 .3 ± 3.2 14 .5 ± 1.9 18 .0 ± 2.2 34 .8 ± 6.4 36 .9 ± 1.8
+
+FedKL 99 .4 ± 0.3 69 .7 ± 5.5 43 .2 ± 13 .2 38 .3 ± 9.4 53 .5 ± 10 .5 60 .8 ± 7.7
+
+FedProx 99 .2 ± 0.9 69 .0 ± 2.4 54 .0 ± 7.4 41 .9 ± 4.2 59 .2 ± 0.4 64 .7 ± 2.8
+
+FedDIA 99 .3 ± 0.7 𝟕𝟖 .𝟖 ± 𝟏 .𝟏 𝟕𝟓 .𝟗 ± 𝟒 .𝟒 𝟓𝟔 .𝟓 ± 𝟐 .𝟓 𝟔𝟕 .𝟓 ± 𝟒 .𝟎 𝟕𝟓 .𝟔 ± 𝟎 .𝟔 empty random grid mixed multi-gate Mean 
+
+> 020 40 60 80 100 Success rate (%)
+> FedAvg FedDIA
+
+Figure 8: Success rate (%) with 40 clients, 8 sampled per round, at round 60 . Mean ± standard deviation over three seeds. 
+
+## 6. Conclusion 
+
+We identified the plateau problem in heterogeneous federated reinforcement learning: once a client has mastered its environment, its updates carry little new information. Uniform averaging nonetheless keeps weighting it equally, and return-based weighting rewards it further. FedDIA scores each client by how much its local training improved the global model, amplified by the difficulty of its environment. Both signals are measured against the same global model, so they are comparable across clients, and require no description of the environment. Against baselines that also weight clients by measured performance, the extra cost is the evaluation of the global model before local training. FedDIA reaches a mean success rate of 75 .5% over five evaluation environments, against 68 .7% for the strongest federated baseline. Its advan-tage carries over to hand-authored warehouse and living-space layouts, evaluated without further training. FedDIA also holds its performance when a client is defective, and remains the best-performing method. The plateau problem can arise wherever federated clients face environments of varying difficulty. In future work, we plan to evaluate FedDIA on tasks where client difficulty comes from something other than obstacle layout. 
+
+## References 
+
+[1] R. S. Sutton, A. G. Barto, Reinforcement Learning: An Introduction, 2nd Edition, Adaptive Computation and Machine Learning, MIT Press, Cambridge, MA, USA, 2018. URL http://incompleteideas.net/book/the-book-2nd.html 
+
+[2] T. P. Lillicrap, J. J. Hunt, A. Pritzel, N. Heess, T. Erez, Y. Tassa, D. Silver, D. Wierstra, Continuous control with deep reinforcement learning, in: Y. Bengio, Y. LeCun (Eds.), 4th International Conference on Learning Representations, ICLR 2016, San Juan, Puerto Rico, May 2-4, 2016, Conference Track Proceedings, 2016. URL http://arxiv.org/abs/1509.02971 
+
+[3] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, O. Klimov, Proximal policy optimization algorithms, CoRR abs/1707.06347 (2017). arXiv: 1707.06347 .URL http://arxiv.org/abs/1707.06347 
+
+[4] T. Haarnoja, A. Zhou, P. Abbeel, S. Levine, Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor, in: J. Dy, A. Krause (Eds.), Proceedings of the 35th International Conference on Machine Learning, Vol. 80 of Proceedings of Machine Learning Research, PMLR, 2018, pp. 1861–1870. URL https://proceedings.mlr.press/v80/haarnoja18b.html 
+
+[5] L. Tai, G. Paolo, M. Liu, Virtual-to-real deep reinforcement learning: Continuous control of mobile robots for mapless navigation, in: 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems, IROS 2017, Vancouver, BC, Canada, September 24-28, 2017, IEEE, 2017, pp. 31–36. doi:10.1109/IROS.2017.8202134 .URL https://doi.org/10.1109/IROS.2017.8202134 
+
+[6] X. Xiao, B. Liu, G. Warnell, P. Stone, Motion planning and control for mobile robot navigation using machine learning: a survey, Auton. Robots 46 (5) (2022) 569–597. doi:10.1007/S10514-022-10039-8 .URL https://doi.org/10.1007/s10514-022-10039-8 
+
+[7] D. Fox, W. Burgard, S. Thrun, The dynamic window approach to collision avoidance, IEEE Robotics Autom. Mag. 4 (1) (1997) 23–33. 
+
+> doi:10.1109/100.580977
+
+.URL https://doi.org/10.1109/100.580977 
+
+[8] H. Jin, Y. Peng, W. Yang, S. Wang, Z. Zhang, Federated reinforce-ment learning with environment heterogeneity, in: G. Camps-Valls, F. J. R. Ruiz, I. Valera (Eds.), International Conference on Artificial Intelligence and Statistics, AISTATS 2022, 28-30 March 2022, Virtual Event, Vol. 151 of Proceedings of Machine Learning Research, PMLR, 2022, pp. 18–37. URL https://proceedings.mlr.press/v151/jin22a.html 
+
+[9] B. Liu, L. Wang, M. Liu, Lifelong federated reinforcement learning: A learning architecture for navigation in cloud robotic systems, IEEE Robotics Autom. Lett. 4 (4) (2019) 4555–4562. doi:10.1109/LRA.2019. 2931179 .URL https://doi.org/10.1109/LRA.2019.2931179 
+
+[10] H. H. Zhuo, W. Feng, Y. Lin, Q. Xu, Q. Yang, Federated deep reinforcement learning, arXiv preprint arXiv:1901.08277 (2019). 
+
+> arXiv:1901.08277
+
+.
+
+Y. L. Tun et al.: Preprint Page 10 of 12 [11] J. Qi, Q. Zhou, L. Lei, K. Zheng, Federated reinforcement learning: techniques, applications, and open challenges, Intelligence & Robotics 1 (1) (2021) 18–57. doi:10.20517/ir.2021.02 .URL https://www.oaepublish.com/articles/ir.2021.02 
+
+[12] B. McMahan, E. Moore, D. Ramage, S. Hampson, B. A. y Arcas, Communication-efficient learning of deep networks from decentralized data, in: A. Singh, X. J. Zhu (Eds.), Proceedings of the 20th Interna-tional Conference on Artificial Intelligence and Statistics, AISTATS 2017, 20-22 April 2017, Fort Lauderdale, FL, USA, Vol. 54 of Proceedings of Machine Learning Research, PMLR, 2017, pp. 1273– 1282. URL http://proceedings.mlr.press/v54/mcmahan17a.html 
+
+[13] N. Ab Azar, A. Shahmansoorian, M. Davoudi, Adaptive confidence-weighted policy aggregation: A novel method for federated reinforce-ment learning, Research Square preprint (2025). doi:10.21203/rs.3. rs-6665562/v1 .[14] Y. Chu, Z. Wei, X. Fang, S. Chen, Y. Zhou, A multiagent federated reinforcement learning approach for plug-in electric vehicle fleet charging coordination in a residential community, IEEE Access 10 (2022) 98535–98548. doi:10.1109/ACCESS.2022.3206020 .URL https://doi.org/10.1109/ACCESS.2022.3206020 
+
+[15] S. Tian, C. Wei, Y. Li, Z. Ji, FGRL: Federated growing reinforcement learning for resilient mapless navigation in unfamiliar environments, Applied Sciences 14 (23) (2024) 11336. doi:10.3390/app142311336 .URL https://www.mdpi.com/2076-3417/14/23/11336 
+
+[16] X. Liang, Y. Liu, T. Chen, M. Liu, Q. Yang, Federated transfer reinforcement learning for autonomous driving, in: Federated and Transfer Learning, Springer International Publishing, Cham, 2023, pp. 357–371. doi:10.1007/978-3-031-11748-0_15 .[17] D. Zhou, Y. Zhang, A. Sonabend-W, Z. Wang, J. Lu, T. Cai, Federated offline reinforcement learning, Journal of the American Statistical Association 119 (548) (2024) 3152–3163. doi:10.1080/01621459.2024. 2310287 .[18] J. Tian, H. Min, J. Hu, Adaptive predictive maintenance for edge-powered smart manufacturing with federated offline-online reinforce-ment learning, IEEE Trans. Ind. Informatics 22 (8) (2026) 6918–6928. 
+
+> doi:10.1109/TII.2026.3681729
+
+.URL https://doi.org/10.1109/TII.2026.3681729 
+
+[19] T. Li, A. K. Sahu, M. Zaheer, M. Sanjabi, A. Talwalkar, V. Smith, Federated optimization in heterogeneous networks, in: I. S. Dhillon, D. S. Papailiopoulos, V. Sze (Eds.), Proceedings of the Third Conference on Machine Learning and Systems, MLSys 2020, Austin, TX, USA, March 2-4, 2020, mlsys.org, 2020. URL https://proceedings.mlsys.org/paper_files/paper/2020/hash/ 1f5fe83998a09396ebe6477d9475ba0c-Abstract.html 
+
+[20] S. P. Karimireddy, S. Kale, M. Mohri, S. J. Reddi, S. U. Stich, A. T. Suresh, SCAFFOLD: stochastic controlled averaging for federated learning, in: Proceedings of the 37th International Conference on Machine Learning, ICML 2020, 13-18 July 2020, Virtual Event, Vol. 119 of Proceedings of Machine Learning Research, PMLR, 2020, pp. 5132–5143. URL http://proceedings.mlr.press/v119/karimireddy20a.html 
+
+[21] Y. Zhao, M. Li, L. Lai, N. Suda, D. Civin, V. Chandra, Federated learning with non-IID data, CoRR abs/1806.00582 (2018). arXiv: 1806.00582 .URL http://arxiv.org/abs/1806.00582 
+
+[22] H. Zhu, J. Xu, S. Liu, Y. Jin, Federated learning on non-IID data: A survey, Neurocomputing 465 (2021) 371–390. doi:10.1016/J.NEUCOM. 2021.07.098 .URL https://doi.org/10.1016/j.neucom.2021.07.098 
+
+[23] X. Li, K. Huang, W. Yang, S. Wang, Z. Zhang, On the convergence of FedAvg on non-IID data, in: 8th International Conference on Learning Representations, ICLR 2020, Addis Ababa, Ethiopia, April 26-30, 2020, OpenReview.net, 2020. URL https://openreview.net/forum?id=HJxNAnVtDS 
+
+[24] P. Kairouz, H. B. McMahan, B. Avent, A. Bellet, M. Bennis, A. N. Bhagoji, K. A. Bonawitz, Z. Charles, G. Cormode, R. Cummings, R. G. L. D’Oliveira, S. E. Rouayheb, D. Evans, J. Gardner, Z. Garrett, A. Gascón, B. Ghazi, P. B. Gibbons, M. Gruteser, Z. Harchaoui, C. He, L. He, Z. Huo, B. Hutchinson, J. Hsu, M. Jaggi, T. Javidi, G. Joshi, M. Khodak, J. Konečný, A. Korolova, F. Koushanfar, S. Koyejo, T. Lepoint, Y. Liu, P. Mittal, M. Mohri, R. Nock, A. Özgür, R. Pagh, M. Raykova, H. Qi, D. Ramage, R. Raskar, D. Song, W. Song, S. U. Stich, Z. Sun, A. T. Suresh, F. Tramèr, P. Vepakomma, J. Wang, L. Xiong, Z. Xu, Q. Yang, F. X. Yu, H. Yu, S. Zhao, Advances and open problems in federated learning, CoRR abs/1912.04977 (2019). 
+
+> arXiv:1912.04977
+
+.URL http://arxiv.org/abs/1912.04977 
+
+[25] T. Li, A. K. Sahu, A. Talwalkar, V. Smith, Federated learning: Challenges, methods, and future directions, IEEE Signal Process. Mag. 37 (3) (2020) 50–60. doi:10.1109/MSP.2020.2975749 .URL https://doi.org/10.1109/MSP.2020.2975749 
+
+[26] L. Hebert, L. Golab, P. Poupart, R. Cohen, FedFormer: Contextual federation with attention in reinforcement learning, in: N. Agmon, B. An, A. Ricci, W. Yeoh (Eds.), Proceedings of the 2023 International Conference on Autonomous Agents and Multiagent Systems, AAMAS 2023, London, United Kingdom, 29 May 2023 - 2 June 2023, ACM, 2023, pp. 810–818. doi:10.5555/3545946.3598716 .URL https://dl.acm.org/doi/10.5555/3545946.3598716 
+
+[27] A. Z. Tan, H. Yu, L. Cui, Q. Yang, Towards personalized federated learning, IEEE Trans. Neural Networks Learn. Syst. 34 (12) (2023) 9587–9603. doi:10.1109/TNNLS.2022.3160699 .URL https://doi.org/10.1109/TNNLS.2022.3160699 
+
+[28] C. T. Dinh, N. H. Tran, T. D. Nguyen, Personalized federated learning with Moreau envelopes, in: H. Larochelle, M. Ranzato, R. Hadsell, M. Balcan, H. Lin (Eds.), Advances in Neural Information Processing Systems 33: Annual Conference on Neural Information Processing Systems 2020, NeurIPS 2020, December 6-12, 2020, virtual, 2020. URL https://proceedings.neurips.cc/paper/2020/hash/ f4f1f13c8289ac1b1ee0ff176b56fc60-Abstract.html 
+
+[29] M. Zhang, K. Sapra, S. Fidler, S. Yeung, J. M. Álvarez, Personalized federated learning with first order model optimization, in: 9th Interna-tional Conference on Learning Representations, ICLR 2021, Virtual Event, Austria, May 3-7, 2021, OpenReview.net, 2021. URL https://openreview.net/forum?id=ehJqJQk9cw 
+
+[30] Y. Huang, L. Chu, Z. Zhou, L. Wang, J. Liu, J. Pei, Y. Zhang, Personalized cross-silo federated learning on non-IID data, in: Thirty-Fifth AAAI Conference on Artificial Intelligence, AAAI 2021, Thirty-Third Conference on Innovative Applications of Artificial Intelligence, IAAI 2021, The Eleventh Symposium on Educational Advances in Artificial Intelligence, EAAI 2021, Virtual Event, February 2-9, 2021, AAAI Press, 2021, pp. 7865–7873. doi:10.1609/AAAI.V35I9.16960 .URL https://doi.org/10.1609/aaai.v35i9.16960 
+
+[31] Q. Li, B. He, D. Song, Model-contrastive federated learning, in: IEEE Conference on Computer Vision and Pattern Recognition, CVPR 2021, virtual, June 19-25, 2021, Computer Vision Foundation / IEEE, 2021, pp. 10713–10722. doi:10.1109/CVPR46437.2021.01057 .URL https://openaccess.thecvf.com/content/CVPR2021/html/Li_ Model-Contrastive_Federated_Learning_CVPR_2021_paper.html 
+
+[32] Y. L. Tun, C. M. Thwal, Y. M. Park, S. Park, C. S. Hong, Federated learning with intermediate representation regularization, in: H. Byun, B. C. Ooi, K. Tanaka, S. Lee, Z. Li, A. Nadamoto, G. Song, Y. Ha, K. Sumiya, Y. Wu, H. Kwon, T. Yamamoto (Eds.), IEEE International Conference on Big Data and Smart Computing, BigComp 2023, Jeju, Republic of Korea, February 13-16, 2023, IEEE, 2023, pp. 56–63. 
+
+> doi:10.1109/BIGCOMP57234.2023.00017
+
+.URL https://doi.org/10.1109/BigComp57234.2023.00017 
+
+[33] H. M. Son, M. H. Kim, T.-M. Chung, Comparisons where it matters: Using layer-wise regularization to improve federated learning on heterogeneous data, Applied Sciences 12 (19) (2022) 9943. doi: 10.3390/app12199943 .URL https://doi.org/10.3390/app12199943 
+
+[34] Z. Xie, S. Song, FedKL: Tackling data heterogeneity in federated reinforcement learning by penalizing KL divergence, IEEE J. Sel. Areas Commun. 41 (4) (2023) 1227–1242. doi:10.1109/JSAC.2023. 3242734 .
+
+Y. L. Tun et al.: Preprint Page 11 of 12 URL https://doi.org/10.1109/JSAC.2023.3242734 
+
+[35] M. Kundroo, T. Singh, T. Kim, FedLBW: A loss-based weighting strategy for federated learning on non-IID data in wireless networks, Expert Syst. Appl. 302 (2026) 130487. doi:10.1016/J.ESWA.2025. 130487 .URL https://doi.org/10.1016/j.eswa.2025.130487 
+
+[36] D.-D. Le, T.-N. Huynh, A.-K. Tran, M.-S. Dao, P. T. Bao, FedNolowe: A normalized loss-based weighted aggregation strategy for robust federated learning in heterogeneous environments, PLOS ONE 20 (8) (2025) 1–25. doi:10.1371/journal.pone.0322766 .URL https://doi.org/10.1371/journal.pone.0322766 
+
+[37] J. He, W. Chen, X. Zhang, FedAA: A reinforcement learning perspec-tive on adaptive aggregation for fair and robust federated learning, in: T. Walsh, J. Shah, Z. Kolter (Eds.), Thirty-Ninth AAAI Conference on Artificial Intelligence, Thirty-Seventh Conference on Innovative Applications of Artificial Intelligence, Fifteenth Symposium on Edu-cational Advances in Artificial Intelligence, AAAI 2025, Philadelphia, PA, USA, February 25 - March 4, 2025, AAAI Press, 2025, pp. 17085– 17093. doi:10.1609/AAAI.V39I16.33878 .URL https://doi.org/10.1609/aaai.v39i16.33878 
+
+[38] H. Wang, Z. Kaplan, D. Niu, B. Li, Optimizing federated learning on non-IID data with reinforcement learning, in: 39th IEEE Conference on Computer Communications, INFOCOM 2020, Toronto, ON, Canada, July 6-9, 2020, IEEE, 2020, pp. 1698–1707. doi:10.1109/INFOCOM41043. 2020.9155494 .URL https://doi.org/10.1109/INFOCOM41043.2020.9155494 
+
+[39] Z. Xie, S. Song, Client selection for federated policy optimization with environment heterogeneity, Journal of Machine Learning Research 26 (2025) 1–45. URL http://jmlr.org/papers/v26/24-0233.html 
+
+[40] NVIDIA, Isaac Lab: A GPU-accelerated simulation framework for multi-modal robot learning, CoRR abs/2511.04831 (2025). arXiv: 2511.04831 , doi:10.48550/ARXIV.2511.04831 .URL https://doi.org/10.48550/arXiv.2511.04831 
+
+[41] V. Makoviychuk, L. Wawrzyniak, Y. Guo, M. Lu, K. Storey, M. Macklin, D. Hoeller, N. Rudin, A. Allshire, A. Handa, G. State, Isaac Gym: High performance GPU based physics simulation for robot learning, in: J. Vanschoren, S. Yeung (Eds.), Proceedings of the Neural Information Processing Systems Track on Datasets and Benchmarks 1, NeurIPS Datasets and Benchmarks 2021, December 2021, virtual, 2021. URL https://datasets-benchmarks-proceedings.neurips.cc/paper/ 2021/hash/28dd2c7955ce926456240b2ff0100bde-Abstract-round2.html 
+
+[42] S. Fujimoto, H. van Hoof, D. Meger, Addressing function approxi-mation error in actor-critic methods, in: J. G. Dy, A. Krause (Eds.), Proceedings of the 35th International Conference on Machine Learning, ICML 2018, Stockholmsmässan, Stockholm, Sweden, July 10-15, 2018, Vol. 80 of Proceedings of Machine Learning Research, PMLR, 2018, pp. 1582–1591. URL http://proceedings.mlr.press/v80/fujimoto18a.html 
+
+Y. L. Tun et al.: Preprint Page 12 of 12

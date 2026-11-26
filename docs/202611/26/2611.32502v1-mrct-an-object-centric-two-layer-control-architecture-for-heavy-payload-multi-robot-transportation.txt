@@ -1,0 +1,875 @@
+1
+MRCT: An Object-Centric Two-Layer Control Architecture for
+Heavy-Payload Multi-Robot Transportation
+Ning Wang1, Yoshihiko Nakamura2, Tianwei Zhang1,3∗
+Abstract—Cooperative transportation of heavy payloads by
+heterogeneous mobile manipulators requires coordinated payload
+motion, force distribution, and compliant physical interaction.
+This paper presents MRCT, an object-centric two-layer control
+architecture for multi-robot transportation. At the object level,
+a model predictive controller (MPC) generates a coordinated
+contact-force reference for the payload. At the robot level, whole-
+body impedance control (WBIC) modules on individual robots
+realise the reference through a confidence-based blending of
+velocity-tracking and impedance torques. The blending mecha-
+nism emphasises tracking when the joint-velocity error is small
+and increases compliance when tracking degrades because of
+abrupt reference changes or physical disturbances. Simulation and
+hardware experiments with a heterogeneous team comprising a
+single-arm and a dual-arm mobile manipulator transporting a
+near-rated table payload demonstrate accurate object tracking,
+regulated contact forces, and stable payload orientation. Parameter
+sensitivity studies, obstacle-avoidance transportation, and step-load
+disturbance experiments further demonstrate the effectiveness of
+MRCT for reliable cooperative transportation under the evaluated
+conditions.
+I. INTRODUCTION
+Cooperative transportation by multiple robots enables the
+handling of heavy or bulky objects beyond the capability of a
+single platform. This capability is important in logistics, manu-
+facturing, and service robotics, where payload motion, contact
+forces, and robot configurations must be coordinated under
+actuation and safety constraints. Heavy-payload transportation
+is particularly challenging because the controller must regulate
+object motion, distribute interaction forces among robots with
+different capabilities, and remain effective under modelling
+errors, contact uncertainty, and external disturbances [1].
+A central challenge is balancing trajectory tracking with
+physical interaction safety. Robots must remain sufficiently
+compliant to prevent impulsive contact, force amplification, and
+possible structural damage, while retaining enough stiffness to
+support the payload and preserve its pose during motion [2].
+This trade-off becomes more difficult for heterogeneous mobile
+manipulators, whose different morphologies, actuation limits,
+and contact configurations complicate whole-body motion co-
+ordination and force realisation. Practical transportation tasks
+further require operation under obstacle constraints, manual
+reference changes, and varying payload loads.
+Existing work addresses cooperative transportation through
+task and motion planning [3], payload-aware trajectory opti-
+misation [4], coupled object-level control [5], and distributed
+or leader–follower coordination strategies [6], [7]. However,
+many approaches either treat the mobile base and manipulator as
+separate subsystems, rely on specialised coordination structures,
+1The Shenzhen Institute of Artificial Intelligence and Robotics for Society
+2Mohamed bin Zayed University of Artificial Intelligence, Abu Dhabi, UAE
+3The Chinese University of Hong Kong - Shenzhen, China
+* Corresponding Author: zhangtianwei@cuhk.edu.cn
+or focus on motion coordination without explicitly integrating
+compliant whole-body execution. In parallel, impedance and
+admittance control have been widely used to improve safety
+in physical interaction, but their integration with payload-level
+planning for cooperative transportation by heterogeneous mobile
+manipulators remains insufficiently explored.
+This paper presents MRCT, an object-centric two-layer con-
+trol architecture for heavy-payload multi-robot transportation.
+An object-level MPC first computes a contact-force reference
+whose resultant defines a payload wrench reference. The re-
+sulting contact-force references are sent to the corresponding
+robot controllers, which independently execute local WBIC
+modules. A confidence-based blending mechanism uses the
+instantaneous joint-velocity tracking error to interpolate between
+tracking and impedance torques: it prioritises precise motion
+execution when tracking is reliable, and increases compliance
+when abrupt references or physical disturbances cause larger
+tracking deviations. This design permits a common payload-
+level objective while allowing heterogeneous robots to respond
+locally to contact conditions. Code will be released upon accep-
+tance. The contributions of this paper are as follows:
+• An object-centric two-layer architecture, termed MRCT,
+that combines object-level MPC planning with robot-level
+WBIC execution for heavy-payload transportation by het-
+erogeneous mobile manipulators.
+• A confidence-based torque blending strategy that inte-
+grates velocity-tracking and impedance torques, enabling a
+smooth trade-off between tracking accuracy and compliant
+interaction.
+• A
+systematic
+simulation
+study of the fusion and
+impedance parameters, characterising their effects on ob-
+ject tracking and contact-force regulation.
+• Hardware validation with a heterogeneous single-arm/dual-
+arm mobile manipulator team in joystick-guided trans-
+portation, obstacle avoidance, and step-load disturbance
+scenarios.
+II. RELATED WORKS
+Cooperative transportation has been studied through multi-
+robot task and motion planning, payload-aware trajectory opti-
+misation, and coordinated manipulation. For example, Motes et
+al. [3] formulate multi-robot task and motion planning using
+hypergraphs, while Kennel-Maushart and Coros [8] consider
+payload-aware trajectory optimisation for non-holonomic mo-
+bile multi-robot manipulation with tip-over avoidance. These
+methods provide valuable task-level planning capabilities, but
+often treat the mobile base and manipulators separately, which
+can limit the whole-body coordination needed for force-sensitive
+heavy-payload transport.
+More integrated cooperative control approaches employ de-
+centralised MPC, leader–follower architectures, or capability-
+arXiv:2611.32502v1  [cs.RO]  24 Nov 2026
+
+
+2
+Fig. 1: A heterogeneous robot team comprising a single-arm and a
+dual-arm mobile manipulator collaboratively transports a 9.89 kg table
+using the proposed MRCT framework. The task includes clockwise
+rotation around an obstacle and a 1 kg step-load disturbance.
+aware adaptation. Gasbarrone et al. [9] develop a decentralised
+transportation method for humanoid robots using a leader–
+follower structure. Lissandrini et al. [4] use decentralised
+nonlinear MPC for heterogeneous aerial–ground cooperative
+manipulation, while Yan et al. [10] address capability differ-
+ences through ability-aware adaptive control. Although effective
+in their respective settings, these methods commonly target
+lightweight objects, assume specific coordination structures, or
+do not explicitly address compliant whole-body execution for
+heterogeneous mobile manipulators transporting heavy rigid
+payloads.
+Compliant interaction is often achieved using admittance or
+impedance control. Admittance control adapts motion according
+to measured external forces but can be affected by feedback
+delays during fast contact transitions [11], [12]. Impedance
+control instead specifies a force–motion relationship and is
+particularly suitable for fast local compliance in stiff physical
+interactions [13]. Whole-body impedance control extends this
+idea by coordinating full-body robot motion while regulating
+task-space compliance [14]. It has been applied successfully
+to legged and wheel-legged robots operating under uncertain
+contact conditions [15], [16].
+In
+contrast
+to
+prior
+work,
+MRCT
+explicitly
+couples
+payload-level wrench planning with local whole-body compli-
+ant execution for a heterogeneous single-arm/dual-arm mobile-
+manipulator team. The proposed confidence-based blending
+mechanism provides an implementation-oriented interface be-
+tween object-level planning and local contact control. Its effec-
+tiveness is evaluated through parameter sensitivity studies and
+real-world cooperative transportation tasks involving obstacles
+and step-load disturbances.
+III. METHODS
+Fig. 2 illustrates the proposed two-layer control framework
+for heterogeneous cooperative transportation. The system oper-
+ates on two levels. At the object level, a shared MPC module
+receives the object’s current pose Pobj and desired trajectory
+Pobj,d. It computes coordinated contact-force references and
+desired contact-point poses for the next control step. This
+information is broadcast to all robots, providing a unified global
+objective.
+At the robot level, each agent independently executes a
+WBIC scheme for the contact point(s) it manages. The robot
+first acquires its own state (base pose and joint angles), e.g., via
+SLAM, motion capture and encoders, then computes the current
+end-effector pose through forward kinematics. The resulting
+pose error is fed simultaneously to two parallel controllers.
+Specifically, a whole-body MPC generates desired joint veloci-
+ties ˙q and base velocity v. The base velocity v is sent directly
+to the base controller, while ˙q is passed to a joint-level PD
+controller to produce a velocity-tracking torque τPD. At the
+same time, an impedance controller uses the same pose error to
+compute a compliance torque τimp.
+These two torque components, τPD and τimp, are then inte-
+grated via a confidence-based weighting mechanism to yield a
+combined joint torque τd. The final joint torque command τ is
+obtained by adding a feedforward term from the robot’s dynam-
+ics and a compensation term τfd for the object’s transportation
+force. This control logic is consistent across heterogeneous
+platforms. For a single-arm robot, one contact point is managed.
+For a dual-arm robot, the left and right arms are controlled
+independently by separate WBIC instances, generating distinct
+torque commands τl and τr.
+A. Object transportation MPC
+The proposed framework is hierarchically structured, be-
+ginning with an object-level MPC. It generates contact-force
+references whose resultant defines the net wrench applied to
+the payload. Let Nc denote the number of active robot–object
+contact points. The spatial momentum dynamics of the object’s
+centre of mass (CoM) are given by
+˙hcom =
+
+
+Nc
+X
+i=1
+Fd,i + mg
+Nc
+X
+i=1
+ri × Fd,i
+
+
+,
+(1)
+where ˙hcom
+∈R6 denotes the rate of change of spatial
+momentum about the CoM, m is the object mass, g is the gravity
+vector, Fd,i ∈R3 is the force applied at contact point i, and ri
+is the contact position relative to the CoM. In our experimental
+setup, Nc = 3, corresponding to one contact on the single-arm
+robot and two contacts on the dual-arm robot.
+An MPC is formulated to regulate the object’s pose by
+solving a finite-horizon optimal control problem. The objective
+is to minimise the deviation from the desired trajectory while
+penalizing control effort, as defined by the cost function:
+min
+{ut}
+N−1
+X
+t=0
+ (Pobj,t −Pobj,d,t)⊤Q(Pobj,t −Pobj,d,t) + u⊤
+t Rut
+
++ (Pobj,N −Pobj,d,N)⊤F(Pobj,N −Pobj,d,N)
+(2)
+s.t.
+Xt+1 = AXt + But,
+∀t
+(3)
+umin ≤ut ≤umax,
+∀t
+(4)
+Here, the state is Xt = [P ⊤
+obj,t, ˙P ⊤
+obj,t, g⊤]⊤∈R15, and the
+input ut = [F ⊤
+d,1,t, . . . , F ⊤
+d,Nc,t]⊤collects the contact forces,
+and Q, R, F ⪰0 are standard weighting matrices. The matrices
+A, B result from linearising Eq. (1) around the nominal oper-
+ating point. Constraints Eq. (3) and (4) enforce the linearised
+dynamics and box constraints on each contact force to ensure
+safe manipulation.
+
+
+3
+Fig. 2: Two-level MRCT framework. The object-level MPC computes coordinated contact-force references whose resultant defines the payload
+wrench reference. Each robot executes a local WBIC module, with specialised configurations for the single-arm (green) and dual-arm (blue)
+robots.
+B. Whole-body impedance control
+The second layer of the architecture is a whole-body
+impedance control (WBIC) scheme executed independently on
+each robot. Its goal is to generate coordinated and compliant
+motion of the mobile base and manipulators so as to realise the
+object-level wrench reference.
+1) Whole-body MPC for motion generation
+To coordinate the motions of the mobile base and manip-
+ulators, a finite-horizon MPC is employed to generate desired
+motion references. Let J denote the set of manipulators on the
+robot, where |J | = 1 for the single-arm robot and |J | = 2 for
+the dual-arm robot. The controller computes optimal motions
+by minimizing end-effector tracking errors, base tracking errors,
+and control effort over the prediction horizon [17], [2]:
+min
+{ut,j}
+C =
+T −1
+X
+t=0
+" X
+j∈J
+
+∥xt,j −xd,t,j∥2
+Qj + ∥ut,j∥2
+Rj
+
++ ∥xt,b −xd,t,b∥2
+Qb
+#
++
+X
+j∈J
+∥xT,j −xd,T,j∥2
+Fj.
+(5)
+Here, ∥z∥2
+Q = z⊤Qz, subject to robot kinematics, dynamics,
+and standard joint position and velocity constraints. Solving the
+MPC yields the desired joint velocity ˙qd and base velocity vd.
+2) Impedance control
+To ensure compliant interaction at the contact points, each
+manipulator simultaneously executes a Cartesian impedance
+controller. Let Pe = Pd −P denote the end-effector pose error.
+The desired interaction force is computed as [13]
+Fimp = Dimp ˙Pe + KimpPe
+(6)
+where Dimp and Kimp denote the virtual damping and stiffness
+matrices, respectively. The corresponding joint-space impedance
+torque is obtained through Jacobian transpose mapping:
+τimp = J⊤(q) Fimp
+(7)
+This provides fast, local compliance to external disturbances
+and contact transitions.
+3) Confidence-based blending of tracking and impedance
+torques
+In cooperative transportation, the joint torque must handle
+both external disturbances, where impedance is desirable, and
+large tracking errors caused by abrupt trajectory changes. Ap-
+plying pure impedance or pure tracking in isolation can either
+amplify forces or compromise robustness. To balance these
+effects, a confidence-based blending mechanism is introduced.
+Define the joint-velocity tracking error
+ev = ˙qd −˙q
+(8)
+where ˙qd and ˙q are the desired and actual joint velocities. A PD
+controller generates a velocity-tracking torque
+τP D = Kpev + Kd ˙ev
+(9)
+with Kp ≻0 and Kd ⪰0 denoting proportional and
+derivative gain matrices. The blending weight w ∈[0, 1] is
+chosen as
+w =
+σ2
+∥ev∥2 + σ2
+(10)
+where σ > 0 sets the error scale of the transition between
+tracking-dominant and impedance-dominant behaviour. When
+the tracking error is small, w is close to 1 and the controller
+
+
+4
+TABLE I: Sensitivity to the blending-scale parameter σ in MuJoCo.
+Trial Info
+Position and Yaw Error (m/rad)
+Contact Force (N)
+Trial
+T (s)
+σ
+ex,pk / ¯ex
+ey,pk / ¯ey
+ez,pk / ¯ez
+eyaw,pk / ¯eyaw
+Fd1,pk
+Fd2,pk
+Fd3,pk
+1
+160
+1.00
+0.091 / -0.012
+0.468 / -0.020
+0.083 / -0.022
+0.137 / -0.013
+542.69
+241.61
+314.50
+2
+147
+0.75
+0.092 / 0.009
+0.233 / -0.016
+0.154 / 0.045
+0.145 / 0.033
+191.51
+128.32
+115.64
+3
+168
+0.50
+0.061 / -0.003
+0.065 / 0.007
+0.052 / 0.005
+0.158 / 0.004
+54.21
+29.71
+23.68
+4
+180
+0.25
+0.205 / 0.018
+0.102 / -0.013
+0.054 / -0.021
+0.120 / -0.019
+48.65
+20.51
+24.13
+5
+Fail
+0.00
+- / -
+- / -
+- / -
+- / -
+-
+-
+-
+| · |max
+180
+–
+0.373 / 0.020
+0.468 / -0.020
+0.154 / 0.045
+0.158 / 0.033
+542.69
+241.61
+314.50
+emphasises precise velocity tracking; when the error is large, w
+decreases and the controller relies more on impedance to remain
+compliant.
+The final desired joint torque is computed as the weighted
+sum
+τd = w τPD + (1 −w) τimp
+(11)
+The commanded joint torque is
+τ = τd + τff + τfd,
+(12)
+where τff denotes nominal robot-dynamics feedforward com-
+pensation and τfd realises the contact-force reference generated
+by the object-level MPC. This formulation balances trajectory
+tracking and compliant interaction.
+Fig. 3: Illustration of the grasping point settings.
+IV. EXPERIMENTAL EVALUATIONS
+This section evaluates the proposed control framework in
+simulation and on physical hardware. The hardware platform
+consists of a heterogeneous robot team comprising a single-arm
+and a dual-arm mobile manipulator. The single-arm robot is built
+on an AGV base equipped with an Elfin 5 arm (payload capacity
+5 kg), while the dual-arm robot uses an AGV base with two Elfin
+3 arms (payload capacity 3 kg per arm). The transported object
+is a rigid table of dimensions 1200 mm × 600 mm and weight
+9.89 kg, and additional step-load disturbances are introduced
+using two 500 g bottles placed on the tabletop. The grasping
+configurations are shown in Fig. 3. Notably, neither robot
+can complete the transportation task independently; successful
+execution requires coordinated cooperative transportation under
+the proposed object-level MPC and WBIC architecture.
+To showcase the performance of the system in executing the
+cooperative transportation task, three main evaluation metrics
+are considered: position tracking accuracy, contact-force regu-
+lation, and payload orientation stability.
+Experiment I: Manual Trajectory Control Trajectories are
+generated via joystick input to evaluate system responsiveness
+and the performance under different control parameter settings.
+Experiment
+II:
+Obstacle-Avoidance
+Transportation
+Transportation tasks are performed in the presence of predefined
+obstacles to evaluate contact force regulation and motion control
+accuracy.
+Experiment III: Step-Load Disturbance Two 500 g bottles
+are placed on the table during transport, creating step changes in
+the payload load to evaluate system stability under disturbances.
+A. Result of Experiment I
+To analyze the impact of control parameters on system
+performance, sensitivity analysis experiments are conducted in
+the MuJoCo simulation environment. The study focuses on
+both the fusion weight parameter and the impedance control
+parameters by varying key configurations, and evaluates the
+resulting tracking errors and contact force responses under
+different conditions.
+First, a sensitivity analysis is performed on the fusion weight
+parameter σ in Eq. (10). The parameter σ is defined as a
+proportion of the maximum joint velocity, and five different
+values are selected for evaluation. The corresponding results
+under different fusion settings are summarized in Table I.
+Table I reports the sensitivity of MRCT to the blending scale
+σ. Small σ values increase the impedance contribution, whereas
+larger values retain the tracking contribution over a broader
+error range. The results show a clear tracking–force trade-off,
+and the intermediate setting used in the subsequent experiments
+provides the most balanced performance.
+Based on this, a sensitivity analysis is further conducted on
+the impedance model parameters in Eq. (6). Multiple combina-
+tions of (Kimp, Dimp) are evaluated, and the resulting tracking
+errors and contact forces are summarised in Table II.
+Fig. 4 illustrates a representative hybrid trial. The robots
+track joystick commands to lift, translate, and rotate the table
+while maintaining smooth object motion without visible os-
+cillations or slippage. Position errors remain within 0.045 m
+in all Cartesian directions and yaw errors within 0.105 rad,
+while pitch and roll stay within ±0.018 rad and ±0.021 rad,
+respectively. The contact force profiles in Fig. 5 show that forces
+remain within approximately ±50 N for the single-arm robot
+
+
+5
+and ±25 N for the dual-arm robot during transportation, with
+the impedance controller dissipating transient peaks and keeping
+non-persistent spikes below 50 N. These results indicate that the
+hybrid strategy achieves a favourable balance between trajectory
+accuracy and interaction safety, combining the tracking benefits
+of whole-body control with the force-limiting advantages of
+impedance.
+B. Result of Experiment II
+Experiment II evaluates the proposed framework on physical
+hardware using a predefined obstacle-avoidance trajectory. Five
+real-world trials were conducted with the hybrid WBIC–MPC
+controller. As summarised in Table III, the system maintains
+accurate position tracking and orientation stability across all
+trials, with performance metrics comparable to the simulation
+results of Experiment I. The slightly improved tracking accuracy
+relative to the joystick-driven case is mainly due to the smooth,
+predefined trajectory, which avoids the abrupt command changes
+inherent to manual operation.
+Figure 6 shows a representative obstacle-avoidance trial.
+The robots approach, lift, transport, and return the table while
+following the desired path around four obstacles. Throughout the
+execution, positional errors remain within 0.045 m in all Carte-
+sian directions and yaw errors do not exceed 0.105 rad. The
+payload maintains excellent stability, with pitch and roll angles
+constrained within ±0.018 rad and ±0.021 rad, respectively.
+These results confirm that the proposed control strategy transfers
+reliably from simulation to real hardware and supports precise,
+stable cooperative transportation in cluttered environments.
+C. Result of Experiment III
+To evaluate the robustness of the proposed framework,
+Experiment III introduces step-load disturbances during coop-
+erative transportation. Building on the joystick-based manual
+control setup of Experiment I, two 500 g bottles are placed
+on the table surface near the dual-arm robot at different times
+during the task. As summarised in Table IV, the system
+maintains stable performance under these dynamic conditions:
+peak position tracking errors remain below 0.052 m with mean
+errors under 0.019 m, while contact forces along the x-axis are
+bounded within 54.22 N, 37.73 N, and 39.81 N for the three
+contact points. The table’s orientation stability is preserved with
+pitch and roll peaks not exceeding 0.020 rad and 0.035 rad,
+respectively, indicating effective disturbance rejection.
+Fig. 7 depicts a representative trial with step-load distur-
+bances. The table orientation (Fig. 7a) remains within approxi-
+Fig. 4: Simulation results for Experiment I using the proposed hybrid control. Top: Snapshots of key task phases. Bottom: (a) 3D trajectory
+and yaw orientation of the table; (b) tracking errors of the table along x, y, z, and yaw axes; (c) the pitch and roll angles of the table.
+
+
+6
+TABLE II: Multiple trials in Experiment I under different impedance parameters
+Trial Info
+Position and Yaw Error (m/rad)
+Contact Force (N)
+Trial
+T (s)
+Kimp
+Dimp
+ex,pk / ¯ex
+ey,pk / ¯ey
+ez,pk / ¯ez
+eyaw,pk / ¯eyaw
+Fd1,pk
+Fd2,pk
+Fd3,pk
+1
+206
+100
+100
+0.138 / -0.021
+0.140 / -0.005
+0.048 / -0.003
+0.105 / -0.038
+52.69
+24.61
+38.50
+2
+217
+200
+100
+0.058 / -0.019
+0.083 / -0.012
+0.048 / 0.006
+0.101 / -0.059
+52.11
+28.32
+35.64
+3
+248
+300
+100
+0.103 / -0.035
+0.115 / 0.017
+0.052 / 0.005
+0.118 / -0.004
+54.21
+29.71
+23.68
+4
+187
+100
+150
+0.145 / -0.025
+0.052 / 0.008
+0.045 / -0.003
+0.060 / -0.002
+48.65
+30.51
+27.13
+5
+214
+100
+50
+0.070 / -0.020
+0.136 / 0.019
+0.047 / 0.009
+0.074 / -0.011
+50.44
+37.32
+24.55
+| · |max
+248
+–
+–
+0.145 / -0.035
+0.140 / 0.019
+0.052 / 0.009
+0.118 / -0.059
+54.21
+37.32
+38.50
+Fig. 5:
+Contact force analysis from Experiment I. (a) Single-arm robot forces. (b) Right arm and (c) left arm forces of the dual-arm robot.
+Each top subfigure shows the measured contact force sequences (blue) between the three contact points and the table and their envelopes (red).
+TABLE III: Experiment II: cooperative transportation in a real obstacle-avoiding scene
+Trial Info
+Position and Yaw Error (m/rad)
+Contact Force (N)
+Trial
+T (s)
+Kimp
+Dimp
+ex,pk / ¯ex
+ey,pk / ¯ey
+ez,pk / ¯ez
+eyaw,pk / ¯eyaw
+Fd1,pk
+Fd2,pk
+Fd3,pk
+1
+230
+100
+100
+0.049 / -0.006
+0.043 / -0.006
+0.038 / 0.006
+0.135 / -0.015
+47.57
+27.64
+36.35
+2
+217
+200
+100
+0.055 / -0.009
+0.053 / -0.012
+0.035 / 0.007
+0.121 / 0.019
+52.13
+32.37
+35.64
+3
+180
+300
+100
+0.103 / -0.005
+0.049 / 0.007
+0.032 / 0.005
+0.058 / -0.027
+54.21
+29.73
+32.81
+4
+153
+100
+150
+0.045 / 0.005
+0.102 / 0.008
+0.045 / 0.013
+0.130 / 0.012
+48.62
+30.52
+33.10
+5
+216
+100
+50
+0.072 / -0.018
+0.066 / 0.019
+0.057 / 0.016
+0.074 / 0.011
+60.40
+37.20
+34.58
+| · |max
+230
+–
+–
+0.103 / -0.018
+0.102 / 0.019
+0.057 / 0.016
+0.135 / 0.027
+60.40
+37.20
+36.35
+TABLE IV: Experiment III: cooperative transportation in the real-world
+Trial Info
+Position and Yaw Error (m/rad)
+Contact Force (N)
+Orientation (rad)
+Trial
+T (s)
+ex,pk / ¯ex
+ey,pk / ¯ey
+ez,pk / ¯ez
+eyaw,pk / ¯eyaw
+Fd1,pk
+Fd2,pk
+Fd3,pk
+pitchpk
+rollpk
+1
+150
+0.038 / 0.004
+0.042 / 0.011
+0.042 / 0.002
+0.050 / 0.011
+51.73
+35.61
+32.53
+0.017
+0.032
+2
+217
+0.052 / 0.019
+0.013 / 0.006
+0.038 / 0.006
+0.081 / 0.029
+52.18
+29.34
+35.62
+0.014
+0.027
+3
+148
+0.043 / 0.005
+0.049 / 0.007
+0.012 / 0.005
+0.018 / 0.007
+54.22
+37.73
+39.81
+0.020
+0.035
+| · |max
+217
+0.052 / 0.019
+0.049 / 0.011
+0.042 / 0.006
+0.081 / 0.029
+54.22
+37.73
+39.81
+0.020
+0.035
+
+
+7
+mately 0.032 rad in pitch and roll, consistent with the stability
+observed in Experiments I and II. Frequency-domain analysis
+of these angles (Figs. 7b–c) shows that the pitch and roll
+spectra are dominated by low-frequency components, which
+is consistent with the smooth orientation response observed
+in the time domain. The vertical contact forces (Figs. 7d–f)
+show the single-arm robot maintaining an average lifting force
+of about −49.5 N, while the dual-arm robot stabilises around
+−29 N on each arm after bottle placement. The total vertical
+support force matches the combined weight of the table and
+bottles, confirming proper load distribution. Throughout the
+experiment, position tracking and orientation stability remain
+comparable to those of Experiments I and II, and the step-
+load stays securely positioned, demonstrating the robustness of
+the proposed collaborative transportation strategy under external
+disturbances.
+Taken together, the experiments demonstrate that MRCT
+maintains accurate payload tracking and regulated contact forces
+across both simulation and hardware tests. The controller
+performs consistently under joystick-guided motion, obstacle-
+constrained transportation, and step-load disturbances, support-
+ing its practical applicability to heterogeneous multi-robot trans-
+portation.
+V. CONCLUSION
+This paper introduced MRCT, an object-centric two-layer
+control architecture for heavy-payload cooperative transporta-
+tion by heterogeneous mobile manipulators. MRCT combines
+object-level MPC planning with local WBIC execution, where a
+confidence-based torque blending mechanism balances velocity
+tracking and compliant interaction. Simulation studies charac-
+terised the effects of the blending and impedance parameters
+on tracking and contact forces. Hardware experiments with a
+single-arm and a dual-arm mobile manipulator demonstrated
+accurate table transportation with regulated contact forces and
+stable orientation during joystick-guided motion, obstacle avoid-
+ance, and step-load disturbances.
+Fig. 6: Real-world results from Experiment II (obstacle-avoidance transportation). Top: Snapshots of the cooperative transportation process.
+Bottom: (a) 3D trajectory and yaw orientation; (b) tracking errors; and (c) pitch and roll angles of the table during obstacle traversal.
+
+
+8
+REFERENCES
+[1] L. Chen, L. Chen, X. Chen, H. Lu, Y. Zheng, J. Wu, Y. Wang, Z. Zhang,
+and R. Xiong, “Compliance while resisting: A shear-thickening fluid
+controller for physical human-robot interaction,” The International Journal
+of Robotics Research, p. 02783649241234364, 2024. 1
+[2] J.-P. Sleiman, F. Farshidian, M. V. Minniti, and M. Hutter, “A unified mpc
+framework for whole-body dynamic locomotion and manipulation,” IEEE
+Robotics and Automation Letters, vol. 6, no. 3, pp. 4688–4695, 2021. 1,
+3
+[3] J. Motes, T. Chen, T. Bretl, M. M. Aguirre, and N. M. Amato,
+“Hypergraph-based multi-robot task and motion planning,” IEEE Trans-
+actions on Robotics, vol. 39, no. 5, pp. 4166–4186, 2023. 1
+[4] N. Lissandrini, C. K. Verginis, P. Roque, A. Cenedese, and D. V. Dimarog-
+onas, “Decentralized nonlinear mpc for robust cooperative manipulation
+by heterogeneous aerial-ground robots,” in 2020 IEEE/RSJ International
+Conference on Intelligent Robots and Systems (IROS), 2020, pp. 1531–
+1536. 1, 2
+[5] N. Wang, S. Liu, T. L. Lam, and T. Zhang, “Human-robot cooperative
+heavy payload manipulation based on whole-body model predictive con-
+trol,” in 2025 IEEE/RSJ International Conference on Intelligent Robots
+and Systems (IROS).
+IEEE, 2025, pp. 15 037–15 043. 1
+[6] T. Zhang, N. Wang, Y. Yang, and Z. Wang, “A generalised system for
+multi-mobile robot cooperation in smart manufacturing,” Robotics and
+Computer-Integrated Manufacturing, vol. 98, p. 103139, 2026. 1
+[7] Z. Li, Y. Yang, X. Yu, C. Liu, O. Kaynak, and H. Gao, “Fixed-time
+control of a novel thrust-vectoring aerial manipulator via high-order fully
+actuated system approach,” IEEE/ASME Transactions on Mechatronics,
+vol. 30, no. 2, pp. 1084–1095, 2024. 1
+[8] F. Kennel-Maushart and S. Coros, “Payload-aware trajectory optimisation
+for non-holonomic mobile multi-robot manipulation with tip-over avoid-
+ance,” IEEE Robotics and Automation Letters, 2024. 1
+[9] G. Gasbarrone, N. Scianca, L. Lanari, and G. Oriolo, “A decentralized
+cooperative transportation scheme for humanoid robots,” in 2024 IEEE-
+RAS 23rd International Conference on Humanoid Robots (Humanoids).
+IEEE, 2024, pp. 381–387. 2
+[10] L. Yan, T. Stouraitis, and S. Vijayakumar, “Decentralized ability-
+aware adaptive control for multi-robot collaborative manipulation,” IEEE
+Robotics and Automation Letters, vol. 6, no. 2, pp. 2311–2318, 2021. 2
+[11] S. Caron, A. Kheddar, and O. Tempier, “Stair climbing stabilization of
+the hrp-4 humanoid robot using whole-body admittance control,” in 2019
+International Conference on Robotics and Automation (ICRA), 2019, pp.
+277–283. 2
+[12] A. Q. Keemink, H. Van der Kooij, and A. H. Stienen, “Admittance
+control for physical human–robot interaction,” The International Journal
+of Robotics Research, vol. 37, no. 11, pp. 1421–1444, 2018. 2
+[13] N. Hogan, “Impedance control: An approach to manipulation: Part
+ii—implementation,” 1985. 2, 3
+[14] A. Dietrich, K. Bussmann, F. Petit, P. Kotyczka, C. Ott, B. Lohmann,
+and A. Albu-Sch¨affer, “Whole-body impedance control of wheeled mobile
+manipulators: Stability analysis and experiments on the humanoid robot
+rollin’justin,” Autonomous Robots, vol. 40, pp. 505–517, 2016. 2
+[15] Q. Li, L. Qian, S. Wang, P. Sun, and X. Luo, “Towards generation and
+transition of diverse gaits for quadrupedal robots based on trajectory
+optimization and whole-body impedance control,” IEEE Robotics and
+Automation Letters, vol. 8, no. 4, pp. 2389–2396, 2023. 2
+[16] L. Shi, X. Yu, C. Zhou, W. Jin, W. Chi, S. Zhang, D. Zhang, X. Li, and
+Z. Zhang, “Whole-body impedance coordinative control of wheel-legged
+robot on uncertain terrain,” arXiv preprint arXiv:2411.09935, 2024. 2
+[17] J. Pankert and M. Hutter, “Perceptive model predictive control for contin-
+uous mobile manipulation,” IEEE Robotics and Automation Letters, vol. 5,
+no. 4, pp. 6177–6184, 2020. 3
+Fig. 7: A representative trial from Experiment III involving step-load disturbance in the real-world. The top part shows selected visual snapshots
+illustrating key phases of the task execution. The bottom part illustrates the following: (a) the pitch and roll angles of the table; (b) and (c)
+the FFT analysis of the pitch and roll angles; (d)-(f) the contact forces along the z-axis measured by the single-arm robot, and the right and
+left arms of the dual-arm robot, respectively.

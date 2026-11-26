@@ -1,0 +1,1329 @@
+Title: TeamFlowRL: Online Policy Optimization of Decentralized Flow Policies for Multi-Agent Coordination
+
+URL Source: https://arxiv.org/pdf/2611.32645v1
+
+Published Time: Wed, 25 Nov 2026 03:24:33 GMT
+
+Number of Pages: 27
+
+Markdown Content:
+# TeamFlowRL: Online Policy Optimization of Decentralized Flow Policies for Multi-Agent Coordination 
+
+Guowei Zou 1, Beiwen Zhang 1, Haitao Wang 1, Hong Hong 1, Zhiquan Chen 1, Hejun Wu 1
+
+1Sun Yat-sen University Offline 
+
+Multi-Agent Data 
+
+7
+
+> environments
+
+21 
+
+> cooperative tasks
+
+51    
+
+> dataset configurations
+> MPE SMAC
+> SMACv2 MA-MuJoCo
+> ManiSkill3 RoboFactory
+
+TeamFlowRL  Online Improvement 
+
+51/51 
+
+> configs improve
+
++47.3% 
+
+> normalized score
+> TeamFlowRL
+> multimodal
+> Gaussian
+> unimodal
+
+Cooperative 
+
+Behaviors     
+
+> handover
+> two-arm stacking
+> multiple team assignments
+> team combat and locomotion
+> online RL fine-tunes the flow policies
+> Offline flow pretraining
+> Flow policy per agent
+> noise flow action
+> agent 1
+> agent 2
+> agent 3
+> Environment
+> Team Policy Optimization
+> team-advantage gradient
+> updates TeamFlow policies
+> Centralized critic
+> stVψ(s t)Ãt
+> shared team advantage
+> Decentralized execution
+> each agent runs its own flow policy
+> initialize initialize
+> action action
+> reward reward
+> ÃÃtt
+> update update
+
+Figure 1 Overview of TeamFlowRL. Left: 7 environments, 21 cooperative tasks, and 51 dataset config-urations. Middle: pretrained flow policies are fine-tuned online with a centralized critic and team policy optimization, then each agent executes its own flow policy from local inputs. Right: all 51 configurations im-prove (scores normalized per task). Flow actions are multimodal where the Gaussian baseline (BC+MAPPO) is unimodal, and agents learn cooperative behaviors. 
+
+Project Page: https://teamflowrl.github.io/ 
+
+Code: https://github.com/teamflowrl/TeamFlowRL 
+
+Models: https://huggingface.co/teamflowrl/TeamFlowRL 
+
+Abstract 
+
+Complex cooperative tasks require coordinated multi-agent behavior. Offline generative policies learn ex-pressive cooperative behaviors from trajectories but remain limited by fixed datasets. Online reinforcement learning can improve them through environment interaction. However, fine-tuning flow policies is difficult because action likelihoods are hard to compute. We propose TeamFlowRL, a two-stage framework that pre-trains multi-agent flow policies offline and fine-tunes them online. We formulate team policy optimization over the complete denoising trajectories of decentralized flow policies, avoiding intractable action likelihoods. The resulting objective weights each agent’s trajectory ratio with a shared team advantage and clips each ratio separately, aligning local policy updates with the common team return. Across 51 paired configurations in seven simulation groups, TeamFlowRL improves every offline initialization, with a 47.3% average gain in normalized score. It also achieves 33.1% higher average success under exploration noise than Gaussian-policy fine-tuning across 6 bimanual tasks. 
+
+1 Introduction 
+
+Cooperative multi-agent tasks, such as robotic manipulation and cooperative control, require agents to co-ordinate their decisions. Multi-agent reinforcement learning, or MARL, learns such coordination through 1arXiv:2611.32645v1 [cs.LG] 24 Nov 2026 interaction [14, 23, 32], while offline generative policies learn expressive action or trajectory distributions from fixed datasets [9, 34]. However, offline policies remain constrained by the quality and coverage of the available data [10]. Online reinforcement learning can further improve coordination through environment interaction and team rewards. Under centralized training and decentralized execution, existing policy-gradient methods typically use categorical distributions for discrete actions or unimodal Gaussians for continuous actions [4, 32]. Such parameterizations cannot represent separated action modes for the same observation, whereas offline flow policies can model richer multimodal behaviors. This motivates fine-tuning expressive offline flow policies with online team feedback. Extending single-agent flow policy methods to multi-agent flow policies faces two severe difficulties. Firstly, a flow policy has no tractable action probability. PPO-class methods need this probability to compute a ratio of the new policy and old policy on the same action for policy update and improvement [27]. As many denoising trajectories of a flow policy reach the same action, its log-likelihood is intractable and computationally impossible for multi-agents. Secondly, supposing the ratio can be obtained, the team update style of existing multi-agent methods, e.g., MAPPO, can no longer be applied to flow policies directly. In MAPPO, each agent updates its policy according to the ratio of its new and old policies by a factor of the shared team advantage [32]. In flow policies, many denoising trajectories of a flow policy can reach the same action, and the team advantage still evaluates the final action. Hence, the ratio together with the factor of team advantage is meaningful only for the final action but not a single trajectory. Even if a scheme uses the ratio between trajectories instead of between actions, it is unclear whether this scheme optimizes the team objective or not, since the relation between a trajectory and a final action is not one to one, but many to one. To address these challenges, we propose TeamFlowRL, a framework for online fine-tuning of offline-trained flow policies of multi-agents. Figure 1 illustrates this framework. We represent each agent’s policy through a stochastic denoising trajectory with tractable likelihoods. We then formulate a team objective that couples these local trajectories through a shared advantage from a centralized critic. Each agent’s complete trajectory ratio is clipped separately, rather than clipping the product of all agents’ ratios. With exact team advantages, this surrogate matches the gradient of the joint surrogate at the collection policy, up to normalization (Appendix A.4). This connects decentralized flow updates to team return optimization. We evaluate TeamFlowRL on 51 task--dataset configurations across five multi-agent benchmark suites and two bimanual manipulation simulators. Online fine-tuning outperforms the offline initialization in all 51 configurations, with an average gain of 47.3% in normalized score. We further compare TeamFlowRL with fine-tuning Gaussian policies. Behavioral analyses show that the fine-tuned flow policies capture multimodal action distributions and exhibit diverse cooperative behaviors. On six bimanual tasks, TeamFlowRL achieves 33.1% higher average success than BC+MAPPO under exploration noise. Our contributions are threefold: • To our knowledge, TeamFlowRL is the first framework for online RL fine-tuning of offline-pretrained multi-agent flow policies. • We formulate a team policy objective over decentralized denoising trajectories, combining a shared team advantage with separate clipping of each agent’s complete trajectory ratio. With exact advantages, the surrogate matches the gradient of the joint surrogate at the collection policy, up to normalization. • Across 51 configurations, TeamFlowRL consistently improves offline initializations and outperforms Gaussian policies in multimodal action expressiveness and online adaptation efficiency. 
+
+2 Related Work 
+
+Offline multi-agent policy learning. Offline MARL learns cooperative policies from fixed datasets, using behavior cloning (BC) [20] or value-based and conservative objectives such as TD3+BC, CQL, and BCQ [6-2Table 1 Comparison with existing methods. Method Policy representation Policy optimization Online Multi-agent DPPO [24] Diffusion PPO on denoising transitions ✓ ---ReinFlow [33] Flow PPO on denoising trajectories ✓ ---FPO [15] Flow Flow matching loss ratio ✓ ---MAPPO [32] Categorical / Gaussian PPO on each agent’s action ✓ ✓               
+
+> MADiff [34] Diffusion Return conditioning ×✓
+> DOM2 [12] Diffusion Q-learning + BC ×✓
+> MAC-Flow [9] Actor distilled from flow Value-guided distillation ×✓
+> TeamFlowRL (ours) Pretrained flow generator PPO on each agent’s denois-ing trajectory
+> ✓✓
+
+-8], with OMAR and OMIGA providing additional offline MARL variants [17, 31]. Generative methods further improve expressiveness: MADiff, DOM2, and DoF use diffusion for trajectory or decentralized policy learning [11, 12, 34], whereas MAC-Flow learns a joint flow model and distills decentralized actors for one-step action generation [9]. All remain constrained by the quality and coverage of the offline data. 
+
+Online multi-agent reinforcement learning. Online MARL learns coordination through environment inter-action using centralized critics [4, 14, 18], value decomposition [23, 28, 30], or MAPPO’s centralized value estimates with agent-level PPO updates [32]. These methods typically use categorical or unimodal Gaussian policies, limiting multimodal action representation. 
+
+Offline pretraining and online fine-tuning. Online RL can improve pretrained generative policies by op-timizing their denoising processes. DPPO applies PPO to diffusion transitions [24], while ReinFlow and FPO construct ratios for flow policies using stochastic denoising trajectories or flow-matching losses [15, 33]. Related work studies fine-tuning generative robot policies [35, 36] and vision-language-action (VLA) mod-els [1, 19], but these approaches remain single-agent and do not address team-level credit assignment for decentralized multi-agent flow policies. 
+
+3 Multi-Agent Flow Policy Optimization 
+
+TeamFlowRL learns decentralized policies for cooperative tasks in two stages. Figure 2 illustrates the com-plete procedure. It first initializes a shared flow policy from offline input--action pairs. For online fine-tuning, we turn the flow generator into a stochastic policy over complete denoising trajectories, making the likelihood of each agent’s sampled trajectory tractable. A centralized critic then estimates a shared team advantage, which multiplies the agent-wise trajectory likelihood ratios in a PPO objective and jointly updates the shared velocity and noise networks. At deployment, each agent independently generates its action from local infor-mation using the fine-tuned velocity network. 
+
+3.1 Cooperative problem formulation 
+
+We model a cooperative task as a decentralized partially observable Markov decision process, abbreviated Dec-POMDP, ⟨I , S, {A i}Ni=1 , P, R, {O i}Ni=1 , O, γ ⟩, where I = {1, . . . , N } is the agent set, S is the global state space, Ai and Oi are the local action and observation spaces, P is the state transition distribution, R
+
+is the common reward function, O is the observation distribution, and γ ∈ (0 , 1) is the discount factor. At environment step t, agent i selects action ait using its local information hit, and all agents receive the shared reward rt. The local information hit contains only features available to agent i. The goal is to learn a joint action policy π that maximizes the expected discounted team return, Eπ,P [∑ 
+
+> t≥0
+
+γtrt].3Offline flow-policy pretraining  Online RL fine-tuning                    
+
+> 1Flow policy
+> agent 1
+> local ht
+> 1
+> ❄enc. x∼i,0 N
+> images + own state
+> agent 2
+> local ht
+> 2
+> ❄enc. x∼i,0 N
+> images + own state
+> agent N
+> local htN
+> ❄enc. x∼i,0 N
+> images + own state
+
+Flow policy (actor) 
+
+…
+
+…
+
+…                                             
+
+> 2Environment
+> a→ts,rt+1 t
+> 3Rollout buffer
+> on-policy;
+> every agent , step itsthtiξtiatirt
+> stored per step
+> 5Policy update
+> ρ=ti
+> q(ξ∣h)old titi
+> q(ξ∣h)θ,ϕtiti
+> clip( ρ, 1 ± tiε)At
+> update θ,ϕ
+> 4Value network
+> centralized critic,
+> sees the global state
+> V(s)ψt
+> GAE At
+> shared by all agents
+> update ψs,rtt
+> ξ,htiti
+> At
+> act
+> ht+1
+> i
+> θ,ϕ
+
+Offline datasets            
+
+> Spread Tag World
+> 3m 8m 2s3z
+> 5m_vs_6m Terran 5v5 Zerg 5v5
+> 2ant 4ant 2halfcheetah
+> 3hopper 6halfcheetah MS Pick
+> MS Stack RF Stack
+> MPE · SMAC · SMACv2 · MuJoCo ·
+> ManiSkill3 · RoboFactory
+
+Where the gradient goes                 
+
+> agent 1ht
+> 1x1,0 x1, kx1, k+1 x1, K
+> agent NhtNxN,0 xN,kxN,k+1 xN,K
+
+⋮ at          
+
+> env rt
+> GAE At
+> ∇log ρAtθ,ϕt
+> 1
+> ∇log ρAtθ,ϕtN
+> flow steps:
+> no reward
+> one team
+> reward
+
+Deployment      
+
+> own observation
+> agent 1
+> +x1,0
+> at
+> 1
+> agent N
+> +xN,0
+> atN
+
+⋮ 
+
+> Flow policy
+> (shared actor)
+> K= 10
+> mean steps,
+> off σϕ
+> at
+> environment
+> own observations only; no critic, no buffer
+
+Figure 2 TeamFlowRL combines offline flow pretraining (top left and center) with online RL fine-tuning (top right). The bottom left shows how a shared team advantage guides updates along each stored denoising trajectory. The bottom right shows decentralized execution without transition noise. 
+
+3.2 Offline flow initialization 
+
+We initialize a shared velocity network vθ from offline input--action pairs (hi, a i) ∈ D . Here and within a single denoising trajectory, we omit environment time t.Conditional flow matching [13] trains vθ to predict the velocity along a straight interpolation from Gaussian noise to the data action: 
+
+xiτ = (1 − τ )zi + τ a i, zi ∼ N (0 , I ), (1) 
+
+LFM (θ) = ED,z,τ,i 
+
+[∥vθ (hi, x iτ , τ ) − (ai − zi)∥22
+
+] , (2) where τ ∼ U [0 , 1] denotes flow time. For discrete action spaces, ai in Equations 1 and 2 is the one-hot action vector. The initialized policy generates actions by integrating vθ from a Gaussian latent with K Euler steps. 
+
+3.3 A stochastic policy over denoising trajectories 
+
+Conditioned on the local input and initial latent, the Euler flow trajectory is deterministic and does not pro-vide tractable transition likelihoods for PPO. Following ReinFlow, we add Gaussian noise to each denoising transition, yielding a tractable probability over the complete trajectory. At each environment step, agent i samples xi, 0 ∼ N (0 , I ) and applies the following stochastic update for 
+
+k = 0 , . . . , K − 1:
+
+xi,k +1 = μθ (hi, x i,k , k ) + σϕ(hi, x i,k , k ) ⊙ ϵi,k ,μθ (hi, x i,k , k ) = xi,k + K−1vθ (hi, x i,k , k/K ), (3) with independent ϵi,k ∼ N (0 , I ) and coordinatewise product ⊙. The mean retains the pretrained Euler update, while a shared noise network learns bounded, positive standard deviations σϕ.4The complete denoising trajectory ξi = ( xi, 0, . . . , x i,K ) therefore has the joint probability 
+
+qθ,ϕ (ξi | hi) = p0(xi, 0)
+
+·
+
+> K−1
+
+∏
+
+> k=0
+
+N(xi,k +1 | μi,k θ , diag(( σi,k ϕ )2)), (4) where p0 is the standard Gaussian probability and μi,k θ , σ i,k ϕ abbreviate the two functions in Equation 3. The environment receives only ai = g(xi,K ), where g clips continuous actions or selects the largest legal coordinate for discrete actions. This trajectory likelihood provides a tractable alternative to the action marginal for policy optimization. Given local inputs, agents sample their initial latents and transition noise independently. Despite parameter sharing, the joint trajectory sampling policy therefore factorizes. We denote this joint trajectory policy by 
+
+Mθ,ϕ (and reserve qθ,ϕ for one agent), giving the team objective 
+
+Mθ,ϕ (ξt | ht) = 
+
+> N
+
+∏
+
+> i=1
+
+qθ,ϕ (ξit | hit),J(θ, ϕ ) = EMθ,ϕ 
+
+[∑ 
+
+> t≥0
+
+γtrt
+
+]
+
+.
+
+(5) Here, ξt = ( ξ1 
+
+> t
+
+, . . . , ξ Nt ) denotes the joint denoising trajectory, and ht = ( h1 
+
+> t
+
+, . . . , h Nt ) denotes the tuple of actor inputs. 
+
+3.4 Team advantages and policy updates 
+
+The remaining step is to connect individual trajectory likelihoods to team returns. The factorization in Equation 5 gives 
+
+∇θ,ϕ log Mθ,ϕ (ξt | ht) = 
+
+> N
+
+∑
+
+> i=1
+
+∇θ,ϕ log qθ,ϕ (ξit | hit). (6) The team policy gradient multiplies this sum by a common team advantage. We use centralized advantage estimation and PPO clipping as in MAPPO, with a likelihood ratio for each denoising trajectory. The centralized critic Vψ (st) estimates team returns from the global state. GAE [26] gives one advantage for each environment transition. We normalize it over the rollout and assign the same team advantage ˜At
+
+to every active agent. The critic target is ̂ Rt =̂ At + Vψold (st), and we fit Vψ to this fixed target with the standard squared error objective. Each agent’s update uses its complete stored denoising trajectory: 
+
+ρit = qθ,ϕ (ξit | hit)
+
+qold (ξit | hit) , Z = max 
+
+(
+
+1, ∑
+
+> t,i
+
+mit
+
+)
+
+, (7) where qold is the rollout policy and mit ∈ { 0, 1} marks agents with an action choice. The log ratio sums transition log probabilities over all denoising steps and action coordinates. The fixed initial probability p0
+
+cancels. Clipping the product of all agents’ ratios makes clipping depend on their combined change. We instead clip each agent’s complete trajectory ratio separately, while retaining the shared team advantage, and average over active samples in the rollout: 
+
+Lclip = 1
+
+Z
+
+∑
+
+> t,i
+
+mit min 
+
+(
+
+ρit ˜At, clip( ρit, 1 − ε, 1 + ε) ˜At
+
+)
+
+, (8) 5where ε is the clipping threshold. With exact team advantages, the two surrogates have the same first-order direction at the collection policy, up to the common scale 1/Z . Appendix A gives the noise parameterization, the formal connection to the action marginal, and the theoretical analysis of this update. We minimize −Lclip while holding the stored denoising trajectories fixed. Gradients update θ and ϕ through the conditional means and standard deviations. Appendix B gives the GAE recursion, boundary handling, and implementation details. 
+
+Table 2 Results on MPE and OG-MARL MuJoCo (continuous control) and SMAC (discrete control), with methods as rows and task--dataset pairs as columns. Local reproductions are marked r and are not directly comparable to the published MAC-Flow configurations. OMIGA MuJoCo and SMACv2 results are in Table 7. Shading marks the best and second-best value in each column. Sources and notation are in Appendix C.1. 
+
+MPE Spread Tag World 
+
+Expert Medium M-R b Random Expert Medium Random Expert Medium Random MADiff-D a [34] (2024) 95 .0 ±5.3 64 .9 ±7.7 30 .3 ±2.5 6.9 ±3.1 120 .9 ±14 .6m 77 .2 ±10 .4m 3.2 ±4.0m 122 .6 ±14 .4m 123 .5 ±4.5m 2.0 ±3.0m
+
+DOM2 [12] (2026) 131 .32 ±4.82 55 .77 ±7.06 46 .02 ±10 .81 49 .86 ±7.28 138 .75 ±12 .02 84 .29 ±25 .36 112 .18 ±30 .21 123 .17 ±19 .81 105 .79 ±27 .11 54 .23 ±16 .57 
+
+MAC-Flow [9] (2026) 101 .7 ±10 .9 80 .1 ±20 .6 50 .4 ±33 .2 31 .1 ±6.8 119 .97 r ±2.26 80 .47 r ±1.77 72 .68 r ±3.20 122 .57 r ±2.91 89 .82 r ±2.25 94 .43 r ±3.72 
+
+TeamFlowRL (w/o online RL) 72 .87 ±4.85 27 .13 ±0.93 7.89 ±4.79 −1.79 ±3.45 96 .60 ±7.31 58 .62 ±6.47 −0.40 ±0.99 109 .23 ±13 .01 61 .69 ±6.60 0.18 ±1.60 
+
+TeamFlowRL 110 .75 † ±3.76 71 .13 † ±8.31 31 .32 † ±7.54 24 .93 † ±2.31 150 .13 † ±5.83 145 .13 † ±7.88 156 .74 † ±4.45 176 .11 † ±16 .62 155 .60 † ±4.71 169 .15 † ±16 .77 
+
+OG-MARL 2ant 2halfcheetah 4ant 
+
+Good Medium Poor Good Medium Poor Good Medium Poor MADiff-D a [34] (2024) 2946 ±77 1211 ±69 946 ±66 8246 ±342 2207 ±23 759 ±18 3080 ±38 1649 ±100 1295 ±57 
+
+OMSD [21] (2026) 2714 ±555 1372 ±107 1213 ±212 8619 ±418 2660 ±125 866 ±78 2844 ±152 1942 ±293 1477 ±192 
+
+MAC-Flow r [9] (2026) 1628 .46 r ±1.72 1077 .94 r ±42 .96 912 .21 r ±23 .51 8569 .00 r ±42 .59 2477 .22 r ±4.11 937 .09 r ±8.23 1750 .85 r ±29 .29 1254 .43 r ±35 .45 1010 .19 r ±39 .19 
+
+TeamFlowRL (w/o online RL) 527 .15 ±134 .37 956 .05 ±50 .61 535 .21 ±6.77 6204 .54 ±43 .82 1616 .70 ±33 .86 544 .34 ±98 .30 1554 .84 ±41 .54 1263 .13 ±42 .48 515 .18 ±73 .05 
+
+TeamFlowRL 3453 .45 ±224 .71 3000 .60 ±53 .38 3283 .65 ±95 .53 10559 .68 ±167 .82 4568 .23 ±93 .63 1414 .51 ±13 .46 3769 .81 ±36 .64 3124 .54 ±7.83 2957 .69 ±74 .82 
+
+SMACv1 3m 8m 2s3z 5m6m 
+
+Good Medium Poor Good Medium Poor Good Medium Poor Good Medium Poor Diffusion BC [2] (2023) 19 .5 ±0.5 13 .3 ±0.7 4.2 ±0.2 19 .4 ±0.5 18 .6 ±0.6 4.8 ±0.2 18 .0 ±1.0 13 .4 ±1.4 6.2 ±1.2 16 .8 ±2.3 12 .5 ±2.1 8.0 ±1.0
+
+Flow BC [13] (2023) 20 .0 ±0.0 14 .7 ±1.5 4.5 ±0.1 19 .5 ±0.2 18 .2 ±0.8 4.9 ±0.1 19 .5 ±0.1 15 .1 ±2.0 6.9 ±0.8 14 .7 ±2.1 12 .8 ±0.8 7.7 ±0.8
+
+MADiff-D a [34] (2024) 19 .3 ±0.5 16 .4 ±2.6 10 .3 ±6.1 18 .9 ±1.1 16 .8 ±1.6 9.8 ±0.9 15 .9 ±1.2 15 .6 ±0.3 8.5 ±1.3 16 .5 ±2.8 15 .2 ±2.6 8.9 ±1.3
+
+DoF [11] (2025) 19 .8 ±0.2 18 .6 ±1.2 10 .9 ±1.1 19 .6 ±0.3 18 .6 ±0.8 12 .0 ±1.2 18 .5 ±0.8 18 .1 ±0.9 10 .0 ±1.1 17 .7 ±1.1 16 .2 ±0.9 10 .8 ±0.3
+
+MAC-Flow [9] (2026) 19 .8 ±0.2 18 .0 ±3.2 10 .6 ±2.2 19 .7 ±0.3 19 .4 ±0.6 11 .5 ±0.8 19 .5 ±0.5 17 .6 ±0.6 8.5 ±0.6 18 .6 ±3.5 15 .6 ±1.3 9.8 ±2.1
+
+TeamFlowRL (w/o online RL) 15 .85 ±1.28 10 .12 ±1.11 4.26 ±0.13 17 .87 ±0.44 11 .19 ±1.26 5.20 ±0.11 18 .28 ±0.54 12 .11 ±0.54 7.12 ±0.35 15 .50 ±0.38 11 .57 ±0.74 8.01 ±0.47 
+
+TeamFlowRL 19 .80 ±0.35 19 .81 ±0.34 18 .63 ±0.89 20 .00 ±0.00 18 .89 ±0.64 18 .40 ±0.34 19 .84 ±0.15 20 .00 ±0.00 16 .46 ±0.67 17 .43 ±0.77 19 .02 ±0.94 12 .85 ±0.45 
+
+a MADiff-D is the decentralized MADiff variant, which matches decentralized execution. b Medium-Replay (M-R) labels a dataset quality. The listed baselines differ across the three blocks because each method supports or reports only some of the continuous and discrete benchmarks. 
+
+Deployment. Each agent samples a fresh Gaussian latent and applies the K mean updates in Equation 3 using only hit. Training uses transition noise, while deployment removes this noise and requires neither the noise network nor the centralized critic. The initial latent keeps the executed policy stochastic. 
+
+4 Experiments 
+
+We evaluate TeamFlowRL on standard multi-agent benchmarks and cooperative bimanual manipulation. The experiments measure improvement over the offline initialization across tasks and data qualities, examine the action distributions and cooperative behaviors of the fine-tuned policy, compare TeamFlowRL with Gaussian policies, and test the main implementation choices for the trajectory ratio. 
+
+4.1 Experimental Setup 
+
+Benchmarks. We evaluate five multi-agent benchmark groups: cooperative navigation and pursuit in the Multi-Agent Particle Environment (MPE), OG-MARL MuJoCo [5], OMIGA MuJoCo [31], SMAC [25], and SMACv2 [3]. They contain 45 combinations of task and dataset. We also evaluate simulated bi-manual manipulation using TwoRobotPickCube-v1 and TwoRobotStackCube-v1 from ManiSkill3 [29] and TwoRobotsStackCube from RoboFactory [22], each with two Franka Panda arms, and treat each arm as one agent. We use both state and camera observations and also include a hands-away variant of the two stacking 60 1 / 0 50 612 18 Return Pre → Online (M) 3m 0 1 / 0 50 510 15 20 Return Pre → Online (M) 2s3z 0 1 / 0 50 612 18 Return Pre → Online (M) 5m6m 0 1 / 0 50 612 18 Return Pre → Online (M) 8m 0 1 / 0 50 150 300 450 Return Pre → Online (M) Spread 0 1 / 0 50 0100 200 300 Return Pre → Online (M) Tag 0 1 / 0 50 050 100 150 Return Pre → Online (M) World 0 0.03 / 0 2050 100 Success (%)                       
+
+> Pre →Online (M) RF Stack, state 01 / 0 50 0.0 1.5 3.0 Return (×10³) Pre →Online (M) 2ant 01 / 0 50 048Return (×10³) Pre →Online (M) 2halfcheetah 01 / 0 50 0.0 1.5 3.0 Return (×10³) Pre →Online (M) 4ant 00.05 / 0 5050 100 Success (%)
+> Pre →Online (M) MS Pick, state
+> Expert / Good Medium Random / Poor Medium-Replay TeamFlowRL
+
+Figure 3 Learning curves on SMAC, MPE, OG-MARL MuJoCo, and the robot tasks. The horizontal axis shows pretraining updates followed by online environment steps in millions, and the tick 1 / 0 marks the start of online training. Colors identify offline data quality. Robot panels show the success of TeamFlowRL under the deployment rule. Additional curves and reporting details are provided in Appendix C. 
+
+tasks, in which both arms must release the blocks and move away at the end. Complete task settings are provided in Appendix C, with the bimanual configurations and pretraining data in Appendix D.1. 
+
+Baselines. We compare TeamFlowRL with representative methods based on diffusion and flow models, including DOM2, MADiff, DoF, Diffusion BC , Flow BC, and MAC-Flow. The baselines vary across MPE, OG-MARL, and SMAC, as not all methods support every benchmark. For bimanual manipulation, we additionally evaluate MAPPO and BC+MAPPO under matched task definitions, observations, rewards, and online interaction budgets. Published RoboFactory results use a different visuomotor imitation-learning protocol and are therefore not directly comparable. 
+
+Evaluation protocol. All benchmark results use a common online budget of 50 million environment steps. The robot methods use matched online interaction budgets within each task. The main robot comparison uses stochastic execution, which keeps the exploration noise used in training. All robot results are averaged over three independent training seeds, and the shaded regions denote 95% confidence intervals over evaluation episodes. Complete reporting conventions, evaluation details, and results under each method’s deployment rule are provided in Appendices C and D. 
+
+4.2 Main Results 
+
+Improvement over offline initialization. Online fine-tuning improves the offline flow policy in all 51 configurations. In all 45 benchmark configurations, the final mean return exceeds that of the offline initialization by 43.2% of the task’s best online return on average. Table 2 reports the main benchmark results. In all six robot tasks, the final success under stochastic execution exceeds that of the pretrained initialization by 61.2% on average, as shown in Table 3. We normalize benchmark returns by the best online return in Figure 1 and express robot success under exploration noise as percentages. The average gain in normalized score across the seven groups and all 51 configurations is 47.3%. 
+
+Effect of offline data quality. Figure 4 shows that gains occur at every data quality and shrink linearly as the offline data improve. Over the 15 SMAC and MPE configurations, each 1% increase in dataset mean 720 40 60 80 Dataset mean return (%) 020 40 60 80 Online gain (%) 
+
+r = −0.97 
+
+SMAC   
+
+> 3m 2s3z 8m
+
+0 20 40 60 Dataset mean return (%) 40 60 80 100 r = −0.98 
+
+MPE 
+
+> Tag World
+
+Figure 4 Online gain versus offline dataset mean return, both as a percentage of the task’s best online return. Dashed lines are linear fits, and error bars show one standard deviation. −202    
+
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+
+(a) Spread, TeamFlowRL (b) Spread, BC+MAPPO (c) World, TeamFlowRL (d) World, BC+MAPPO                 
+
+> agent 1 agent 2 agent 3 action limit ABC
+> ABC
+> (e) Spread, TeamFlowRL (f) Spread, BC+MAPPO (g) World, TeamFlowRL (h) World, BC+MAPPO
+> Landmark Agent Evader Food Forest Obstacle Agent −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+
+(a) Spread, TeamFlowRL (b) Spread, BC+MAPPO (c) World, TeamFlowRL (d) World, BC+MAPPO                 
+
+> agent 1 agent 2 agent 3 action limit ABC
+> ABC
+> (e) Spread, TeamFlowRL (f) Spread, BC+MAPPO (g) World, TeamFlowRL (h) World, BC+MAPPO
+> Landmark Agent Evader Food Forest Obstacle Agent −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+
+(a) Spread, TeamFlowRL (b) Spread, BC+MAPPO (c) World, TeamFlowRL (d) World, BC+MAPPO                 
+
+> agent 1 agent 2 agent 3 action limit ABC
+> ABC
+> (e) Spread, TeamFlowRL (f) Spread, BC+MAPPO (g) World, TeamFlowRL (h) World, BC+MAPPO
+> Landmark Agent Evader Food Forest Obstacle Agent −202ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+
+(a) Spread, TeamFlowRL (b) Spread, BC+MAPPO (c) World, TeamFlowRL (d) World, BC+MAPPO                 
+
+> agent 1 agent 2 agent 3 action limit ABC
+> ABC
+> (e) Spread, TeamFlowRL (f) Spread, BC+MAPPO (g) World, TeamFlowRL (h) World, BC+MAPPO
+> Landmark Agent Evader Food Forest Obstacle Agent −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+> −202
+> ax−202
+> ay
+
+(a) Spread, TeamFlowRL (b) Spread, BC+MAPPO (c) World, TeamFlowRL (d) World, BC+MAPPO             
+
+> agent 1 agent 2 agent 3 action limit ABC
+> ABC
+> (e) Spread, TeamFlowRL (f) Spread, BC+MAPPO (g) World, TeamFlowRL (h) World, BC+MAPPO
+> Landmark Agent Evader Food Forest Obstacle Agent
+
+Figure 5 Action distributions and MPE trajectories of TeamFlowRL and BC+MAPPO. (a)--(d) Action distributions of the three agents at the first step of one Spread and one World scene, with colors identifying agents. (e)--(h) Paths of 64 MPE rollouts per method from one initial scene, with the same agent colors. Additional diagnostic details are provided in Appendix C.3. 
+
+return lowers the online gain by 0.93%, with Pearson correlation r = −0.98 . In 3m, 2s3z, 8m, Tag, and World, the policy fine-tuned from the Good or Expert data exceeds the mean return of that dataset. In 3m, 8m, Tag, and World, the policy fine-tuned from the Poor or Random data ends within 10% of the best final return. Additional learning curves and robot episodes are provided in Appendices C and D. 
+
+4.3 Policy Expressiveness 
+
+Action distributions. Figure 5(a)--(d) compares actions generated from the same local input. In the displayed scenes, the fine-tuned flow policy produces separated action modes, whereas BC+MAPPO rep-resents each agent’s action with a single Gaussian. The fine-tuned flow policy therefore represents action distributions that the Gaussian policy cannot represent. 
+
+Cooperative behaviors. In Spread, three agents must cover three landmarks. We label the landmarks A, B, and C, and write an assignment as the landmarks that agents 1, 2, and 3 end nearest to, so CAB means that agent 1 goes to C, agent 2 to A, and agent 3 to B. A rollout covers all landmarks when each landmark has an agent within distance 0.1. Over 64 stochastic rollouts from one fixed scene, TeamFlowRL covers all landmarks with two different assignments. It uses CAB in 35 rollouts and ACB in 28, as shown in Figure 5(e)--(f). The remaining rollout leaves one landmark uncovered. We compare with BC+MAPPO, which pretrains a Gaussian policy on the same data and fine-tunes it with MAPPO. BC+MAPPO covers the landmarks in 63 rollouts but always uses the single assignment BCA. In World, Figure 5(g)--(h) shows that TeamFlowRL also follows more varied pursuit paths than BC+MAPPO from the fixed initial scene. Thus, the fine-tuned flow policy provides both comparable task coverage and greater behavioral diversity 80 0.05 / 0 5Pre → Online (M) 050 100 Success (%)                     
+
+> 00.05 / 0 5Pre →Online (M) 050 100
+> 00.02 / 0 1Pre →Online (M) 050 100
+> 00.05 / 0 2Pre →Online (M) 050 100
+> 00.03 / 0 2Pre →Online (M) 050 100
+> 00.03 / 0 2Pre →Online (M) 050 100
+
+(a) MS Pick (b) MS Stack (c) MS Stack, cam. (d) MS Stack, away (e) RF Stack (f) RF Stack, away       
+
+> TeamFlowRL BC+MAPPO MAPPO from scratch −0.2 0.0 0.2 y (m)
+> −0.2 0.0 x (m) 0.05 0.10 0.15 z (m)
+> −0.2 0.0 0.2 y (m)
+> −0.2 0.0 x (m) 0.05 0.10 0.15 z (m)
+> −0.2 0.0 0.2 y (m)
+> −0.1 0.0 0.1 x (m) 0.0 0.1 z (m)
+> −0.2 0.0 0.2 y (m)
+> −0.1 0.0 0.1 x (m) 0.0 0.1 z (m)
+
+(g) MS Pick, TeamFlowRL 28/30 (h) MS Pick, BC+MAPPO 9/30 (i) RF Stack, TeamFlowRL 29/30 (j) RF Stack, BC+MAPPO 21/30       
+
+> TeamFlowRL success BC+MAPPO success Failure Initial cube Target Arm 1 start Arm 2 start
+
+Figure 6 Training in multi-arm manipulation. (a)--(f) Success with exploration noise from pretraining through online fine-tuning. The vertical line marks the start of online training, and bands are 95% intervals over the evaluation episodes. (g)--(j) Tool center point paths of both arms from one initial scene with exploration noise, where red lines are failures. 
+
+Figure 7 Recorded episodes. (a)--(b) TeamFlowRL and BC+MAPPO from the same ManiSkill3 Pick scene under exploration noise, with the left (L) and right (R) wrist views above each frame; insets in (b) enlarge the arms colliding and the cube left on the table. (c)--(d) TeamFlowRL in Spread and in SMAC 2s3z. 
+
+than the unimodal Gaussian baseline. Further behavioral and robot trajectory diagnostics are provided in Appendices C and D. 
+
+4.4 Comparison with Gaussian Policies 
+
+We compare TeamFlowRL with BC+MAPPO, which pretrains a one-step Gaussian policy on the same data and fine-tunes it with MAPPO, and with MAPPO trained from scratch. 9Table 3 Robot success under stochastic execution; bold marks the best final result.                                           
+
+> MAPPO BC+MAPPO TeamFlowRL Task Trained Pretrained Fine-tuned Pretrained Fine-tuned MS Pick 0.0% 0% 34.4% 20% 91.6%
+> MS Stack 0.0% 16% 82.6% 31% 95.8%
+> MS Stack, cam. 0.0% 19% 52.0% 54% 84.0%
+> MS Stack, away 0.0% 0% 69.0% 1% 91.6%
+> RF Stack 0.0% 2% 49.8% 25% 90.4%
+> RF Stack, away 0.0% 3% 40.0% 28% 73.0%
+> Average 0.0% 6.7% 54.6% 26.5% 87.7%
+> MS/RF: ManiSkill3/RoboFactory; cam.: camera; away: hands-away.
+
+Online adaptation. Figure 6(a)--(f) shows the training curves of the six robot tasks. After 1 million online steps, the success of TeamFlowRL with exploration noise averages 68.0% over the six tasks, against 31.3% for BC+MAPPO. Table 3 shows that MAPPO trained from scratch succeeds in none of the six tasks at the end of training. This comparison shows that offline flow pretraining substantially improves online adaptation over both Gaussian fine-tuning and training MAPPO from scratch. 
+
+Performance under exploration noise. Online training executes each policy with exploration noise, so we evaluate the success of these executions. At the end of training, TeamFlowRL has higher success than BC+MAPPO in all six tasks, by 33.1% on average, as reported in Table 3. From one fixed initial state per task, 95% of the TeamFlowRL executions succeed, against 50% for BC+MAPPO, as shown in Figure 6(g)--(j). Figure 7(a)--(b) shows one such episode: TeamFlowRL lifts the cube to the goal, whereas BC+MAPPO leaves it on the table. Overall, TeamFlowRL retains its advantage when the policies are evaluated under the same stochastic execution rule used during online training. These main results evaluate the stochastic training policy. Additional results under each method’s deployment rule are provided in Appendix D. 
+
+4.5 Ablation Study 
+
+We compare the complete denoising trajectory ratio with per-step clipping and ratio averaging with clamping on three representative configurations. The trajectory ratio achieves the best final performance in two of the three configurations and is never substantially worse than the alternatives. This result supports using the complete trajectory ratio as the default update rule, while detailed curves and configuration results are provided in Appendix C.2. 
+
+5 Conclusion 
+
+We introduced TeamFlowRL, a two-stage framework that pretrains multi-agent flow policies offline and fine-tunes them through online interaction. TeamFlowRL formulates team policy optimization over decentralized denoising trajectories, using a shared team advantage and separate clipping of each agent’s complete trajec-tory ratio to align local updates with the common team return. Across 51 configurations in seven simulation groups, online fine-tuning improves every offline initialization, with a 47.3% average gain in normalized score. The fine-tuned flow policies also represent multimodal action distributions and diverse cooperative behaviors, and achieve 33.1% higher average success under exploration noise than Gaussian-policy fine-tuning across six bimanual tasks. 
+
+Limitations. Our manipulation evaluation is limited to simulated two-arm cube manipulation. Camera observations are used in only two tasks, and we do not evaluate physical robots. We use compact, task-specific policy networks and have not evaluated TeamFlowRL with large VLA models. Finally, offline data quality affects final online performance differently across tasks. We have not identified why lower-quality initializations catch up with higher-quality ones in some tasks but not others, as shown in Figure 3. 10 LLM Usage Statement 
+
+We used large language model assistants (Claude and Codex) in this work. They were used to polish the English writing and to help implement the method and the plotting code. The authors designed the method and the experiments, verified all code, results, and proofs, and take full responsibility for the content of the paper. 
+
+References 
+
+[1] Kang Chen, Zhihao Liu, Tonghe Zhang, Zhen Guo, Si Xu, Hao Lin, Hongzhi Zang, Xiang Li, Quanlu Zhang, Zhaofei Yu, Guoliang Fan, Tiejun Huang, Yu Wang, and Chao Yu. πRL : Online RL fine-tuning for flow-based vision-language-action models. arXiv preprint arXiv:2510.25889 , 2025. URL https://arxiv.org/abs/2510.25889. [2] Cheng Chi, Siyuan Feng, Yilun Du, Zhenjia Xu, Eric Cousineau, Benjamin Burchfiel, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. In Robotics: Science and Systems (RSS) , 2023. doi: 10.15607/RSS.2023.XIX.026. [3] Benjamin Ellis, Jonathan Cook, Skander Moalla, Mikayel Samvelyan, Mingfei Sun, Anuj Mahajan, Jakob N. Foerster, and Shimon Whiteson. SMACv2: An improved benchmark for cooperative multi-agent reinforcement learning. In Advances in Neural Information Processing Systems (NeurIPS) , volume 36, pages 37567--37593, 2023. doi: 10.52202/075280-1634. [4] Jakob N. Foerster, Gregory Farquhar, Triantafyllos Afouras, Nantas Nardelli, and Shimon Whiteson. Counter-factual multi-agent policy gradients. In AAAI Conference on Artificial Intelligence (AAAI) , volume 32, pages 2974--2982, 2018. doi: 10.1609/aaai.v32i1.11794. [5] Claude Formanek, Asad Jeewa, Jonathan Shock, and Arnu Pretorius. Off-the-grid MARL: Datasets and baselines for offline multi-agent reinforcement learning. In International Conference on Autonomous Agents and Multiagent Systems (AAMAS) , pages 2442--2444, 2023. doi: 10.65109/vmil8420. [6] Scott Fujimoto and Shixiang Shane Gu. A minimalist approach to offline reinforcement learning. In Advances in Neural Information Processing Systems (NeurIPS) , pages 20132--20145, 2021. URL https://arxiv.org/abs/2106. 06860. [7] Scott Fujimoto, David Meger, and Doina Precup. Off-policy deep reinforcement learning without exploration. In 
+
+International Conference on Machine Learning (ICML) , volume 97 of Proceedings of Machine Learning Research (PMLR) , pages 2052--2062, 2019. [8] Aviral Kumar, Aurick Zhou, George Tucker, and Sergey Levine. Conservative Q-Learning for offline reinforce-ment learning. In Advances in Neural Information Processing Systems (NeurIPS) , volume 33, 2020. URL https://proceedings.neurips.cc/paper/2020/hash/0d2b2061826a5df3221116a5085a6052-Abstract.html. [9] Dongsu Lee, Daehee Lee, and Amy Zhang. Multi-agent coordination via flow matching. In International Con-ference on Learning Representations (ICLR) , 2026. URL https://arxiv.org/abs/2511.05005. [10] Sergey Levine, Aviral Kumar, George Tucker, and Justin Fu. Offline reinforcement learning: Tutorial, review, and perspectives on open problems. arXiv preprint arXiv:2005.01643 , 2020. URL https://arxiv.org/abs/2005. 01643. [11] Chao Li, Ziwei Deng, Chenxing Lin, Wenqi Chen, Yongquan Fu, Weiquan Liu, Chenglu Wen, Cheng Wang, and Siqi Shen. DoF: A diffusion factorization framework for offline multi-agent reinforcement learning. In 
+
+International Conference on Learning Representations (ICLR) , 2025. [12] Zhuoran Li, Ling Pan, Jiatai Huang, and Longbo Huang. Improving generalization and data efficiency with diffusion in offline multi-agent RL. Transactions on Machine Learning Research (TMLR) , 2026. URL https: //openreview.net/forum?id=GKuCKSJKvl. [13] Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maximilian Nickel, and Matthew Le. Flow matching for generative modeling. In International Conference on Learning Representations (ICLR) , 2023. URL https: //openreview.net/forum?id=PqvMRDCJT9t. 
+
+11 [14] Ryan Lowe, Yi Wu, Aviv Tamar, Jean Harb, Pieter Abbeel, and Igor Mordatch. Multi-agent actor-critic for mixed cooperative-competitive environments. In Advances in Neural Information Processing Systems (NeurIPS) ,volume 30, pages 6379--6390, 2017. [15] David McAllister, Songwei Ge, Brent Yi, Chung Min Kim, Ethan Weber, Hongsuk Choi, Haiwen Feng, and Angjoo Kanazawa. Flow matching policy gradients. In International Conference on Learning Representations (ICLR) , 2026. URL https://proceedings.iclr.cc/paper_files/paper/2026/hash/ 3d43cc5692bf68944ee7cd31b97d0c11-Abstract-Conference.html. [16] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. DINOv2: Learning robust visual features without supervision. Transactions on Machine Learning Research (TMLR) , 2024. [17] Ling Pan, Longbo Huang, Tengyu Ma, and Huazhe Xu. Plan better amid conservatism: Offline multi-agent reinforcement learning with actor rectification. In International Conference on Machine Learning (ICML) , volume 162 of Proceedings of Machine Learning Research (PMLR) , pages 17221--17237, 2022. URL https://proceedings.mlr.press/v162/pan22a.html. [18] Bei Peng, Tabish Rashid, Christian A. Schroeder de Witt, Pierre-Alexandre Kamienny, Philip H. S. Torr, Wendelin Böhmer, and Shimon Whiteson. FACMAC: Factored multi-agent centralised policy gradients. In Advances in Neural Information Processing Systems (NeurIPS) , pages 12208--12221, 2021. URL https: //proceedings.neurips.cc/paper/2021/hash/65b9eea6e1cc6bb9f0cd2a47751a186f-Abstract.html. [19] Physical Intelligence, Ali Amin, Raichelle Aniceto, Ashwin Balakrishna, Kevin Black, Ken Conley, Grace Con-nors, James Darpinian, Karan Dhabalia, Jared DiCarlo, Danny Driess, Michael Equi, Adnan Esmail, Yunhao Fang, Chelsea Finn, Catherine Glossop, Thomas Godden, Ivan Goryachev, Lachy Groom, Hunter Hancock, Karol Hausman, Gashon Hussein, Brian Ichter, Szymon Jakubczak, Rowan Jen, Tim Jones, Ben Katz, Liyiming Ke, Chandra Kuchi, Marinda Lamb, Devin LeBlanc, Sergey Levine, Adrian Li-Bell, Yao Lu, Vishnu Mano, Mohith Mothukuri, Suraj Nair, Karl Pertsch, Allen Z. Ren, Charvi Sharma, Lucy Xiaoyang Shi, Laura Smith, Jost Tobias Springenberg, Kyle Stachowicz, Will Stoeckle, Alex Swerdlow, James Tanner, Marcel Torne, Quan Vuong, Anna Walling, Haohuan Wang, Blake Williams, Sukwon Yoo, Lili Yu, Ury Zhilinsky, and Zhiyuan Zhou. π∗
+
+> 0.6
+
+: a VLA that learns from experience. In Robotics: Science and Systems (RSS) , 2026. doi: 10.15607/RSS.2026.XXII.087. [20] Dean A. Pomerleau. Efficient training of artificial neural networks for autonomous navigation. Neural Compu-tation , 3(1):88--97, 1991. [21] Dan Qiao, Wenhao Li, Shanchao Yang, Hongyuan Zha, and Baoxiang Wang. Offline multi-agent reinforcement learning via sequential score decomposition. In International Conference on Machine Learning (ICML) , volume 306 of Proceedings of Machine Learning Research (PMLR) , 2026. URL https://arxiv.org/abs/2505.05968. [22] Yiran Qin, Li Kang, Xiufeng Song, Zhenfei Yin, Xiaohong Liu, Xihui Liu, Ruimao Zhang, and Lei Bai. Robo-Factory: Exploring embodied agent collaboration with compositional constraints. In IEEE/CVF International Conference on Computer Vision (ICCV) , pages 10075--10085, 2025. doi: 10.1109/ICCV51701.2025.00939. [23] Tabish Rashid, Mikayel Samvelyan, Christian Schroeder de Witt, Gregory Farquhar, Jakob Foerster, and Shi-mon Whiteson. QMIX: Monotonic value function factorisation for deep multi-agent reinforcement learning. In 
+
+International Conference on Machine Learning (ICML) , pages 4292--4301, 2018. URL https://proceedings.mlr. press/v80/rashid18a.html. [24] Allen Z. Ren, Justin Lidard, Lars L. Ankile, Anthony Simeonov, Pulkit Agrawal, Anirudha Majumdar, Benjamin Burchfiel, Hongkai Dai, and Max Simchowitz. Diffusion policy policy optimization. In International Conference on Learning Representations (ICLR) , 2025. [25] Mikayel Samvelyan, Tabish Rashid, Christian Schroeder de Witt, Gregory Farquhar, Nantas Nardelli, Tim G. J. Rudner, Chia-Man Hung, Philip H. S. Torr, Jakob Foerster, and Shimon Whiteson. The StarCraft multi-agent challenge. In International Conference on Autonomous Agents and Multiagent Systems (AAMAS) , pages 2186--2188, 2019. doi: 10.65109/lvzz5205. [26] John Schulman, Philipp Moritz, Sergey Levine, Michael Jordan, and Pieter Abbeel. High-dimensional continu-ous control using generalized advantage estimation. In International Conference on Learning Representations (ICLR) , 2016. 
+
+12 [27] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 , 2017. URL https://arxiv.org/abs/1707.06347. [28] Peter Sunehag, Guy Lever, Audrunas Gruslys, Wojciech Marian Czarnecki, Vinicius Zambaldi, Max Jaderberg, Marc Lanctot, Nicolas Sonnerat, Joel Z. Leibo, Karl Tuyls, and Thore Graepel. Value-decomposition networks for cooperative multi-agent learning based on team reward. In International Conference on Autonomous Agents and Multiagent Systems (AAMAS) , pages 2085--2087, 2018. doi: 10.65109/jsrc7365. [29] Stone Tao, Fanbo Xiang, Arth Shukla, Yuzhe Qin, Xander Hinrichsen, Xiaodi Yuan, Chen Bao, Xinsong Lin, Yulin Liu, Tse-kai Chan, et al. ManiSkill3: GPU parallelized robotics simulation and rendering for generalizable embodied AI. arXiv preprint arXiv:2410.00425 , 2024. URL https://arxiv.org/abs/2410.00425. [30] Jianhao Wang, Zhizhou Ren, Terry Liu, Yang Yu, and Chongjie Zhang. QPLEX: Duplex dueling multi-agent Q-Learning. In International Conference on Learning Representations (ICLR) , 2021. [31] Xiangsen Wang, Haoran Xu, Yinan Zheng, and Xianyuan Zhan. Offline multi-agent reinforcement learning with implicit global-to-local value regularization. In Advances in Neural Information Processing Systems (NeurIPS) ,volume 36, pages 52413--52429, 2023. doi: 10.52202/075280-2282. [32] Chao Yu, Akash Velu, Eugene Vinitsky, Jiaxuan Gao, Yu Wang, Alexandre Bayen, and Yi Wu. The surprising effectiveness of PPO in cooperative, multi-agent games. In Advances in Neural Information Processing Systems (NeurIPS) , volume 35, pages 24611--24624, 2022. doi: 10.52202/068431-1787. [33] Tonghe Zhang, Chao Yu, Sichang Su, and Yu Wang. Reinflow: Fine-tuning flow matching policy with online reinforcement learning. In Advances in Neural Information Processing Systems (NeurIPS) , volume 38, pages 117701--117738, 2025. doi: 10.52202/085713-3547. [34] Zhengbang Zhu, Minghuan Liu, Liyuan Mao, Bingyi Kang, Minkai Xu, Yong Yu, Stefano Ermon, and Weinan Zhang. MADiff: Offline multi-agent learning with diffusion models. In Advances in Neural Information Process-ing Systems (NeurIPS) , 2024. [35] Guowei Zou, Weibing Li, Hejun Wu, Yukun Qian, Yuhang Wang, and Haitao Wang. D 2PPO: Diffusion policy policy optimization with dispersive loss. In AAAI Conference on Artificial Intelligence (AAAI) , volume 40, pages 18891--18899, 2026. doi: 10.1609/aaai.v40i22.38959. URL https://ojs.aaai.org/index.php/AAAI/article/ download/38959/42921. [36] Guowei Zou, Haitao Wang, Hejun Wu, Yukun Qian, Yuhang Wang, and Weibing Li. OGPO: One-step generative policy optimization for real-time robot control. In ACM International Conference on Multimedia (ACM MM) ,2026. URL https://arxiv.org/abs/2601.20701. 
+
+13 Appendix Contents 
+
+A Method Details and Theoretical Analysis 15 
+
+A.1 Notation and Index Conventions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15 A.2 Offline Flow Objective and Networks . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15 A.3 Denoising Trajectory Likelihood . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16 A.4 Theoretical Analysis . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17 A.5 Comparison with the Gaussian Baseline . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19 
+
+B Implementation Details 19 
+
+B.1 Inputs, Action Map, and Update Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19 B.2 Online Fine-Tuning Settings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 B.3 Bounded Repair . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21 
+
+C Benchmark Experiments 21 
+
+C.1 Experimental Protocol and Reporting Conventions . . . . . . . . . . . . . . . . . . . . . . . . 21 C.2 Trajectory Ratio Ablation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 C.3 Behavioral Diagnostic Details . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 
+
+D Robot Manipulation Experiments 24 
+
+D.1 Robot Manipulation Setup . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 D.2 Success under the Deployment Rule . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 D.3 Trajectories under the Deployment Rule . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25 D.4 Bimanual Stacking under Exploration Noise . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25 D.5 Bimanual Manipulation with Camera Observations . . . . . . . . . . . . . . . . . . . . . . . . 25 D.6 Learning to Release and Withdraw . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27 14 A Method Details and Theoretical Analysis 
+
+A.1 Notation and Index Conventions 
+
+Environment time t, flow time τ , denoising step k, and the agent index i describe different operations. Agent indices are superscripts and environment time is a subscript, as in hit. Within one denoising trajectory the time index is omitted, so xi,k is the variable of agent i after k of the K = 10 denoising steps. Denoising step 
+
+k corresponds to flow time τ = k/K , at which the velocity network is evaluated in Equation 3. A subscript τ ,as in xiτ , always denotes flow time and never environment time. Bold symbols collect all N agents. Table 4 lists the symbols. 
+
+Table 4 Symbols used in training, deployment, and analysis. Symbol Meaning 
+
+Indices, clocks, and local information 
+
+i, N Agent index and number of controlled agents ( N = |I| ). 
+
+t, T Environment step and episode horizon. 
+
+k, K Denoising step and number of flow steps, with K = 10 .
+
+τ Continuous interpolation time between latent noise and data. 
+
+hit, s t Local actor input and centralized critic input. 
+
+ait, r t Executed local action and shared team reward. 
+
+Flow initialization and denoising trajectories 
+
+z, I Standard Gaussian latent and identity covariance matrix. 
+
+xτ Interpolated offline flow input. 
+
+vθ , θ Conditional velocity field and its shared parameters. 
+
+LFM Conditional flow matching objective. 
+
+xi,k , ξ i Intermediate denoising variable and complete stored trajectory (xi, 0, . . . , x i,K ).
+
+μθ Conditional transition mean. 
+
+fϕ, σ ϕ, ϕ Noise network, conditional transition standard deviation, and its parameters. 
+
+σmin , σ max Lower and upper bounds on the conditional standard deviation. 
+
+ϵi,k Independent standard Gaussian transition noise. 
+
+p0, q θ,ϕ , M θ,ϕ Initial latent probability, one-agent trajectory probability, and factorized joint trajectory policy. 
+
+g, π θ,ϕ , U Action transformation, induced action distribution, and measurable action set. 
+
+b Bound on the transition mean in the repaired variant. 
+
+Team advantages and online optimization 
+
+J, γ Expected discounted team return and discount factor. 
+
+Vψ , ψ Centralized critic and its parameters. 
+
+ut, d t True termination indicator and episode boundary indicator. 
+
+δt, λ, ̂ At Temporal-difference residual, GAE trace coefficient, and team advantage esti-mate. 
+
+ℓθ,ϕ , ℓ old Sums of conditional transition log probabilities under the current and collection policies. 
+
+ρit, ε Per-agent likelihood ratio of the denoising trajectory and PPO clipping threshold. 
+
+mit, L clip Actor activity mask and clipped PPO objective. 
+
+E, D KL , clip Expectation, Kullback--Leibler divergence, and clipping operator. 
+
+Reported scores 
+
+R, R random , R expert Raw episode return and the reference returns for MPE normalization. 
+
+A.2 Offline Flow Objective and Networks 
+
+For a dataset pair (hi, a i), a latent zi ∼ N (0 , I ), and τ ∼ U [0 , 1] , the straight interpolation xiτ = (1 −τ )zi +τ a i
+
+has the conditional velocity 
+
+u(xiτ | zi, a i) = dx iτ
+
+dτ = ai − zi, (9) 15 and conditional flow matching regresses the network onto it, which gives Equation 2. For the true marginal velocity u⋆(x, τ | h) = E[a − z | xτ = x, h ], the regression target satisfies 
+
+E∥vθ (h, x τ , τ ) − (a − z)∥2
+
+= E∥vθ (h, x τ , τ ) − u⋆(xτ , τ | h)∥2 + C, (10) where C does not depend on θ. This is the standard argument that the conditional loss has the same minimizer as regression onto u⋆. The offline teacher generates an action with K deterministic Euler steps, 
+
+xi,k +1 = xi,k + K−1vθ (hi, x i,k , k/K ), (11) for k = 0 , . . . , K − 1, which is the transition mean of Equation 3. The velocity network is a multilayer perceptron with GELU activations on the concatenation of hi, xi,k , and either k/K or sinusoidal features of k/K . The widths and time features are imported with the offline checkpoint. The noise network fϕ is a separate perceptron with one hidden layer of width 64 and a tanh activation on (hi, x i,k , k/K ). Its output layer starts with zero weights and a constant bias, so every coordinate starts at the configured standard deviation: σϕ(hi, x i,k , k ) = σmin + ( σmax − σmin )
+
+· sigmoid (fϕ(hi, x i,k , k/K )), (12) with σmin = 0 .01 , σmax = 0 .5, and initial value 0.1.
+
+A.3 Denoising Trajectory Likelihood 
+
+Given xi,k , the mean μi,k θ and the standard deviation σi,k ϕ in Equation 3 are fixed, and xi,k +1 = μi,k θ +σi,k ϕ ⊙ϵi,k 
+
+is an affine function of ϵi,k ∼ N (0 , I ). An affine function of a standard Gaussian vector is Gaussian, so 
+
+xi,k +1 | xi,k ∼ N (μi,k θ , diag(( σi,k ϕ )2)). Because each step depends on earlier steps only through xi,k , the trajectory probability in Equation 4 is the product of these transitions. Each transition is a diagonal Gaussian over the d action coordinates, so 
+
+log N (xi,k +1 | μi,k θ , diag(( σi,k ϕ )2))
+
+= −
+
+> d
+
+∑
+
+> c=1
+
+[ (xi,k +1  
+
+> c
+
+− μi,k θ,c )2
+
+2( σi,k ϕ,c )2 + log σi,k ϕ,c + 12 log 2 π
+
+]
+
+, (13) and the stored log likelihood is the sum over all steps and coordinates, 
+
+ℓθ,ϕ (ξi | hi) = 
+
+> K−1
+
+∑
+
+> k=0
+
+log N (xi,k +1 | μi,k θ , diag(( σi,k ϕ )2)). (14) The ratio in Equation 7 is 
+
+ρit = exp (ℓθ,ϕ (ξit | hit) − ℓold (ξit | hit)).
+
+The stored denoising trajectory is held fixed while μ and σ are recomputed at its prefixes. The marginal probability of the final variable is represented by 
+
+qKθ,ϕ (xi,K | hi) = 
+
+∫
+
+qθ,ϕ (ξi | hi) dx i, 0 · · · dx i,K −1, (15) which cannot be evaluated directly. The executed action distribution is its pushforward under g, with point masses at the clipping bounds for continuous control. 
+
+Proposition 1 (Trajectory ratios and marginal ratios) . Fix hi and let q = qθ,ϕ (· | hi) and qold be the joint probabilities of two denoising processes of the form of Equation 4 with strictly positive standard deviations. Then, for almost every xi,K ,
+
+Eξi∼qold 
+
+[ q(ξi)
+
+qold (ξi)
+
+∣∣∣∣ xi,K 
+
+]
+
+= qK (xi,K )
+
+qK
+
+> old
+
+(xi,K ) . (16) 16 If, in addition, differentiation can pass under the integral, then 
+
+∇ log qK (xi,K ) = Eξi∼q
+
+[∇ log q(ξi) ∣∣ xi,K ]. (17) 
+
+Proof. Gaussian transitions with positive variance make q and qold positive everywhere. Write y =(xi, 0, . . . , x i,K −1). The conditional probability of y given xi,K under qold is qold (ξi)/q K
+
+> old
+
+(xi,K ), so the left side of Equation 16 equals 
+
+∫ qold (ξi)
+
+qK
+
+> old
+
+(xi,K )
+
+q(ξi)
+
+qold (ξi) dy = 1
+
+qK
+
+> old
+
+(xi,K )
+
+∫
+
+q(ξi) dy 
+
+= qK (xi,K )
+
+qK
+
+> old
+
+(xi,K ) .
+
+For Equation 17, 
+
+∇qK (xi,K ) = 
+
+∫
+
+∇q(ξi) dy =
+
+∫
+
+q(ξi) ∇ log q(ξi) dy. 
+
+Dividing by qK (xi,K ) and using the conditional probability of y under q gives the claim. The proposition explains why the trajectory ratio is a usable substitute for the intractable ratio of action marginals: conditioned on the final variable, it is unbiased for the marginal ratio, and its expected score equals the marginal score. By the law of total variance, the unconditional variance of the trajectory ratio is at least that of the marginal ratio, because the intermediate variables add conditional randomness. 
+
+A.4 Theoretical Analysis 
+
+The analysis concerns the joint sampling policy with transition noise, 
+
+Mθ,ϕ (ξ | χ) = ∏
+
+> i
+
+qθ,ϕ (ξi | hi),
+
+where χ is a Markov information state containing the joint histories and each hi is a fixed projection of χ.The environment sees only a = ( g(x1,K ), . . . , g (xN,K )) . Assume 0 < γ < 1, bounded rewards, initial and transition distributions independent of the parameters, fixed legal masks at each history, and the regularity needed to interchange differentiation and expectation. Let dM be the normalized discounted occupancy of χ
+
+and AM (χ, ξ) the exact team advantage, which depends on ξ only through a. The statements below concern the training policy with transition noise. 
+
+Proposition 2 (Raw denoising trajectories under a fixed action map) . The gradient of the expected return of the sampling policy can be written with the trajectory score ∇ log qθ,ϕ (ξi | hi). For two policies over denoising trajectories q, p at the same history, 
+
+DKL (g#qK ∥g#pK ) ≤ DKL (qK ∥pK ) ≤ DKL (q∥p)
+
+whenever the right side is finite. Proof. For a single decision with return functional R(g(xi,K )) independent of the parameters, 
+
+∇Eξ∼q
+
+[R(g(xi,K )) ] =
+
+∫
+
+R(g(xi,K )) ∇q(ξ) dξ = Eq
+
+[R ∇ log q(ξ)].
+
+Applying this to finite trajectories and taking the discounted limit gives the score form. Both inequalities follow from the chain rule for relative entropy. The KL of a joint distribution equals the KL of a marginal plus the expected KL of the conditionals, which is nonnegative. The first applies it to (xi,K , g (xi,K )) , and the second to (ξi, x i,K ).17 Proposition 3 (Factorized joint change) . At a fixed information state, for product policies over denoising trajectories M = ∏ 
+
+> i
+
+qi and M ′ = ∏ 
+
+> i
+
+pi with finite individual KL divergences, 
+
+DKL (M ∥M ′) = ∑
+
+> i
+
+DKL (qi∥pi), ∏
+
+> i
+
+ρi = M ′
+
+M .
+
+Proof. 
+
+DKL (M ∥M ′) = Eξ∼M
+
+[∑ 
+
+> i
+
+log qi(ξi)
+
+pi(ξi)
+
+]
+
+= ∑
+
+> i
+
+Eξi∼qi
+
+[
+
+log qi
+
+pi
+
+]
+
+because each term depends only on ξi, whose marginal under M is qi. The ratio identity is the factorization itself. The factorization uses independent latents and transition noise across agents. Shared parameters do not affect it. A bound δ on the KL averaged over active agents gives at most N δ for the joint KL at that history. 
+
+Proposition 4 (Team policy gradient with shared parameters) . Under the stated assumptions, 
+
+∇J = 11 − γ Eχ∼dM ,ξ∼M
+
+[
+
+AM (χ, ξ)
+
+·
+
+> N
+
+∑
+
+> i=1
+
+∇ log qθ,ϕ (ξi | hi)
+
+]
+
+,
+
+(18) 
+
+where the gradient is taken with respect to (θ, ϕ ).Proof. The log likelihood of a finite trajectory contains ∑
+
+> t
+
+∑ 
+
+> i
+
+log qθ,ϕ (ξit | hit). The environment terms do not depend on the parameters. The score identity, removal of rewards that precede each score by conditional expectation, replacement of the remaining return by the action value, and subtraction of the state value, which does not depend on the action, give Equation 18 after the discounted limit. With shared parameters, the product rule sums the scores of all agents. A common team advantage is therefore compatible with decentralized sampling. The implementation replaces 
+
+AM with normalized GAE from a learned critic and averages uniformly over rollout samples. 
+
+Proposition 5 (First-order consistency of agent ratios) . Fix the collection parameters, write Aold for the corresponding advantage, and define, with expectations under the collection occupancy and policy, 
+
+Sagent = E
+
+[
+
+Aold ∑
+
+> i
+
+(ρi − 1) 
+
+]
+
+,Sjoint = E
+
+[
+
+Aold (∏ 
+
+> i
+
+ρi − 1
+
+)] 
+
+.
+
+(19) 
+
+At the collection parameters both vanish, their gradients are equal to (1 − γ)∇J, and replacing each ρiAold 
+
+by its clipped counterpart leaves the gradient unchanged. Proof. Every ratio equals one at the collection parameters, so there 
+
+∇ ∏
+
+> i
+
+ρi = ∑
+
+> i
+
+∇ρi = ∑
+
+> i
+
+∇ log qθ,ϕ (ξi | hi).
+
+Substituting into the definitions and using Proposition 4 gives the gradient identity. The clipping interval contains one in its interior, so the clipped and unclipped terms agree in a neighborhood and have the same derivative. The agreement is local: after the first update of an iteration, sums and products of ratios differ. By Proposi-tion 1, the same local agreement holds between the trajectory ratio and the ratio of action marginals. 18 A.5 Comparison with the Gaussian Baseline 
+
+The baseline BC+MAPPO fine-tunes a one-step Gaussian policy with MAPPO. Table 5 lists where the two optimization problems differ. In the analysis above, the statements that hold for any product of agent policies are stated for policies over denoising trajectories. Proposition 1 and the trajectory form of Proposition 2 have no counterpart for a one-step Gaussian, whose action likelihood can be evaluated directly. The one-step baseline is deployed with its latent fixed at zero, whereas TeamFlowRL samples a fresh latent at every step during both training and deployment. 
+
+Table 5 TeamFlowRL and the Gaussian baseline BC+MAPPO. Values for BC+MAPPO follow its configuration in the robot tasks, listed in Table 8. TeamFlowRL BC+MAPPO Initial policy Ten-step flow teacher vθ from flow matching One-step student network, latent fixed at zero Sampling distribution Markov chain of K = 10 Gaussian transi-tions with learnable noise σϕ(hi, x i,k , k ) ∈
+
+[0 .01 , 0.5] 
+
+Gaussian around the student output with a learned standard deviation shared across states and agents Stored sample Complete denoising trajectory ξit =(xi, 0 
+
+> t
+
+, . . . , x i,K t )
+
+Raw action before clipping Likelihood Sum of K transition log probabilities (Equa-tion 4). The action marginal cannot be eval-uated directly Gaussian likelihood of the raw action Ratio One trajectory ratio per agent (Equation 7) One action ratio per agent Clipping Per-agent ratio, ε = 0.2 by default, com-puted in log space Per-agent ratio, ε = 0 .05 in the robot tasks Regularization None in reported runs ( β = 0 , no entropy term) Reference KL coefficient 0.01 and entropy co-efficient 0.001 in the robot tasks Update-size control Conditional trajectory KL summed over K
+
+transitions, threshold 0.02, optional back-tracking Analytic Gaussian KL of the action, thresh-old 0.02 Deployment Random initial latent, deterministic Euler steps, so the action stays stochastic Mean action with the latent fixed at zero 
+
+B Implementation Details 
+
+B.1 Inputs, Action Map, and Update Control 
+
+Inputs and initialization. The actor conditions only on its local input. Continuous control uses local obser-vation features with the identity encoding supplied by the environment adapter. For StarCraft, the actor conditions on local recurrent features from a pretrained encoder that remains frozen during online opti-mization. The online actor imports the teacher velocity network from the offline checkpoint. All reported configurations use K = 10 denoising steps and β = 0 in Equation 22. 
+
+Action map. The actor stores the sampled denoising trajectory before any action transformation. The executed action is ai = clip( xi,K , −1, 1) for continuous control and the largest legal coordinate of xi,K for StarCraft. 
+
+Valid trajectory ratio. Three implementation requirements make the ratio in Equation 7 valid. First, each denoising trajectory is sampled from the noisy transition chain of Equation 3 itself, and its log likelihood is stored at collection. The update recomputes the likelihood of the same stored trajectory, so ρit = 1 at the collection parameters, which we check at every update. Second, log ρit is the exact sum of the transition log probabilities over all K steps and action coordinates, without averaging or clamping. Third, each agent has 19 its own ratio, clipped against the shared team advantage. The stored trajectory is detached, so gradients enter the velocity and noise networks only through the conditional means and standard deviations at the stored prefixes. 
+
+Update size and execution. Gradient clipping and a conditional trajectory KL check limit the update size: once the trajectory KL exceeds its threshold, the remaining actor updates of the iteration are skipped, and some tasks additionally use KL backtracking, described in Appendix B.2. Bounded transition means define a separate repair variant, described in Appendix B.2. Training samples with transition noise, and deployment follows the mean update. 
+
+B.2 Online Fine-Tuning Settings 
+
+With collection critic parameters ψold , the implementation computes GAE backward over each rollout of 128 steps, 
+
+δt = rt + γ(1 − ut)Vψold (s+
+
+> t+1
+
+) − Vψold (st),̂
+
+At = δt + γλ (1 − dt)̂At+1 ,̂ Rt =̂ At + Vψold (st), (20) where s+ 
+
+> t+1
+
+is the successor state before any reset, γ = 0 .99 , and λ = 0 .95 . A time limit has ut = 0 and dt = 1 ,so it bootstraps from the final state but cuts the trace. The value targets are formed before normalization. The actor advantage is normalized once per rollout, with the population standard deviation, and copied to every agent: 
+
+˜At =̂ At − A
+
+max (std( ̂A), 10 −8) , ˜Ait = ˜At for all i. (21) The actor and critic minimize Lactor = −Lclip ,
+
+LV = 12 Et
+
+[(Vψ (st) −̂ Rt)2], (22) where the return target ̂ Rt is held fixed. The implementation evaluates Equation 8 in log space and clips only the side selected by the advantage sign, 
+
+min (ρ ˜A, clip( ρ, 1 − ε, 1 + ε) ˜A)
+
+=
+
+{
+
+emin(log ρ, log(1+ ε)) ˜A, ˜A ≥ 0,emax(log ρ, log(1 −ε)) ˜A, ˜A < 0,
+
+(23) which is an identity. For ˜A ≥ 0, the minimum of ρ ˜A and clip( ρ) ˜A is min( ρ, 1 + ε) ˜A. For ˜A < 0, it is 
+
+max( ρ, 1 − ε) ˜A. Update size is measured by the conditional trajectory KL from the collection policy, 
+
+Dit =
+
+> K−1
+
+∑
+
+> k=0
+
+DKL 
+
+(N (μi,k 
+
+> old
+
+, diag(( σi,k 
+
+> old
+
+)2)) 
+
+∥ N (μi,k θ , diag(( σi,k ϕ )2)) ),
+
+(24) evaluated at the stored prefixes and averaged with weights mit. By the chain rule for relative entropy, its expectation over prefixes from the collection policy equals the trajectory KL DKL (qold ∥qθ,ϕ ). Without backtracking, after each actor minibatch step the minibatch value is compared with the target 0.02. If it is exceeded, the value over the whole rollout is computed. If that also exceeds 0.02, the remaining actor updates of the iteration stop while critic updates continue. The rollout value is also checked at the end of each epoch. The triggering step is kept. With backtracking enabled, a step is accepted only if the rollout value is at most the target. Otherwise, parameters and Adam state are restored, and the step is retried with the learning rate halved, up to the configured number of retries. The first iteration updates only the critic. Four configurations use task-specific optimization settings: 2-HalfCheetah Good, 5m_vs_6m Medium, Tag 20 Random, and Spread Random. They keep the ten-step generator and the complete trajectory ratio, and their settings are provided in the released code. The centralized critic is a multilayer perceptron with two 256-unit hidden layers and hyperbolic tangent activations. The conditional noise network has one 64-unit hidden layer with a hyperbolic tangent activation. The generator architecture is imported from the source checkpoint. The source checkpoint also determines the local recurrent encoder for StarCraft. The encoder remains frozen so stored local features can be used consistently when replaying likelihoods. 
+
+B.3 Bounded Repair 
+
+The bounded repair applies b tanh( μ/b ) to the transition mean μθ in Equation 3, with b = 10 . The Gaussian noise is added after this transformation. Two OMIGA configurations use this structural change. The 6-HalfCheetah Expert and 3-Hopper Expert runs each complete 50 million steps and appear in Table 7 and Figure 8. Their offline references are the original step zero evaluations of the same teachers. 
+
+C Benchmark Experiments 
+
+C.1 Experimental Protocol and Reporting Conventions 
+
+Table 6 gives the default configuration, and the configuration of every task is provided in the released code. Online budgets count joint environment transitions. 
+
+Table 6 Online fine-tuning settings. Online budgets count joint environment transitions, with one transition per joint environment step.                                                        
+
+> Benchmark Actor Critic γλClip KL Ref. Ent. Epochs Minib. Envs Rollout Grad. Warmup Penalty σ0Actor input Critic input SMAC, SMACv2 2e-5 3e-4 0.99 0.95 0.2 0.02 004256 8128 0.5 1st iter. off 0.1 frozen recurrent features state MPE, MA-MuJoCo 2e-5 3e-4 0.99 0.95 0.2 0.02 004256 40 128 0.5 1st iter. off 0.1 local observation joint observation or state Actor, Critic: learning rates. γ: discount. λ: GAE parameter. Clip: PPO clipping. KL: trajectory KL threshold. Ref., Ent.: reference and entropy coefficients. Minib.: minibatch size. Envs: parallel environments. Rollout: rollout length. Grad.: gradient norm clipping. Warmup: critic warmup. Penalty: reference penalty. σ0: initial Gaussian transition noise.
+
+Table 2 in the main text reports MPE, OG-MARL, and SMAC, and Table 7 reports OMIGA and SMACv2. Each offline source provides a teacher pretrained for one million updates. All benchmark entries of Team-FlowRL share an online budget of 50 million environment steps. The robot tasks keep their own budgets of 1 to 5 million steps. The OMIGA Expert entries for 6-HalfCheetah and 3-Hopper use bounded repair at 50 million steps and are marked ‡. The learning curves also include the two SMACv2 Good datasets. The MPE panel reports normalized scores. For raw return R, the score is 
+
+100 R − Rrandom 
+
+Rexpert − Rrandom 
+
+.
+
+The remaining panels report raw team returns. The learning curves and the paired comparisons in the text use raw returns throughout. Published baseline values retain their source protocols. SMAC and SMACv2 baselines follow MAC-Flow [9], Table 1. MPE baselines follow MAC-Flow, Table 2, except the entries marked m from MADiff [34], Table 1, and DOM2 [12], Table 1. DOM2 uses its own collected datasets. Its entries convert the raw returns in DOM2, Table 1, into normalized scores with the expert and random reference returns given in the DOM2 appendix (p. 22). The DOM2 Spread average is computed by us from its four Spread entries. OG-MARL baselines follow MADiff, Table 1, OMSD entries follow OMSD, Table 2, and OMIGA baselines follow MAC-Flow, Table 2. 21 Entries marked r are local reproductions of the offline MAC-Flow student. Their settings are provided in the released code. The three SMACv2 Replay entries marked r in Table 7 come from the MAC-Flow pretraining run that initializes TeamFlowRL on these tasks. MADiff-D uses decentralized execution, while MADiff-C uses centralized execution. Published averages retain their source coverage except for OMIGA, whose baseline averages equally weight the nine reported combinations of task and dataset. The TeamFlowRL Spread average equally weights four datasets, and its SMACv2 average equally weights three Replay tasks. Light green shading and boldface mark the largest displayed mean. Light gray shading and underlining mark 
+
+Table 7 Published results and TeamFlowRL on OMIGA MuJoCo (continuous control) and SMACv2 (discrete control), with methods as rows and task and dataset pairs as columns. Notation follows Table 2. We collected the SMACv2 Good datasets ourselves and will release them. Published baselines report only Replay, so a TeamFlowRL result on Good is shaded and bold when it exceeds every published baseline on the same task. MAC-Flow r is our local reproduction. 
+
+OMIGA HalfCheetah Hopper Ant Avg. 
+
+Expert M-E Expert M-R M-E Expert Medium M-R M-E MACQL [8] (2020) 4589 .5 ±98 .5 4738 .2 ±181 .1 3359 .1 ±513 .8 31 .4 ±15 .2 2751 .8 ±123 .3 2082 .4 ±21 .7 1033 .9 ±66 .4 434 .6 ±108 .3 1800 .2 ±21 .5 2313 .5
+
+MATD3BC [6] (2021) 4401 .6 ±169 .1 3518 .1 ±381 .0 3309 .9 ±4.5 269 .7 ±41 .8 2904 .3 ±477 .4 2046 .9 ±17 .1 1422 .6 ±21 .1 995 .2 ±52 .8 1636 .1 ±96 .0 2278 .3
+
+OMAR [17] (2022) −206 .7 ±161 .1 −253 .8 ±63 .9 2.4 ±1.5 3.3 ±3.2 1.4 ±0.9 312 .5 ±297 .5 −1710 .0 ±1589 .0 −2014 .2 ±844 .7 −2992 .8 ±7.0 −762 .0
+
+OMIGA [31] (2023) 3383 .6 ±552 .7 2948 .5 ±518 .9 859 .6 ±709 .5 774 .2 ±494 .3 709 .0 ±595 .7 2055 .5 ±1.6 1418 .4 ±5.4 1105 .1 ±88 .9 1720 .3 ±110 .6 1663 .8
+
+MADiff-D [34] (2024) 4711 .4 ±213 .6 4410 .9 ±836 .8 2853 .3 ±593 .8 936 .1 ±574 .0 2810 .4 ±723 .2 2060 .0 ±10 .3 1428 .4 ±14 .7 1294 .5 ±360 .2 1740 .2 ±158 .9 2471 .69 
+
+MAC-Flow [9] (2026) 4650 .0 ±271 .6 5139 .9 ±84 .1 3592 .1 ±8.9 1166 .3 ±451 .9 2988 .3 ±480 .2 2060 .2 ±20 .0 1432 .4 ±17 .8 1498 .4 ±20 .3 2053 .3 ±20 .4 2731 .2
+
+TeamFlowRL (w/o online RL) 3477 .40 ±246 .94 3021 .08 ±128 .55 2896 .91 ±48 .37 403 .84 ±37 .51 900 .09 ±64 .63 2048 .93 ±6.48 1420 .26 ±3.02 1092 .11 ±19 .17 1768 .56 ±63 .84 1892 .13 
+
+TeamFlowRL 6562 .96 ‡ ±346 .62 6828 .97 ±91 .78 3059 .66 ‡ ±116 .38 3287 .96 ±138 .76 2055 .42 ±102 .72 3867 .80 ±27 .18 3874 .97 ±35 .42 3761 .87 ±23 .21 5193 .92 ±108 .55 4277 .06 
+
+SMACv2 Terran 5v5 Zerg 5v5 Terran 10v10 Avg. 
+
+Replay Good Replay Good Replay BC [20] (1991) 7.3 ±1.0 -- 6.8 ±0.6 -- 7.4 ±0.5 7.2
+
+MABCQ [7] (2019) 13 .8 ±4.4 -- 10 .3 ±1.2 -- 12 .7 ±2.0 12 .3
+
+MACQL [8] (2020) 11 .8 ±0.9 -- 10 .3 ±3.4 -- 11 .8 ±2.0 11 .3
+
+Diffusion BC [2] (2023) 9.3 ±0.9 -- 8.1 ±1.7 -- 5.5 ±1.5 7.6
+
+Flow BC [13] (2023) 8.3 ±1.9 -- 4.6 ±0.5 -- 5.8 ±1.7 6.2
+
+MADiff-D [34] (2024) 13 .3 ±1.8 -- 10 .2 ±1.1 -- 13 .8 ±1.3 12 .4
+
+MAC-Flow [9] (2026) 16 .6 ±4.3 -- 9.8 ±1.5 -- 13 .0 ±4.7 13 .1
+
+MAC-Flow r 9.70 ±1.40 -- 7.01 ±1.27 -- 6.03 ±0.57 7.58 
+
+TeamFlowRL (w/o online RL) 7.22 ±0.74 14 .22 ±0.45 6.24 ±0.56 12 .42 ±0.37 4.77 ±0.94 6.08 
+
+TeamFlowRL 12 .86 ±0.78 15 .17 ±0.81 10 .86 ±1.18 14 .17 ±1.00 10 .16 ±0.96 11 .29 ±0.93 
+
+‡ bounded repair: the transition mean is bounded as 10 · tanh(mean /10) , a structural change for numerical stability. SMACv2 averages are over the three Replay tasks. 0 1 / 0 50 0.0 2.5 5.0 7.5 Return (×10³) Pre → Online (M) OMIGA 6-HC 0 1 / 0 50 0123Return (×10³) Pre → Online (M) OMIGA 3-Hopper 0 1 / 0 50 0.0 1.5 3.0 4.5 Return (×10³) Pre → Online (M) OMIGA 2-Ant 0 1 / 0 50 510 15 Return Pre → Online (M) Terran 5v5 0 1 / 0 50 4812 16 Return Pre → Online (M) Zerg 5v5 0 1 / 0 50 36912 Return Pre → Online (M) Terran 10v10 
+
+Expert / Good Medium Medium-Replay Medium-Expert Replay Bounded repair 
+
+Figure 8 Learning curves on OMIGA MuJoCo and SMACv2, drawn as in Figure 3. Dashed curves show runs with bounded repair, and 6-HC denotes 6-HalfCheetah. 
+
+22 the second-largest distinct mean. Equal rounded means share ranks. M-R and M-E denote Medium-Replay and Medium-Expert. In the main tables, a dagger marks a normalized MPE score. 
+
+Evaluation details. The offline flow comparison uses the same evaluation rule as TeamFlowRL. In MPE, the Medium-Replay and Random Spread initializations also improve but end below Expert. Table 2 reports all MPE combinations on the normalized score scale used by the published references. 
+
+Table 8 Configurations for the robot experiments with state observations.                                                                                    
+
+> Pretraining Online fine-tuning Method Init. Pre. upd. Demos Split Batch Seq. Steps Envs Ep. len. Actor Critic Epochs Clip KL stop Ref. KL Ent. Minib. Rollout Exec. MS3 TeamFlowRL 10-step 50k 983/1007 90/10 128 20 5M 64 100 2e-5 3e-4 4--0.02 ------6400 random z
+> BC+MAPPO 1-step 50k 983/1007 90/10 128 20 5M 64 100 2e-5 3e-4 40.05 0.02 0.01 0.001 128 6400 mean RF TeamFlowRL 10-step 30k 817/1024 735/82 ----2M 64 100 2e-5 3e-4 4--0.02 ------6400 --BC+MAPPO 1-step 30k 817/1024 735/82 ----2M 64 100 2e-5 3e-4 4--0.02 ------6400 mean MS3: ManiSkill3. RF: RoboFactory. Init.: initial policy. Actor, Critic: learning rates. Pre. upd.: pretraining updates. Split: train/validation. Seq.: pretraining sequence length. Steps: online environment steps. Ep. len.: episode length. Ref. KL: reference KL coefficient. Ent.: entropy coefficient. Minib.: online minibatch. Exec.: execution rule. The two methods share the pretraining run and demonstration split within each benchmark. ManiSkill3 demonstrations are listed for Pick / Stack, and RoboFactory uses 817 successful of 1,024 expert episodes and the pretraining checkpoint at 30k of 50k updates. The TeamFlowRL execution rule samples a random initial latent without transition noise. Rollout batch sizes count joint environment transitions.
+
+C.2 Trajectory Ratio Ablation 
+
+We change one choice of the trajectory ratio at a time and keep every other setting of the default configuration, with a budget of 50 million environment steps. We compare the per-agent trajectory ratio over the complete denoising trajectory with two alternative constructions: clipping the ratio of each denoising step separately, as DPPO does for single-agent denoising transitions [24], and averaging the trajectory log probability over steps and coordinates before clamping it to [−5, 2] . Table 9 reports the return at 50 million steps and the mean return over the last 5 million steps. 
+
+Table 9 Variants of the TeamFlowRL denoising trajectory ratio. Final: return at the end of training. Last 10%: mean return over the last 10% of training. 
+
+Spread Medium Spread M-R 2-Ant Poor Ratio Final Last 10% Final Last 10% Final Last 10% Complete trajectory per agent (default) 449.6 448.9 300.3 305.4 3195 3162 Clipped per denoising step 401.5 406.2 301.2 301.8 3195 2971 Averaged and clamped 441.2 434.7 255.5 263.2 3035 3052 
+
+Clipping each denoising step separately lowers the return in Spread Medium by about 43 and the late mean in 2-Ant Poor by about 190, and leaves Spread Medium-Replay unchanged. Averaging and clamping the log probability changes little: although the clamp is active for about 74% of the samples at the end of training, the learnable transition noise keeps enough samples inside the clamping range. With a fixed and smaller transition noise, the averaged log probability starts above the upper bound and most gradients vanish, so the clamp is harmful only in combination with that noise. 
+
+C.3 Behavioral Diagnostic Details 
+
+The diagnostic uses the Expert checkpoints of TeamFlowRL and BC+MAPPO and the MAPPO checkpoint trained from scratch. The stochastic Gaussian baselines sample their learned action distributions. The diagnostic uses 64 rollouts from each fixed initial scene. Assignment labels describe the nearest landmark, while full coverage requires every landmark to be within the stated distance threshold. 23 D Robot Manipulation Experiments 
+
+D.1 Robot Manipulation Setup 
+
+ManiSkill3 tasks. In TwoRobotPickCube, the cube starts within reach of the left arm only, and the goal position lies within reach of the right arm only, so the arms must pass the cube between them to lift it to the goal. An episode succeeds when the cube is within 0.025 m of the goal and the right arm is static. In TwoRobotStackCube, each arm can reach only one of two cubes. The right arm places its cube in a goal region on the midline between the robots, and the left arm stacks the second cube on top. An episode succeeds when the stacked cubes rest in the goal region and neither arm holds a cube. Each arm observes its own joint positions and velocities, its own end effector pose, the poses of the cubes, the goal position, the relative positions between these objects, the remaining time, and an agent indicator, but not the other arm. Object and goal poses are privileged information, because a physical robot would have to estimate them from its sensors, so the state results measure cooperative control with known object poses, and Appendix D.5 replaces these poses with camera observations. 
+
+Pretraining and online training. Offline pretraining uses all successful demonstrations released with Man-iSkill3, which number 983 for TwoRobotPickCube and 1007 for TwoRobotStackCube, split into 90% for training and 10% for validation. Both methods start from the same pretraining run of 50,000 updates, in which a frozen recurrent encoder summarizes the observation history of each arm. TeamFlowRL starts from the ten-step flow policy. BC+MAPPO starts from a one-step policy distilled from the flow policy, with the latent fixed at zero so that the output is the mean of its Gaussian policy. Online fine-tuning runs for 5 million environment steps with 64 parallel environments, and each episode lasts 100 environment steps. 
+
+RoboFactory. In TwoRobotsStackCube from RoboFactory, each arm receives its own joint and end effector state, the cube poses, the goal region, and an agent indicator, but not the other arm. Each action sets joint position changes for one environment step, and each episode lasts 100 steps. Training uses a staged dense reward that we define for reaching, grasping, lifting, aligning, and placing, normalized to a maximum of one, and success follows the evaluation function of RoboFactory. The demonstrations come from a PPO expert trained on the dense reward. Pretraining on the scripted motion planning demonstrations provided with RoboFactory gives 0% closed-loop success. Both methods start from the same pretrained checkpoint. Online fine-tuning uses the optimization settings of the ManiSkill state experiment for 2 million environment steps. 
+
+Release and withdrawal. The main table and the RoboFactory learning curve report hands-away success, which additionally requires both arms to release the blocks and withdraw while the stack stands on its own. Appendix D.6 defines this variant. 
+
+D.2 Success under the Deployment Rule 
+
+Figure 10 shows the success of both methods under their deployment rules from pretraining through online fine-tuning in the seven robot tasks, evaluated on 100 episodes per point. TeamFlowRL draws new initial ABC        
+
+> ABC
+> (a) Spread, TeamFlowRL (b) Spread, BC+MAPPO (c) Tag, TeamFlowRL (d) Tag, BC+MAPPO
+> Landmark Agent Evader Obstacle Pursuer
+> Figure 9 MPE rollouts drawn as in Figure 5, with 64 rollouts per method from one initial scene. (a)--(b) Spread from a second initial scene. (c)--(d) Tag, where colored paths show the three pursuers and gray paths show the evader.
+
+24 latents and adds no transition noise, and BC+MAPPO executes its Gaussian mean. At the end of online training, the success rates of the two methods differ by at most 5% in every task. Although the final success is close, TeamFlowRL keeps the multimodal action distribution of the flow policy, because each execution draws new initial latents, whereas BC+MAPPO executes a single mean action. Appendix D.3 shows the resulting variation of the executed paths. Under the stochastic execution of Table 3, TeamFlowRL averages 87.7% over the six tasks and BC+MAPPO 54.6%. 0 0.05 / 0 5Pre → Online (M) 050 100 Success (%)  MS Pick, state 0 0.05 / 0 5Pre → Online (M) 050 100 Success (%)  MS Stack, state 0 0.11 / 0 1Pre → Online (M) 050 100 Success (%)  MS Pick, camera 0 0.086 / 0 1Pre → Online (M) 050 100 Success (%)  MS Stack, camera 0 0.05 / 0 2Pre → Online (M) 050 100 Success (%)  MS Stack, away 0 0.03 / 0 2Pre → Online (M) 050 100 Success (%)  RF Stack 0 0.03 / 0 2Pre → Online (M) 050 100 Success (%)  RF Stack, away 
+
+> TeamFlowRL BC+MAPPO Shared camera pretraining
+
+Figure 10 Success under each method’s deployment rule from pretraining through online fine-tuning, with 100 episodes per point. The horizontal axis is drawn as in Figure 3, with the pretraining length marked at the start of online training. In the camera panels, grey points show the flow pretraining and DAgger shared by both methods, after which each method fits its own action head on the frozen encoder. ‘‘Away’’ denotes the hands-away variant. 
+
+D.3 Trajectories under the Deployment Rule 
+
+Figure 11 shows the tool center point paths of both arms when each policy is run 31 times from one initial scene under its deployment rule. TeamFlowRL draws new initial latents in every run and adds no transition noise, and BC+MAPPO executes its Gaussian mean. To separate the variation caused by the simulator, we also run TeamFlowRL with the same latents in all 31 runs. We measure the spread of the paths as the root mean square distance of the tool center points from their mean over the runs, over the first 40 control steps and both arms, and average it over four MS Pick scenes and eight RF Stack scenes. On MS Pick, the spread is 1.6 cm for TeamFlowRL, 0.4 cm with the same latents, and 0.3 cm for BC+MAPPO. On RF Stack, it is 0.9 cm, 0.2 cm, and 0.3 cm. The latent sampling of TeamFlowRL varies the executed path several times more than the simulator alone, whereas BC+MAPPO follows a single path. The variation stays at the centimeter level around one route. At least 98% of the runs succeed in every group. 
+
+D.4 Bimanual Stacking under Exploration Noise 
+
+Figure 12 shows TwoRobotStackCube in ManiSkill3 in the layout of Figure 7. TeamFlowRL and BC+MAPPO start from the same scene and both execute with exploration noise. In this scene, Team-FlowRL succeeds in 93% of 30 runs and BC+MAPPO in 77%. In the illustrated TeamFlowRL run, the right arm places the green cube in the goal region and the left arm stacks the blue cube on it. In the illustrated BC+MAPPO run, the arms bring both cubes into the goal region, but the cubes end side by side and are not stacked at the final step. 
+
+D.5 Bimanual Manipulation with Camera Observations 
+
+Figure 13 summarizes how the camera policy for TeamFlowRL is obtained. Each arm receives a global view shared by both arms and its own wrist view, encoded by a frozen DINOv2 model [16], together with its proprioceptive state, the goal position, the remaining time, and an agent indicator. The cube poses are 25 −0.2 0.0 0.2 y (m)               
+
+> −0.4
+> −0.2 0.0 x (m) 0.1 0.2 z (m)
+> −0.2 0.0 0.2 y (m)
+> −0.4
+> −0.2 0.0 x (m) 0.1 0.2 z (m)
+> −0.2 0.0 0.2 y (m)
+> −0.4
+> −0.2 0.0 x (m) 0.1 0.2 z (m)
+> −0.1 0.0 0.1 y (m) 0.0 0.1 x (m) 0.05 0.10 0.15 z (m)
+> −0.1 0.0 0.1 y (m) 0.0 0.1 x (m) 0.05 0.10 0.15 z (m)
+> −0.1 0.0 0.1 y (m) 0.0 0.1 x (m) 0.05 0.10 0.15 z (m)
+> (a) MS Pick, TeamFlowRL (b) MS Pick, TeamFlowRL, same latents (c) MS Pick, BC+MAPPO (d) RF Stack, TeamFlowRL (e) RF Stack, TeamFlowRL, same latents (f) RF Stack, BC+MAPPO
+> Initial cube Target Arm 1 start Arm 2 start
+
+Figure 11 Tool center point paths under the deployment rule, with 31 runs from one initial scene per task. (a), (d) TeamFlowRL with new initial latents in every run. (b), (e) TeamFlowRL with the same latents in all runs. (c), (f) BC+MAPPO. Axes are shared within each row. 
+
+Figure 12 Recorded TwoRobotStackCube episodes in ManiSkill3. (a)--(b) TeamFlowRL and BC+MAPPO from the same scene under exploration noise, with the left (L) and right (R) wrist views above each frame. 
+
+available only to the state teacher and to the centralized critic. The state teacher trains a camera policy through DAgger. A camera policy pretrained only on the offline demonstrations reaches 22% success in TwoRobotPickCube and 23% in TwoRobotStackCube under the deployment rule, because its own rollouts soon reach states that the demonstrations do not cover. In DAgger, the camera policy controls the arms, the state teacher labels every visited state, and the camera policy is trained on the data of all rounds. The DAgger policy uses a one-step action head, whereas TeamFlowRL optimizes the likelihood of the ten-step denoising trajectory. We therefore freeze the encoder of this policy and fit a ten-step flow head with conditional flow matching on the DAgger data, using the teacher actions as targets. Online fine-tuning keeps the encoders frozen and runs for one million environment steps with the optimization settings of the state experiment. The remaining settings are provided in the released code. 26 State teacher 
+
+> uses object poses;
+> fine-tuned online with a different method
+> simulator state
+
+↓
+
+> cube poses + proprioception
+
+↓
+
+> state policy
+> (teacher actions)
+
+(a) 
+
+→
+
+DAgger 
+
+> teacher labels every visited step;
+> all rounds are aggregated
+> round 0:
+> teacher acts
+> later rounds:
+> camera policy acts
+
+↓
+
+> aggregated data:
+> camera inputs + teacher labels
+
+↻
+
+> retrain camera policy,
+> collect next round
+
+(b) 
+
+→
+
+Camera policy 
+
+> each arm sees a global view
+> and its own wrist view
+> global view · wrist views
+
+↓
+
+> frozen DINOv2 encoder
+
+↓
+
+> one-step action head
+
+(c) 
+
+→
+
+Flow head refit  
+
+> encoder from (c) kept frozen;
+> conditional flow matching on the
+> teacher labels from (b)
+> frozen encoder features
+
+↓    
+
+> x0→x1→ … → x10
+> ten-step flow head
+> 20k updates, initial policy for (e)
+
+(d) 
+
+→
+
+TeamFlowRL fine-tuning 
+
+> arms act from cameras;
+> critic uses the state in training only
+> final camera policies: Pick, Stack
+> actors: camera + proprioception
+> centralized critic: simulator state
+
+(e) 
+
+stages before TeamFlowRL  stages of TeamFlowRL Figure 13 Training TeamFlowRL with camera observations through DAgger, flow head fitting on a frozen encoder, and online fine-tuning. Blue panels mark the stages of TeamFlowRL, and beige panels mark the preceding stages. 
+
+D.6 Learning to Release and Withdraw 
+
+The hands-away variant of the two-arm stacking tasks in ManiSkill and RoboFactory requires the arms to release the blocks, withdraw, and leave the completed stack standing. An episode succeeds when the original task succeeds and, at the end of the episode, neither arm touches the blocks and both hands are away from them. In ManiSkill, training starts from the pretrained stacking policies and adds a reward term for withdrawal. In RoboFactory, the original demonstrations contain no withdrawal, so the flow policies are pretrained on new demonstrations that include it. The thresholds and remaining settings are provided in the released code. 27

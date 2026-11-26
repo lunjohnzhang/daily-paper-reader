@@ -1,0 +1,717 @@
+Title: Sampling at Scale: Distributed Multi-Agent Trajectory Optimization
+
+URL Source: https://arxiv.org/pdf/2611.31561v1
+
+Published Time: Wed, 25 Nov 2026 01:27:01 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Sampling at Scale: Distributed Multi-Agent Trajectory Optimization 
+
+Minchan Jung 1, Dimitrios S. Georgiou 1, Augustinos D. Saravanos 2 and Evangelos A. Theodorou 1
+
+Abstract — Multi-agent trajectory optimization poses two cou-pled challenges: effectively exploring non-convex landscapes and scaling favorably to large teams of agents. Sampling-based methods are natural candidates for the exploration challenge but scale poorly with problem dimension. Moreover, their off-the-shelf integration into distributed optimization introduces a fundamental trade-off: sampling either fails to address the constraint-induced non-convexity or its search space grows with neighborhood size. We address this gap by introducing a Distributed Sampling-based Trajectory Optimization (DS-TO) architecture built on a splitting mechanism tailored to sampling. Under this splitting, each agent samples only in its own control space, independent of neighborhood size, while still remaining exposed to both the constraint-induced non-convexity and the decisions of other agents. The resulting algorithm is fully decentralized, requiring only neighborhood communication, with all local updates executed in parallel across agents. Efficient variations, including parallel Jacobi updates within each agent’s subproblem and single-step con-straint linearization, further reduce computation. Experiments on 2D and 3D tasks with up to 1024 agents demonstrate improved exploration and constraint satisfaction over state-of-the-art derivative-based distributed optimization, and superior scalability to existing distributed sampling methods. 
+
+I. I NTRODUCTION 
+
+Cooperative trajectory planning is fundamental to the safe and efficient operation of robot teams in shared en-vironments, such as aerial swarms navigating clutter [1], autonomous vehicles traversing intersections [2], and ware-house fleets transporting goods [3]. In such settings, robots must plan trajectories that optimize task performance subject to their dynamics, actuation limits, and collision avoidance with obstacles and other robots. These requirements render planning non-convex, coupling decisions through nonlinear dynamics across the horizon and inducing competing local minima among routes and passing orders. At the same time, scale compounds the difficulty: the computational cost of coordinating these coupled trajectories grows rapidly with team size. Meeting these requirements calls for methods that jointly address scalability and non-convexity. Coordination has been pursued through multi-agent path finding [4], reactive feedback methods [5], learned policies [6], and dynamic games [7]; however, these approaches do not jointly optimize the team’s trajectories. In contrast, trajectory optimization (TO) plans all agents’ trajectories through a joint optimal control problem, yet solving that             
+
+> 1Daniel Guggenheim School of Aerospace Engineering, Georgia Institute of Technology, Atlanta, GA, USA.
+
+{minchan.jung, dgeorgiou3, evangelos.theodorou }@gatech.edu  
+
+> 2Department of Aeronautics and Astronautics, Massachusetts Institute of Technology, Cambridge, MA, USA.
+
+asaravan@mit.edu 
+
+> Corresponding author: Minchan Jung
+
+t = 0
+
+t = 41 
+
+Ours 
+
+t = 17 
+
+DistributedDDP 
+
+t = 68 
+
+Ours 
+
+t = 82 
+
+DistributedDDP   
+
+> Fig. 1. Scalable multi-agent coordination with DS-TO (Ours). By keeping the sampled control dimension independent of neighborhood size, DS-TO enables 1024 locally coupled agents to navigate strongly non-convex interactions while maintaining collision-free coordination beyond the local minima encountered by existing gradient-based distributed methods.
+
+centrally quickly becomes prohibitive as teams grow. Dis-tributed approaches address this bottleneck by decomposing the full problem into local agent-level subproblems solved in parallel and coordinated through neighborhood commu-nication. Some of the most prominent ones build on the alternating direction method of multipliers (ADMM) [8], a well-established distributed optimization framework. Such methods have enabled distributed model predictive control [9], [10], collaborative manipulation [11] and legged loco-motion [12], as well as distributed TO architectures scaling to thousands of agents [13], [14]. Nevertheless, these methods typically rely on derivative-based local solvers, remaining prone to initialization and poor local minima. Sampling-based derivative-free methods such as model predictive path integral (MPPI) [15] and the cross entropy method (CEM) [16] are natural candidates for such non-convex landscapes. Although such methods are widely used in the single-agent setting [17], [18], their sample efficiency deteriorates as the search space grows, fundamentally limit-ing their extension to large-scale multi-agent problems. Some notable attempts include ADMM schemes that sample joint neighborhood trajectories [19], [20], belief propagation for distributed inference [21], and decentralized MPPI account-arXiv:2611.31561v1 [cs.RO] 23 Nov 2026 ing for neighbors through predicted trajectories [22]. The effectiveness of distributed sampling schemes hinges on two factors: the dimension of each local search and the safety information available to evaluate rollouts. On one side, jointly sampling ego and neighboring controls [19], [20] exposes the sampler to all constraints but inflates the search dimension. On the other hand, splittings that isolate agent dynamics [13], [23] would keep the sampled dimension small but hide the constraints inside auxiliary copies, leaving the sampler to explore a surrogate objective blind to the true safety landscape. Some decentralized MPPI schemes [24] avoid the trade-off entirely, but only by abandoning coordination through a joint problem, treating neighbors as fixed predictions rather than co-optimizing agents. The core challenge is therefore to retain direct exploration of the non-convex safety landscape and joint trajectory coordination while sampling only each agent’s own controls. We propose Distributed Sampling-based Trajectory Optimization (DS-TO) , an ADMM-based distributed sampling-based TO framework that retains constraint-aware exploration while sampling only each agent’s own controls. The proposed formulation separates dynamically feasible primal trajectories from local copies subject to safety con-straints, with global consensus variables enforcing consis-tency between the two. Soft constraint penalties in the primal objective let stochastic optimizers explore the non-convex safety landscape directly, while the local copies coordinate constraint satisfaction without entering the sampled search, keeping its dimension independent of neighborhood size. Instantiating the primal solver with MPPI, our experiments demonstrate strong constraint satisfaction, improved explo-ration in non-convex scenarios, and favorable scaling relative to state-of-the-art distributed TO baselines (Fig. 1). The contributions of this work are:  
+
+> •
+
+We formulate a distributed TO decomposition that sep-arates agent dynamics from local constraints through consensus, enabling parallel agent updates and feasibil-ity subproblems that decompose across time.  
+
+> •
+
+We introduce DS-TO, a scalable, fully decentral-ized algorithm tailored to stochastic solvers, achieving constraint-aware exploration while keeping the sampled control dimension independent of neighborhood size.  
+
+> •
+
+Extensive evaluation on 2D and 3D tasks with up to 1024 agents, demonstrating improved exploration and constraint satisfaction over state-of-the-art derivative-based distributed optimization, and superior scalability than existing distributed sampling methods. II. P RELIMINARIES 
+
+A. Notation 
+
+Scalars and vectors use lowercase letters, e.g. , a ∈ R, v ∈
+
+Rn, respectively; matrices use uppercase, e.g. , A ∈ Rm×n;and calligraphic letters denote sets, with |S| their cardinality. We use (·)⊤ for transpose, I for identity, blkdiag( ·) for block-diagonal concatenation, and ∥ · ∥ for the Euclidean norm, with ∥v∥2 
+
+> A
+
+≜ v⊤Av as the weighted norm. A tilde (˜ ·)
+
+denotes a local copy and a bar (¯ ·) a global variable. U(a, b )
+
+denotes the uniform distribution on [a, b ], and N (μ, Σ) aGaussian distribution with mean μ and covariance Σ.
+
+B. Problem Definition 
+
+We consider a team of N agents, with agent set V ≜
+
+{1, . . . , N }, over a finite horizon of T steps. At time t, agent 
+
+i ∈ V has state xi,t ∈ Rnx and control input ui,t ∈ Rnu . Each agent i has a neighborhood set Ni ⊆ V \ { i}, comprising agents with which it exchanges trajectory information. We formulate the problem as an optimal control problem (OCP) over the agents’ trajectories. For agent i, let xi ≜
+
+(xi, 0, . . . , x i,T ) and ui ≜ (ui, 0, . . . , u i,T −1), with X ≜
+
+(x1, . . . , x N ) and U ≜ (u1, . . . , u N ) denoting the team trajectories. The stage cost Ji,t captures task performance and control effort, while Ji,T encodes the terminal goal. The dynamics fi,t govern state evolution, gi,t captures agent-wise requirements (obstacle avoidance and state/control limits), and hij,t pairwise safety requirements (minimum separation). For all i ∈ V and t = 0 , . . . , T − 1, the resulting OCP is 
+
+min 
+
+> X,U
+
+X
+
+> i∈V
+
+"T −1X
+
+> t=0
+
+Ji,t (xi,t , u i,t ) + Ji,T (xi,T )
+
+#
+
+(1a) 
+
+s.t. xi, 0 = xi, init , xi,t +1 = fi,t (xi,t , u i,t ), (1b) 
+
+gi,t (xi,t , u i,t ) ≤ 0, (1c) 
+
+hij,t (xi,t , x j,t , u i,t , u j,t ) ≤ 0, j ∈ N i (1d) where the terminal constraints can be handled analogously. 
+
+C. Alternating Direction Method of Multipliers (ADMM) 
+
+We briefly review the standard two-block ADMM [8]. Consider the constrained optimization problem 
+
+min  
+
+> p,q
+
+ϕ(p) + ψ(q) s.t. Ap + Bq = c, (2) where p ∈ Rnp and q ∈ Rnq are the two primal blocks, 
+
+ϕ and ψ are their objective terms, and A, B, and c define the coupling constraint. Introducing the dual variable λ and penalty parameter ρ > 0, the augmented Lagrangian (AL) is 
+
+Lρ(p, q, λ ) = ϕ(p)+ ψ(q)+ λ⊤r+ρ
+
+2 ∥r∥2, r ≜ Ap +Bq −c (3) At iteration ℓ, ADMM alternates between minimization over the two primal blocks followed by a dual ascent step, 
+
+pℓ+1 = arg min  
+
+> p
+
+Lρ(p, q ℓ, λ ℓ), (4a) 
+
+qℓ+1 = arg min  
+
+> q
+
+Lρ(pℓ+1 , q, λ ℓ), (4b) 
+
+λℓ+1 = λℓ + ρ Ap ℓ+1 + Bq ℓ+1 − c . (4c) The algorithm holds similarly for multiple primal blocks. 
+
+D. Model Predictive Path Integral Control 
+
+Model Predictive Path Integral (MPPI) control is aderivative-free method for optimal control that iteratively up-dates a nominal control sequence using importance-weighted, dynamically feasible rollouts generated by forward simula-tion [15]. Given a nominal sequence u, MPPI samples K
+
+perturbed control sequences around it according to 
+
+u(k) 
+
+> t
+
+= ut + ϵ(k) 
+
+> t
+
+, ϵ(k) 
+
+> t
+
+∼ N (0 , Σ) , (5) where Σ is the sampling covariance. Each perturbed se-quence is propagated through the dynamics and assigned a trajectory cost J(k). The samples are then weighted as 
+
+wk = exp( −αJ (k))/ ¯w, ¯w =
+
+> K
+
+X
+
+> r=1
+
+exp( −αJ (r)), (6) where α > 0 controls the concentration toward lower-cost rollouts. The nominal control trajectory, corresponding to the mean of the sampling distribution, is updated according to 
+
+ut ← ut +
+
+> K
+
+X
+
+> k=1
+
+wkϵ(k) 
+
+> t
+
+, t = 0 , . . . , T − 1. (7) III. M ETHODOLOGY 
+
+DS-TO is built around a sampling-tailored decomposition: each agent samples only its own controls, while dynamics-free local copies represent neighboring trajectories and ex-plicitly enforce local and interagent constraints. Soft penal-ties expose these constraints directly to the sampled primal rollouts, while ADMM consensus reconciles the dynamically feasible primal trajectories with their local copies. This keeps the sampled dimension independent of neighborhood size while allowing direct exploration of the non-convexity. 
+
+A. Consensus Reformulation and Augmented Lagrangian 
+
+Let N + 
+
+> i
+
+= Ni ∪ { i} denote agent i’s augmented neigh-borhood. Agent i maintains local state and input copies 
+
+˜xij,t , ˜uij,t for each j ∈ N + 
+
+> i
+
+, where superscript i identifies the agent holding the copy. We stack these variables as 
+
+˜xai,t := (˜ xij,t )j∈N +
+
+> i
+
+and ˜uai,t := (˜ uij,t )j∈N +
+
+> i
+
+, with superscript 
+
+a denoting quantities stacked over N + 
+
+> i
+
+. The local copies provide the variables on which constraints are imposed: gi,t 
+
+acts on agent i’s own copy, while hai,t collects the interagent constraints with j ∈ N i. Global variables ¯xi,t , ¯ui,t provide a common representation of each agent’s state and input, with ¯xai,t and ¯uai,t stacking the corresponding global variables over N + 
+
+> i
+
+. Defining Z = (X, U ), ˜Za = ( ˜Xa, ˜U a), and 
+
+¯Z = ( ¯X, ¯U ) we reformulate the OCP (1) as follows 
+
+min   
+
+> Z, ˜Za,¯Z
+
+X
+
+> i∈V
+
+Φi(Zi, ˜Zai )
+
+s.t. xi, 0 = xi, init , xi,t +1 = fi,t (xi,t , u i,t ),gi,t (˜ xii,t , ˜uii,t ) ≤ 0, hai,t (˜ xai,t , ˜uai,t ) ≤ 0,xi,t = ¯ xi,t , ui,t = ¯ ui,t ,
+
+˜xai,t = ¯ xai,t , ˜uai,t = ¯ uai,t ,
+
+(8) where the agent-wise objective Φi combines task cost with soft penalties that expose constraint-induced non-convexity and neighboring-trajectory information to the primal update: 
+
+Φi(Zi, ˜Zai ) ≜ 
+
+> T−1
+
+X
+
+> t=0
+
+Ji,t (xi,t , u i,t ) + Ji,T (xi,T ) (9) 
+
++ 
+
+> T−1
+
+X
+
+> t=0
+
+βg c(gi,t (xi,t , u i,t )) + 
+
+> T−1
+
+X
+
+> t=0
+
+X
+
+> j∈N i
+
+βh c hij,t (xi,t , u i,t , ˜xij,t , ˜uij,t ) ,
+
+where the penalty c(·) is zero when constraints are satisfied and positive otherwise, with βg , β h > 0. At consensus, feasibility of the local copies ensures the original constraints in (1) are satisfied and therefore the soft penalties vanish. To form the Augmented Lagrangian (AL), we introduce dual variables λi and ˜λai for Zi = ¯Zi and ˜Zai = ¯Zai ,respectively. Define R := blkdiag( ρI, μI ) and ˜Ri := 
+
+|P i|−1 blkdiag(˜ ρI, ˜μI ), where Pi := {k | i ∈ N + 
+
+> k
+
+}
+
+collects the agents holding copies of agent i, and all penalty coefficients are positive. Normalizing by |P i| preserves the primal’s contribution as the copy count increases. The aug-mented penalty is ˜Rai := blkdiag(( ˜Rj )j∈N +
+
+> i
+
+). The AL is 
+
+L = X
+
+> i∈V
+
+Li = X
+
+> i∈V
+
+"
+
+Φi(Zi, ˜Zai ) + If (Zi) + Ic( ˜Zai )+λ⊤ 
+
+> i
+
+(Zi − ¯Zi)+ 12 ∥Zi − ¯Zi∥2
+
+> R
+
++( ˜λai )⊤( ˜Zai − ¯Zai )+ 12 ∥ ˜Zai − ¯Zai ∥2˜Rai
+
+#
+
+(10) where If (Zi), Ic( ˜Zai ) are indicators of dynamically feasible primal and constraint-feasible local-copy sets in (8). In the following, we apply ADMM to alternate between local updates over (Zi, ˜Zai ), decentralized consensus updates over ¯Zi, and dual updates over (λi, ˜λai ), corresponding to the updates in (4). Since the augmented Lagrangian is separable across agents, the local updates can be performed in parallel. 
+
+B. First Block: Agent-wise Local Subproblem 
+
+In the first ADMM block, each agent independently min-imizes Li over its primal and local-copy variables (Zi, ˜Zai ),while keeping the global and dual variables fixed. The opti-mization variables remain coupled through the soft penalty terms βhc(hij,t ) in Φi. Jointly solving for these variables cannot exploit distinct structures: the primal variables are constrained only by the dynamics, whereas the local copies are subject to hard constraints but timewise independent. We therefore use a block-coordinate update to separate updates, yielding subproblems tailored to their respective structures. The block-coordinate update can follow either a Jacobi or Gauss–Seidel (GS) scheme; we use Jacobi by default, allowing both blocks to use previous iterates and perform the computationally intensive updates in parallel within each agent. The ADMM penalties maintain coupling between the two blocks through the shared consensus variables. Suppressing the inner block-coordinate iteration index, un-derlined variables denote the latest available values. They are initialized as {xi,t , u i,t } = {xℓi,t , u ℓi,t } and ˜Zai = ˜Za,ℓ i .
+
+1) Sub-Block A: Primal Trajectory Update: Fixing the local copy ˜Zai , each agent i optimizes only for Zi:
+
+Zℓ+1  
+
+> i
+
+= arg min 
+
+> Zi
+
+Φi
+
+
+
+Zi, ˜Zai
+
+
+
++ 12 Zi − ¯Zℓi + R−1λℓi
+
+> 2
+> R
+
+s.t. x i, 0 = xi, init , xi,t +1 = fi,t (xi,t , u i,t ), (11) where If (Zi) is enforced by the initial condition and dy-namics, reducing the problem via forward rollout to un-constrained optimization over the control sequence. This is well suited to sampling-based optimization, since samples are drawn only over agent i’s controls, with a fixed sampling dimension of T ×nu independent of neighborhood size. The soft penalties in Φi incorporate constraint and neighboring-trajectory information, enabling exploration of the resulting non-convex landscape. Since the constraint-feasible local copies need not satisfy the dynamics, these penalties guide the primal trajectory toward consistency with them. 
+
+2) Sub-Block B: Local-Copy Feasibility Update: Since 
+
+˜Zai carries no dynamic constraints, its update decomposes across time. With {xi,t , u i,t } fixed, agent i solves 
+
+˜Za,ℓ +1  
+
+> i,t
+
+= arg min 
+
+> ˜Zai,t
+
+12 ˜Zai,t − ¯Za,ℓ i,t + ( ˜Rai,t )−1 ˜λa,ℓ i,t 
+
+> 2˜Rai,t
+
++ X
+
+> j∈N i
+
+βhc hij,t (xi,t , u i,t , ˜xij,t , ˜uij,t )
+
+s.t. gi,t (˜ xii,t ,˜uii,t ) ≤ 0, hai,t (˜ xai,t , ˜uai,t ) ≤ 0, (12) for each t = 0 , . . . , T − 1. Unlike the primal update, this subproblem explicitly enforces constraints gi and hai , thereby producing constraint-feasible local copies. The decomposi-tion confines neighborhood-dependent scaling to each time step rather than over the entire horizon. If βh = 0 , the primal and local-copy updates decouple within the ADMM primal step (4a). The soft penalties introduce this coupling, allowing constraint-feasible local copies to inform the dynamically feasible primal update and thereby motivating the block-coordinate update scheme. 
+
+C. Second Block: Global Consensus and Dual Updates 
+
+Minimizing Li over ¯Zi yields a second ADMM block with penalty weights R, ˜Ri and dual corrections λi, {˜λki }k∈P i ,
+
+¯Zℓ+1  
+
+> i
+
+=  R+|P i| ˜Ri
+
+−1
+
+"
+
+RZ ℓ+1  
+
+> i
+
++λℓi +X
+
+> k∈P i
+
+ ˜Ri ˜Zk,ℓ +1  
+
+> i
+
++˜λk,ℓ i
+
+#
+
+(13) Agent i evaluates (13) using (Zi, λ i) and ( ˜Zki , ˜λki ) received from agents k ∈ P i. Since |P i| ˜Ri = blkdiag(˜ ρI, ˜μI ), the total weight assigned to all local copies of agent i, { ˜Zki }k∈P i ,remains fixed as |P i| grows, preserving the relative influence of Zi in the consensus update. Finally, each agent updates its dual variables λi and ˜λai
+
+by ascent on the primal and local copy consensus residuals, 
+
+λℓ+1  
+
+> i
+
+= λℓi + R(Zℓ+1  
+
+> i
+
+− ¯Zℓ+1  
+
+> i
+
+), (14) 
+
+˜λa,ℓ +1  
+
+> i
+
+= ˜λa,ℓ i + ˜Rai ( ˜Za,ℓ +1  
+
+> i
+
+− ¯Za,ℓ +1  
+
+> i
+
+), (15) where ¯Za,ℓ +1  
+
+> i
+
+collects ¯Zℓ+1  
+
+> j
+
+for j ∈ N + 
+
+> i
+
+, with each neighbor 
+
+j ∈ N i communicating the updated ¯Zℓ+1  
+
+> j
+
+to agent i.IV. I MPLEMENTATION DECISIONS 
+
+We describe the solver choices and approximations used in DS-TO. These choices are specific to our implementation, and alternatives can be used within the same framework. 
+
+A. MPPI for Constraint-Aware Exploration 
+
+We employ MPPI to solve (11), sampling each agent’s control sequence T × nu and generating dynamically fea-sible rollouts in parallel. The soft penalties βg c(gi,t ) and 
+
+βhc(hij,t ) guide dynamically feasible exploration of the non-convex constraint landscape. Penalty evaluations can be performed in parallel across samples and constraints without requiring any constraint derivatives. Note that a convergence guarantee accounting for the inexact stochastic MPPI updates lies beyond the scope of this work. 
+
+B. Constraint Linearization and Relaxation 
+
+The local copy variables are warm-started from the global consensus variables, which also serve as the proximal targets in (12) and carry information from the preceding primal up-date through (13). This motivates normalizing the local-copy penalties to preserve the influence of explored primal trajec-tories. Although (12) decomposes across time, fully solving each nonlinear subproblem requires multiple iterations. We instead linearize the constraints and omit the interagent soft penalty βhc(hij,t ), yielding a small QP independent of the current primal update and relinearize at the next ADMM iteration. Since the omitted penalty and its gradient vanish at consensus, this does not alter the stationarity conditions. Since global consensus may violate the constraints, lin-earization around consensus variables can yield an infeasible subproblem. We therefore introduce slack variables initial-ized from the current violations to ensure a feasible relaxed subproblem. We do not warm-start the local solver dual variables, avoiding bias toward the previous active set. V. E XPERIMENTS 
+
+We first study fully connected (|N + 
+
+> i
+
+| = N, ∀i ∈ V)agents in tasks emphasizing interagent coordination and non-convex route exploration, then evaluate locally connected 
+
+(|N + 
+
+> i
+
+| ≪ N, ∀i ∈ V ) agents to assess scalability. The agents are modeled as unicycles or drones. We select baselines with complementary characteristics. Merged DistributedDDP [13] is a scalable deterministic baseline using three-block ADMM with primal–local and local–global consensus and gradient-based trajectory updates. DSS [19], [20] utilizes MPPI with soft penalties using two-block ADMM, but samples control trajectories over the augmented neighborhood, increasing the search dimension to |N + 
+
+> i
+
+| × T × nu. We also include SQP [25], with OSQP [26] as the internal solver. The ablations of DS-TO either remove the interagent soft penalty (βh = 0 ), both of them ( βg , β h = 0 ), or replace the default parallel Jacobi update with sequential Gauss–Seidel. Distributed methods use 100 ADMM iterations, while SQP uses 100 outer iterations. For DS-TO, ρ, μ, ˜ρ, ˜μ = 10 , with t = 0
+
+Ours 
+
+t = 25 t = 100 
+
+t = 0
+
+DistributedDDP 
+
+t = 47 t = 100 
+
+t = 0
+
+DSS 
+
+t = 75 t = 100 Fig. 2. Trajectories in the Gate with 18 agents. The middle snapshot is taken when agents are closest to one another. Red agent edges indicate collisions. 
+
+local-copy penalties scaled by 1/|P i|. Both DS-TO and DSS use c(·) = [max(0 , ·)] 2 with βg = βh = 10 5. DS-TO performs one Jacobi block-coordinate update per ADMM iteration. For unicycle tasks, baseline penalties are tuned over 
+
+ρ = μ ∈ { 0.1, 1, 10 , 100 , 1000 }; DSS additionally sweeps 
+
+α ∈ { 10 2, 10 3, 10 4}. For each task and scale, We report the best Clean or Succ rate, as defined in the corresponding sections. For drone experiments, we use the same ADMM penalty as DS-TO. DistributedDDP performs eight DDP updates per ADMM iteration, while DS-TO and DSS perform three MPPI updates with K = 4096 samples. DS-TO uses α =100 , while DSS uses the tuned value above. The sam-pling covariances are Σuni = diag(0 .4, 0.2) and Σdrone =diag(10 −2, 10 −4, 10 −4, 10 −4). For sampling methods, each environment and scale is evaluated over five random seeds. The agents’ dynamics are discretized by forward Eu-ler using ∆t = 0.1 s . The unicycle has state xi =[px,i , p y,i , θ i]⊤ ∈ R3 (planar position and heading) and control ui = [ υi, ˙θi]⊤ ∈ R2 (linear and angular velocity). The drone follows the model in [27], with state xi =[p⊤ 
+
+> i
+
+, ˙p⊤ 
+
+> i
+
+, η ⊤ 
+
+> i
+
+, Ω⊤ 
+
+> i
+
+]⊤ ∈ R12 (position, velocity, Euler angles, and body angular velocity) and control ui = [ Fi, τ ⊤ 
+
+> i
+
+]⊤ ∈ R4
+
+(total thrust and body torque). We use mass m = 1 kg 
+
+and inertia tensor I = diag(0 .02 , 0.02 , 0.04) kg ·m2. Control bounds υi ∈ [−1, 3] , | ˙θi| ≤ 2, Fi ∈ [0 , 20] , |τi,k | ≤ 0.2 are enforced by clamping in MPPI and box constraining the QPs. Since DistributedDDP does not enforce these bounds, control bound violations are excluded from comparison metrics. All tasks use per-agent quadratic stage Ji,t (xi,t , u i,t ) =  
+
+> 12
+
+∥xi,t − xref  
+
+> i
+
+∥2 
+
+> Q
+
++ 12 ∥ui,t − uref ∥2 
+
+> R
+
+and terminal cost 
+
+Ji,T (xi,T ) = 12 ∥xi,T − xref  
+
+> i
+
+∥2 
+
+> QT
+
+, where xref  
+
+> i
+
+is the target state. For unicycle, Q = diag(1 , 1, 0) , R = diag(3 , 0.3) , and 
+
+uref = 0 ; for drones, Q = blkdiag( I3, 0.1I3, 03×3, 0.01 I3),
+
+R = 0 .01 I4, and uref = [9 .81 , 0, 0, 0] ⊤, where both use 
+
+QT = 2400 ×Q. State trajectories are initialized at xi, init and control sequences at uref . Obstacle constraints are defined as gobs  
+
+> i,t
+
+= ( ragent + robs ) − ∥ pi,t − cobs ∥, where cobs and 
+
+robs denote the obstacle center and radius, respectively; the resulting constraints are stacked into gi,t . Interagent collision avoidance is imposed as hij,t = 2 ragent − ∥ pi,t − pj,t ∥.Experiments were conducted on an Intel i9-13900K CPU, 64 GB RAM, and an NVIDIA RTX 4090 GPU. ADMM methods execute on the GPU while SQP (OSQP) on the CPU. For Jacobi, parallel runtime is estimated as the max-imum solve time of (11) and (12), measured sequentially with GPU synchronization. For locally connected cases with 
+
+N ≥ 64 , methods are serialized in batches of 32 agents due to hardware limits; we report average per-batch runtime to reflect parallel execution in a distributed deployment. 
+
+A. Fully Connected Agents 
+
+We employ unicycles of ragent = 0.3 m and evaluate 20 environments. Clean denotes the fraction of episodes in which all agents finish within 2ragent of their goals while all obstacle and interagent violations remain below 0.05 m . We also report the maximum penetration δmax over all episodes. 
+
+1) Gate: This task requires two groups to exchange positions through a narrow passage. We consider N ∈{2, 8, 18 , 32 } with T = 100 , pairing corresponding po-sitions to equalize travel distances and offsetting initial heights by ±0.3 m to break symmetry. The two obstacles share robs ∼ U(0 .5, 3.0) m , with horizontal offsets from 
+
+U(−1, 1) m ; passage width and vertical center are sampled from U(1 .3, 2.4) m and U(−0.6, 0.6) m . Large obstacles force coordination through the central passage, as shown in Fig. 2, whereas smaller ones allow detours. Figure 3 shows that DS-TO achieves Clean rates of 1.00 ,0.00.51.0      
+
+> Clean
+> 2510 20
+> J/N
+> ×10 3
+> 2818 32 012
+> δmax  [m]
+> 2818 32 10 0
+> 10 1
+> 10 2
+> 10 3
+> t [s]
+
+team size N           
+
+> Ours Ours (GS) DistributedDDP SQP(OSQP) DSS
+> Fig. 3. Comparison in the Gate. Top left: Clean (↑); bottom left: δmax (↓); top right: J/N (↓); bottom right: computation time ( ↓).
+
+t = 0
+
+Ours 
+
+t = 104 t = 200 t = 0 t = 81 t = 200 
+
+t = 0
+
+DistributedDDP 
+
+t = 176 t = 200 t = 0 t = 171 t = 200 
+
+t = 0
+
+SQP(OSQP) 
+
+t = 100 t = 200 t = 0 t = 149 t = 200 Fig. 4. Trajectories in the Circle with 24 agents. The left two columns show the antipodal goal assignment, and the right two columns show the random  
+
+> permutation assignment. The middle snapshot is taken when agents are closest to one another. Red agent edges indicate collisions.
+
+0.92 , and 0.68 at N = 8 , 18 , 32 , respectively. In contrast, DistributedDDP has no clean episodes for N ≥ 8, while SQP drops to 0.15 at N = 32 , highlighting the limited exploratory capability of gradient-based updates. DSS also degrades with team size and exceeds memory at N = 32 . DS-TO scales more favorably, requiring 17 .1 s at N = 32 , versus 38 .0 s 
+
+for DistributedDDP and 523 .3 s for SQP, while achieving a lower J/N of 2.44 × 10 3, compared with 3.27 × 10 3 and 
+
+6.92 × 10 3, respectively. We omit J/N hereafter. Finally, we compare the default Jacobi update with GS. GS improves Clean from 0.92 to 0.99 at N = 18 and from 0.68 to 0.93 at N = 32 , at up to 21% additional computation time. The modest subproblem sizes, however, limit the computational benefit of parallel Jacobi updates. 0.00.51.0       
+
+> Clean
+> Permutation Antipodal
+> 3612 24 10 0
+> 10 2
+> t [s]
+> 3612 24
+
+team size N          
+
+> Ours Ours (GS) DistributedDDP SQP(OSQP) DSS
+> Fig. 5. Comparison in the Circle. The left and right columns show the
+> permutation and antipodal assignments, respectively, while the top and bottom rows report the Clean rate ( ↑) and log-scale computation time ( ↓).
+
+2) Circle: In this task, we examine interagent coordina-tion with route exploration in cluttered environments. We initialize N ∈ { 3, 6, 12 , 24 } agents evenly on a circle of radius 4 m with T = 200 . The antipodal setting assigns diametrically opposite goals, requiring compatible passing orders near the center, whereas the permutation setting randomly assigns goals, requiring agents to navigate through the obstacle field (Fig. 4). Each environment contains 11 circular obstacles with robs ∼ U (0 .45 , 0.75) m inside the initialization circle with sufficient clearance; obstacles either overlap by at least 0.18 m or are separated by at least 83 ragent ,creating traps while excluding marginally traversable gaps. Figure 5 shows that DS-TO maintains a Clean rate of at least 0.98 for all N under the permutation setting, while it decreases to 0.85 at N = 24 under the antipodal setting. At this scale, both deterministic baselines have zero Clean 
+
+rate under the antipodal setting; under the permutation , SQP reaches 0.35 while DistributedDDP reaches zero. As the problem size increases, the gradient-based baselines become increasingly prone to local minima, resulting in lower Clean 
+
+rates. DSS has no clean episodes at N = 12 and exceeds available memory at N = 24 . The computation time for DS-TO remains below 20 s at N = 24 in both settings, compared with at least 52 .7 s for DistributedDDP and 632 .4 s for SQP. The benefit of parallel Jacobi updates becomes more 3 6 12 24 0.00.51.0   
+
+> Clean
+> 3612 24 0.00.51.0
+> δmax  [m]
+
+team size N               
+
+> Ours βh=0βg=βh=0permutation antipodal
+> Fig. 6. Soft penalty ablations in the Circle. Left: Clean rate ( ↑); right: maximum penetration δmax (↓).
+
+t = 0
+
+Ours 
+
+t = 36 t = 46 t = 56 t = 67 t = 90 
+
+t = 0
+
+DistributedDDP 
+
+t = 36 t = 46 t = 56 t = 67 t = 90 Fig. 7. Trajectories in the Formation with 256 agents. Lines between agents indicate local connections. The middle panels magnify instants where a baseline agent penetrates multiple obstacles, with both methods shown over the same spatial and temporal window. Red agent edges indicate collisions. 
+
+pronounced in this task. At N = 24 under the antipodal 
+
+assignment, the QP accounts for 55% of the iteration time, yielding a 1.74 × speedup over GS, compared with 1.06 –
+
+1.23 × for smaller problems. Jacobi also achieves a higher 
+
+Clean rate, 0.85 versus 0.66 , indicating that sequential up-dates do not uniformly improve finite-budget solution quality. Figure 6 evaluates the role of the soft penalties. At N = 6 ,removing the interagent penalty reduces Clean under both assignments, while removing both penalties yields no clean episodes, supporting the use of soft penalties for sampling. 
+
+B. Locally Connected Formation of Large Teams 
+
+We next evaluate scalability under local connectivity. Agents with ragent = 0 .15 m are arranged on a 0.9 m grid with formation constraints preserving the initial coordinate-wise ordering, hcij,t = −scij (pcj,t − pci,t ) ≤ 0, where scij =sign( pcj, 0 − pci, 0) and c ∈ { x, y }. The constraint uses x,
+
+y, or both coordinates for horizontal, vertical, or diagonal neighbors. Each of the 20 environments contains 48 obstacles with robs = 0 .2 m , sampled in a 2 × 18 m region under the same overlap and gap conditions as in the Circle task. Figure 7 shows trajectories at the largest scale. We report the agent-wise success rate Succ. , defined analo-gously to Clean with the formation constraints, together with 
+
+δmax . The horizons are T = 40 , 40 , 50 , 70 , 90 , and 90 for 
+
+N = 2 , 8, 32 , 64 , 128 , and 256 , respectively. As SQP scales poorly with the number of agents, we omit its results here. 2 8 32 64 128 256 0.00.51.0        
+
+> Succ.
+> kmax =8
+> 2832 64 128 256 0.00.20.4
+> δmax  [m]  kmax =8
+
+team size N         
+
+> Ours DistributedDDP DSS
+> Fig. 8. Comparison in the Formation. Left: Succ. rate ( ↑); right: maximum penetration δmax (↓). The shaded region fixes kmax = 8 .
+
+As shown in Fig. 8, DS-TO maintains a success rate of 
+
+1.00 as local connectivity increases over kmax = 1 , 2, 5, and 
+
+8, corresponding to N = 2 , 8, 32 , and 64 . At kmax = 8 ,DistributedDDP drops to 0.80 with δmax = 0 .298 . DSS also degrades with increasing connectivity; at N = 64 , we reduce its chunk size from 32 to 16 to avoid out-of-memory, yet its success rate is only 0.19 .Next, fixing kmax = 8 , we scale the team from N = 64 
+
+to 256 . DS-TO maintains a success rate of 1.00 , while DistributedDDP remains between 0.78 and 0.81 . At N =256 , DS-TO achieves δmax = 0 .170 , compared with 0.307 
+
+for DistributedDDP. The primal soft penalties discourage violations before full consensus, whereas consensus residuals in DistributedDDP can directly induce constraint violations. 
+
+C. Scalability in a 3D Multi-Drone Task 
+
+We further evaluate scalability on a 3D multi-drone task with T = 90 over 5 environments. Extending the 2D formation along z gives kmax = 8 , 17 , and 26 for N =256 , 512 , and 1024 . Each environment contains 16 spherical obstacles with robs = 0 .6 m , using the same x–y distribution as in the Formation task and cz ∼ U (−az , a z ), with az =1.65 , 2.10 , and 3.00 chosen according to the formation height to maintain comparable difficulty. The same overlap and gap conditions as in the Circle task are applied in 3D. Due to memory limitations and poor scalability with neighborhood size, we omit DSS from this experiment. Figure 9 shows that DS-TO maintains a success rate of at least 0.997 with δmax ≤ 0.017 across all scales, while DistributedDDP reaches δmax = 0 .505 at N = 1024 . At 
+
+N = 512 , comparable MPPI and QP solve times maximize 256 512 1024 0.00.51.0    
+
+> Succ.
+> Succ. δmax
+> 256 512 1024 010 50 100 200
+> t [s]
+> MPPI QP
+> 0.0 0.2 0.4
+> δmax  [m]
+
+team size N      
+
+> Ours DistributedDDP
+> Fig. 9. Comparison in the Drone. Left: Succ. rate ( ↑) and δmax (↓). Right: average computation time ( ↓) on a square-root scale per framework chunk (in lines), and DS-TO sub-block solves (MPPI and QP; in bars).
+
+the benefit of parallel execution, making DS-TO 4.21 × faster than DistributedDDP ( 22 .1 s compared with 93 .0 s ). At N =1024 , the QP dominates as kmax grows, but DS-TO remains 
+
+4.19 × faster ( 44 .9 s compared with 188 .3 s ). VI. C ONCLUSION 
+
+We proposed DS-TO, a highly parallel and fully decentral-ized framework for multi-agent trajectory optimization. DS-TO combines sampling-based optimization in each agent’s control space with locally optimized views of interacting agents’ trajectories, which are reconciled through decentral-ized consensus of ADMM. This separates constraint-aware exploration from multi-agent coordination without requiring a centralized optimizer. Across the considered tasks, DS-TO maintained high solution feasibility in challenging non-convex multi-agent problems and scaled to large locally connected teams, including a team of 1024 drones. While this work focuses on MPPI as the local solver, the framework remains well suited to other sampling-based methods. Future work will explore integrating more ad-vanced training-free [28] or learning-based diffusion/flow-based samplers [29] to further enhance performance. Another interesting direction is extending to the MPC setting, where previous solutions would effectively warm-start sampling. REFERENCES [1] X. Zhou, J. Zhu, H. Zhou, C. Xu, and F. Gao, “EGO-Swarm: A fully autonomous and decentralized quadrotor swarm system in cluttered environments,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) , 2021, pp. 4101–4107. [2] L. Ferranti, L. Lyons, R. R. Negenborn, T. Keviczky, and J. Alonso-Mora, “Distributed nonlinear trajectory optimization for multi-robot motion planning,” IEEE Transactions on Control Systems Technology ,vol. 31, no. 2, pp. 809–824, 2023. [3] P. R. Wurman, R. D’Andrea, and M. Mountz, “Coordinating hundreds of cooperative, autonomous vehicles in warehouses,” AI Magazine ,vol. 29, no. 1, pp. 9–20, 2008. [4] G. Sharon, R. Stern, A. Felner, and N. Sturtevant, “Conflict-based search for optimal multi-agent path finding,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 26, no. 1, 2012, pp. 563–569. [5] L. Wang, A. D. Ames, and M. Egerstedt, “Safety barrier certificates for collisions-free multirobot systems,” IEEE Transactions on Robotics ,vol. 33, no. 3, pp. 661–674, 2017. [6] Y. F. Chen, M. Liu, M. Everett, and J. P. How, “Decentralized non-communicating multiagent collision avoidance with deep reinforce-ment learning,” in 2017 IEEE International Conference on Robotics and Automation (ICRA) , 2017, pp. 285–292. [7] S. Le Cleac’h, M. Schwager, and Z. Manchester, “ALGAMES: A fast solver for constrained dynamic games,” in Proceedings of Robotics: Science and Systems , 2020. [8] S. Boyd, N. Parikh, E. Chu, B. Peleato, and J. Eckstein, “Distributed optimization and statistical learning via the alternating direction method of multipliers,” Foundations and Trends® in Machine learn-ing , vol. 3, no. 1, pp. 1–122, 2011. [9] T. H. Summers and J. Lygeros, “Distributed model predictive consen-sus via the alternating direction method of multipliers,” in 2012 50th annual allerton conference on communication, control, and computing (Allerton) . IEEE, 2012, pp. 79–84. [10] A. D. Saravanos, I. M. Balci, E. Bakolas, and E. A. Theodorou, “Distributed model predictive covariance steering,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2024, pp. 5740–5747. [11] O. Shorinwa and M. Schwager, “Scalable collaborative manipulation with distributed trajectory planning,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2020, pp. 9108–9115. [12] Z. Zhou, P. Shu, R. Cao, Y. Zhao, and Y. Zhao, “Aclm: Admm-based distributed model predictive control for collaborative loco-manipulation,” arXiv preprint arXiv:2603.07095 , 2026. [13] A. D. Saravanos, Y. Aoyama, H. Zhu, and E. A. Theodorou, “Dis-tributed differential dynamic programming architectures for large-scale multiagent control,” IEEE Transactions on Robotics , vol. 39, no. 6, pp. 4387–4407, 2023. [14] A. D. Saravanos, I. M. Balci, A. T. Abdul, E. Bakolas, and E. A. Theodorou, “Distributed covariance steering via non-convex admm for large-scale multi-agent systems,” arXiv preprint arXiv:2604.04499 ,2026. [15] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic mpc for model-based reinforcement learning,” in 2017 IEEE international conference on robotics and automation (ICRA) . IEEE, 2017, pp. 1714–1721. [16] M. Kobilarov, “Cross-entropy motion planning,” The International Journal of Robotics Research , vol. 31, no. 7, pp. 855–871, 2012. [17] M. S. Gandhi, B. Vlahov, J. Gibson, G. Williams, and E. A. Theodorou, “Robust model predictive path integral control: Analysis and performance guarantees,” IEEE Robotics and Automation Letters ,vol. 6, no. 2, pp. 1423–1430, 2021. [18] J. Yin, C. Dawson, C. Fan, and P. Tsiotras, “Shield model predictive path integral: A computationally efficient robust mpc method using control barrier functions,” IEEE Robotics and Automation Letters ,vol. 8, no. 11, pp. 7106–7113, 2023. [19] Z. Wang, A. D. Saravanos, H. Almubarak, O. So, and E. A. Theodorou, “Sampling-based optimization for multi-agent model predictive con-trol,” arXiv preprint arXiv:2211.11878 , 2022. [20] T. Yoon, A. D. Saravanos, and E. A. Theodorou, “Distributed stochas-tic search for multi-agent model predictive control,” arXiv preprint arXiv:2510.18211 , 2025. [21] C. Jiang, “Distributed sampling-based model predictive control via be-lief propagation for multi-robot formation navigation,” IEEE Robotics and Automation Letters , vol. 9, no. 4, pp. 3467–3474, 2024. [22] S. Dergachev, A. Pshenitsyn, A. Panov, A. Skrynnik, and K. Yakovlev, “Corl-mppi: Enhancing mppi with learnable behaviours for efficient and provably-safe multi-robot collision avoidance,” arXiv preprint arXiv:2511.09331 , 2025. [23] R. Chen, Z. Liang, J. Cheng, P. You, and Z. Yang, “Multi-agent cooperative motion planning based on alternating direction method of multipliers,” IEEE Control Systems Letters , vol. 7, pp. 3307–3312, 2023. [24] S. Dergachev and K. Yakovlev, “Decentralized uncertainty-aware multi-agent collision avoidance with model predictive path integral,” in 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2025, pp. 12 456–12 463. [25] J. Nocedal and S. J. Wright, Numerical optimization . Springer, 2006. [26] B. Stellato, G. Banjac, P. Goulart, A. Bemporad, and S. Boyd, “OSQP: an operator splitting solver for quadratic programs,” Mathematical Programming Computation , vol. 12, no. 4, pp. 637–672, 2020. [Online]. Available: https://doi.org/10.1007/s12532-020-00179-2 [27] T. Luukkonen, “Modelling and control of quadcopter,” Independent research project in applied mathematics, Espoo , vol. 22, no. 22, pp. 1–24, 2011. [28] C. Pan, Z. Yi, G. Shi, and G. Qu, “Model-based diffusion for trajectory optimization,” in Advances in Neural Information Processing Systems ,vol. 37, 2024. [29] A. D. Saravanos, O. So, H. M. S. Ahmad, and C. Fan, “Learning-to-optimize via deep unfolded flows,” in Forty-third International Conference on Machine Learning , 2026.
