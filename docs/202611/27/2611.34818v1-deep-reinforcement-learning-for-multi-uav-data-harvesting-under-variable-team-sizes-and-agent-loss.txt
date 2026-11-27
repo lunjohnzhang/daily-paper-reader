@@ -1,0 +1,342 @@
+Title: Deep Reinforcement Learning for Multi-UAV Data Harvesting Under Variable Team Sizes and Agent Loss
+
+URL Source: https://arxiv.org/pdf/2611.34818v1
+
+Published Time: Thu, 26 Nov 2026 03:48:36 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Deep Reinforcement Learning for Multi-UAV Data Harvesting Under Variable Team Sizes and Agent Loss 
+
+# Thiago de Souza Lamenza ∗ Bruno José Olivieri de Souza Markus Endler 
+
+tlamenza@inf.puc-rio.br bolivieri@inf.puc-rio.br endler@inf.puc-rio.br   
+
+> ORCID: 0009-0001-1510-6735 ORCID: 0000-0002-1707-7755 ORCID: 0000-0002-8007-9817
+
+Pontifícia Universidade Católica do Rio de Janeiro, Rio de Janeiro, RJ, Brazil 
+
+# Abstract 
+
+Collecting data from wireless sensors can be chal-lenging when limited communication infrastruc-ture prevents them from offloading their measure-ments. In such settings, unmanned aerial vehi-cles (UAVs) can exploit their mobility to harvest data locally, while coordinated UAV teams can pro-vide efficient and redundant coverage of remote ar-eas. Multi-agent reinforcement learning (MARL) enables such teams to learn decentralized coordi-nation policies. However, training separate policies for different team and sensor populations is costly, and fixed-population policies may be vulnerable to agent failures. This work proposes F-MADDPG, a flexible variant of Multi-Agent Deep Determin-istic Policy Gradient (MADDPG) that supports data harvesting with varying numbers of wireless sensors and UAVs. The framework also accom-modates unexpected catastrophic failures that per-manently remove agents during a mission. We compare F-MADDPG with a MADDPG baseline that uses multilayer perceptrons (MLPs) and eval-uate training strategies based on team-size sam-pling and exposure to agent terminations. The re-sults show that F-MADDPG learns across the eval-uated population sizes, completes missions faster than the baseline on average, benefits from inverse-cardinality team-size sampling compared with uni-form sampling, remains effective after permanent agent losses, and gains no consistent benefit from exposure to failures during training. 
+
+Keywords: Distributed systems, data harvesting, re-inforcement learning, fault tolerance 
+
+> ∗Corresponding author.
+
+# 1 Introduction 
+
+Unmanned aerial vehicles (UAVs) provide a mobile platform for tasks performed over large or difficult-to-access areas [5, 20, 21, 17]. When deployed as a team, they can divide spatially distributed work and continue operating without relying on permanent infrastructure. One relevant applica-tion is data harvesting from wireless sensor net-works: UAVs travel between ground sensors and collect their measurements through short-range air-to-ground communication [3, 4, 8]. Using a UAV swarm can shorten a mission, but they must coordi-nate their actions to complete the task efficiently, avoiding redundant sensor visits and distributing the remaining workload. Designing coordination rules by hand becomes difficult as the number of UAVs and sensors in-creases and as their spatial configuration changes. Multi-agent reinforcement learning (MARL) offers an alternative in which coordinated behavior is learned through interaction with a simulated en-vironment. Deep reinforcement-learning methods have consequently been applied to multi-UAV data collection, jointly addressing decisions such as tra-jectory planning, sensor selection, and task alloca-tion [11, 26, 27, 14]. The flexibility obtained through learning comes at the cost of an expensive training process. Deep reinforcement-learning policies may require mil-lions of environment interactions, and a policy trained for one scenario configuration may perform poorly when deployed under substantially different conditions. Training a separate model for every possible team size in a multi-agent problem would multiply this cost and require the system to main-1arXiv:2611.34818v1 [cs.LG] 25 Nov 2026 tain and select among several population-specific policies. A single policy capable of operating across team sizes can instead reuse training across config-urations and makes the learned controller easier to deploy. Population variability is also a fault tolerance concern: UAVs may become unavailable because of energy depletion, communication problems, ad-verse weather, or equipment failure. Consequently, solutions that can adapt to dynamic agent popula-tions are better equipped to handle such conditions. A permanent failure during an episode abruptly changes the number of participating agents and requires the survivors to redistribute unfinished work. However, conventional MARL implemen-tations commonly represent inputs using fixed-dimensional vectors tied to a predefined number of agents. Merely filling an absent agent’s slot with a fixed value does not explicitly distinguish it from valid input and does not eliminate the relationship of the network architecture with a maximum pop-ulation. In our previous work [9] we proposed two algo-rithms that addressed population variability. The first was successful in producing a model that works across a range of sensor populations. The second attempted the same for UAV populations, but ul-timately failed to achieve consistent performance across team sizes. We now propose F-MADDPG, a flexible variant of Multi-Agent Deep Deterministic Policy Gradient (MADDPG) [16] for cooperative UAV data har-vesting under variable team sizes and permanent agent losses. F-MADDPG integrates a Flexible En-coder into a shared decentralized actor and central-ized critic. The encoder uses MLP heads for fixed-size fields and masked attention heads for variable-cardinality fields, producing a fixed-size representa-tion for each field. Explicit validity masks exclude absent agents and unavailable sensors, allowing one policy to operate across the evaluated populations. We evaluate F-MADDPG in a simulated data-harvesting task with varying numbers of UAVs and sensors and with stochastic, permanent UAV losses. Our experiments compare F-MADDPG with a MADDPG baseline that uses multilayer per-ceptrons (MLPs) in terms of learning efficiency and final task performance. We also formulate an inverse-cardinality strategy for sampling initial team sizes during training and compare it with uniform sampling to evaluate its effect on perfor-mance across team sizes. Finally, we compare poli-cies trained with different failure probabilities to investigate whether explicit failure exposure pro-vides benefits beyond training across initial team sizes. F-MADDPG learns effective policies across the evaluated configurations, completes missions faster than the MLP baseline on average, and ben-efits from inverse-cardinality team-size sampling. For each policy, performance remains similar across the evaluated failure probabilities. Exposure to failures during training does not consistently im-prove performance. 
+
+# 2 Related Work 
+
+Multi-agent reinforcement learning has been ap-plied to UAV data harvesting to coordinate move-ment and collection decisions under objectives such as energy efficiency and information freshness [11, 26, 27, 14]. These studies address important op-erational constraints, including limited energy and communication range. A further question concerns coordination across changing team sizes: the num-ber of UAVs may differ between missions, or the active team may change during a mission. Per-manent UAV loss is one important instance of the latter, requiring the surviving agents to complete work that would otherwise have been performed by the missing teammate. Ramezani et al. [19] enable surviving UAVs to continue a coverage mission after permanent losses by switching among population-specific configura-tions. This accommodates within-mission changes but requires training, maintaining, and selecting among several population-specific policies. Our prior work [9] explored training models with a fixed team size and deploying them in scenarios with different UAV counts. In our experiments, this strategy was effective when the deployment pop-ulation was at least as large as the training popu-lation, although transfer to larger teams incurred a completion-time penalty. Authors in [2, 22] repre-sent a rectangular collection area as a discrete grid, absorbing population variability into a task-specific spatial representation. They explore varying pop-ulations between episodes but not within episodes. The spatial representation imposes restrictions on the shape of the environment, limits the spatial res-2olution with which UAV positions are represented, and requires a task which can be represented in a spatially structured manner. Looking beyond data harvesting, the cooperative MARL literature offers several strategies for accom-modating varying agent populations. Some studies test transfer between fixed training and deployment populations without changing the underlying archi-tecture [10]. Such transfer is useful when local ob-servations remain comparable, but it does not ad-dress recovery from agent losses. Other methods construct bounded local views. K-nearest MARL [12] forms fixed-size neighborhoods within a larger variable population. Tong et al. [24] use a spatial representation, similar to those discussed above, for cooperative patrolling, evaluating continued oper-ation after catastrophic agent failures and subse-quent additions. Their shared actor incorporates teammate locations into a fixed-size map, while their centralized critic retains explicit team infor-mation padded to a maximum training population. In the broader reinforcement learning litera-ture, some authors explore neural architectures that explicitly accommodate variations in agent population. Long et al. [15] propose apopulation-invariant MADDPG architecture with two attention-based aggregation stages in the critic. The first aggregates observation entities to form each agent’s observation–action embedding, while the second aggregates agent embeddings into a fixed-size representation for the centralized critic. The actor also uses attention over observation entities. F-MADDPG instead centralizes corre-sponding observation and action fields before field-specific encoding and shares parameters across agents rather than maintaining independently pa-rameterized agents. Long et al.’s main objec-tive is to scale MARL training to larger popu-lations through Evolutionary Population Curricu-lum (EPC). Across stages of increasing popula-tion size, EPC combines candidate agent sets, fine-tunes them, and selects those that adapt best to the enlarged population. The reported experiments show better performance at larger populations than training from scratch, and an extrapolation test de-ploys cloned policies at twice the largest training population without further training. Some of the experiment environments also include game-driven agent deaths, although operational fault tolerance is not the study’s focus. Our work investigates a shared policy across team sizes and continued UAV data harvesting after permanent agent losses. Self-attention is also used in the MA-POCA al-gorithm [7], which was designed for cooperative en-vironments in which agents can spawn or termi-nate during an episode. Its centralized value and counterfactual-baseline networks aggregate infor-mation from currently active agents, avoiding ex-plicit absorbing-state inputs for terminated agents. The authors also address posthumous credit as-signment, which allows an agent’s earlier decisions to receive credit from team rewards obtained af-ter its termination. Our work also investigates attention-based aggregation of variable-cardinality inputs, applying it to both the actor and critic. Our experiments did not reveal evidence that posthu-mous credit assignment was a practical issue in the evaluated data-harvesting setting. Finally, Alarcon Granadeno et al. [1] use recur-rent neural networks to process observations from a variable number of teammates in a multi-UAV plume-tracing task. Their Action-Specific Dou-ble Deep Recurrent Q-Network (ADDRQN) archi-tecture combines separate embeddings of the act-ing UAV’s current observation and previous ac-tion with a fixed-size teammate representation pro-duced by a gated recurrent unit (GRU). These em-beddings are passed to a long short-term mem-ory (LSTM) network, followed by an output net-work estimating Q-values for seven discrete ac-tions. All UAVs share the same network param-eters. Whereas the teammate GRU accommodates population variability, the temporal LSTM main-tains memory under partial observability. Our method instead uses attention-based entity encod-ing within a continuous-action actor–critic formu-lation. Their described training randomizes ini-tial team sizes without explicit within-mission fail-ure injection, and evaluation includes permanent UAV dropout and communication blackouts. Our experiments focus on permanent losses and ad-ditionally compare different training-time failure-exposure conditions. These studies also address how different team sizes are represented during learning. Alarcon Granadeno et al. partition replay experience into team-size buckets and uniformly select a bucket be-fore sampling training sequences, while Tong et al. [24] allocate additional parallel training episodes to single-agent teams. Our inverse-cardinality 3strategy instead changes the initial-team sampling distribution to compensate for larger teams con-tributing more agent-level experience per envi-ronment step. This concerns experience collec-tion, whereas ADDRQN’s buckets act during re-play sampling. Episode duration and agent losses also affect the amount of collected experience, so initial-team sampling alone does not guaran-tee a balanced final distribution. In Section 5.2, we compare inverse-cardinality sampling with uni-form initial-team sampling and an adaptation of ADDRQN’s bucketed replay strategy within F-MADDPG. These experiments do not compare the complete F-MADDPG and ADDRQN algorithms. Overall, these studies highlight two related con-cerns: training policies that generalize to variable agent populations and adapting to within-episode changes in active agent count. Our evaluation brings these concerns together in UAV data har-vesting by examining the training efficiency of our proposed actor–critic representation, the distribu-tion of initial team sizes during training, and expo-sure to permanent within-mission losses. 
+
+# 3 Algorithm 
+
+# 3.1 Background 
+
+A cooperative multi-agent reinforcement-learning task can be modeled as a partially observable Markov game. The objective is to maximize the expected discounted team return 
+
+J(π) = Eπ
+
+[T −1∑
+
+> t=0
+
+γtrt
+
+]
+
+, (1) where π denotes the policy, rt is the shared team reward at time t, γ ∈ [0 , 1) is the discount factor, and T is the episode horizon [23]. We use MADDPG [16] with centralized train-ing and decentralized execution. Each UAV uses a shared actor μϕ to compute a continuous action based on its local observation, while a centralized critic Qθ evaluates the active team’s joint observa-tions and actions during training. Parameter shar-ing [6] exploits the homogeneity of the UAVs and allows active agents to execute the same policy in-dependently. Let Imax = {1, . . . , N max  
+
+> a
+
+} denote the available agent slots and It ⊆ I max the active agents at time 
+
+t. A failure is applied after the affected UAV acts in transition t. With Dt indicating completion or truncation of the team episode, we define 
+
+mjt = I[j ∈ I t] ,ejt = mjt
+
+(
+
+1 − mjt+1 
+
+)
+
+,djt = Dt ∨ ejt ,yjt = rt + γ(1 − djt ) ¯Q(ot+1 , ¯μ(ot+1 ), mt+1 ) .
+
+(2) Here, I is the indicator function, which returns 1 if its condition is true and 0 otherwise. Thus, mjt
+
+indicates whether slot j is active at time t, and ejt
+
+indicates whether the agent terminates during the transition. Slots absent at episode reset represent padding rather than failures, but both absent and failed slots are excluded from centralized inputs and loss reductions. The centralized critic produces one value for the team, and yjt is its TD(0) training target for agent 
+
+j. At time t + 1, ot+1 denotes the joint obser-vations. The joint action ¯ μ(ot+1 ) collects the ac-tions produced by applying the shared target ac-tor ¯ μ to each agent’s local observation. The target critic ¯Q evaluates the joint observations and ac-tions. The terminal indicator djt prevents a failed UAV from bootstrapping beyond its final reward, while survivors bootstrap using the reduced team if the episode continues. Partial agent loss therefore does not terminate the team episode, allowing the remaining UAVs to redistribute unfinished work. Actor and critic losses are computed using masked mean reduction: 
+
+L =
+
+∑ 
+
+> t,j
+
+mjt ℓjt
+
+∑ 
+
+> t,j
+
+mjt
+
+, (3) where ℓjt denotes the corresponding unreduced per-agent loss, and the sums run over the sampled transitions and agent slots in the minibatch. An agent’s final active transition remains included be-cause mjt = 1; subsequent entries have mjt = 0 and contribute no gradient. 
+
+# 3.2 Flexible Encoder 
+
+Conventional deep reinforcement-learning net-works typically flatten observations into fixed-dimensional vectors. Padding variable entity sets to a maximum size provides regular tensors, but an 4MLP cannot inherently distinguish padding from valid values or model interactions among the enti-ties. The Flexible Encoder instead decomposes an ob-servation o into H semantically distinct fields. As shown in Figure 1, a field-specific head fh maps the input xh to a fixed-size representation. For variable-cardinality fields, the head also receives a validity mask bh that identifies the valid entries in 
+
+xh. The resulting representations are concatenated and mixed: 
+
+zh = fh(xh, b h) ∈ Rnh ,E(o) = fmix (z1 | · · · | zH ) ∈ Rnmix , (4) where | denotes concatenation and bh is omit-ted for fixed-size fields. Consequently, the encoder output dimension is independent of the number of valid entities. The encoder does not prescribe a re-inforcement learning update rule. Its output can be used wherever a conventional neural network would otherwise consume a flattened observation. The MLP heads encode fixed-size fields such as scalars or single-entity feature vectors. Masked at-tention heads encode variable-cardinality fields by projecting each element to the Transformer em-bedding dimension, applying self-attention using bh
+
+to exclude padding, and performing masked mean pooling. If bh contains no valid elements, the head returns the zero vector. Padding therefore affects neither attention nor pooling. Entity identity em-beddings may be added before attention when en-tity roles must be retained. The pooled represen-tation is independent of the ordering of entities. In the data-harvesting implementation, the ac-tor uses an MLP head for the UAV identifier and masked attention heads for the relative positions of sensors and other UAVs. Their validity masks, de-scribed in Section 3.4, exclude collected or nonex-istent sensors and inactive or nonexistent agents. The following subsection specifies the separate ac-tor and critic encoders used by F-MADDPG. 
+
+# 3.3 F-MADDPG 
+
+F-MADDPG replaces the conventional actor and critic feature networks of MADDPG with separate Flexible Encoders Eμϕ and EQθ . The shared actor processes each agent’s local observation, whereas the critic produces a scalar value from centralized observations and actions. The actor encoder produces a vector with the same dimensionality as the action space. Its output is normalized element-wise to [0 , 1]: 
+
+ajt = μϕ(ojt ) = ρ
+
+(
+
+Eμϕ (ojt )
+
+)
+
+, ρ(v) = tanh( v) + 1 2 .
+
+(5) To construct the critic’s input, a centraliza-tion operator C concatenates corresponding fields across agent slots while combining each field mask 
+
+bjh,t with the activity mask mjt . For a variable-cardinality observation field, the centralization op-eration and resulting critic evaluation are given by 
+
+Ch(ot, mt) = 
+
+( N max 
+
+> a
+
+concat  
+
+> j=1
+
+xjh,t , N max 
+
+> a
+
+concat 
+
+> j=1
+
+(
+
+mjt ∧ bjh,t 
+
+))
+
+,Qθ (ot, at, mt) = EQθ (C(ot, mt), (at, mt)) .
+
+(6) Here, ot and at contain the observations and ac-tions of all available slots. Concatenating a fixed-size observation field across agents yields a variable-cardinality field whose valid entries correspond to active agents. The joint action is an additional variable-cardinality field masked by mt. Each cen-tralized element receives a learned embedding iden-tifying its owning agent. Padding and information from inactive agents are excluded while the critic can still distinguish the sources of valid elements. 
+
+# 3.4 Data-Harvesting Task 
+
+The task builds on our previous study [9], retain-ing proximity-based sensor collection, shared team information, and the cooperative objective of com-pleting collection efficiently. Here, we investigate variable active populations and permanent within-mission UAV losses. The task contains a variable-size team of UAVs and stationary ground sensors at known positions. Each sensor is collected once, and the numbers and positions of UAVs and sensors are sampled at each episode reset. UAVs are assumed to share their positions and sensor-collection status through reli-able team communication. The observation of ac-tive UAV j is 
+
+ojt =
+
+〈
+
+Pjs,t , bjs,t , Pja,t , bja,t , ι jt
+
+〉
+
+, (7) 5Figure 1: Diagram of the Flexible Encoder architecture and how it is applied to the data-harvesting task. Inputs with variable-cardinality such as sensor and teammate positions are processed by masked attention heads while fixed-size inputs such as UAV identifiers are processed by MLP heads. The resulting representations are concatenated and mixed to produce a fixed-size output. where Pjs,t contains the normalized relative posi-tions of the N ∗ 
+
+> s
+
+closest uncollected sensors and Pja,t 
+
+those of the N ∗ 
+
+> a
+
+closest other active UAVs. We set 
+
+N ∗ 
+
+> s
+
+= 12 and use N ∗ 
+
+> a
+
+= 7 unless otherwise specified. The Boolean masks bjs,t and bja,t distinguish valid entities from padding, while ιjt is the UAV’s iden-tifier. Collected sensors and inactive UAVs are ex-cluded. Consequently, an agent failure immediately removes that UAV from subsequent observations. Each actor produces a normalized two-dimensional action 
+
+ajt = ⟨ajθ,t , a jv,t ⟩ ∈ [0 , 1] 2,θjt = 2 πa jθ,t ,vjt = vmax ajv,t ,
+
+(8) which determines the UAV’s movement direction 
+
+θjt and speed vjt . UAVs fly at a fixed altitude and, under a simplified motion model, may change di-rection and speed instantaneously. Agents must remain within the scenario boundaries. Data col-lection requires no explicit action: any uncollected sensor within the 20 m horizontal communication range transmits its data and is collected automati-cally. All UAVs receive the same team reward. Let 
+
+Ct and Ct+1 be the cumulative numbers of sen-sors collected before and after transition t, respec-tively, and Ns the number of sensors present in the episode. The reward for transition t is 
+
+rt =
+
+
+
+10( Ct+1 − Ct), Ct+1 > C t,
+
+− Ns − Ct+1 
+
+Ns
+
+, otherwise .
+
+(9) This rewards newly collected data while penaliz-ing delays in completing the remaining workload. UAVs that fail after acting receive the reward from their final transition; thereafter, their observations, actions, and rewards are masked, and the surviving team continues the mission. 64 Experimental Setup 
+
+All models evaluated in the following section were trained for 25 million time steps on the same ma-chine, equipped with an RTX 3090 GPU. All train-ing parameters, trained models, simulation code, and algorithms are open source and publicly avail-able. The code and trained policies are available on Zenodo [13]. Each condition uses one training run and its re-sulting policy, with repeated policy evaluations. Reported confidence intervals reflect evaluation-episode variability, not variability across indepen-dent training runs. Unless otherwise specified, we evaluated each policy on 2,000 episodes per evaluation setting. By default, experiments consider team sizes in the range [N min  
+
+> a
+
+, N max 
+
+> a
+
+], with N min  
+
+> a
+
+= 1 and N max  
+
+> a
+
+= 8, and sensor counts between N min  
+
+> s
+
+= 1 and N max  
+
+> s
+
+=36. These variations cover a wide range of UAV and sensor densities. The model must generalize across them to ensure reliable, high-quality task comple-tion. Completion time is the elapsed simulated time, in seconds, at the end of the step in which the fi-nal sensor is collected. Unsuccessful episodes are assigned the 500 s episode horizon. 
+
+# 5 Results 
+
+# 5.1 Training Efficiency 
+
+Training a deep reinforcement learning model can be highly resource intensive, depending on the com-plexity of the environment and model architecture [18, 25]. Consequently, improving sample efficiency can substantially reduce training costs. The ap-proach introduced in Section 3.2 uses specialized heads for each observation field, potentially increas-ing training efficiency. To evaluate training efficiency, we compare F-MADDPG with a MADDPG baseline that uses an MLP to process all observations. Because this baseline cannot mask inactive observation entries or agents, these entries are padded with a fixed value of −1. Both models use inverse-cardinality team-size sampling and are trained without agent failures. Both of these details will be explored in sections 5.2 and 5.3, respectively. 
+
+Figure 2: Periodic evaluation success rate of F-MADDPG and the MLP baseline over 25 million training steps. Figure 2 presents the success rates of F-MADDPG and the MLP baseline during training. An episode is considered successful if all sensors are visited within the allotted time. The models were periodically evaluated by pausing parameter updates and running 100 episodes with uniformly sampled agent counts, sensor counts, and sensor lo-cations. Both F-MADDPG and the baseline achieved near-100% success rates by the end of the 25 million training steps. The first sequence of three consec-utive evaluations with at least 90% success began at 5.3 million training steps for F-MADDPG and 9.8 million for the baseline. These results suggest that F-MADDPG learned to process the variable-cardinality observation fields more quickly than the baseline. Success rate alone does not fully characterize task performance because it captures only binary task completion and does not reflect completion quality. Moreover, metrics aggregated over uni-formly sampled episodes may conceal weaknesses in specific environment configurations. Figure 3 shows the success rate and completion time, stratified by the initial number of agents. Both algorithms achieved high success rates. The largest difference occurred in single-agent episodes, for which F-MADDPG’s success rate was 6.5 per-centage points lower than that of the baseline. By contrast, F-MADDPG reduced the mean comple-tion time by 7.2 s across all team sizes. 7(a) Success rate. (b) Completion time. 
+
+Figure 3: Performance of the final F-MADDPG and MLP baseline policies, stratified by initial number of agents. Error bars show 95% confidence intervals. 
+
+# 5.2 Team Size Sampling 
+
+Our previous work found that policies trained with larger UAV teams would perform poorly when de-ployed with fewer agents [9], but even policies trained with smaller teams still suffer from task performance degradation. Here, we expose mod-els to all initial team sizes during training and in-vestigate how the per-episode team size sampling distribution affects performance. Because F-MADDPG uses parameter sharing and all agents are homogeneous, each step involving 
+
+Na active agents contributes Na experiences. Uni-form initial-team sampling therefore yields more agent-level experience per step from larger teams, potentially leaving smaller teams underrepresented during learning. Alarcon Granadeno et al. [1] propose ADDRQN, which addresses a similar issue by partitioning re-play experience into team-size buckets and uni-formly selecting a bucket before sampling train-ing sequences. Our approach instead modifies the initial-team sampling distribution to increase expo-sure to smaller teams during experience collection. We sample the initial agent count Na with a probability inversely proportional to the team size to increase exposure to smaller teams during expe-rience collection: 
+
+P (Na) = 1
+
+NaZ , Z = 
+
+> Nmax
+> a
+
+∑ 
+
+> k=Nmin
+> a
+
+1
+
+k . (10) Assuming equal average episode duration across team sizes and ignoring within-episode agent losses, the probability P e(Na) that a uniformly sampled replay experience was generated by a team of size 
+
+Na is 
+
+P e(Na) = NaP (Na)
+
+∑N max  
+
+> a
+> k=Nmin
+> a
+
+kP (k) = 1
+
+N max  
+
+> a
+
+− N min  
+
+> a
+
++ 1 ,
+
+(11) which is constant across team sizes under these sim-plifying assumptions. In practice, episode duration and agent losses can change the collected distribu-tion, so inverse-cardinality sampling does not guar-antee a balanced final replay memory. To assess how initial team-size sampling af-fects the balance of collected experience, we com-pared policies trained with uniform and inverse-cardinality sampling. We chose three milestones to represent early, mid, and late training at ap-proximately 4, 12, and 21 million training steps, respectively. For each policy at each milestone, we collected a fresh rollout of 50,000 environment steps under its team-size sampling strategy. Each step contributed one transition per active agent to the count for that step’s team size. We computed the root mean squared error (RMSE) of the resulting percentages relative to an equal share of 12.5% per team size. Figure 4 shows that inverse-cardinality sampling yielded lower RMSE at all three mile-stones. The reduction relative to uniform sampling 8Figure 4: Team-size imbalance in collected experi-ence at approximately 4, 12, and 21 million training steps. Bars show root mean squared error (RMSE) relative to an equal representation target (12.5% per team size), in percentage points. was largest at the early milestone (38%). Figure 5 shows how the strategies differ at the late checkpoint. With inverse-cardinality sampling, one- and two-agent teams each contributed more than the target share of 12.5%, while teams of five to eight agents each contributed less. The earlier checkpoints showed a similar shift toward smaller teams. One possible explanation is that episode du-rations are more similar across team sizes early in training. If larger teams learn to finish episodes sooner, their shorter episodes could reduce their share of collected experience. To investigate the impact of the sampling strat-egy on policy performance, we compare three F-MADDPG policies trained using uniform team-size sampling with ordinary replay, inverse-cardinality team-size sampling with ordinary replay, or uni-form team-size sampling with bucketed replay. The bucketed baseline adapts ADDRQN’s replay strat-egy by partitioning experience according to initial team size, uniformly selecting a bucket, and then sampling experiences within it. We evaluated all three policies without agent failures and report suc-cess rates by initial team size. Figure 6 shows the success rates of mod-els trained using the three strategies. Inverse-cardinality sampling achieved the highest or joint-highest success rate at every evaluated team size, increasing the success rate by an average of 3 per-centage points over uniform sampling with ordinary 
+
+Figure 5: Share of collected transitions by active team size in rollouts from the late checkpoint (ap-proximately 21 million training steps). The dashed line indicates equal representation (12.5% per team size). replay. The largest difference between these two strategies occurred in the single-agent setting, for which inverse-cardinality sampling improved the success rate by 9.7 percentage points. This im-provement is consistent with the sampling ratio-nale. Bucketed replay sampling also improved aggre-gate success relative to uniform team-size sam-pling with ordinary replay, although the improve-ment was smaller than that obtained with inverse-cardinality sampling. This experiment compares sampling strategies within F-MADDPG rather than the complete F-MADDPG and ADDRQN al-gorithms. The relative effectiveness of these strate-gies may depend on the surrounding architecture and training procedure; the results do not identify which factors account for the observed ranking or establish that inverse-cardinality sampling is gen-erally superior. They support inverse-cardinality sampling as a simple and effective strategy in the evaluated F-MADDPG setting. 
+
+# 5.3 Robustness to Agent Failures 
+
+As discussed in Section 5.2, reinforcement learning models generally struggle in situations not encoun-tered during training. F-MADDPG is designed to produce policies that are robust to changes in team size. The preceding experiments considered changes between episodes; however, the active team 9Figure 6: Success rates of F-MADDPG policies trained using uniform and inverse-cardinality team-size sampling and bucketed replay sampling. Re-sults are stratified by initial number of agents. Er-ror bars show 95% confidence intervals. size may also change within an episode when one or more agents terminate. This section evaluates whether F-MADDPG can maintain task performance after agent failures. We consider two approaches to achieving robustness to such failures. The first is to train the model us-ing a randomly sampled team size in each episode, as described in previous sections. If the model generalizes to every Na ∈ [N min  
+
+> a
+
+, N max 
+
+> a
+
+], the loss of one agent reduces the active team from |I t| to 
+
+|I t+1 | = |I t|− 1, a size encountered during training. Failures are disabled when |I t| = 1 because the task cannot be completed without an active agent. The second approach explicitly introduces agent failures during training. After the active UAVs act in transition t, the sim-ulator independently selects each UAV j ∈ I t for failure with probability p. The simulator perma-nently deactivates the selected UAVs while ensur-ing that at least one UAV remains active. Tables 1 and 2 report the success rates and mean completion times, respectively, for policies trained and evaluated using three values of p, correspond-ing to no, infrequent, and frequent failures. In both tables, rows indicate the failure probability used during training, whereas columns indicate the prob-ability used during evaluation. Each policy was evaluated under every listed failure probability. For a given training condition, changing the evaluation failure probability had little effect on either met-ric. Differences among the training conditions were larger but nonmonotonic: training with p = 0 .0005 Table 1: Success rate (%) under different training and evaluation failure probabilities.               
+
+> Training pEvaluation p
+> 00.0005 0.002 099.60 99.60 99.66 0.0005 99.09 99.09 98.92 0.002 99.60 99.60 99.60
+
+Table 2: Mean completion time (s) under different training and evaluation failure probabilities.               
+
+> Training pEvaluation p
+> 00.0005 0.002 031.22 31.26 31.16 0.0005 36.18 36.27 37.15 0.002 32.93 32.95 33.18
+
+produced longer completion times, whereas train-ing with p = 0 .002 yielded results closer to those obtained without failures. Thus, the results pro-vide no evidence that greater exposure to failures during training consistently improves policy perfor-mance. Results were also similar across initial team sizes; therefore, we do not stratify them by initial team size. These results demonstrate that population vari-ability during training is sufficient for F-MADDPG to learn policies that maintain performance after mid-episode agent failures. To further assess the role of population variability, we compared two policies trained without failures (p = 0): one trained across different initial team sizes and an-other trained with a fixed team size of Na = 5. Both policies were evaluated with five initial UAVs, varying only the per-agent failure probability per timestep from p = 0 to p = 1. The environment prevents the final active UAV from failing. Fig-ure 7 shows the resulting success rates. The fixed-population policy’s success rate decreases sharply as failure probability increases, whereas the policy trained with variable team sizes maintains a high success rate across the evaluated probabilities. 
+
+# 5.4 Generalization to Larger Popu-lations 
+
+We evaluate F-MADDPG’s ability to generalize be-yond the training population range by comparing it with an MLP baseline in scenarios with up to 10 Figure 7: Success rates of policies trained with and without population variability, both evaluated with five initial UAVs under different per-step failure probabilities. Shaded areas show 95% confidence intervals. 
+
+Figure 8: Average completion time of F-MADDPG and the MLP baseline for different initial team sizes. Unsuccessful missions are assigned the 500 s episode horizon. Shaded bands show 95% confi-dence intervals. 20 UAVs. The models were trained with inverse-cardinality sampling and no failures on episodes with up to 8 UAVs. These are the same models used in section 5.1. We evaluated both policies at each fixed team size from 1 to 20 UAVs. Figure 8 shows the average completion time of F-MADDPG and the MLP baseline for different initial team sizes. Mean completion times generally decreased for both policies as team size increased beyond eight UAVs. F-MADDPG achieves lower completion times for larger populations within the training range and retains this advantage beyond the largest training population. The observation structure described in equa-tion 7 limits peer information to a fixed number of closest UAVs. Consequently, the observation struc-ture remains consistent for larger populations. This 
+
+Figure 9: Mean completion time of F-MADDPG across population sizes and observation neighbor-hood limits. Cell values report completion time in seconds. Within each population size, blue indicates shorter completion times and red indi-cates longer completion times relative to the seven-neighbor variant. stability may explain the models’ ability to general-ize to larger populations. As such, the results may be environment-specific and may not apply to other scenarios where out-of-distribution observations oc-cur as a consequence of population growth. Further experiments are required to evaluate F-MADDPG’s generalization capabilities in other environments. This observation structure affects our ability to demonstrate one of the benefits of F-MADDPG over the MLP baseline, namely its ability to process variable-cardinality observations. Figure 9 shows the mean completion time of the same trained F-MADDPG policy evaluated with neighborhood limits of 1, 7, and 19 UAVs. Compared with the other two settings, N ∗ 
+
+> a
+
+= 1 yielded lower mean com-11 pletion times for teams of 2–8 UAVs and higher mean completion times for teams of 9–20 UAVs. The N ∗ 
+
+> a
+
+= 7 and N ∗ 
+
+> a
+
+= 19 settings yielded similar mean completion times. Overall, the results sug-gest that the benefit of observing more neighbors depends on team size in this environment. Further experiments are required to evaluate F-MADDPG’s ability to process variable-cardinality observations in other environments. 
+
+# 6 Conclusion 
+
+We introduced F-MADDPG, a multi-agent rein-forcement learning framework designed for cooper-ative tasks with variable team sizes and permanent agent losses. Its Flexible Encoder uses masked, field-specific representations to process variable-cardinality observations and centralized critic in-puts without treating absent entities as conven-tional values. Consequently, a single shared policy can operate across different UAV-team and sensor-population sizes and can continue a mission after failed UAVs are removed from the system. In the evaluated data-harvesting scenarios, F-MADDPG achieved competitive success rates while completing missions faster than the MLP-based baseline. Inverse-cardinality team-size sampling yielded higher aggregate success rates than uni-form team-size sampling with either ordinary or bucketed replay, with the largest gains observed for smaller teams. For each trained policy, perfor-mance remained similar across the evaluated failure probabilities. Exposure to failures during training yielded no consistent performance gains. This sug-gests that, in the considered setting, exposure to varying team sizes can be sufficient for learning behavior that remains effective after mid-episode agent terminations, without requiring failures to be explicitly introduced during training. An abla-tion study supports this hypothesis, as the variable-population policy outperformed a fixed-population baseline in scenarios with increasing probability of agent losses. Moreover, we demonstrate that both F-MADDPG and the MLP baseline generalize well to scenarios with agent populations larger than those observed during training, although the ob-servation structure of the data-harvesting scenario facilitates this. These findings are limited to a simulated en-vironment with simplified UAV dynamics, glob-ally available team information, and fail-stop fail-ures. Future work should consider communication-constrained observations, more realistic mobility and energy models, and other failure modes, in-cluding intermittent communication and degraded rather than complete loss of functionality. Evalu-ating F-MADDPG in additional cooperative tasks and physical UAV deployments would further clar-ify the generality and practical robustness of the proposed architecture. The Flexible Encoder can also be extended to represent other input represen-tations, such as spatial or image data. 
+
+# References 
+
+[1] Alarcon Granadeno, P.A., Chambers, T., Cleland-Huang, J., 2025. Multi-source plume tracing via multi-agent reinforcement learning under common UAV-faults. Machine Learning with Applications 22, 100737. doi: 10.1016/j. mlwa.2025.100737 .[2] Bayerlein, H., Theile, M., Caccamo, M., Ges-bert, D., 2021. Multi-UAV Path Planning for Wireless Data Harvesting with Deep Re-inforcement Learning. IEEE Open Journal of the Communications Society 2, 1171–1187. doi: 10.1109/OJCOMS.2021.3081996 .[3] Ben Ghorbel, M., Rodriguez-Duarte, D., Ghazzai, H., Hossain, M.J., Menouar, H., 2018. Energy Efficient Data Collection for Wireless Sensors Using Drones, in: 2018 IEEE 87th Vehicular Technology Conference (VTC Spring), pp. 1–5. doi: 10.1109/VTCSpring. 2018.8417798 .[4] Bouhamed, O., Ghazzai, H., Besbes, H., Mas-soud, Y., 2020. A UAV-Assisted Data Col-lection for Wireless Sensor Networks: Au-tonomous Navigation and Scheduling. IEEE Access 8, 110446–110460. doi: 10.1109/ ACCESS.2020.3002538 .[5] Cavalcanti, M., Souza, B.J.O.D., Lamenza, T.D.S., Reimer, T., Lucchesi, L., Endler, M., 2026. Rescue from the air: Real-time data fu-sion and distributed path planning for multi-uav sar applications. IEEE Access 14, 81535– 81554. doi: 10.1109/ACCESS.2026.3697637 .12 [6] Chu, X., Ye, H., 2017. Parameter Sharing Deep Deterministic Policy Gradient for Cooperative Multi-agent Reinforcement Learning. doi: 10.48550/arXiv.1710.00336 ,
+
+arXiv:1710.00336 .[7] Cohen, A., Teng, E., Berges, V.P., Dong, R.P., Henry, H., Mattar, M., Zook, A., Ganguly, S., 2021. On the Use and Misuse of Absorbing States in Multi-agent Reinforcement Learning. doi: 10.48550/ARXIV.2111.05992 .[8] De Souza, B.J.O., Lamenza, T., Paulon, M., Rodrigues, V.B., Carneiro, V.C.A., Endler, M., 2023. Collecting Sensor Data from WSNs on the Ground by UAVs: Assessing Mis-matches from Real-World Experiments and Their Corresponding Simulations, in: 2023 IEEE Symposium on Computers and Commu-nications (ISCC), pp. 284–290. doi: 10.1109/ ISCC58397.2023.10218042 .[9] de Souza Lamenza, T., José Olivieri de Souza, B., Endler, M., 2026. Deep Reinforcement Learning Approaches for Sensor Data Collec-tion by a Swarm of UAVs. Advanced Intel-ligent Systems 8, e202501146. doi: 10.1002/ aisy.202501146 .[10] Guresti, B., Ure, N.K., 2021. Evaluating Gen-eralization and Transfer Capacity of Multi-Agent Reinforcement Learning Across Vari-able Number of Agents. doi: 10.48550/arXiv. 2111.14177 , arXiv:2111.14177 .[11] Khodaparast, S.S., Lu, X., Wang, P., Nguyen, U.T., 2021. Deep Reinforcement Learning Based Energy Efficient Multi-UAV Data Col-lection for IoT Networks. IEEE Open Journal of Vehicular Technology 2, 249–260. doi: 10. 1109/OJVT.2021.3085421 .[12] Khorasgani, H., Wang, H., Tang, H.K., Gupta, C., 2021. K-nearest Multi-agent Deep Re-inforcement Learning for Collaborative Tasks with a Variable Number of Agents, in: 2021 IEEE International Conference on Big Data (Big Data), pp. 3883–3889. doi: 10.1109/ BigData52589.2021.9671691 .[13] Lamenza, T.d.S., de Souza, B.J.O., Endler, M., 2026. Replication pack-age for "deep reinforcement learning for multi-uav data harvesting under variable team sizes and agent loss". URL: https: //doi.org/10.5281/zenodo.24533808 ,doi: 10.5281/zenodo.24533808 .[14] Lee, C., Lee, S., Kim, T., Bang, I., Lee, J.H., Chae, S.H., 2024. Multi-Agent Deep Re-inforcement Learning-Based Multi-UAV Path Planning for Wireless Data Collection and En-ergy Transfer, in: 2024 Fifteenth International Conference on Ubiquitous and Future Net-works (ICUFN), pp. 500–504. doi: 10.1109/ ICUFN61752.2024.10625275 .[15] Long, Q., Zhou, Z., Gupta, A., Fang, F., Wu, Y., Wang, X., 2020. Evolutionary Popula-tion Curriculum for Scaling Multi-Agent Re-inforcement Learning. doi: 10.48550/arXiv. 2003.10423 , arXiv:2003.10423 .[16] Lowe, R., Wu, Y., Tamar, A., Harb, J., Abbeel, P., Mordatch, I., 2017. Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments, in: Advances in Neural Information Processing Systems, Cur-ran Associates, Inc. [17] Messaoudi, K., Oubbati, O.S., Rachedi, A., Lakas, A., Bendouma, T., Chaib, N., 2023. A survey of UAV-based data collection: Chal-lenges, solutions and future perspectives. Jour-nal of Network and Computer Applications 216, 103670. doi: 10.1016/j.jnca.2023. 103670 .[18] OpenAI, Berner, C., Brockman, G., Chan, B., Cheung, V., Dębiak, P., Dennison, C., Farhi, D., Fischer, Q., Hashme, S., Hesse, C., Józe-fowicz, R., Gray, S., Olsson, C., Pachocki, J., Petrov, M., Pinto, H.P.d.O., Raiman, J., Sal-imans, T., Schlatter, J., Schneider, J., Sidor, S., Sutskever, I., Tang, J., Wolski, F., Zhang, S., 2019. Dota 2 with Large Scale Deep Re-inforcement Learning. doi: 10.48550/ARXIV. 1912.06680 .[19] Ramezani, M., Amiri Atashgah, M.A., Rezaee, A., 2024. A Fault-Tolerant Multi-Agent Rein-forcement Learning Framework for Unmanned Aerial Vehicles–Unmanned Ground Vehicle Coverage Path Planning. Drones 8, 537. doi: 10.3390/drones8100537 .13 [20] Reimer, T., Olivieri, B., Cavalcanti, M., Endler, M., 2025. From air to ground: Co-ordinating uavs and ugvs in sar missions, in: 2025 28th International Conference on Infor-mation Fusion (FUSION), pp. 1–6. doi: 10. 23919/FUSION65864.2025.11124130 .[21] Samir, M., Assi, C., Sharafeddine, S., Ebrahimi, D., Ghrayeb, A., 2020. Age of In-formation Aware Trajectory Planning of UAVs in Intelligent Transportation Systems: A Deep Learning Approach. IEEE Transactions on Ve-hicular Technology 69, 12382–12395. doi: 10. 1109/TVT.2020.3023861 .[22] Seong, M., Jo, O., Shin, K., 2023. Multi-UAV trajectory optimizer: A sustainable sys-tem for wireless data harvesting with deep reinforcement learning. Engineering Appli-cations of Artificial Intelligence 120, 105891. doi: 10.1016/j.engappai.2023.105891 .[23] Sutton, R.S., Barto, A.G., 2018. Reinforce-ment Learning: An Introduction. Adaptive Computation and Machine Learning Series. second edition ed., The MIT Press, Cam-bridge, Massachusetts. [24] Tong, C., Harwood, A., Rodriguez, M.A., Sin-nott, R.O., 2026. An energy-aware and fault-tolerant deep reinforcement learning-based ap-proach for multi-agent patrolling problems. Soft Computing 30, 4919–4944. doi: 10.1007/ s00500-025-10685-x .[25] Vinyals, O., Babuschkin, I., Czarnecki, W.M., Mathieu, M., Dudzik, A., Chung, J., Choi, D.H., Powell, R., Ewalds, T., Georgiev, P., Oh, J., Horgan, D., Kroiss, M., Danihelka, I., Huang, A., Sifre, L., Cai, T., Agapiou, J.P., Jaderberg, M., Vezhnevets, A.S., Leblond, R., Pohlen, T., Dalibard, V., Budden, D., Sulsky, Y., Molloy, J., Paine, T.L., Gul-cehre, C., Wang, Z., Pfaff, T., Wu, Y., Ring, R., Yogatama, D., Wünsch, D., McK-inney, K., Smith, O., Schaul, T., Lillicrap, T., Kavukcuoglu, K., Hassabis, D., Apps, C., Silver, D., 2019. Grandmaster level in Star-Craft II using multi-agent reinforcement learn-ing. Nature 575, 350–354. doi: 10.1038/ s41586-019-1724-z .[26] Wang, X., Yi, M., Liu, J., Zhang, Y., Wang, M., Bai, B., 2023. Cooperative Data Collection With Multiple UAVs for Information Freshness in the Internet of Things. IEEE Transactions on Communications 71, 2740–2755. doi: 10. 1109/TCOMM.2023.3255240 .[27] Wu, Y., Zhang, F., Xu, C., Wang, X., 2023. Semantics-Aware Multi-UAV Cooper-ation for Age-Optimal Data Collection: An Adaptive Communication based MARL Ap-proach, in: 2023 IEEE 97th Vehicular Tech-nology Conference (VTC2023-Spring), pp. 1– 5. doi: 10.1109/VTC2023-Spring57618.2023. 10200769 .14

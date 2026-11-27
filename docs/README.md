@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-11-26</span>
+      <span class="dpr-home-dashboard-kicker">2026-11-27</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 5 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>3</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>3</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>1</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>4</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-11-26 02:24:57 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-11-27 02:34:34 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,9 +69,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>2026-11-26 机器人日报：6 篇入选、3 篇精读，重点聚焦多智能体轨迹优化与重载多机协同控制。</p>
-<p>最值得看的是两项满分 8.0 工作：分布式多智能体轨迹优化的规模化采样方法，以及面向重载运输的以物体为中心的双层控制架构；另有 3 篇速读覆盖联邦强化学习聚合与多机操作基准。</p>
-<p>普通读者可先读这两篇精读了解方法主线，再扫速读中的基准与聚合思路，判断是否与自己的场景相关。</p>
+<p>今天完成5篇论文筛选，精读1篇、速读4篇，重点聚焦多智能体路径规划与多无人机协同。</p>
+<p>最值得看的是精读高分（9.0/10）的LSRP*-LA大规模智能体异步动作路径规划，以及多无人机在队形变化与智能体损失下的数据采集强化学习方向。</p>
+<p>普通读者可先读精读篇掌握异步动作与可扩展性思路，再按兴趣浏览速读篇的任务分配与四足机器人协同规划。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -80,12 +80,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">1 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Sampling at Scale: Distributed Multi-Agent Trajectory Optimization">Sampling at Scale: Distributed Multi-Agent Trajectory Optimization</span></li><li><span class="dpr-home-dashboard-paper-title" title="MRCT: An Object-Centric Two-Layer Control Architecture for Heavy-Payload Multi-Robot Transportation">MRCT: An Object-Centric Two-Layer Control Architecture for Heavy-Payload Multi-Robot Transportation</span></li><li><span class="dpr-home-dashboard-paper-title" title="TeamFlowRL: Online Policy Optimization of Decentralized Flow Policies for Multi-Agent Coordination">TeamFlowRL: Online Policy Optimization of Decentralized Flow Policies for Multi-Agent Coordination</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="LSRP*-LA: Scalable and Anytime Multi-Agent Path Finding for Large Agents with Asynchronous Actions">LSRP*-LA: Scalable and Anytime Multi-Agent Path Finding for Large Agents with Asynchronous Actions</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>1</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -93,12 +93,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">3 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Beyond Easy Clients: Difficulty- and Improvement-Aware Aggregation for Federated Reinforcement Learning in Robot Navigation">Beyond Easy Clients: Difficulty- and Improvement-Aware Aggregation for Federated Reinforcement Learning in Robot Navigation</span></li><li><span class="dpr-home-dashboard-paper-title" title="DeCoNav-Act: Benchmarking Collective Physical Capability in Multi-Robot Mobile Manipulation">DeCoNav-Act: Benchmarking Collective Physical Capability in Multi-Robot Mobile Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="MRBench: Benchmarking Physical Necessity Reasoning in Heterogeneous Multi-Robot Manipulation">MRBench: Benchmarking Physical Necessity Reasoning in Heterogeneous Multi-Robot Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Energy-Aware Distributed Task Allocation via Local Submodular Maximization">Energy-Aware Distributed Task Allocation via Local Submodular Maximization</span></li><li><span class="dpr-home-dashboard-paper-title" title="Deep Reinforcement Learning for Multi-UAV Data Harvesting Under Variable Team Sizes and Agent Loss">Deep Reinforcement Learning for Multi-UAV Data Harvesting Under Variable Team Sizes and Agent Loss</span></li><li><span class="dpr-home-dashboard-paper-title" title="CoTAMP: Cooperative Task and Motion Planning for Quadruped Robots with Large Language Models">CoTAMP: Cooperative Task and Motion Planning for Quadruped Robots with Large Language Models</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>3</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">multi-robot <strong>4</strong></span></div>
 </section>
 </div>
 

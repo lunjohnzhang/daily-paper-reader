@@ -1,0 +1,1605 @@
+Title: Energy-Aware Distributed Task Allocation via Local Submodular Maximization
+
+URL Source: https://arxiv.org/pdf/2611.34293v1
+
+Published Time: Thu, 26 Nov 2026 02:59:31 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+> GENERIC COLORIZED JOURNAL, VOL. XX, NO. XX, XXXX 2026 1
+
+# Energy-Aware Distributed Task Allocation via Local Submodular Maximization 
+
+Jing Liu, Fangfei Li, Member, IEEE , Xin Jin, Member, IEEE , Yang Tang, Fellow, IEEE ,Ruggero Carli, Member, IEEE , and Luca Ballotta, Member, IEEE 
+
+Abstract — This paper studies distributed task allocation under time-varying agent sets, task sets, and communi-cation graphs. At each decision epoch, the stage alloca-tion problem is formulated as monotone submodular max-imization over a time-varying, energy-filtered admissible ground set subject to a partition-matroid constraint. We develop a Distributed Adaptive Greedy Bidding Algorithm (DAGBA) that combines local admissible-set construction, conditional marginal bidding, and neighbor-based con-flict resolution under limited communication. We prove that DAGBA guarantees per-epoch feasibility, finite-round convergence, and residual-energy safety. Theoretically, we identify a sequential-greedy regime where DAGBA recov-ers the classical 1/2-approximation guarantee. For gen-eral executions with partial information, we derive a local-information-factor approximation bound and conservative bounds computable from the execution trace that quan-tify the degradation caused by local estimates and par-allel fixing. Simulations on cooperative observation mis-sions demonstrate that DAGBA achieves task-completion progress and utility close to centralized and complete-communication references, while improving communica-tion efficiency and maintaining strict energy feasibility. 
+
+Index Terms — Open multi-agent systems (OMAS), distributed task allocation, submodular maximization, resource-constrained coordination. 
+
+I. I NTRODUCTION 
+
+The rapid deployment of autonomous agents in open envi-ronments, such as swarms of unmanned aerial vehicles, mobile 
+
+This work is supported by the Program of China Scholarship Coun-cil under Grant 202506740033, the National Key R&D Program of China under Grant 2025YFA1016504, the National Natural Science Foundation of China under Grants 62233005, 62573198, U2441245, U25B6002, 62403141, the National Key Laboratory of Space Target Awareness under Grant STA2025ZCB0208, in part by the Shanghai Institute for Mathematics and Interdisciplinary Sciences (SIMIS) under Grant SIMIS-ID-2025-SP. (Corresponding authors: Fangfei Li and Yang Tang.) 
+
+Jing Liu is with the School of Mathematics, East China Univer-sity of Science and Technology, Shanghai 200237, China (e-mail: y20220091@mail.ecust.edu.cn). Fangfei Li is with the School of Mathematics and the Key Labora-tory of Smart Manufacturing in Energy Chemical Process, Ministry of Education, East China University of Science and Technology, Shanghai 200237, China (e-mail: li fangfei@163.com, lifangfei@ecust.edu.cn). Xin Jin is with the Research Institute of Intelligent Complex Systems, Fudan University, Shanghai 200433, China (e-mail: jx 9810@163.com). Yang Tang is with the Key Laboratory of Smart Manufacturing in Energy Chemical Process, Ministry of Education, East China University of Science and Technology, Shanghai, 200237, China (e-mail: yang-tang@ecust.edu.cn). Ruggero Carli and Luca Ballotta are with the Department of Infor-mation Engineering, University of Padova, 35131 Padova, Italy (e-mail: carlirug@dei.unipd.it; luca.ballotta@unipd.it). 
+
+sensor networks, and robotic search-and-rescue teams, has stimulated extensive research on adaptive and scalable task allocation strategies [1]–[4]. In these applications, agents must repeatedly coordinate to accomplish spatially and temporally evolving tasks, including target tracking, area coverage, and information gathering. In practice, the participating agent set, the active task set, and the communication topology may all change over time due to mobility, failures, energy depletion, and asynchronous task arrivals and completions [5]– [12]. These time-varying features challenge the assumptions underlying many classical distributed coordination methods, which typically require fixed agent teams, stable communica-tion networks, and sufficient time for bidding or consensus to stabilize [13]–[20]. Recent studies on dynamic multi-agent coordination have made important progress in distributed optimization, online re-source allocation, and open multi-agent systems (OMAS) [5]– [12]. However, these works primarily address continuous-valued optimization problems with convex or linear objectives. The task allocation problem studied in this paper is combi-natorial in nature. Its admissible decisions are discrete agent-task pairs, the utility is nonadditive due to cooperative sensing effects, and feasibility is coupled with local motion constraints and residual energy budgets. In particular, assigning additional agents to the same task often improves observation or tracking performance but with diminishing marginal benefit, a structure naturally formalized by monotone submodularity [21]–[23]. The present problem introduces several difficulties that are not simultaneously captured by existing distributed submod-ular maximization frameworks. First, the admissible ground set is time-varying: at each decision epoch, candidate agent-task pairs depend on the currently active agents, active tasks, residual energies, and motion-feasibility conditions. Second, each agent carries a finite onboard energy reserve over the mis-sion horizon. Energy consumed at the current epoch reduces the residual energy available at subsequent epochs and may therefore restrict future admissible ground sets. Third, the com-munication graph determines which bidding and confirmed-assignment information is locally visible to each agent. Under neighbor-limited communication, different agents may main-tain different estimates of the accepted assignment, so the exact centralized greedy sequence used in classical matroid-constrained submodular maximization cannot in general be enforced. Online optimization methods such as regret mini-mization, bandit allocation, and budgeted utility maximization [24]–[26] address submodular objectives in isolation, but they arXiv:2611.34293v1 [cs.MA] 25 Nov 2026 2 GENERIC COLORIZED JOURNAL, VOL. XX, NO. XX, XXXX 2026 
+
+are not designed for this communication-limited, multi-agent setting with cross-epoch energy coupling. Existing distributed submodular maximization frameworks face the same limitation from a different angle: consensus-based bundle methods [17], [20] and distributed sequential greedy algorithms [21], [27], [28] typically assume a static agent set or a stable communica-tion structure, while continuous-relaxation methods attaining the tight (1 − 1/e )-approximation of the multilinear extension [29], [30] rely on oracle access and multiple rounds of gradient-consensus iterations per decision epoch, rendering them computationally prohibitive for per-epoch deployment in time-critical missions. Motivated by these observations, this paper studies dis-tributed task allocation under time-varying feasibility, residual-energy constraints, and local communication. At each decision epoch, the currently available information defines a stage allocation problem formulated as monotone submodular maxi-mization over an energy-filtered admissible ground set subject to a partition-matroid constraint. Since future agent arrivals, task completions, and communication changes are unknown at decision time, we evaluate the proposed algorithm against the offline optimum of the same-epoch problem, which provides a natural and tractable per-epoch benchmark. To solve the stage problem, we develop the Distributed Adaptive Greedy Bidding Algorithm (DAGBA). Even against this per-epoch benchmark, establishing an approximation guarantee is nontrivial. Under neighbor-limited communication, each agent maintains only a local estimate of the accepted assignment and multiple pairs may be fixed in parallel, deviating from the exact sequential greedy order required by the classical 1/2-approximation [31]. Our contributions are as follows: 1) We formulate distributed task allocation in OMAS with time-varying agent sets, task sets, and communication graphs as a sequence of stagewise monotone submodular maximization problems over time-varying, energy-filtered admissible ground sets subject to partition-matroid con-straints. Unlike recent dynamic multi-agent optimization methods that address continuous-valued convex objec-tives [8]–[10], [12], this formulation simultaneously cap-tures the combinatorial decision structure, cooperative di-minishing returns, neighbor-limited communication, and cross-epoch coupling through residual energy constraints. 2) We propose DAGBA, a distributed greedy coordination algorithm based on local admissible-set construction, conditional marginal bidding, and neighbor-based conflict resolution. The central design challenge is to realize the greedy marginal-selection principle without a global co-ordinator: because the marginal gain of each candidate de-pends on which agents have already been assigned, every agent must bid against a locally maintained assignment estimate that is generally neither identical to nor syn-chronized with those of other agents. Unlike consensus-based bundle methods [17], [20] that require a stable agent set for bidding to converge, DAGBA accommodates time-varying agent and task sets by reconstructing local admissible subsets and local assignment estimates at each decision epoch, without requiring global consensus. 3) We establish per-epoch feasibility, finite-round conver-gence, and residual-energy safety of DAGBA, and de-rive per-epoch approximation guarantees. In a sequential-greedy regime, DAGBA recovers the classical 1/2-approximation with a curvature-dependent refinement. For general local-information executions, we derive a local-information-factor approximation bound and con-servative bounds computable at runtime that quantify the degradation caused by stale local estimates and parallel fixing. The analysis is nontrivial because, under sparse communication, different agents evaluate marginal bids with respect to different local estimates and multiple pairs may be fixed in parallel, deviating from the exact sequential greedy order assumed by classical matroid-constrained submodular maximization analysis [31]. The proof requires a new charging argument that verifies local estimates are subsets of the final assignment, establishes the submodular charging inequality for arbitrary, not necessarily nested, pairs of assignments, and exploits the partition-matroid structure to prevent double-charging. 
+
+Notation : Let Z+ and R+ denote the sets of positive integers and nonnegative real numbers, respectively. For a finite set 
+
+A, 2A denotes its power set and |A| denotes its cardinality. For two sets A and B, A \ B denotes the set difference. The indicator function is denoted by 1·, which equals one if the condition in braces is true and zero otherwise. For a set function f , the marginal gain of adding an element e to a set 
+
+S is denoted by ∆f (e | S) = f (S ∪ { e}) − f (S). For an agent 
+
+i, Ni,t denotes its neighbor set and N + 
+
+> i,t
+
+= Ni,t ∪ { i} denotes its closed neighborhood. The symbol arg max denotes the set of maximizers. The remainder of this paper is organized as follows. Sec-tion II formulates the problem and reviews preliminaries. Sec-tion III presents DAGBA. Section IV provides the theoretical analysis. Section V reports simulations. Section VI concludes the paper. 
+
+II. T ASK ALLOCATION PROBLEM FORMULATION 
+
+We consider distributed task allocation in an OMAS over a finite horizon t ∈ { 1, . . . , T }, where T ∈ Z+. Let V =
+
+{1, 2, . . . , N max } and M = {1, 2, . . . , M max } denote the universal sets of all possible agents and tasks that may appear during the entire mission horizon, respectively. At epoch t,only the active subsets Vt ⊆ V and Mt ⊆ M participate in the allocation problem. The active communication topology is described by an undirected graph Gt = ( Vt, Et). Since agents may join or leave and tasks may arrive or be completed be-tween consecutive decision epochs [9], the tuple (Vt, Mt, Gt)
+
+is generally time-varying, which in turn makes the admissible ground set and feasible family dependent on the decision epoch. 
+
+A. Preliminaries 
+
+Let Ω be a finite ground set and let f : 2 Ω → R be a set function. The function f is normalized if f (∅) = 0 , monotone nondecreasing if f (A) ≤ f (B) for all A ⊆ B ⊆ Ω, and submodular if f (A ∪ { e}) − f (A) ≥ f (B ∪ { e}) − f (B) holds LIU et al. : ENERGY-AWARE DISTRIBUTED TASK ALLOCATION VIA LOCAL SUBMODULAR MAXIMIZATION 3
+
+for all A ⊆ B ⊆ Ω and all e ∈ Ω \ B. The marginal gain of adding e to A is denoted by ∆f (e | A) = f (A ∪ { e}) −
+
+f (A) [22]. 
+
+Definition 1 (Matroid [32]) . Let Ω be a finite ground set and let I ⊆ 2Ω be a family of subsets of Ω. The set system (Ω , I)
+
+is called a matroid if: (i) ∅ ∈ I ;(ii) if A ∈ I and B ⊆ A, then B ∈ I ;(iii) if A, B ∈ I and |A| < |B|, then there exists e ∈ B \ A
+
+such that A ∪ { e} ∈ I .The sets in I are called independent sets. 
+
+Definition 2 (Partition matroid [32]) . Let {P1, P 2, . . . , P m}
+
+be a partition of the ground set Ω, namely, ⋃mi=1 Pi =Ω, Pi ∩ Pj = ∅, ∀i 6 = j. Let ki ∈ Z+ satisfy 
+
+ki ≤ |Pi| for all i = 1, 2, . . . , m , and define I =
+
+{X ⊆ Ω|| X ∩ Pi| ≤ ki, ∀i = 1 , 2, . . . , m }. Then (Ω , I) is called a partition matroid. 
+
+Definition 3 (Total curvature [33]) . Let f : 2Ω → R+
+
+be a normalized monotone submodular function. The total curvature of f is 
+
+cf = 1 − min  
+
+> e∈Ω:∆ f(e|∅)>0
+
+∆f (e | Ω \ { e})∆f (e | ∅) ∈ [0 , 1] . (1) When cf = 0 , f is modular; when cf = 1 , f exhibits the maximum diminishing-returns effect. 
+
+B. Problem of Interest 
+
+We formulate the per-epoch task-allocation problem. For each active agent i ∈ V t, let xi,t ∈ Rnx be its state and 
+
+ui,t ∈ Rnu be its control input. The motion layer evolves according to 
+
+xi,t +1 = fi(xi,t , u i,t ). (2) For each active task j ∈ M t, let yj,t ∈ Rny denote the task state, with dynamics 
+
+yj,t +1 = hj (yj,t ) + ξj,t , ξ j,t ∼ N (0 , Q j,t ). (3) At epoch t, the currently available information is Ht =(Vt, Mt, Gt, {xi,t , E i,t }i∈V t , {yj,t }j∈M t ), where Ei,t ≥ 0
+
+denotes the residual energy of agent i. The agent dynamics in (2) are modeled deterministically at the allocation layer, since the current agent state is estimated to be available and the nominal motion response is handled by the lower-level controller or planner. By contrast, task dynamics are not controlled by the agents and may be affected by exogenous disturbances. Hence, the process noise ξj,t is included in (3) to model uncertainty in task evolution [1]. An assignment at epoch t is a subset Πt ⊆ V t × M t, where 
+
+(i, j ) ∈ Πt means that agent i is assigned to task j at epoch 
+
+t. Since multiple agents may jointly serve the same task, we associate each assignment Π with the subset of agents assigned to task j, defined by Vj,t (Π) = {i ∈ V t | (i, j ) ∈ Π}. The allocation utility at epoch t is then given by 
+
+Ut(Π) = ∑
+
+> j∈M t
+
+Fj,t 
+
+(Vj,t (Π) ). (4) Here, each Fj,t : 2 Vt → R+ evaluates the utility obtained from the subset of agents assigned to task j and is assumed to be normalized, monotone nondecreasing, and submodular. The additive structure in (4) assumes task independence [21], while the submodularity of Fj,t captures diminishing marginal returns caused by sensing overlap or redundancy [21], [22]. Since Ut is a sum of nonnegative submodular functions composed with disjoint agent subsets, Ut is a normalized monotone submodular function over the agent-task pair ground set Ωt [22]. For each candidate pair (i, j ) ∈ V t × M t, the lower-level planner returns a predicted execution cost ̂ Cij,t ∈ [0 , +∞],which estimates the energy required for agent i to move toward and execute task j along a locally feasible trajectory. The predicted execution cost ̂ Cij,t is computed by the lower-level motion planner based on the agent’s current state xi,t , the task’s current state yj,t , and the motion dynamics (2). If no such trajectory exists, we set ̂ Cij,t = + ∞. The admissible ground set at epoch t is defined as 
+
+Ωt = {(i, j ) ∈ V t × M t |̂ Cij,t ≤ Ei,t 
+
+}. (5) Thus, every pair in Ωt is individually executable under the current residual-energy and local motion-planning conditions. The feasible family at epoch t is 
+
+St =
+
+{
+
+Π ⊆ Ωt
+
+∣∣∣ ∑
+
+> j∈M t
+
+1(i,j )∈Π ≤ 1, ∀i ∈ V t
+
+}
+
+. (6) Hence each active agent can serve at most one task at epoch t,while multiple agents may be assigned to the same task. This feasible family St forms a partition matroid over the ground set Ωt, where each partition corresponds to all admissible task pairs of a single agent, and each partition can contain at most one selected element. For each epoch t, let ct denote the total curvature of the induced stage utility Ut over Ωt.After the assignment is executed for one epoch, the residual energy evolves according to the realized one-step execution cost: 
+
+Ei,t +1 = Ei,t − ∑
+
+> j∈M t
+
+eij,t 1(i,j )∈Πt , i ∈ V t, (7) where eij,t ≥ 0 denotes the energy actually consumed by agent 
+
+i for executing the current epoch of the planned motion toward task j.
+
+Assumption 1 (Execution-cost prediction) . For every epoch t
+
+and every admissible pair (i, j ) ∈ Ωt, the predicted execution cost returned by the lower-level planner upper bounds the realized one-epoch execution cost, namely, 
+
+0 ≤ eij,t ≤̂ Cij,t , (i, j ) ∈ Ωt. (8) The energy constraint enters the per-epoch problem through the admissible ground set (5). Across epochs, energy con-sumed by the current assignment reduces Ei,t +1 in (7), which may reduce Ωt+1 .We consider the following stage allocation problem at epoch 
+
+t.
+
+Problem 1. Given the currently available information Ht,determine an assignment Πt ∈ S t such that 
+
+max 
+
+> Π∈S t
+
+Ut(Π) . (P1) Problem 1 is solved at each epoch using only Ht. Because 4 GENERIC COLORIZED JOURNAL, VOL. XX, NO. XX, XXXX 2026 
+
+future agent arrivals, task arrivals, departures, and communi-cation changes are unknown at decision time, the performance analysis evaluates the quality of Πt against the offline optimum of the same-epoch problem. This per-epoch benchmark is natural and tractable, isolating the distributed coordination difficulty from the prediction of future system events. 
+
+Assumption 2 (Local information and communication [21]) .
+
+At each epoch t ∈ {1, . . . , T }, the communication graph 
+
+Gt = (Vt, Et) is undirected and need not be connected. Each active agent i ∈ V t knows its own state and residual energy and has access to the predicted execution costs and task information required to construct its local admissible set 
+
+Ωi,t . Agent i communicates only with its current neighbors 
+
+Ni,t = {k ∈ V t | (i, k ) ∈ E t} and has no access to the global assignment state or the full admissible ground set Ωt.For every locally admissible pair (i, j ) ∈ Ωi,t and every locally available confirmed-assignment estimate ̂ Πi,t , agent i
+
+can evaluate the conditional marginal gain ∆t
+
+((i, j ) |̂ Πi,t 
+
+)
+
+using the local assignment estimate ̂ Πi,t and the task utility parameters obtained through neighbor communication. 
+
+III. D ISTRIBUTED GREEDY ALGORITHM FOR 
+
+RESOURCE -C ONSTRAINED SUBMODULAR TASK 
+
+ALLOCATION 
+
+Section II formulates the per-epoch allocation as monotone submodular maximization over the energy-feasible ground set 
+
+Ωt under the partition-matroid constraint St. Solving this problem in a distributed manner is challenging for three reasons. First, the admissible candidate space is time-varying because agents, tasks, residual energies, and motion-feasibility conditions all change across epochs. Second, due to submodu-larity, the marginal contribution of an agent-task pair depends on which agents have already been assigned to the same task, so bids cannot be treated as fixed edge weights [21], [22]. Third, under sparse and time-varying communication, no agent can maintain a globally synchronized view of the accepted assignment [27], [28]. To address these difficulties, we propose the Distributed Adaptive Greedy Bidding Algorithm (DAGBA) , a dis-tributed implementation of marginal-greedy submodular max-imization under local information constraints. At each inner round, agents locally evaluate conditional marginal gains, exchange only locally visible bidding information, resolve conflicts among agents that preselect the same task, and update their local views of fixed assignments. Thus, the bidding mechanism is the communication-efficient realization of the greedy marginal-selection rule [21], [22]. DAGBA maintains local information states rather than a shared global assignment state. At inner round r, each agent 
+
+i keeps three local arrays μ(r) 
+
+> i,t
+
+= {μ(r)
+
+> i,k,t
+
+}k∈V t , β(r) 
+
+> i,t
+
+=
+
+{β(r)
+
+> i,k,t
+
+}k∈V t , φ (r) 
+
+> i,t
+
+= {φ(r)
+
+> i,k,t
+
+}k∈V t . The entry μ(r) 
+
+> i,k,t
+
+represents agent i’s local view of the task selected by agent k, β(r) 
+
+> i,k,t
+
+is the associated bid value, and φ(r) 
+
+> i,k,t
+
+∈ { 0, 1} indicates whether agent k’s assignment is regarded as fixed in agent i’s local view. The self-state (μ(r)
+
+> i,i,t
+
+, β (r)
+
+> i,i,t
+
+, φ (r)
+
+> i,i,t
+
+) represents agent i’s own selected task, bid value, and fixed status. Neighbor entries 
+
+Algorithm 1 DAGBA at epoch t 
+
+> 1:
+
+The current system state determines Vt, Mt, Gt, and Ωt. 
+
+> 2:
+
+Each active agent i ∈ V t constructs Ωi,t in (9).  
+
+> 3:
+
+Each agent i initializes μ(0)  
+
+> i,k,t
+
+← 0, β(0)  
+
+> i,k,t
+
+← 0, and 
+
+φ(0)  
+
+> i,k,t
+
+← 0 for all k ∈ V t. 
+
+> 4:
+
+for r = 1 , 2, . . . , R max  
+
+> t
+
+do  
+
+> 5:
+
+for all i ∈ V t do  
+
+> 6:
+
+Update previous local information state: μ(r) 
+
+> i,t
+
+←
+
+μ(r−1)  
+
+> i,t
+
+, β (r) 
+
+> i,t
+
+← β(r−1)  
+
+> i,t
+
+, φ (r) 
+
+> i,t
+
+← φ(r−1)  
+
+> i,t
+
+. 
+
+> 7:
+
+Construct the local assignment estimate ̂ Π(r−1)  
+
+> i,t
+
+=
+
+{(k, μ (r−1)  
+
+> i,k,t
+
+) | φ(r−1)  
+
+> i,k,t
+
+= 1 , μ (r−1)  
+
+> i,k,t
+
+6 = 0 }. 
+
+> 8:
+
+if φ(r−1)  
+
+> i,i,t
+
+= 0 and Ωi,t 6 = ∅ then  
+
+> 9:
+
+(j(r) 
+
+> i,t
+
+, b (r) 
+
+> i,t
+
+) ← Select (i, Ωi,t ,̂ Π(r−1)  
+
+> i,t
+
+). 
+
+> 10:
+
+Set μ(r) 
+
+> i,i,t
+
+← j(r) 
+
+> i,t
+
+and β(r) 
+
+> i,i,t
+
+← b(r) 
+
+> i,t
+
+. 
+
+> 11:
+
+else if φ(r−1)  
+
+> i,i,t
+
+= 1 then  
+
+> 12:
+
+Preserve the fixed self-record: μ(r) 
+
+> i,i,t
+
+←
+
+μ(r−1)  
+
+> i,i,t
+
+, β (r) 
+
+> i,i,t
+
+← β(r−1)  
+
+> i,i,t
+
+. 
+
+> 13:
+
+else  
+
+> 14:
+
+Set μ(r) 
+
+> i,i,t
+
+← 0 and β(r) 
+
+> i,i,t
+
+← 0. 
+
+> 15:
+
+end if  
+
+> 16:
+
+end for  
+
+> 17:
+
+Each agent i exchanges its pre-resolution self-record (μ(r)
+
+> i,i,t
+
+, β (r)
+
+> i,i,t
+
+, φ (r−1) 
+
+> i,i,t
+
+) with neighbors in Gt. 
+
+> 18:
+
+for all i ∈ V t do  
+
+> 19:
+
+Update locally stored neighbor records: 
+
+(μ(r)
+
+> i,k,t
+
+, β (r)
+
+> i,k,t
+
+, φ (r)
+
+> i,k,t
+
+) ← (μ(r)
+
+> k,k,t
+
+, β (r)
+
+> k,k,t
+
+, φ (r−1)  
+
+> k,k,t
+
+), for all k ∈ N i,t . 
+
+> 20:
+
+(μ(r) 
+
+> i,t
+
+, β (r) 
+
+> i,t
+
+, φ (r) 
+
+> i,t
+
+) ←
+
+ResolveAndUpdate (i, μ (r) 
+
+> i,t
+
+, β (r) 
+
+> i,t
+
+, φ (r) 
+
+> i,t
+
+). 
+
+> 21:
+
+end for  
+
+> 22:
+
+end for  
+
+> 23:
+
+Output ΠD 
+
+> t
+
+= {(i, μ (Rmax   
+
+> t)
+> i,i,t
+
+) | φ(Rmax   
+
+> t)
+> i,i,t
+
+= 1 , μ (Rmax   
+
+> t)
+> i,i,t
+
+6 = 0 }.are refreshed only through one-hop communication over the current graph Gt.For marginal-gain evaluation, each agent converts its locally fixed information state into the set-valued estimate ̂ Π(r) 
+
+> i,t
+
+=
+
+{(k, μ (r)
+
+> i,k,t
+
+) | φ(r) 
+
+> i,k,t
+
+= 1 , μ (r) 
+
+> i,k,t
+
+6 = 0 }. This estimate is the assignment information locally available to agent i when computing conditional marginal gains, not a globally shared assignment. Under sparse communication, different agents may hold different estimates. This local-estimate structure avoids the need for global consensus over a time-varying communi-cation graph. For any admissible pair π = ( i, j ) ∈ Ωt and any assignment set Π ⊆ Ωt, define the conditional marginal utility ∆t(π |
+
+Π) = Ut(Π ∪ { π}) − Ut(Π) . Since Ut is submodular, the marginal contribution of assigning agent i to task j depends on the agents already assigned to task j in the local estimate [21], [22]. Therefore, DAGBA recomputes bids against the latest locally fixed assignment estimate rather than using static edge weights. LIU et al. : ENERGY-AWARE DISTRIBUTED TASK ALLOCATION VIA LOCAL SUBMODULAR MAXIMIZATION 5
+
+Algorithm 2 Select (i, Ωi,t ,̂ Π)  
+
+> 1:
+
+for all (i, j ) ∈ Ωi,t do  
+
+> 2:
+
+Compute bij,t = ∆ t
+
+((i, j ) |̂ Π). 
+
+> 3:
+
+end for  
+
+> 4:
+
+Select ji,t ∈ arg max j:( i,j )∈Ωi,t bij,t , with ties broken by the ordered task index.  
+
+> 5:
+
+Set bi,t = bij i,t ,t . 
+
+> 6:
+
+return (ji,t , b i,t ).
+
+Algorithm 3 ResolveAndUpdate (i, μ i, β i, φ i) 
+
+> 1:
+
+if φi,i = 1 or μi,i = 0 then  
+
+> 2:
+
+return (μi, β i, φ i). 
+
+> 3:
+
+end if  
+
+> 4:
+
+Construct the locally visible competitor set Ci = {k ∈N + 
+
+> i,t
+
+| φi,k = 0 , μ i,k = μi,i }. 
+
+> 5:
+
+if Ci = ∅ then  
+
+> 6:
+
+return (μi, β i, φ i). 
+
+> 7:
+
+end if  
+
+> 8:
+
+Let k⋆ ∈ arg max k∈C i (βi,k , −k). 
+
+> 9:
+
+if k⋆ = i then  
+
+> 10:
+
+Confirm the selected pair: φi,i ← 1. 
+
+> 11:
+
+else  
+
+> 12:
+
+Clear the losing self-record: μi,i ← 0, βi,i ← 0, and 
+
+φi,i ← 0. 
+
+> 13:
+
+end if  
+
+> 14:
+
+return (μi, β i, φ i).For each agent i ∈ V t, define its local admissible subset 
+
+Ωi,t = {(i, j ) ∈ Ωt | j ∈ M t}. (9) Thus, Ωi,t contains exactly the task choices currently exe-cutable by agent i. Since Ωt already incorporates the residual-energy and motion-feasibility conditions, infeasible trajectories and energy-infeasible pairs are excluded before bidding. At inner round r, if agent i is not fixed in its own local view, i.e., φ(r−1)  
+
+> i,i,t
+
+= 0 , and Ωi,t 6 = ∅, it constructs ̂ Π(r−1)  
+
+> i,t
+
+and selects a task by j(r) 
+
+> i,t
+
+∈ arg max j:( i,j )∈Ωi,t ∆t
+
+((i, j ) |̂ Π(r−1) 
+
+> i,t
+
+), and 
+
+b(r) 
+
+> i,t
+
+= ∆ t
+
+((i, j (r) 
+
+> i,t
+
+) |̂ Π(r−1) 
+
+> i,t
+
+), where ties are broken by the ordered task index. The self-state is then updated as μ(r) 
+
+> i,i,t
+
+=
+
+j(r) 
+
+> i,t
+
+and β(r) 
+
+> i,i,t
+
+= b(r) 
+
+> i,t
+
+. If agent i has already been fixed, its self-state is preserved and it no longer submits a new bid. If no admissible task is available, it submits a null state. After the bidding step, each agent exchanges only its self-state with its current neighbors. Using the refreshed neighbor entries, agent i resolves conflicts among locally visible agents that select the same task. Specifically, if agent i is not fixed and has selected a nonzero task, it forms the locally visible competitor set C(r) 
+
+> i,t
+
+= {k ∈ N + 
+
+> i,t
+
+| φ(r−1)  
+
+> i,k,t
+
+= 0 , μ (r) 
+
+> i,k,t
+
+= μ(r)
+
+> i,i,t
+
+},where N + 
+
+> i,t
+
+= Ni,t ∪{ i} is the closed neighborhood of agent i.The locally visible agent with the lexicographically largest pair 
+
+(β(r)
+
+> i,k,t
+
+, −k) is regarded as the local winner. If the local winner is agent i itself, agent i confirms its selected pair by setting 
+
+φ(r) 
+
+> i,i,t
+
+= 1 . Otherwise, agent i clears its tentative self-record and remains unfixed. The complete procedure is summarized in Algorithms 1-3. Algorithm 1 describes the epoch-level coordination loop. Algorithm 2 implements the conditional marginal-gain se-lection step, and Algorithm 3 implements the local conflict-resolution and information-state update step. The assignment returned by DAGBA at epoch t is induced by the fixed self-record at the end of the prescribed inner-round budget: ΠD 
+
+> t
+
+={
+
+(i, μ (Rmax   
+
+> t)
+> i,i,t
+
+)
+
+∣∣∣φ(Rmax   
+
+> t)
+> i,i,t
+
+= 1 , μ (Rmax   
+
+> t)
+> i,i,t
+
+6 = 0 
+
+}
+
+. Equivalently, each fixed agent executes its fixed pair (i, μ (Rmax   
+
+> t)
+> i,i,t
+
+). Since each agent fixes at most one self-state, the output satisfies the per-agent partition constraint. Multiple agents may still be assigned to the same task, either across different rounds or within the same round when their mutual conflict is not visible under the current sparse communication graph. The design of DAGBA reflects the structure of Problem 1. The local admissible subset Ωi,t handles the time-varying can-didate space induced by active-set variation, motion feasibility, and residual-energy constraints. Conditional marginal bidding implements the submodular greedy principle by evaluating each candidate relative to the latest locally fixed assignment estimate. Neighbor-based conflict resolution coordinates lo-cally competing agents without requiring global consensus. The agent-wise local information states allow the allocation process to proceed even when the communication graph is sparse or disconnected. 
+
+IV. P ERFORMANCE ANALYSIS OF DAGBA 
+
+This section analyzes the per-epoch performance of DAGBA. At a fixed epoch t, the tuple (Vt, Mt, Gt, Ωt, St, U t)
+
+is determined by the current system information. Let Π⋆t ∈
+
+arg max Π∈S t Ut(Π) denote an optimal assignment for Prob-lem 1 at epoch t, and let ΠD 
+
+> t
+
+denote the assignment returned by DAGBA. The guarantees compare the DAGBA assignment 
+
+ΠD 
+
+> t
+
+with an optimal solution Π⋆t of the same-epoch Problem 1. Across epochs, the executed assignment influences future stage problems through the residual-energy update (7), agent motion, task completion, and the resulting communication topology. 
+
+A. Analysis Setup and Feasibility 
+
+By (9), each active agent i ∈ V t has a local admissible subset Ωi,t = {(i, j ) ∈ Ωt | j ∈ M t}. Let rt = |{ i ∈ V t |
+
+Ωi,t 6 = ∅}| denote the number of active agents that have at least one admissible candidate pair at epoch t. Since the sets 
+
+Ωi,t are pairwise disjoint and St selects at most one element from each Ωi,t , the set system (Ω t, St) is a partition matroid by Definition 2, induced by the partition {Ωi,t }i∈V t:Ω i,t 6 =∅.Define the set of agent-task pairs newly fixed at inner round 
+
+r by 
+
+A(r) 
+
+> t
+
+=
+
+{
+
+(i, μ (r)
+
+> i,i,t
+
+)
+
+∣∣∣ φ(r) 
+
+> i,i,t
+
+= 1 , φ (r−1)  
+
+> i,i,t
+
+= 0 , μ (r) 
+
+> i,i,t
+
+6 = 0 
+
+}
+
+.
+
+(10) Then the assignment returned by DAGBA is 
+
+ΠD 
+
+> t
+
+=
+
+> Rmax
+> t
+
+⋃
+
+> r=1
+
+A(r) 
+
+> t
+
+=
+
+{
+
+(i, μ (Rmax   
+
+> t)
+> i,i,t
+
+)
+
+∣∣∣φ(Rmax   
+
+> t)
+> i,i,t
+
+= 1 , μ (Rmax   
+
+> t)
+> i,i,t
+
+6 = 0 
+
+}
+
+.
+
+(11) 6 GENERIC COLORIZED JOURNAL, VOL. XX, NO. XX, XXXX 2026 
+
+If Rmax  
+
+> t
+
+≥ rt, all active agents with nonempty admissible subsets become fixed within at most rt inner rounds, while the remaining inner rounds only preserve the fixed self-records. 
+
+Proposition 1 (Feasibility and finite-round convergence) . For every epoch t, DAGBA returns an assignment ΠD 
+
+> t
+
+∈ S t after 
+
+Rmax  
+
+> t
+
+inner rounds, and the residual-energy update satisfies 
+
+Ei,t +1 ≥ 0 for all i ∈ V t. If Rmax  
+
+> t
+
+≥ rt, then all active agents with nonempty local admissible subsets become fixed within at most rt inner rounds; all subsequent inner rounds preserve their fixed self-records. Proof. i) Feasibility. By construction, every pair in ΠD 
+
+> t
+
+be-longs to Ωt. Moreover, by the definition (11), ΠD 
+
+> t
+
+contains at most one pair (i, j ) for each agent i ∈ V t, so |ΠD 
+
+> t
+
+∩ Ωi,t | ≤ 1
+
+for all i ∈ V t. Hence ΠD 
+
+> t
+
+∈ S t.
+
+ii) Energy safety. If agent i is unassigned, then Ei,t +1 =
+
+Ei,t ≥ 0. If agent i is assigned to task j, then (i, j ) ∈ Ωt
+
+implies ̂ Cij,t ≤ Ei,t by (5). By Assumption 1, eij,t ≤̂ Cij,t ,and since ΠD 
+
+> t
+
+∈ St assigns agent i to at most one task, 
+
+Ei,t +1 ≥ Ei,t −̂ Cij,t ≥ 0.
+
+iii) Finite-round convergence. The inner loop contains Rmax 
+
+> t
+
+rounds by construction. When Rmax  
+
+> t
+
+≥ rt, we show that at least one previously unconfirmed agent confirms in each round. Among all unfixed agents that select the same task j, consider the subgraph of Gt they induce. In every connected compo-nent of this subgraph, the agent with the lexicographically largest pair (β(r)
+
+> k,k,t
+
+, −k) sees no same-task neighbor with a larger value after the neighbor exchange, and hence confirms by Algorithm 3. Therefore, at least one previously unfixed agent becomes fixed in every such round, so all agents with nonempty admissible subsets are fixed within at most rt inner rounds and remain fixed thereafter. 
+
+B. Sequential Greedy Approximation 
+
+This subsection identifies a regime in which DAGBA re-duces to the classical sequential greedy algorithm and there-fore inherits its approximation guarantee. For any feasible assignment Π ∈ St, define the feasible augmentation set 
+
+Bt(Π) = {π ∈ Ωt \ Π | Π ∪ { π} ∈ S t}. A centralized sequen-tial greedy algorithm starts from G0,t = ∅ and, at step k,selects 
+
+gk,t ∈ arg max  
+
+> π∈B t(Gk−1,t )
+
+∆t(π | Gk−1,t ),Gk,t = Gk−1,t ∪ { gk,t }.
+
+(12) The process stops when Bt(Gk−1,t ) = ∅. Since (Ω t, St) is a partition matroid, this is the standard greedy procedure for monotone submodular maximization under a matroid con-straint [31]. DAGBA reproduces the centralized sequential greedy order provided that, before each successful fixing step, (i) all unfixed agents share the same fixed-pair set G ⊆ Ωt, (ii) each unfixed agent evaluates its candidate marginal gains with respect to 
+
+G, and (iii) exactly one pair π⋆ ∈ arg max π∈B t(G) ∆t(π |
+
+G) is fixed and added to G. These conditions characterize the sequential-greedy setting considered in this subsection, in which all unfixed agents evaluate their bids with respect to the same fixed-pair set and exactly one pair attaining the globally largest current marginal gain is fixed at each step. 
+
+Lemma 1. If Conditions (i)-(iii) above hold, the output of DAGBA at epoch t can be ordered as ΠD 
+
+> t
+
+= {g1,t , . . . , g K,t }
+
+such that the ordering satisfies the centralized greedy rule in (12) .Proof. Let Gk−1,t = {g1,t , . . . , g k−1,t } be the set of pairs fixed before the k-th successful self-fixing event. By condi-tion (i), each unfixed agent evaluates its marginal bid with respect to Gk−1,t . For each unfixed agent, the local admissible candidates are exactly the feasible augmentations associated with that agent’s partition class. Since each agent submits a bid for its best candidate under Gk−1,t , the largest submitted bid coincides with the largest marginal gain over the full feasible augmentation set Bt(Gk−1,t ). By condition (iii), the unique fixed pair at this step is therefore an element of 
+
+arg max π∈B t(Gk−1,t ) ∆t(π | Gk−1,t ), which is exactly the centralized greedy rule in (12). Repeating this argument for all successful self-fixing events gives the desired ordering. 
+
+Theorem 1 (Sequential greedy approximation) . If Condi-tions (i)-(iii) above hold, 
+
+Ut(Π D 
+
+> t
+
+) ≥ 12 Ut(Π ⋆t ). (13) 
+
+Moreover, if the total curvature of Ut is ct ∈ [0 , 1] , then 
+
+Ut(Π D 
+
+> t
+
+) ≥ 11 + ct
+
+Ut(Π ⋆t ). (14) 
+
+Proof. By Lemma 1, the output of DAGBA coincides with the output of the centralized sequential greedy algorithm applied to Problem 1. Since Ut is normalized, monotone nondecreasing, and submodular, the classical greedy guaran-tee for monotone submodular maximization under a matroid constraint gives (13) [31]. If the total curvature of Ut is ct,the curvature-refined greedy guarantee gives (14) [33]. Theorem 1 shows that DAGBA recovers the standard greedy approximation guarantee when the distributed execution has complete visibility of previously fixed pairs and accepts one globally best marginal bid at a time. In sparse communication graphs, these conditions generally do not hold, and the next subsection quantifies the resulting performance loss. 
+
+C. Approximation under Local Information 
+
+In the standard execution of DAGBA, each agent computes marginal bids using its local assignment estimate, and several pairs may be fixed in the same inner round. This subsection derives the corresponding approximation guarantee. We first state a consistency condition on the local assignment estimates used in the analysis. 
+
+Lemma 2 (Confirmed local estimates) . Under Algorithm 1 with the confirmed update rule in Algorithm 3, every local assignment estimate used in marginal-gain evaluation contains only pairs that belong to the final DAGBA assignment. That is, for every active agent i and every inner round r,̂ Π(r−1)  
+
+> i,t
+
+⊆ ΠD 
+
+> t
+
+.Proof. Consider any pair (k, μ (r−1)  
+
+> i,k,t
+
+) ∈̂ Π(r−1)  
+
+> i,t
+
+. By the def-inition of the local assignment estimate, φ(r−1)  
+
+> i,k,t
+
+= 1 and 
+
+μ(r−1)  
+
+> i,k,t
+
+6 = 0 . Under Algorithm 3, an agent can set only its LIU et al. : ENERGY-AWARE DISTRIBUTED TASK ALLOCATION VIA LOCAL SUBMODULAR MAXIMIZATION 7
+
+own fixed indicator from zero to one. Hence φ(r−1)  
+
+> i,k,t
+
+= 1 must have originated from a confirmed fixed status of agent k that was propagated to agent i through the exchanged self-records. Once agent k confirms its assignment, Algorithm 1 preserves its self-record in later inner rounds. Therefore, at the final round Rmax  
+
+> t
+
+, agent k remains fixed with the same selected task, and (k, μ (r−1)  
+
+> i,k,t
+
+) ∈ ΠD 
+
+> t
+
+.For each pair π = (i, j ) ∈ A(r) 
+
+> t
+
+newly fixed at in-ner round r, define the local bid value bt(π) = β(r) 
+
+> i,i,t
+
+=∆t
+
+(
+
+π |̂ Π(r−1) 
+
+> i,t
+
+)
+
+, and the corresponding local marginal sum 
+
+Lt = ∑Rmax 
+
+> t
+> r=1
+
+∑
+
+> π∈A (r)
+> t
+
+bt(π). If Ut(Π D 
+
+> t
+
+) > 0, define the local-information factor 
+
+ηt = Lt
+
+Ut(Π D 
+
+> t
+
+) . (15) The quantity ηt measures how much the sum of locally evaluated marginal bids exceeds the final utility obtained by DAGBA. Under full sequential information, the local marginal sum telescopes and ηt = 1 . Under local information, missing fixed pairs may cause agents to overestimate marginal gains, and ηt quantifies this overestimation. 
+
+Theorem 2 (Approximation under local information) . Suppose that Algorithm 1 is executed with the confirmed update rule in Algorithm 3 and a round budget satisfying Rmax  
+
+> t
+
+≥ rt. If 
+
+Ut(Π D 
+
+> t
+
+) > 0, then 
+
+Ut(Π D 
+
+> t
+
+) ≥ 11 + ηt
+
+Ut(Π ⋆t ). (16) 
+
+If Ut(Π D 
+
+> t
+
+) = 0 , then Ut(Π ⋆t ) = 0 .Proof. Since Ut is monotone submodular, the following stan-dard inequality holds for any A, B ⊆ Ωt [34]. Indeed, order 
+
+A \ B = {π1, . . . , π m} and let Bℓ = B ∪ { π1, . . . , π ℓ}. Then 
+
+Ut(A) ≤ Ut(A ∪ B) (monotonicity) 
+
+= Ut(B) + 
+
+> m
+
+∑
+
+> ℓ=1
+
+∆t(πℓ | Bℓ−1) (telescoping) 
+
+≤ Ut(B) + 
+
+> m
+
+∑
+
+> ℓ=1
+
+∆t(πℓ | B) (submodularity, B ⊆ Bℓ−1)
+
+= Ut(B) + ∑
+
+> π∈A\B
+
+∆t(π | B).
+
+Applying this inequality with A = Π ⋆t and B = Π D 
+
+> t
+
+gives 
+
+Ut(Π ⋆t ) ≤ Ut(Π D 
+
+> t
+
+) + ∑ 
+
+> π∈Π⋆t\ΠD
+> t
+
+∆t(π | ΠD 
+
+> t
+
+).Consider any pair π⋆ = ( i, j ⋆) ∈ Π⋆t \ ΠD 
+
+> t
+
+. Since π⋆ ∈ Ωi,t 
+
+and DAGBA fixes every active agent with a nonempty local admissible subset, agent i is fixed by DAGBA to some pair 
+
+πD 
+
+> i
+
+= ( i, j D 
+
+> i
+
+) ∈ ΠD 
+
+> t
+
+at inner round ri. By Lemma 2, ̂ Π(ri−1)  
+
+> i,t
+
+⊆
+
+ΠD 
+
+> t
+
+. By submodularity and the greedy selection rule, ∆t(π⋆ |
+
+ΠD 
+
+> t
+
+) ≤ ∆t(π⋆ |̂ Π(ri −1)  
+
+> i,t
+
+) ≤ ∆t(πD 
+
+> i
+
+|̂ Π(ri −1)  
+
+> i,t
+
+) = bt(πD 
+
+> i
+
+),where the second inequality uses π⋆ ∈ Ωi,t and the fact that agent i maximized the conditional marginal gain over Ωi,t .Since both Π⋆t and ΠD 
+
+> t
+
+satisfy the partition-matroid con-straint, each agent contributes at most one pair to each assignment, so each selected pair in ΠD 
+
+> t
+
+is charged at most once. Therefore ∑ 
+
+> π∈Π⋆t\ΠD
+> t
+
+∆t(π | ΠD 
+
+> t
+
+) ≤ Lt, which gives 
+
+Ut(Π ⋆t ) ≤ Ut(Π D 
+
+> t
+
+) + Lt. If Ut(Π D 
+
+> t
+
+) > 0, substituting the definition of ηt in (15) proves (16). If Ut(Π D 
+
+> t
+
+) = 0 , then all selected local bids are zero, and the same charging argument gives Ut(Π ⋆t ) ≤ 0. Since Ut is nonnegative, Ut(Π ⋆t ) = 0 .Theorem 2 separates the effect of local information from the feasibility structure of the problem. The factor ηt equals one in the full-information sequential case and can be larger when agents compute bids without observing some previously fixed pairs. Thus, performance degradation is caused by marginal-gain overestimation under local assignment estimates, not by violation of the partition-matroid constraint. The following corollary gives a conservative bound in terms of Kt, Rmax  
+
+> t
+
+,and smax ,t .
+
+Corollary 1 (Computable bound) . Let Kt = |ΠD 
+
+> t
+
+| and 
+
+smax ,t = max 1≤r≤Rmax  
+
+> t
+
+|A (r) 
+
+> t
+
+|. Under the conditions of Theo-rem 2, 
+
+Ut(Π D 
+
+> t
+
+) ≥ 1
+
+Kt + 1 Ut(Π ⋆t ) ≥ 1
+
+smax ,t Rmax  
+
+> t
+
++ 1 Ut(Π ⋆t ). (17) 
+
+Proof. For any fixed pair π ∈ ΠD 
+
+> t
+
+, by submodularity and monotonicity, bt(π) = ∆ t(π |̂ Π) ≤ ∆t(π | ∅ ) = Ut({π}) ≤
+
+Ut(Π D 
+
+> t
+
+). Therefore Lt ≤ KtUt(Π D 
+
+> t
+
+), which implies ηt ≤ Kt.Substituting into (16) yields the first inequality. Since Kt ≤
+
+smax ,t Rmax  
+
+> t
+
+, the second inequality follows. The bound in Corollary 1 is conservative but directly computable from the prescribed round budget and the observed number of pairs fixed in each inner round. 
+
+D. Computational Complexity 
+
+We analyze the computational and communication costs of DAGBA at a fixed epoch t. Let Nt = |V t|, Mt = |M t|,and mi,t = |Ωi,t | for each active agent i ∈ Vt. Then 
+
+|Ωt| = ∑ 
+
+> i∈V t
+
+mi,t . Let Cplan denote the cost of evaluating the motion feasibility and predicted execution cost for one candidate agent-task pair, and let C∆ denote the cost of evaluating one conditional marginal utility ∆t(( i, j ) |̂ Π) .The admissible ground set is constructed before the inner bidding process starts. If each active agent checks all active tasks, the construction cost is O(NtMtCplan ). At each inner round, every unfixed agent evaluates the conditional marginal utility of its admissible pairs, giving O(|Ωt|C∆) marginal-evaluation cost. The local conflict-resolution step requires 
+
+O(Nt + |E t|) operations per round. In each inner round, every active agent sends its self-record to its neighbors, giving 
+
+O(|E t|) messages per round. 
+
+Proposition 2 (Complexity of DAGBA) . At epoch t, DAGBA has worst-case computational complexity O (NtMtCplan + Rmax  
+
+> t
+
+[|Ωt|C∆ + Nt + |E t|]) .Since |Ωt| ≤ NtMt, a coarse upper bound is 
+
+O (NtMtCplan + Rmax  
+
+> t
+
+[NtMtC∆ + Nt + |E t|]) . The worst-case communication complexity at epoch t is O(Rmax  
+
+> t
+
+|E t|)
+
+messages. Proof. The construction of Ωt requires evaluating motion feasibility and predicted execution cost for candidate pairs, giving O(NtMtCplan ). During each inner round, each agent 
+
+i evaluates ∆t(( i, j ) |̂ Π(r−1)  
+
+> i,t
+
+) for all (i, j ) ∈ Ωi,t , giving 8 GENERIC COLORIZED JOURNAL, VOL. XX, NO. XX, XXXX 2026 
+
+O(|Ωt|C∆) total marginal-evaluation cost. The neighbor ex-change and conflict-resolution step requires O(Nt + |E t|) local operations per round. Multiplying the per-round costs by Rmax 
+
+> t
+
+and adding the admissible-set construction cost yields the stated worst-case computational complexity. Since each edge carries a constant-size message per inner round, the worst-case communication complexity is O(Rmax  
+
+> t
+
+|E t|).Under Algorithm 1, the local storage required by agent i is 
+
+O(Nt + mi,t ). The complexity depends on the current system size through Nt, Mt, |Ωt|, and |E t|. Agents and tasks inactive at epoch t do not enter the computation. 
+
+V. A PPLICATIONS AND SIMULATIONS 
+
+This section evaluates DAGBA in a cooperative observation and tracking mission. We assess stage allocation quality, finite-horizon task-completion performance, communication sensitivity, runtime, and the role of the main algorithmic components under dynamic agent participation and limited communication. All simulations are implemented in MATLAB R2022b. 
+
+A. Simulation Setup 
+
+We consider a cooperative observation and tracking mis-sion deployed over a bounded two-dimensional workspace 
+
+W = [ −10 , 10] 2 m. The simulation instantiates the per-epoch allocation model in Section II: at each epoch t, the active agent set Vt, active task set Mt, communication graph Gt, residual-energy states, admissible ground set Ωt, and feasible family 
+
+St are updated before the allocation decision is made. Each active agent i ∈ V t has state xi,t = ( pi,t , vi,t )⊤ ∈ R4, where 
+
+pi,t ∈ R2 and vi,t ∈ R2 denote its position and velocity, respectively. The control input satisfies ‖ui,t ‖ ≤ umax . Each active task j ∈ M t corresponds to a moving target with state 
+
+yj,t = ( qj,t , wj,t )⊤ ∈ R4, where qj,t ∈ R2 is the target position. A task is completed and removed from Mt once at least one assigned agent enters its observation radius Robs .Each potential agent becomes active at a prescribed entry epoch and may later fail or depart from the system. Each potential task becomes active at a prescribed arrival epoch and is removed after completion. At epoch t, the active sets 
+
+Vt and Mt are determined by this event schedule and the task-completion status. Throughout the mission horizon, the active sets satisfy |V t| ≤ Nmax and |M t| ≤ Mmax . Agent and task arrivals introduce new candidate agent-task pairs, whereas agent failures and task completions remove previously available pairs from the current admissible ground set. The communication graph Gt = ( Vt, Et) is generated from the current agent positions. Two active agents are connected if their inter-agent distance is no larger than the communication radius Rc. Let D denote the diameter of W. The complete-communication setting uses Rc = D, under which all active agents are mutually reachable. The sparse-communication set-ting uses Rc = ρD with ρ < 1, so that agents exchange bidding and assignment-status information only with nearby neighbors. For each candidate pair (i, j ) ∈ V t × M t, the lower-level planner computes the predicted execution cost ̂ Cij,t from the 
+
+> 0.3 0.4 0.5 0.6 0.7 0.8
+> Average Utility
+> 0.3 0.4 0.5 0.6 0.7 0.8 0.3 0.4 0.5 0.6 0.7 0.8
+
+(a) Average utility.                
+
+> 010 20 30
+> Time (s)
+> 00.5 1
+> Task Completion Rate
+> 25 27.5 30 0.83 0.88 0.93
+> 010 20 30
+> Time (s)
+> 00.5 1
+> 25 27.5 30 0.9 0.95 1
+> 010 20 30
+> Time (s)
+> 00.5 1
+> 25 27.5 30 0.85 0.89 0.93
+
+(b) Task completion rate.          
+
+> 010 20 30
+> Time (s)
+> 23456
+> Active Agents
+> 4/8 5/10 6/12 010 20 30
+> Time (s)
+> 0246810
+> Active Tasks
+> 010 20 30
+> Time (s)
+> 020 40 60 80
+> Admissible Pairs
+
+(c) System profile. 
+
+Fig. 1 : Mission performance and system characteristics un-der three problem scales. (a) reports the distribution of the workload-normalized average utility over 10 independent tri-als. (b) reports the task completion rate over time, where the curves represent the sample mean and the shaded re-gions denote the standard error. (c) shows the evolution of active agents, active tasks, and admissible pairs. DAGBA under sparse communication maintains utility and completion progress close to the complete-communication and centralized greedy references while operating under time-varying partici-pants and feasible candidate pairs. current agent state, target state, and local motion-feasibility conditions. If no feasible local trajectory exists, we set ̂ Cij,t =+∞. The admissible ground set and feasible family are then constructed according to (5) and (6), respectively. After the selected assignment is executed for one epoch, residual energies are updated according to (7). Energy consumed by the current assignment may reduce the admissible ground set at subsequent epochs, coupling consecutive per-epoch allocation problems through residual resources. The stage utility is constructed from cooperative observation probabilities. For each active agent-task pair (i, j ) ∈ Vt × Mt,the per-epoch observation success probability is modeled as 
+
+Pij,t = exp (−λj ‖pi,t − qj,t ‖), λ j > 0 . For each task j ∈Mt and each agent subset C ⊆ V t, the task utility is 
+
+Fj,t (C) = ωj
+
+(
+
+1 − ∏
+
+> i∈C
+
+(1 − P ij,t )
+
+)
+
+, ω j > 0. (18) The allocation utility follows (4). The union-of-success form LIU et al. : ENERGY-AWARE DISTRIBUTED TASK ALLOCATION VIA LOCAL SUBMODULAR MAXIMIZATION 9
+
+> 0.15 0.2 0.25 0.3 0.35 0.4
+> Utility per Communication Edge
+> 0.1 0.15 0.2 0.25 0.3 0.05 0.1 0.15 0.2
+
+Fig. 2 : Communication efficiency across problem scales. The metric is computed as the workload-normalized average utility per communication edge. Each box shows the distribution over 
+
+10 independent trials, and dots denote individual trials. 
+
+TABLE I : Communication efficiency measured by utility per communication edge. Each entry reports mean ± SE over 10 
+
+independent runs.                                 
+
+> Scale DAGBA
+> (Rc= 0 .3D)
+> DAGBA
+> (Rc=D)
+> GCAA
+> (Rc= 0 .3D)4/80.276 ±0.015 0.219 ±0.012 0.265 ±0.025 5/10 0.182 ±0.024 0.145 ±0.013 0.170 ±0.021 6/12 0.144 ±0.010 0.109 ±0.008 0.138 ±0.012
+
+in (18) is normalized, monotone nondecreasing, and submod-ular in C, as each additional agent increases the observa-tion probability with diminishing marginal improvement [22]. Therefore, the simulated utility is consistent with the monotone submodular objective used in Problem 1. The common simulation parameters are as follows. The initial residual energy is E0 
+
+> i
+
+= 300 , the acceleration bound is umax = 1 .2 m /s2, the observation radius is Robs = 0 .5 m ,and λj = 0 .1 for all tasks. Agents re-plan at 10 Hz , corre-sponding to the physical-time sampling interval ∆τ = 0 .1 s .The terminal simulation time is tf = 30 s , and hence each trial contains Tsim = tf 
+
+> ∆τ
+
+= 300 decision epochs. Each configuration is evaluated over 10 independent Monte Carlo trials. Curves report the sample mean, and shaded regions or error bars denote the standard error. 
+
+B. Baselines and Metrics 
+
+The compared methods include DAGBA under sparse com-munication, DAGBA under complete communication, cen-tralized sequential greedy assignment (CSG) [31], greedy coalition auction algorithm (GCAA) [20], and an energy-feasible weighted random heuristic. DAGBA under sparse communication uses Rc = 0 .3D unless otherwise specified. DAGBA under complete communication uses Rc = D and serves as a communication-unconstrained implementation of the same distributed marginal-greedy mechanism. CSG is a centralized sequential marginal-greedy baseline evaluated on the same monotone submodular stage utility. GCAA is a dis-tributed auction-type baseline. The random baseline samples from energy-feasible candidate pairs using utility-proportional weights. We evaluate three problem scales: N0 = 2 , Nmax = 4 ,
+
+M0 = 4 , Mmax = 8 ; N0 = 2 , Nmax = 5 , M0 = 5 , Mmax =10 ; and N0 = 2 , Nmax = 6 , M0 = 6 , Mmax = 12 , denoted by the 4/8, 5/10 , and 6/12 settings, respectively. To evaluate task     
+
+> 4/8 5/10 6/12 Problem Scale 0.55 0.6 0.65 0.7 0.75 Average Utility 4/8 5/10 6/12 Problem Scale 0.85 0.9 0.95 11.05 Approximation Ratio
+
+Fig. 3 : Average utility and empirical approximation ratio relative to CSG across problem scales. Error bars denote the standard error over 10 independent trials.                 
+
+> 0.1 0.3 0.5 0.7 10.55 0.6 0.65 0.7 0.75
+> Average Utility
+> 0.1 0.3 0.5 0.7 10.8 0.85 0.9 0.95 1
+> Final Completion Rate
+> 0.1 0.3 0.5 0.7 1123456
+> Average Communication Edges
+> 0.1 0.3 0.5 0.7 120 25 30 35 40
+> Runtime per Epoch (ms)
+
+Fig. 4 : Communication-performance tradeoff under different communication radii. Performance retention and reduction are measured relative to complete communication Rc = D.allocation under time-varying agents, tasks, communication links, and residual-energy constraints, we report the following metrics:  
+
+> •
+
+The average utility of a run is computed as the time average of the workload-normalized stage utility, 
+
+¯U = 1
+
+|T + 
+
+> r
+
+|
+
+∑ 
+
+> t∈T +
+> r
+
+Ut(Π t)
+
+∑
+
+> j∈M unf
+> t
+
+ωj
+
+, (19) where T + 
+
+> r
+
+=
+
+{
+
+t : ∑
+
+> j∈M unf
+> t
+
+ωj > 0
+
+}
+
+, Munf  
+
+> t
+
+is the set of active unfinished tasks at epoch t. This normalization accounts for the time-varying active task load.  
+
+> •
+
+The task completion rate at time t is the fraction of appeared tasks completed by time t, defined as 
+
+TCR( τ ) = 
+
+∣∣{j : τ arr  
+
+> j
+
+≤ τ, τ com  
+
+> j
+
+≤ τ }∣ ∣∣∣{j : τ arr  
+
+> j
+
+≤ τ }∣ ∣ , (20) where τ arr  
+
+> j
+
+and τ com  
+
+> j
+
+denote the physical arrival and com-pletion times of task j, respectively. The final completion rate is TCR( tf ) at tf = 30 s . 
+
+> •
+
+For each problem scale, the empirical approximation ratio 
+
+relative to CSG is defined as 
+
+Ratio alg = ¯U alg 
+
+¯U CSG + ǫ , (21) 10 GENERIC COLORIZED JOURNAL, VOL. XX, NO. XX, XXXX 2026 
+
+TABLE II : Communication sensitivity of DAGBA on the 5/10 setting. Values are reported as mean ± SE over 10 independent runs. Reductions are computed relative to the complete-communication case Rc = D.                                                                                  
+
+> Rc/D Avg. utility ↑Final completion rate ↑Comm. edges ↓Runtime/epoch (ms) ↓Edge reduction ↑Runtime reduction ↑
+> 0.10.587 ±0.030 0.890 ±0.050 1.36 ±0.16 24 .90 ±1.48 74 .3% 33 .4% 0.30.717 ±0.019 0.960 ±0.027 4.45 ±0.47 29 .00 ±3.02 15 .6% 22 .4% 0.50.721 ±0.018 0.980 ±0.020 5.19 ±0.42 33 .26 ±3.68 1.6% 11 .0% 0.70.721 ±0.018 0.980 ±0.020 5.24 ±0.40 37 .20 ±2.83 0.7% 0.4% 1.00.721 ±0.018 0.980 ±0.020 5.28 ±0.39 37 .37 ±2.58 0.0% 0.0%
+
+TABLE III : Ablation study on the 5/10 sparse-communication setting. Values are reported as mean ± SE over 10 independent runs. Higher is better for average utility and final completion rate, while lower is better for energy violations.                                  
+
+> Variant Avg. utility ↑Final completion rate ↑Energy violations ↓
+> DAGBA 0.717 ±0.019 0.960 ±0.027 0.000 ±0.000
+> w/o Marginal Gain 0.427 ±0.037 0.760 ±0.072 0.000 ±0.000
+> w/o Energy-Aware Admissibility 0.710 ±0.021 0.930 ±0.042 62 .000 ±36 .875
+> 0.2 0.4 0.6 0.8
+> Average Utility
+> 0.4 0.6 0.8 1
+> Final Completion Rate
+> 0100 200 300 400
+> Energy Violations  DAGBA w/o Marginal Gain w/o Energy-Aware Admissibility
+
+Fig. 5 : Ablation study under sparse communication on the 
+
+5/10 setting. The compared variants remove the submodular marginal-gain rule or the energy-aware admissible-set con-struction. where ǫ > 0 is a small numerical constant used only to avoid division by zero. This metric is an empirical utility ratio relative to CSG.  
+
+> •
+
+The number of communication edges is |E t|, averaged over time and trials. The per-epoch runtime is the average allocation runtime per decision epoch. The communica-tion efficiency is measured by the workload-normalized average utility per communication edge. Finally, energy violations count assignments that would violate residual-energy feasibility when energy-aware admissible-set con-struction is removed. 
+
+C. Results and Discussion 
+
+Figure 1 summarizes the performance under the three problem scales. Figure 1a reports the distribution of the normalized average utility over 10 independent trials. DAGBA with sparse communication achieves utility distributions close to DAGBA with complete communication and CSG, while generally outperforming GCAA. This indicates that the pro-posed local marginal-gain bidding rule preserves high-quality stage allocation under limited communication and provides a utility advantage over the auction-type distributed baseline in the tested scenarios. Figure 1b shows the corresponding task-completion process. DAGBA under sparse communica-tion follows completion trajectories close to DAGBA with complete communication, CSG, and GCAA, whereas the random baseline progresses substantially more slowly. Hence, energy-feasible random selection alone is insufficient for ef-ficient mission execution. Marginal-gain-based coordination improves both normalized stage utility and finite-horizon task-completion progress. Figure 2 and Table I compare the communication efficiency of DAGBA and GCAA across the three problem scales. The metric measures the workload-normalized average utility obtained per communication edge and therefore captures the utility gained from each unit of communication connectiv-ity. DAGBA under sparse communication achieves higher communication efficiency than its complete-communication counterpart, showing that increasing the communication radius improves information availability but also introduces addi-tional communication edges that do not always yield propor-tional utility gains. Compared with GCAA, sparse DAGBA attains competitive or higher utility per communication edge across the tested scales. This indicates that the proposed local marginal-gain bidding mechanism uses limited communication more effectively and does not rely on dense connectivity to obtain high allocation utility. Figure 3 compares the average utility and the empirical utility ratio relative to CSG across different problem scales. The average utility directly measures the normalized stage allocation quality, whereas the empirical utility ratio reports the fraction of CSG utility recovered by each method under the same scale. A value close to one indicates that the method attains utility comparable to the centralized sequential greedy reference. DAGBA remains close to the CSG reference across the tested scales and generally achieves a higher ratio than GCAA. Figure 4 and Table II quantify the effect of communication sparsification. Reducing Rc substantially decreases the number of communication edges and the per-epoch allocation runtime. For moderate sparse communication, average utility and final completion rate remain close to the complete-communication reference. Figure 5 and Table III isolate the two main algorithmic ingredients. Removing the submodular marginal-gain rule sub-stantially reduces average utility and final completion rate, showing that DAGBA is not merely a generic bidding pro-tocol but relies on the greedy marginal-selection principle underlying Theorem 1 and Theorem 2. Removing the energy-aware admissible-set construction can keep utility high in some LIU et al. : ENERGY-AWARE DISTRIBUTED TASK ALLOCATION VIA LOCAL SUBMODULAR MAXIMIZATION 11 
+
+runs, but it produces energy violations and therefore infea-sible assignments. This result is consistent with the energy-safety guarantee in Proposition 1. When the admissibility filter ̂ Cij,t ≤ Ei,t is enforced, all returned assignments satisfy Ei,t +1 ≥ 0. When it is removed, this guarantee is violated. Together, the full DAGBA combines marginal-gain-based coordination for high-quality assignments with energy-aware admissible-set construction for execution feasibility. 
+
+VI. C ONCLUSION 
+
+This paper developed DAGBA for energy-constrained dis-tributed task allocation under time-varying agent sets, task sets, and communication graphs. We established per-epoch feasibility, residual-energy safety, finite-round convergence, and approximation guarantees for both the sequential-greedy and local-information regimes. Simulation results demon-strated that DAGBA achieves competitive allocation utility and task-completion performance under sparse communication, while the ablation study verified the complementary roles of marginal-gain bidding and energy-aware admissible-set construction. Future work will investigate non-myopic energy planning and distributed task allocation under more general submodular objectives and communication constraints. 
+
+REFERENCES 
+
+[1] L. Zhou and V. Kumar, “Robust multi-robot active target tracking against sensing and communication attacks,” IEEE Transactions on Robotics ,vol. 39, no. 3, pp. 1768–1780, 2023. [2] G. Shi, L. Zhou, and P. Tokekar, “Robust multiple-path orienteering problem: Securing against adversarial attacks,” IEEE Transactions on Robotics , vol. 39, no. 3, pp. 2060–2077, 2023. [3] H. Chen, Q. Sun, F. Li, and Y. Tang, “Computer vision tasks for intelli-gent aerospace perception: An overview,” Science China Technological Sciences , vol. 67, no. 9, pp. 2727–2748, 2024. [4] M. Xue, Y. Tang, W. Ren, and F. Qian, “Practical consensus tracking of asynchronously switched multiagent systems,” IEEE Transactions on Automatic Control , vol. 69, no. 11, pp. 7758–7772, 2024. [5] Y. Liu, M. Ye, L. Ding, L. Xie, and S. Xu, “Distributed online resource allocation in open networks,” IEEE Transactions on Automatic Control ,vol. 69, no. 12, pp. 8876–8883, 2024. [6] Y. Tang, Y. Lv, J. Zhou, and M. Ogorza lek, “Resilient consensus in open multi-agent systems,” IEEE Control Systems Letters , vol. 9, pp. 1261–1266, 2025. [7] S. Jiang, X. Wu, Y. Zhang, and J. Lin, “Dynamic consensus of open double-integrator systems with velocity constraint,” IEEE Transactions on Automation Science and Engineering , vol. 22, pp. 23 935–23 945, 2025. [8] X. Wu, J. Lin, S. Jiang, Z. Zhang, Y. Du, and Y. Zhang, “Open dis-tributed convex optimization,” IEEE Transactions on Automatic Control ,vol. 71, no. 2, pp. 1302–1309, 2026. [9] D. Deplano, N. Bastianello, M. Franceschelli, and K. H. Johansson, “Op-timization and learning in open multi-agent systems,” IEEE Transactions on Automatic Control , pp. 1–16, 2026. [10] W. Liu, J. Lei, P. Yi, and L. Pavel, “Online best-response algorithm in open non-cooperative games,” IEEE Transactions on Automatic Control ,pp. 1–15, 2025. [11] Y. Liu, M. Ye, L. Ding, and Q.-L. Han, “Distributed strategy design for free-in and free-out aggregative games,” IEEE Transactions on Automatic Control , vol. 70, no. 8, pp. 5592–5599, 2025. [12] Y. Liu, M. Ye, L. Ding, L. Xie, and Q.-L. Han, “Distributed nash equilibrium seeking with a dynamic set of players,” Automatica , vol. 183, p. 112598, 2026. [13] D. Sarne and S. Kraus, “Solving the auction-based task allocation problem in an open environment,” in Proceedings of the National Conference on Artificial Intelligence , vol. 20, no. 1, 2005, p. 164. [14] D. Paccagnan and J. R. Marden, “Utility design for distributed resource allocation—part ii: applications to submodular, covering, and supermod-ular problems,” IEEE Transactions on Automatic Control , vol. 67, no. 2, pp. 618–632, 2021. [15] B. Fu, W. Smith, D. M. Rizzo, M. Castanier, M. Ghaffari, and K. Barton, “Robust task scheduling for heterogeneous robot teams under capability uncertainty,” IEEE Transactions on Robotics , vol. 39, no. 2, pp. 1087– 1105, 2022. [16] T. Wu, X. Fan, H. Wei, Y. Qu, C. Xiang, P. Yang, and F. Wu, “Predictive service provisioning with online learning in wireless edge networks,” 
+
+IEEE Transactions on Mobile Computing , vol. 23, no. 5, pp. 4076–4091, 2023. [17] H.-L. Choi, L. Brunet, and J. P. How, “Consensus-based decentralized auctions for robust task allocation,” IEEE Transactions on Robotics ,vol. 25, no. 4, pp. 912–926, 2009. [18] S. Liemhetcharat and M. Veloso, “Modeling and learning synergy for team formation with heterogeneous agents,” in Proceedings of the 11th International Conference on Autonomous Agents and Multiagent Systems-Volume 1 , 2012, pp. 365–374. [19] A. Rogers, A. Farinelli, R. Stranders, and N. R. Jennings, “Bounded approximate decentralised coordination via the max-sum algorithm,” 
+
+Artificial Intelligence , vol. 175, no. 2, pp. 730–759, 2011. [20] M. Braquet and E. Bakolas, “Greedy decentralized auction-based task allocation for multi-agent systems,” IFAC-PapersOnLine , vol. 54, no. 20, pp. 675–680, 2021. [21] G. Qu, D. Brown, and N. Li, “Distributed greedy algorithm for multi-agent task assignment problem with submodular utility functions,” 
+
+Automatica , vol. 105, pp. 206–215, 2019. [22] A. Krause and D. Golovin, Submodular Function Maximization . Cam-bridge University Press, 2014, p. 71–104. [23] J. Liu, F. Li, X. Jin, and Y. Tang, “Distributed task allocation for multi-agent systems: A submodular optimization approach,” IEEE Transac-tions on Automatic Control , 2026. [24] A. Badanidiyuru, R. Kleinberg, and A. Slivkins, “Bandits with knap-sacks,” Journal of the ACM (JACM) , vol. 65, no. 3, pp. 1–55, 2018. [25] M. Kapralov, I. Post, and J. Vondr´ ak, “Online submodular welfare maximization: Greedy is optimal,” in Proceedings of the twenty-fourth annual ACM-SIAM symposium on Discrete algorithms . SIAM, 2013, pp. 1216–1225. [26] S. Agrawal and N. R. Devanur, “Bandits with concave rewards and convex knapsacks,” in Proceedings of the fifteenth ACM conference on Economics and computation , 2014, pp. 989–1006. [27] B. Gharesifard and S. L. Smith, “Distributed submodular maximization with limited information,” IEEE Transactions on Control of Network Systems , vol. 5, no. 4, pp. 1635–1645, 2017. [28] D. Grimsman, M. S. Ali, J. P. Hespanha, and J. R. Marden, “The impact of information in distributed submodular maximization,” IEEE Transactions on Control of Network Systems , vol. 6, no. 4, pp. 1334– 1343, 2018. [29] G. Calinescu, C. Chekuri, M. P´ al, and J. Vondr´ ak, “Maximizing a monotone submodular function subject to a matroid constraint,” in SIAM Journal on Computing , vol. 40, no. 6, 2011, pp. 1740–1766. [30] A. Robey, A. Adibi, B. Schlotfeldt, H. Hassani, and G. J. Pappas, “Optimal algorithms for submodular maximization with distributed constraints,” in Learning for Dynamics and Control . PMLR, 2021, pp. 150–162. [31] M. L. Fisher, G. L. Nemhauser, and L. A. Wolsey, An analysis of approximations for maximizing submodular set functions—II . Springer, 1978. [32] Q. Hou and A. Clark, “Robust maximization of correlated submodular functions under cardinality and matroid constraints,” IEEE Transactions on Automatic Control , vol. 66, no. 12, pp. 6148–6155, 2021. [33] M. Conforti and G. Cornu´ ejols, “Submodular set functions, matroids and the greedy algorithm: tight worst-case bounds and some generalizations of the rado-edmonds theorem,” Discrete Applied Mathematics , vol. 7, no. 3, pp. 251–274, 1984. [34] G. L. Nemhauser, L. A. Wolsey, and M. L. Fisher, “An analysis of approximations for maximizing submodular set functions—I,” Mathe-matical programming , vol. 14, pp. 265–294, 1978.

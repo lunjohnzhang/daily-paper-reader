@@ -1,0 +1,892 @@
+Title: Compute-Aware Submodular Online Learning in Open Multi-Agent Systems
+
+URL Source: https://arxiv.org/pdf/2611.34211v1
+
+Published Time: Thu, 26 Nov 2026 02:50:50 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+> Proceedings of Machine Learning Research vol vvv:1–15, 2027
+
+# Compute-Aware Submodular Online Learning in Open Multi-Agent Systems *
+
+Jing Liu Y20220091@ MAIL .ECUST .EDU .CN 
+
+School of Mathematics East China University of Science and Technology, Shanghai, China 
+
+Luca Ballotta LUCA .BALLOTTA @UNIPD .IT 
+
+Department of Information Engineering University of Padova, Padova, Italy 
+
+Fangfei Li LIFANGFEI @ECUST .EDU .CN 
+
+School of Mathematics and the Key Laboratory of Smart Manufacturing in Energy Chemical Process Ministry of Education, East China University of Science and Technology, Shanghai, China 
+
+Yang Tang YANGTANG @ECUST .EDU .CN 
+
+Key Laboratory of Smart Manufacturing in Energy Chemical Process Ministry of Education, East China University of Science and Technology, Shanghai, China 
+
+Ruggero Carli RUGGERO .CARLI @UNIPD .IT 
+
+Department of Information Engineering University of Padova, Padova, Italy 
+
+Abstract 
+
+This paper studies policy learning for cooperative task allocation in open multi-agent systems, where submodular utilities model diminishing marginal returns due to overlapping agent contributions. While standard methods evaluate every candidate action to update the policy, this may incur an excessive computational cost online. Hence, we impose a budget on these evaluations and analytically study the effect of query budget on online learning. Our algorithm samples a prescribed number of agent-action pairs and applies inverse-probability weighing to their marginal gains, yielding an unbiased gradient estimate of the expected stage utility for a Kullback-Leibler (KL) mirror-ascent update. We derive a 1/2-approximate regret bound that elegantly splits into a tracking error between optimal and learned policies, quantified by their KL divergence, and a query-dependent feedback term. Experiments on cooperative information coverage show that our approach retains high performance with significantly less computation online. 
+
+Keywords: Online learning, submodular optimization, multi-agent system, open system. 
+
+1. Introduction 
+
+Multi-agent task allocation refers to the problem where cooperative autonomous agents are dispatched to engage with given tasks. Sub-additive agent contributions give rise to so-called diminishing returns: each agent’s individual (or marginal) contribution to global performance decreases when more agents engage with a target. This is common in robotics where diminishing returns model, e.g., overlapping camera fields-of-view in cooperative coverage (Tzoumas et al., 2016). Submodularity offers an elegant framework to formally capture such overlaps and derive provable suboptimality gaps if the feasible set has added structure in the form of a matroid, which includes common cardinality and partition constraints (Nemhauser et al., 1978; Calinescu et al., 2011).  
+
+> *
+
+This work was supported in part by the China Scholarship Council (CSC).     
+
+> © 2027 J. Liu, L. Ballotta, F. Li, Y. Tang & R. Carli. arXiv:2611.34211v1 [cs.LG] 25 Nov 2026 LIU BALLOTTA LITANG CARLI
+
+The intersection between submodularity and data-driven coordination policies is still under-explored, especially in multi-agent systems. Online coordination methods use knowledge about submodular marginal gains (Xu et al., 2023b; Zhang et al., 2025b,a), while bandit methods leverage feedback on selected actions (Zhang et al., 2019; Wan et al., 2023; Xu et al., 2023a). Related to submodular data-driven optimization, previous works by the authors study submodular multi-agent reinforcement learning; Liu et al. (2026b) designs policy gradient tailored to submodular rewards, while Liu et al. (2026a) learns tabular softmax policies via Kullback-Leibler (KL) mirror ascent. While these studies leverage submodularity to evaluate the marginal gains of alternative actions and iteratively improve the policy, they assume no constraint on the learning agent feedback, i.e., all candidate actions can be evaluated at each policy update. However, this assumption may fail in online learning; if the physical learning device (e.g., a mobile robot or smart sensor) carries limited compute, it cannot timely evaluate all marginal gains corresponding to a large number of actions or agents, introducing a latency bottleneck for real-time operation. Moreover, open systems, where agents may join or leave during operation (Deplano et al., 2026), exacerbate this issue; each agent must select its action while accounting for possible changes in the team. Budgeted feedback has been studied in label-efficient prediction (Cesa-Bianchi et al., 2005), reinforcement learning (Efroni et al., 2021), and nonstationary bandits (Li and Li, 2025). However, these works limit access to labels or rewards rather than counterfactual marginal evaluations used to update the policies, while we focus on the latter issue which is central to compute-aware learning. 
+
+Contribution. To address this challenge, we extend SubMAPL (Liu et al., 2026a) to online learning with budgeted marginal feedback. Instead of evaluating every candidate action, we impose a given number of marginal queries to estimate the gradient of the expected utility. This reduces the number of marginal evaluations at each round while allowing the policy to adapt as the agents and feasible actions change. Our contributions are summarized as follows. • We propose a policy-aware query allocation strategy that distributes a given number of marginal evaluations across agent-action pairs at each learnig round. Unlike methods that restrict reward observations (Efroni et al., 2021; Li and Li, 2025), we allocate counterfactual marginal queries for policy updates. In particular, we derive and characterize an optimal allocation rule that minimizes an upper bound on the second moment of the policy gradient estimator. • We develop an online submodular policy learning method with a given number of queries at each round. Our method constructs an unbiased gradient estimator using only the selected marginal evaluations, enabling online learning with limited compute in real time. A fixed-size sampling procedure ensures that the query budget is always satisfied, updating policies online as agents and feasible actions change. • We establish a 1/2-approximate dynamic regret bound for our method. Compared with recent studies on multi-agent online learning (Zhang et al., 2025b,a), our bound highlights the distinct contributions of feedback budget and of time-varying agent set due to open systems. Numerical experiments on cooperative coverage showcase performance close to the compute-unaware full-feedback baseline despite a substantial reduction in marginal queries. 
+
+Organization. We introduce the multi-agent submodular online learning problem in Section 2. In Section 3, we recap SubMAPL, which we extend to budgeted online learning in Section 4. In Section 5, we establish a provable regret bound and propose a strategy to sample counterfactual feedback that minimizes it. We report simulations results in Section 6 and conclude in Section 7. 
+
+> 2
+
+COMPUTE -A WARE SUBMODULAR ONLINE LEARNINGIN OPEN MULTI -A GENT SYSTEMS 
+
+2. Setup and Problem Statement 
+
+2.1. Multi-Agent Task Allocation Setup 
+
+The system evolves across rounds t = 1 , . . . , T . State st includes agent configurations, tasks, and any other variables required to evaluate performance. Let Nt denote the set of active agents at round 
+
+t. Each agent i ∈ N t selects one action from a finite, potentially time-varying set Ai,t . We define the total number of actions at round t as dt = P 
+
+> i∈N t
+
+mi,t with mi,t = |A i,t |. The agent-action ground set Ωt = {(i, a ) : i ∈ N t, a ∈ A i,t } gathers all possible agent-action pairs at round t. A joint action 
+
+At ⊆ Ωt contains one action per active agent and A−it = At \ { (i, a i,t )} excludes agent i.Let Ft(A; st) denote the team utility when the joint action A is applied at state st. For an element 
+
+e ∈ Ωt, we denote its marginal gain (relative to A) as Ft(e | A; st) = Ft(A ∪ { e}; st) − Ft(A; st).A set function is submodular if Ft(e | B; st) ≥ Ft(e | C; st) for all B ⊆ C ⊆ Ωt and e ∈ Ωt \ C.Submodularity captures diminishing marginal returns associated with overlapping, i.e., sub-additive agent contributions to team performance (Nemhauser et al., 1978). 
+
+Assumption 1 (Stage utility) Each Ft(·; st) : 2 Ωt → R is normalized, monotone, and submodular. There exists a constant L > 0 such that 0 ≤ Ft(( i, a ) | A−i; st) ≤ L for every (i, a ) ∈ Ωt and every collection A−i containing one action from each active agent other than i.
+
+During online operation, a learner samples joint actions from a categorical policy over active agents. Let xi,a denote the probability that agent i executes action a. The set of policies at round t is 
+
+Ft =
+
+x ∈ R|Ωt| 
+
+> +
+
+: X
+
+> a∈A i,t
+
+xi,a = 1 , ∀i ∈ N t
+
+ (1) and the policy of each agent i is the categorical probability distribution {xi,a }a∈A i,t . For the multi-agent policy xt ∈ F t, let Dt(xt) denote the distribution over joint actions induced by the categorical distributions of active agents. The conditional expected stage utility is 
+
+eft(xt; st) = EA∼D t(xt)[Ft(A; st) | st]. (2) Our objective is to learn policies xt online that achieve high stage utility despite changes in the state, active agents, and feasible actions that induce time-varying utilities. As a performance metric, following common formulations in online learning, we compare the learned policy with a stagewise optimal policy evaluated at the state visited by the learner at each round (Xu et al., 2023b). 
+
+Problem 1 (Regret-optimal online learning) Let an optimal time-varying policy be 
+
+xOPT  
+
+> t
+
+∈ arg max 
+
+> xt∈F t
+
+eft(xt; st) t = 1 , . . . , T. (3) 
+
+Define the 1/2-approximate dynamic regret of a time-varying policy x = {xt}Tt=1 ∈ F = F1 × · · · × FT as 
+
+Reg 1/2 
+
+> T
+
+(x) = Eτ
+
+" TX
+
+> t=1
+
+ 12 eft(xOPT  
+
+> t
+
+; st) − eft(xt; st)
+
+
+
+s1
+
+#
+
+(4) 
+
+where τ denotes the stochastic state trajectory induced by the multi-agent policy. We aim to learn a regret-optimal policy x∗ = {x∗ 
+
+> t
+
+}Tt=1 that satisfies 
+
+x∗ ∈ arg min  
+
+> x∈F
+
+Reg 1/2 
+
+> T
+
+(x). (5) 
+
+3LIU BALLOTTA LI TANG CARLI 
+
+We use 1/2-approximation instead of classic regret due to submodularity; analytical intuition is given in Section 3. In the next section, we recap a policy gradient method tailored to submodular utilities and its computational limitation, which we adapt in Section 4 to solve Problem 1. 
+
+3. Preliminaries: Submodular Policy Gradient 
+
+In paper (Liu et al., 2026a), the authors propose a KL mirror-ascent policy gradient method for multi-agent reinforcement learning with tabular softmax policies, SubMAPL, which can be readily adapted to tackle Problem 1. Central to the formal guarantees of this method, the partition multilinear extension (PME) ef of a submodular set function F is a continuous relaxation of F defined on the extended policy domain Pt = {x ∈ R|Ωt| 
+
+> +
+
+: P 
+
+> a∈A i,t
+
+xi,a ≤ 1, ∀i ∈ N t}, where xi,a has the meaning described in Section 2.1: for x ∈ P t, agent i selects action a with probability xi,a and selects no action with the remaining probability. Notice that an arbitrary element in Pt is not aproper multi-agent policy since some agent’s categorical distributions may not be normalized to 1.By defining the restriction to the so-called categorical face Ft = ∂Pt defined in (1), it is possible to prove that the PME eft(xt; st) of the stage utility Ft(A; st) coincides with its expectation as per (2) and that its gradient satisfies 
+
+∇i,a eft(x; st) = EA−i∼D −it (x)
+
+Ft(( i, a ) | A−i; st) , (6) where D−it (x) denotes the distribution of active agents’ actions other than i (Liu et al., 2026a). Given a joint action At ∼ D t(xt), the counterfactual-gain feedback associated with (i, a ) ∈ Ωt
+
+evaluates the marginal gain of the agent-action pair (i, a ) as 
+
+hi,a,t = Ft(( i, a ) | A−it ; st). (7) Then, for a state st and policy xt, this feedback provides an unbiased estimator of the corresponding PME gradient coordinate, since combining (6) and (7) readily yields 
+
+EA−i∼D −it (x) [hi,a,t ] = ∇i,a eft(xt; st). (8) Equivalently, the counterfactual-gain vector ht = ( hi,a,t )i,a is a stochastic gradient of eft(xt; st).SubMAPL updates the agents’ categorical policies through KL mirror ascent, where the policy probabilities are assumed to satisfy the following condition. 
+
+Assumption 2 (Policy support) For every round t, it holds xi,a,t > 0 for all a ∈ A i,t , i ∈ N t.
+
+Given the full counterfactual-gain vector ht and stepsize η > 0, the KL mirror-ascent update is 
+
+¯xt+1 = KL( xt) = arg max 
+
+> x∈F t
+
+{η⟨ht, x ⟩ − DKL (x∥xt)} (9) where DKL denotes the standard Kullback-Leibler divergence (Beck and Teboulle, 2003). This update admits the following closed-form expression for each active agent i:
+
+¯xi,a,t +1 = xi,a,t exp( ηh i,a,t )
+
+P 
+
+> b∈A i,t
+
+xi,b,t exp( ηh i,b,t ) . (10) 
+
+4COMPUTE -A WARE SUBMODULAR ONLINE LEARNINGIN OPEN MULTI -A GENT SYSTEMS 
+
+We denote the updated policy on the current domain by ¯xt+1 ∈ F t, which does not consider changes in time-varying agent and action sets. The policy actually implemented in the next round is 
+
+xt+1 = Mt+1 (¯ xt+1 ) ∈ F t+1 , where map Mt+1 adjusts tabular policy parameters to accommodate potentially different agent set Nt+1 and actions sets Ai,t +1 at the next round. We omit its formal definition for the sake of readability and refer the reader to Liu et al. (2026a) for details. SubMAPL learns tabular softmax policies. The learner maintains agent-indexed logits θi(o, a )
+
+for every observation-action pair. Given observation oi,t of st, the policy of agent i is 
+
+xi,a,t = exp( θi(oi,t , a )) 
+
+P 
+
+> b∈A i,t
+
+exp( θi(oi,t , b )) . (11) Then, the update in (10) is implemented by adding ηh i,a,t to current logits. Finite logits and feasibility masking through migration M preserve the positive support required by Assumption 2. SubMAPL can be readily used to learn a time-varying multi-agent policy xt online, in agreement with Problem 1. However, a computational bottleneck arises: update (10) requires querying the counterfactual marginal gain hi,a,t for each active agent-action pair (i, a ) at each round t. The time complexity of this calculation does not (jointly) scale with the number of agents and actions, clashing against real-time requirements for large systems. Hence, building on the framework of SubMAPL, in Section 4 we introduce a computationally controlled budgeted gradient estimator that replaces ht
+
+while preserving the KL mirror-ascent update and policy-migration mechanism. 
+
+4. Policy Learning With Budgeted Queries 
+
+The KL update in (10) requires evaluating a marginal query for every active agent-action pair 
+
+(i, a ) ∈ Ωt, i.e., evaluating the counterfactual gain hi,a,t in (7) holding the other agents’ actions A−it
+
+fixed. Next, we construct an unbiased estimator of ∇ eft with a fixed budget on counterfactual queries. At each round t, the learner selects Qt ∈ { 1, . . . , d t} queries from the active agent-action pairs, where we recall that dt is the total number of actions for all agents at time t. Let Zi,a,t ∈ { 0, 1} be equal to 1 if (i, a ) ∈ Ωt is queried and zero otherwise. Then, given original SubMAPL iterates and budget constraint, we formally define the problem tackled in the remaining. 
+
+Problem 2 (Budgeted submodular online learning) Learn a regret-optimal policy xt via SubMAPL subject to a budget Qt on marginal feedback queries: 
+
+minimize 
+
+x ∈ F Reg 1/2 
+
+> T
+
+(x) (12a) 
+
+subject to xt+1 = Mt+1 (KL( xt)) ∀t = 1 , . . . , T, (12b) 
+
+X
+
+> (i,a )∈Ωt
+
+Zi,a,t = Qt ∀t = 1 , . . . , T, (12c) 
+
+Zi,a,t ∈ { 0, 1}. ∀(i, a ) ∈ Ωt, ∀t = 1 , . . . , T (12d) In the following, we tackle Problem 2 by designing a stochastic querying mechanism that is guaranteed to satisfy the budget constraint and returns an unbiased gradient estimator for eft at each round t. Denote by I− 
+
+> t
+
+= {st, Nt, x t, Q t} the information available before the current marginal gains are observed: this is all and only information available to select queries. We define the inclusion probability ρi,a,t = Pr( Zi,a,t = 1 | I − 
+
+> t
+
+) as the chance that pair (i, a ) is queried at round t.
+
+> 5
+
+LIU BALLOTTA LI TANG CARLI 
+
+Conditioned on I− 
+
+> t
+
+, query randomization is independent of current utility and sampled joint action. To ensure that the construction is well posed, we impose a positive lower bound ρmin ,t ≥ ρmin > 0
+
+on the inclusion probabilities. Thus, query design satisfies 
+
+ρmin ,t ≤ ρi,a,t ≤ 1 ∀ (i, a ) ∈ Ωt (13) 
+
+X
+
+> (i,a )∈Ωt
+
+ρi,a,t = Qt (14) 
+
+X
+
+> (i,a )∈Ωt
+
+Zi,a,t = Qt. (15) Feasibility is guaranteed when Qt ≥ dtρmin ,t . Using the queried marginal gains, we construct the inverse-probability PME gradient coordinate estimator as 
+
+bgi,a,t = Zi,a,t 
+
+ρi,a,t 
+
+hi,a,t . (16) The estimated gradient bgt = ( bgi,a,t )(i,a ) is then used in the KL mirror-ascent update (9) in place of 
+
+ht. Note that bgi,a,t = 0 if (i, a ) is not queried: its marginal feedback is not used in the current update, which does not imply that the corresponding PME gradient coordinate is zero. As we prove later, this estimator is indeed unbiased for the PME gradient ∇ eft after averaging over joint-action and query sampling, formally supporting our online learning algorithm and its regret analysis. 
+
+Deterministic query sampling via rounding. To deterministically enforce the query budget from probabilistic querying, we apply randomized pipage rounding, a classic pairwise-rounding procedure to satisfy cardinality constraints. Given inclusion vector ρt = ( ρi,a,t )(i,a ), the procedure generates a selection vector Zt ∈ { 0, 1}dt satisfying P 
+
+> (i,a )∈Ωt
+
+Zi,a,t = Qt and E[Zi,a,t | G t] = ρi,a,t ∀(i, a ).The conditional inclusion probabilities are preserved by performing query rounding independently of joint-action sampling. For details, we refer the reader to (Gandhi et al., 2006). Tabular softmax policy parametrization and migration for open system dynamics follow the mechanism of SubMAPL described in Section 3. The final algorithm with budgeted gradient estimation is summarized in Algorithm 1. Note that pipage rounding requires at most dt − 1 pairwise updates. When Qt = dt, all pairs are queried and the update coincides with the full marginal-feedback KL update of SubMAPL. In the next section, we analytically bound the approximate dynamic regret of Algorithm 1 and propose a strategy to choose inclusion probabilities ρt based on that. 
+
+5. Performance Analysis 
+
+In this section, we establish a provable bound on approximate regret for Algorithm 1 that holds uniformly across allocations ρt. Then, we propose an optimization-based allocation ρ⋆ that minimizes our regret bound; hence, while it need not be optimal w.r.t. the original Problem 1, it provides a principled way to query counterfactual marginals under budget constraint. Proofs are in Appendix. To account for changes in the stagewise comparator and policy domain, define the policy-dependent open-system KL tracking variation (Liu et al., 2026a) as 
+
+Vopen  
+
+> T
+
+= E
+
+" T −1X
+
+> t=1
+
+
+
+DKL (x⋆t+1 ∥xt+1 ) − DKL (x⋆t ∥¯xt+1 )
+
+
+
+> +
+
+#
+
+, (17) 
+
+6COMPUTE -A WARE SUBMODULAR ONLINE LEARNINGIN OPEN MULTI -A GENT SYSTEMS 
+
+Algorithm 1 Online policy learning with query-budgeted SubMAPL updates 
+
+Require: Current policy xt ∈ F t, budget Qt, lower bound ρmin ,t , step size η 
+
+> 1:
+
+Observe st, Nt, and {A i,t }i∈N t 
+
+> 2:
+
+Select admissible inclusion probabilities ρt 
+
+> 3:
+
+Sample Zt by fixed-size dependent rounding of ρt 
+
+> 4:
+
+Sample At ∼ D t(xt) independently of query rounding  
+
+> 5:
+
+Evaluate hi,a,t for the pairs with Zi,a,t = 1 at the fixed state st 
+
+> 6:
+
+Execute At and observe the next state  
+
+> 7:
+
+Construct bgt using (16)  
+
+> 8:
+
+Update ¯xt+1 using (10) with ht replaced by bgt 
+
+> 9:
+
+Set xt+1 = Mt(¯ xt+1 ) on the next active domain where (z)+ = max {z, 0}. Each KL divergence compares policies on the same active agent–action domain; ¯xt+1 and xt+1 are the pre- and post-migration policies defined in Section 4. 
+
+Theorem 1 (Query-dependent regret bound) Under Assumptions 1–2, Algorithm 1 satisfies 
+
+Reg 1/2 
+
+> T
+
+≤ E[DKL (x⋆
+
+> 1
+
+∥x1)] + Vopen 
+
+> T
+
+2η + (e − 2) ηL 2
+
+2
+
+> T
+
+X
+
+> t=1
+
+E
+
+ X
+
+> (i,a )∈Ωt
+
+xi,a,t 
+
+ρi,a,t 
+
+ . (18) As a baseline, we specialize this general bound to a naive allocation strategy that samples counterfactual marginals uniformly at random across active agent-action pairs. 
+
+Corollary 2 (Regret bound with uniform querying) Under Assumptions 1–2, let Algorithm 1 query qi,t actions uniformly for each agent, i.e., qi,t ∼ U ([1 , m i,t ]) for all i ∈ N t and t. It holds 
+
+Reg 1/2 
+
+> T
+
+≤ E[DKL (x⋆
+
+> 1
+
+∥x1)] + Vopen 
+
+> T
+
+2η + (e − 2) ηL 2
+
+2
+
+> T
+
+X
+
+> t=1
+
+E
+
+" X
+
+> i∈N t
+
+mi,t 
+
+qi,t 
+
+#
+
+(19) 
+
+where the KL tracking variation is the one induced by uniform querying. 
+
+Policy-aware query allocation. The query-dependent regret bound in Theorem 1 motivates a strategic selection of inclusion probabilities to reduce regret of the learned policy. From (18), the policy-weighted estimator second moment is bounded by L2Φt(ρt) with 
+
+Φt(ρt) = X
+
+> (i,a )∈Ωt
+
+xi,a,t 
+
+ρi,a,t 
+
+. (20) Consequently, we determine the inclusion probabilities by solving 
+
+minimize 
+
+ρ Φt(ρ) (21a) 
+
+subject to ρmin ,t ≤ ρi,a,t ≤ 1 ∀ (i, a ) ∈ Ωt, ∀ t = 1 , . . . , T, (21b) 
+
+X
+
+> (i,a )∈Ωt
+
+ρi,a,t = Qt ∀ t = 1 , . . . , T. (21c) The resulting allocation depends only on the current policy and query budget and can therefore be computed before observing the marginal gains. 
+
+7LIU BALLOTTA LI TANG CARLI 
+
+Proposition 3 (Regret-optimal query allocation) Under Assumption 2, if dtρmin ,t ≤ Qt, the optimization problem (21) admits a unique minimizer given by ρ⋆i,a,t = clip [ρmin ,t ,1] 
+
+ τt√xi,a,t 
+
+ ,
+
+where clip [l,u ](z) = min {u, max {l, z }} and τt > 0 is chosen so that P 
+
+> (i,a )∈Ωt
+
+ρ⋆i,a,t = Qt. In particular, τt need not be unique if all coordinates are clipped. When no clipping is active, it holds 
+
+ρ⋆i,a,t = Qt√xi,a,t 
+
+P
+
+> (j,b )∈Ωt
+
+√xj,b,t 
+
+, Φt(ρ⋆t ) = 
+
+P
+
+> (i,a )∈Ωt
+
+√xi,a,t 
+
+2
+
+Qt
+
+. (22) 
+
+Corollary 4 (Regret bound with policy-aware querying) Let ρt = ρ⋆t ∀t = 1 , . . . , T . It holds 
+
+Reg 1/2 
+
+> T
+
+≤ E[DKL (x⋆
+
+> 1
+
+∥x1)] + Vopen 
+
+> T
+
+2η + (e − 2) ηL 2
+
+2
+
+> T
+
+X
+
+> t=1
+
+E
+
+ dt|N t|
+
+Qt
+
+
+
+. (23) To characterize the benefit of optimization (21), we compare with naive uniform querying by defining the effective action dimension 
+
+deff (xt) = 
+
+P
+
+> (i,a )∈Ωt
+
+√xi,a,t 
+
+2
+
+|N t| . (24) By (24), blockwise normalization and the Cauchy–Schwarz inequality yield |N t| ≤ deff (xt) ≤ dt.Under uniform allocation ρunif  
+
+> i,a,t
+
+= Qt/dt, the unclipped optimum ρ⋆i,a,t satisfies 
+
+Φt(ρ⋆t )Φt(ρunif  
+
+> t
+
+) = deff (xt)
+
+dt
+
+, (25) which characterizes the second-moment improvement over uniform querying with inactive clipping. Theorem 1 and Corollary 4 separate the KL tracking variation from the query-dependent feedback term. Establishing sublinear regret requires suitable bounds on Vopen  
+
+> T
+
+and PTt=1 E[dtNt].
+
+6. Experiments 
+
+We study how query budget supports online policy learning in open systems where agents enter and leave overtime. All reported performance estimates use 20 held-out seeds. 
+
+6.1. Cooperative coverage task 
+
+We consider |N t| ≤ max t |N t| = 5 agent on a 30 × 30 grid through T = 200 rounds. An action keeps the agent still or moves it by one cell in a cardinal direction, such that all possible resulting positions cover a 3 × 3 footprint Ci,a,t . Each cell c has weight wc ≥ 0 satisfying P 
+
+> c
+
+wc = 1 ,quantifying, e.g., sensing information gathered at the cell. We denote the cells covered by round t as 
+
+Ut and set the team’s utility at round t as the newly covered weighted cells (satisfying Assumption 1): 
+
+Ft(At; st) = X 
+
+> c∈S
+> (i,a )∈AtCi,a,t \Ut
+
+wc. (26) The learner learns policies online using Algorithm 1. If an agent (temporarily) leaves the system, the relevant policy logits are kept frozen. Observations contain workspace sector, local covered/value categories, and previous action, while unseen observation are assigned uniform action probabilities. 
+
+8COMPUTE -A WARE SUBMODULAR ONLINE LEARNINGIN OPEN MULTI -A GENT SYSTEMS  
+
+> Figure 1: Relative cumulative stage utility (a) and coverage AUC (b). Marks and bars respectively show means and 95%
+> confidence intervals across cell-weight fields, agent schedules, and seeds.
+
+We average results across three cell-weight fields, namely uniform, Gaussian mixture with two components, and log-Gaussian, and three agent schedules, namely static (closed) system with 
+
+|N t| ≡ 5, a “ramp schedule” with 2, 4, 5, 4, 2 agents changing at rounds 50 , 100 , 150 , 175 , and a “shock” schedule with 5, 2, 5 agents changing at rounds 70 , 130 . We use the same environment seeds and learning rate η = 2 for every condition and run each of them with 20 random seeds. Full feedback queries all dt ≤ max i |N t|mi,t = 45 agent-action pairs at each round t, whereby each agent can execute at most max i mi,t = 9 actions, which corresponds to the original uncon-strained implementation with full stochastic gradient ht. We compare optimized and uniform querying with budget Qt = round( βd t) for β ∈ { 0.10 , 0.25 , 0.50 } and lower bound ρmin ,t = 0 .1Qt/dt. In addition, we compare a uniform allocation that draws one candidate action for each active agent at each round, whose budget therefore need not match the other budgeted querying policies. Queries are selected before evaluating counterfactual marginals, hence making querying causal and practically meaningful under online learning in real time applications. We compare policies based only on the number of queries; deeper comparison on actual compute cost, e.g., CPU cycles or wall-clock time, will be investigated in future work. 
+
+6.2. Average Performance Versus Query Settings 
+
+Figure 1 reports relative cumulative stage utility and the area-under-curve coverage metric AUC = 
+
+T −1 PTt=1 
+
+Pts=1 Fs(As; ss), w.r.t. full-feedback feedback, i.e., no budget constraint, averaged across all cell-weight fields, agent schedules, and seeds. Formally, a method’s relative difference is 
+
+100( V/Vfull − 1) , where V is either metric and Vfull is its corresponding full-feedback value. AUC captures coverage throughout an episode, including differences before final coverage saturates. Bars mark percentile 95% confidence intervals. All budgeted methods perform close to the full-query baseline, with percentage displacement within 2% in most cases. For instance, using about 10% of marginal queries (corresponding to 
+
+β = 0 .10 ), the two budgeted methods feature mean AUC differences of 1.4% for policy-aware allocation and slightly below 1% for uniform allocation. In fact, it is remarkable that budgeted querying performs slightly better than unconstrained one on this task, although the practical behaviors are hardly distinguishable. This may be due to budgeted queries’ statistical advantages compared to full feedback, which may increase bias of ht for gradient estimation. Although small, performance 
+
+9LIU BALLOTTA LI TANG CARLI −0.015 −0.010 −0.005 0.000 0.005                
+
+> Cumulative utility gap to Full
+> (a) Ramp
+> −0.010 −0.005 0.000 0.005 0.010 0.015
+> (b) Shock
+> 25 50 75 100 125 150 175 200
+> Online round
+> 2345
+> Agents
+> 25 50 75 100 125 150 175 200
+> Online round
+> 2345Uniform, Q=3 Policy-aware, Q=3
+
+Figure 2: Coverage performance with Qt ≡ 3 on log-Gaussian cell-weight fields under ramp (a) and shock (b) agent schedules. Upper panels show mean cumulative-utility gaps to full feedback with 95% confidence intervals regions. Lower panels show the number of active agents, with vertical dotted lines in both panels marking the changes in agent set. 
+
+difference appears consistent across all budgets, with a monotonic trend that reinforces its statistical significance. A deeper study on potential advantages of querying is outside the scope of this paper. On the other hand, the impact of optimized behavior does not seem significantly in this case. With β = 0 .10 and policy-aware allocation, the mean normalized policy entropy is 0.99990 and the mean same-policy ratio Φt(ρ⋆t )/Φt(ρunif  
+
+> t
+
+) is 0.99919 , offering little opportunity for improvement over uniform allocation. This may be partly explained by modest time-variation of the agent set. 
+
+6.3. Open-System Response Under Constant Budget 
+
+Next, we hold a fixed budget Qt = 3 and test with ramp and shock agent schedules on log-Gaussian cell-weight fields. In this case, budgeted methods query about 17% of the gradient coordinates under ramp and 15% under shock schedules. Figure 2 shows the cumulative-utility gaps ( not percentage) with uniform and optimized querying throughout the horizon. In this case, the latter method yields statistically consistent higher utility, especially with gradually changing agent set. 
+
+7. Conclusion 
+
+This paper presented a KL mirror-ascent method for task allocation in open multi-agent systems. Deterministic rounding and inverse-probability weighting of counterfactual samples enforce a pre-scribed budget and preserve unbiased gradient estimation. We established a regret bound separating the contributions of open system and query budget, respectively, and proposed a query allocation that minimizes it. Experiments on cooperative coverage report essentially unchanged performance at a fraction of full-feedback queries, supporting online learning with cheap compute. Future work will consider noisy marginal evaluations, neural policies, and deeper compute evaluation. 
+
+Generative AI Use 
+
+Generative AI tools were used to refine proofs and write simulation code. All AI-assisted content was reviewed by the authors, who take responsibility for the correctness and integrity of the work. 
+
+10 COMPUTE -A WARE SUBMODULAR ONLINE LEARNINGIN OPEN MULTI -A GENT SYSTEMS 
+
+References 
+
+Amir Beck and Marc Teboulle. Mirror descent and nonlinear projected subgradient methods for convex optimization. Operations Research Letters , 31(3):167–175, 2003. Gruia Calinescu, Chandra Chekuri, Martin P´ al, and Jan Vondr´ ak. Maximizing a monotone submodu-lar function subject to a matroid constraint. SIAM Journal on Computing , 40(6):1740–1766, 2011. doi: 10.1137/080733991. Nicol` o Cesa-Bianchi, G´ abor Lugosi, and Gilles Stoltz. Minimizing regret with label efficient prediction. IEEE Transactions on Information Theory , 51(6):2152–2162, 2005. doi: 10.1109/TIT. 2005.847729. Diego Deplano, Nicola Bastianello, Mauro Franceschelli, and Karl H. Johansson. Optimization and learning in open multi-agent systems. IEEE Transactions on Automatic Control , 71(6):3864–3879, 2026. doi: 10.1109/TAC.2026.3653296. Yonathan Efroni, Nadav Merlis, Aadirupa Saha, and Shie Mannor. Confidence-budget matching for sequential budgeted learning. In Proceedings of the 38th International Conference on Machine Learning , volume 139 of Proceedings of Machine Learning Research , pages 2937–2947, 2021. Rajiv Gandhi, Samir Khuller, Srinivasan Parthasarathy, and Aravind Srinivasan. Dependent rounding and its applications to approximation algorithms. Journal of the ACM , 53(3):324–360, 2006. doi: 10.1145/1147954.1147956. Shaoang Li and Jian Li. Constrained feedback learning for non-stationary multi-armed bandits. In 
+
+Advances in Neural Information Processing Systems , volume 38, pages 80711–80744, 2025. doi: 10.52202/085713-2697. Jing Liu, Luca Ballotta, Yangyang Yang, Fangfei Li, Yang Tang, and Ruggero Carli. Submodu-lar policy learning for distributed task allocation in open multi-agent systems. arXiv preprint arXiv:2608.14390 , 2026a. Jing Liu, Yangyang Yang, Luca Ballotta, Fangfei Li, Yang Tang, and Ruggero Carli. Submodular multi-agent policy learning for online distributed task allocation in open multi-agent systems. In 
+
+Advances in Neural Information Processing Systems , 2026b. [accepted]. George L. Nemhauser, Laurence A. Wolsey, and Marshall L. Fisher. An analysis of approximations for maximizing submodular set functions—i. Mathematical Programming , 14:265–294, 1978. doi: 10.1007/BF01588971. V. Tzoumas, A. Jadbabaie, and G. J. Pappas. Sensor placement for optimal Kalman filtering: Fundamental limits, submodularity, and algorithms. In 2016 American Control Conference (ACC) ,pages 191–196, July 2016. doi: 10.1109/ACC.2016.7524914. acc. Zongqi Wan, Jialin Zhang, Wei Chen, Xiaoming Sun, and Zhijie Zhang. Bandit multi-linear DR-submodular maximization and its applications on adversarial submodular bandits. In Proceedings of the 40th International Conference on Machine Learning , volume 202 of Proceedings of Machine Learning Research , pages 35491–35524, 2023.     
+
+> 11 LIU BALLOTTA LITANG CARLI
+
+Zirui Xu, Xiaofeng Lin, and Vasileios Tzoumas. Bandit submodular maximization for multi-robot coordination in unpredictable and partially observable environments. In Robotics: Science and Systems XIX , Daegu, Republic of Korea, July 2023a. doi: 10.15607/RSS.2023.XIX.109. Zirui Xu, Hongyu Zhou, and Vasileios Tzoumas. Online submodular coordination with bounded tracking regret: Theory, algorithm, and applications to multi-robot coordination. IEEE Robotics and Automation Letters , 8(4):2261–2268, April 2023b. doi: 10.1109/LRA.2023.3248372. Mingrui Zhang, Lin Chen, Hamed Hassani, and Amin Karbasi. Online continuous submodular maximization: From full-information to bandit feedback. In Advances in Neural Information Processing Systems , volume 32, pages 9206–9217, 2019. Qixin Zhang, Yan Sun, Can Jin, Xikun Zhang, Yao Shu, Puning Zhao, Li Shen, and Dacheng Tao. Effective policy learning for multi-agent online coordination beyond submodular objectives. In 
+
+Advances in Neural Information Processing Systems , volume 38, pages 164278–164339, 2025a. Qixin Zhang, Zongqi Wan, Yu Yang, Li Shen, and Dacheng Tao. Near-optimal online learning for multi-agent submodular coordination: Tight approximation and communication efficiency. In 
+
+International Conference on Learning Representations , 2025b. 
+
+> 12
+
+COMPUTE -A WARE SUBMODULAR ONLINE LEARNINGIN OPEN MULTI -A GENT SYSTEMS 
+
+Appendix: Table of Contents 
+
+A Assumption 1 13 B Proof of Theorem 1 13 C Proof of Proposition 3 15 D Proof of Corollary 4 15 
+
+Appendix A. Assumption 1 
+
+Set function Ft(·; st) : 2 Ωt → R is: • Normalized: Ft(∅; st) = 0 ;• Monotone: Ft(B; st) ≤ Ft(C; st) for every B ⊆ C ⊆ Ω;• submodular: Ft(e | B; st) ≥ Ft(e | C; st) for B ⊆ C and e / ∈ C.
+
+Appendix B. Proof of Theorem 1 
+
+Before proving the main theorem, we introduce a few auxiliary lemmas. 
+
+Lemma 5 (Restricted PME inequality) Under Assumption 1, for any x, y ∈ F t,
+
+12 eft(y; st) − eft(x; st) ≤ 12 ⟨∇ eft(x; st), y − x⟩. (27) 
+
+Proof Draw A = {ei : i ∈ N t} ∼ D t(x) and Y = {ui : i ∈ N t} ∼ D t(y) independently. Monotonicity and a telescoping expansion of Ft(A ∪ Y ; st) − Ft(A; st) give 
+
+Ft(Y ; st) − Ft(A; st) ≤ X
+
+> i∈N t
+
+Ft(ui | A−i; st).
+
+Add the elements of Y in a fixed agent order. If ui̸ = ei, the set present before adding ui contains 
+
+A−i. Submodularity therefore bounds the increment by Ft(ui | A−i; st). If ui = ei, the union already contains that element, so the increment is zero and the same upper bound follows from monotonicity. Normalization and a telescoping expansion of Ft(A; st) in the same agent order give 
+
+X
+
+> i∈N t
+
+Ft(ei | A−i; st) ≤ Ft(A; st).
+
+Subtracting this bound from the preceding one yields, for every realization, 
+
+Ft(Y ; st) − 2Ft(A; st) ≤ X
+
+> i∈N t
+
+Ft(ui | A−i; st) − Ft(ei | A−i; st).
+
+Take expectation over the independent draws A and Y . For every coordinate, differentiating the extension on Pt gives 
+
+∂ eft(x; st)
+
+∂x i,a 
+
+= EA−i∼D −it (x)[Ft(( i, a ) | A−i; st)] .
+
+13 LIU BALLOTTA LI TANG CARLI 
+
+Consequently, 
+
+eft(y; st) − 2 eft(x; st) ≤ ⟨∇ eft(x; st), y − x⟩.
+
+Division by two proves the result. Note that setting x = xt and y = xOPT  
+
+> t
+
+provides the bound underlying the factor 1/2 in the definition of approximate dynamic regret in (4). For subsequent analysis, let Ht = σ(I− 
+
+> t
+
+, F t) and Gt = σ(Ht, A t) respectively denote the σ-algebras generated by available information and utility at round t and, additionally, the joint action samples at round t.
+
+Lemma 6 (Gradient estimator moments) Assume that ρi,a,t > 0 and that At, conditional on Ht,follows Dt(xt). Then the estimator in (16) satisfies 
+
+E[bgi,a,t | G t] = hi,a,t , (28) 
+
+E[bg 2 
+
+> i,a,t
+
+| G t] = h 2
+
+> i,a,t
+
+ρi,a,t 
+
+. (29) 
+
+Consequently, 
+
+E[bgt | H t] = ∇ eft(xt; st). (30) 
+
+Proof Conditional on Gt, the marginal gain hi,a,t and inclusion probability ρi,a,t are fixed, and 
+
+E[Zi,a,t | G t] = Pr( Zi,a,t = 1 | G t) = ρi,a,t . Substitution into (16) gives (28) and identity 
+
+Z2 
+
+> i,a,t
+
+= Zi,a,t gives (29). Taking the conditional expectation of (28) with respect to Ht and applying (8) yields (30). The next lemma uses the entropic mirror-descent framework (Beck and Teboulle, 2003), with a second-order term suited to the nonnegative marginal-gain estimates. 
+
+Lemma 7 (Second-order KL mirror-ascent bound) Let x, u belong to the same product of cate-gorical simplexes, with x > 0. Given g ≥ 0 and η > 0 such that ηg i,a ≤ 1 for all (i, a ), let x+ be the KL mirror-ascent update of x with direction g as in (10) . Then 
+
+⟨g, u − x⟩ ≤ DKL (u∥x) − DKL (u∥x+)
+
+η + ( e − 2) η X
+
+> i,a
+
+xi,a g2
+
+> i,a
+
+. (31) 
+
+Proof For an agent i, let Mi = P 
+
+> a
+
+xi,a exp( ηg i,a ). The mirror update gives 
+
+DKL (ui∥xi) − DKL (ui∥x+ 
+
+> i
+
+) = η⟨ui, g i⟩ − log Mi.
+
+Since ez ≤ 1 + z + ( e − 2) z2 for z ∈ [0 , 1] and log(1 + r) ≤ r for r > −1,
+
+log Mi ≤ η⟨xi, g i⟩ + ( e − 2) η2 X
+
+> a
+
+xi,a g2
+
+> i,a
+
+.
+
+Replacing this inequality into the KL identity, summing over the agents, and dividing by η proves (31). By Assumption 1 and the inclusion-probability lower bound (13), it follows 0 ≤ bgi,a,t ≤ L/ρmin .Hence, the condition of Lemma 7 holds for every realization when 
+
+0 < η ≤ ρmin 
+
+L . (32) 
+
+14 COMPUTE -A WARE SUBMODULAR ONLINE LEARNINGIN OPEN MULTI -A GENT SYSTEMS 
+
+Proof of Theorem 1 The restricted first-order inequality (27) gives 
+
+12 eft(x⋆t ; st) − eft(xt; st) ≤ 12 ⟨∇ eft(xt; st), x ⋆t − xt⟩.
+
+The comparator x⋆t and the current policy xt are Ht-measurable. By (30), the expectation of the right-hand side equals 12 E[⟨bgt, x ⋆t − xt⟩]. Applying Lemma 7 to xt 7 → ¯xt+1 , followed by (29), yields 
+
+E
+
+ 12 eft(x⋆t ; st) − eft(xt; st)
+
+
+
+≤ E[DKL (x⋆t ∥xt)] − E[DKL (x⋆t ∥¯xt+1 )] 2η
+
++ (e − 2) η
+
+2 E
+
+ X
+
+> (i,a )∈Ωt
+
+xi,a,t h 2
+
+> i,a,t
+
+ρi,a,t 
+
+ .
+
+(33) Set Φt = DKL (x⋆t ∥xt) and Γt = DKL (x⋆t ∥¯xt+1 ). The KL terms satisfy the telescoping identity 
+
+> T
+
+X
+
+> t=1
+
+(Φ t − Γt) = Φ 1 − ΓT + 
+
+> T−1
+
+X
+
+> t=1
+
+(Φ t+1 − Γt).
+
+Since ΓT ≥ 0, (17) implies E[PTt=1 (Φ t − Γt)] ≤ E[Φ 1] + Vopen  
+
+> T
+
+. Summing the one-step inequalities and combining the last expectation in (33) with Assumption 1 proves the claim. 
+
+Appendix C. Proof of Proposition 3 
+
+Since all active policy probabilities are positive, the objective in (21) is strictly convex on its feasible set, which is nonempty and compact under the budget condition. For an interior coordinate, the KKT stationarity condition yields −xi,a,t /ρ 2 
+
+> i,a,t
+
++ λ = 0 , hence ρi,a,t = pxi,a,t /λ . KKT conditions and complementary slackness yield ρ⋆i,a,t = clip [ρmin ,t ,1] 
+
+ τt√xi,a,t 
+
+. The scalar τt = λ−1/2 is selected to satisfy the budget equality, and strict convexity ensures a unique minimizer. At the extreme feasible budgets, the allocation is uniquely determined by the constraints and satisfies the clipping condition. Equalities (22) follow directly in the absence of clipping. 
+
+Appendix D. Proof of Corollary 4 
+
+Uniform inclusion probabilities ρunif  
+
+> i,a,t
+
+= Qt/dt are feasible for problem (21). Since categorical agent policies satisfy P 
+
+> (i,a )∈Ωt
+
+xi,a,t = |N t|, optimality Φt(ρ⋆t ) ≤ Φt(ρunif  
+
+> t
+
+) implies 
+
+X
+
+> (i,a )∈Ωt
+
+xi,a,t 
+
+ρ⋆i,a,t 
+
+≤ dt|N t|
+
+Qt
+
+(34) and the claim follows by replacing bound (34) into (18). 
+
+15
